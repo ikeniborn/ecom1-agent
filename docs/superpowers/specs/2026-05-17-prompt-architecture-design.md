@@ -1,3 +1,52 @@
+---
+review:
+  spec_hash: 244311d70d76d4db
+  last_run: "2026-05-17"
+  phases:
+    structure:   { status: passed }
+    coverage:    { status: passed }
+    clarity:     { status: passed }
+    consistency: { status: passed }
+  findings:
+    - id: F-001
+      phase: coverage
+      severity: CRITICAL
+      section: "## eval_log Entry Format (Updated)"
+      section_hash: c1760d43774503e9
+      text: >
+        Противоречие: пример eval_log содержит "task_type": "lookup" (legacy-тип),
+        но §data/prompts/ Audit требует удалить lookup и использовать только sql | compute | default.
+      verdict: fixed
+      verdict_at: "2026-05-17"
+    - id: F-002
+      phase: clarity
+      severity: WARNING
+      section: "## New: `agent/prompt_assembler.py`"
+      section_hash: 2cce32d21114cd25
+      text: >
+        "Убери нерелевантные для этой задачи правила" — нет явного критерия релевантности.
+      verdict: fixed
+      verdict_at: "2026-05-17"
+    - id: F-003
+      phase: clarity
+      severity: WARNING
+      section: "### `scripts/propose_optimizations.py`"
+      section_hash: df78f0d0f4442903
+      text: >
+        "Логирует изменения" — не указано куда (stdout, файл) и в каком формате.
+      verdict: fixed
+      verdict_at: "2026-05-17"
+    - id: F-004
+      phase: clarity
+      severity: WARNING
+      section: "### `agent/models.py`"
+      section_hash: 59347eaafc914829
+      text: >
+        "тест-генерация использует модель SDD" — MODEL_SDD не объявлен как env-переменная;
+        неясно, это существующая переменная или псевдоним для MODEL.
+      verdict: fixed
+      verdict_at: "2026-05-17"
+---
 # Prompt Architecture Redesign
 
 **Date:** 2026-05-17  
@@ -116,7 +165,7 @@ def assemble_prompt(
 - Дай все источники (выше)
 - LLM: объедини без дублирования, разреши противоречия в пользу высшего приоритета
 - Структура unified_context: `# LEARNED` → `# RULES` → `# SECURITY` → `# BASE`
-- Убери нерелевантные для этой задачи правила
+- Убери правила, у которых нет ни одного пересечения по entity type, operation type или domain-ключевым словам с `task_text`
 
 **Вызывается:** в начале каждого цикла pipeline loop (до SDD), передавая актуальный `learn_ctx`.
 
@@ -140,7 +189,7 @@ def assemble_prompt(
 - Schema gate: оставить (программная валидация column/table names)
 
 ### `agent/models.py`
-- Убрать `MODEL_TEST_GEN` (тест-генерация использует модель SDD)
+- Убрать `MODEL_TEST_GEN` (тест-генерация использует `MODEL`; отдельной модели для SDD нет)
 
 ### `agent/prompt.py`
 - Убрать `_TASK_BLOCKS` Python dict → заменить на `data/prompts/task_blocks.yaml`
@@ -153,7 +202,7 @@ def assemble_prompt(
   - `data/prompts/*.md` — обновить блоки
   - `data/rules/*.yaml` — добавить/обновить правила (с `verified: true`)
   - `data/security/*.yaml` — добавить/обновить gates (с `verified: true`)
-- Логирует изменения
+- Логирует изменения в stdout: `[propose] <action> <file>` (action: created | updated | skipped)
 - Убрать `verified: true` gate как блокировку (оптимизации применяются автоматически)
 
 ### `agent/evaluator.py`
@@ -205,7 +254,7 @@ default: [<новые блоки после аудита>]   # fallback
 {
   "task_id": "t42",
   "task_text": "...",
-  "task_type": "lookup",
+  "task_type": "sql",
   "outcome": "ok",
   "cycles": 2,
   "trace": [...],
@@ -226,7 +275,7 @@ default: [<новые блоки после аудита>]   # fallback
 
 ### Removed env vars
 - `TDD_ENABLED` — TDD всегда обязателен
-- `MODEL_TEST_GEN` — используется `MODEL_SDD` (или `MODEL`)
+- `MODEL_TEST_GEN` — TDD и SDD используют `MODEL` (основная модель)
 
 ### New env var
 - `MODEL_ASSEMBLER` — модель для сборки unified prompt (defaults to `MODEL`)

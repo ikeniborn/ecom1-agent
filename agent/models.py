@@ -16,6 +16,7 @@ class SddOutput(BaseModel):
     spec: str
     plan: list[PlanStep]
     agents_md_refs: list[str] = []
+    error: str | None = None
 
 
 class TestOutput(BaseModel):
