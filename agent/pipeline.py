@@ -698,6 +698,8 @@ def run_pipeline(
                 print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
 
             _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx, cycles_used, outcome, None)
+            if task_id and learn_ctx:
+                print(f"{CLI_BLUE}[pipeline] learn_ctx ({len(learn_ctx)} rules) moved to eval_log, data/learned/{task_id}.yaml cleared{CLI_CLR}")
             clear_learned_ctx(task_id)
             success = True
             break
