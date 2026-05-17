@@ -372,11 +372,14 @@ def run_pipeline(
                 sgr_trace.append(sgr_entry)
 
                 if not sdd_out:
-                    print(f"{CLI_RED}[pipeline] SDD LLM parse failed — running LEARN{CLI_CLR}")
-                    last_error = "SDD phase: failed to parse LLM output"
+                    raw_sdd = sgr_entry.get("output", "") if isinstance(sgr_entry.get("output"), str) else ""
+                    sdd_err_type = "semantic" if raw_sdd else "llm_fail"
+                    print(f"{CLI_RED}[pipeline] SDD LLM parse failed ({sdd_err_type})"
+                          f"{': ' + raw_sdd[:200] if raw_sdd else ''}{CLI_CLR}")
+                    last_error = f"SDD phase: failed to parse LLM output. Raw response: {raw_sdd[:400]}" if raw_sdd else "SDD phase: LLM returned empty response"
                     _run_learn(unified_context, model, cfg, task_text, [], last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
-                               error_type="llm_fail", cycle=cycle + 1,
+                               error_type=sdd_err_type, cycle=cycle + 1,
                                prior_learn_hashes=prior_learn_hashes, task_id=task_id)
                     continue
 
