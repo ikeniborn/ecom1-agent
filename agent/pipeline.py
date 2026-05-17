@@ -293,7 +293,7 @@ def _run_learn(
                 if task_id:
                     save_learned_ctx(task_id, learn_ctx)
                 print(f"{CLI_BLUE}[pipeline] LEARN: anchor={anchor!r}, vault rule added{CLI_CLR}")
-                return
+                return  # compacted_ctx ignored when anchor path taken
         compacted = learn_out.compacted_ctx
         if compacted and len(compacted) > 0 and all(isinstance(r, str) for r in compacted):
             learn_ctx[:] = compacted

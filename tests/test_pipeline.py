@@ -230,44 +230,38 @@ def test_learn_compaction_replaces_ctx(tmp_path):
 
 
 def test_learn_compaction_fallback_on_empty(tmp_path):
-    """When compacted_ctx is [], fall back to append."""
-    from agent.models import LearnOutput
+    """When compacted_ctx is [], _run_learn falls back to append."""
+    import json
+    from unittest.mock import patch
+    from agent.pipeline import _run_learn
 
     learn_ctx: list[str] = ["existing rule"]
-    learn_out = LearnOutput(
-        reasoning="r",
-        conclusion="c",
-        rule_content="new rule",
-        agents_md_anchor=None,
-        compacted_ctx=[],
-    )
+    learn_json = json.dumps({
+        "reasoning": "r", "conclusion": "c", "rule_content": "new rule",
+        "agents_md_anchor": None, "compacted_ctx": [],
+    })
 
-    compacted = learn_out.compacted_ctx
-    if compacted and len(compacted) > 0 and all(isinstance(r, str) for r in compacted):
-        learn_ctx[:] = compacted
-    else:
-        learn_ctx.append(learn_out.rule_content)
+    with patch("agent.pipeline.call_llm_raw", return_value=learn_json), \
+         patch("agent.pipeline.load_security_gates", return_value=[]):
+        _run_learn("ctx", "model", {}, "task", [], "err", [], learn_ctx, {})
 
     assert learn_ctx == ["existing rule", "new rule"]
 
 
 def test_learn_compaction_fallback_on_none(tmp_path):
-    """When compacted_ctx is None (field omitted), fall back to append."""
-    from agent.models import LearnOutput
+    """When compacted_ctx is None, _run_learn falls back to append."""
+    import json
+    from unittest.mock import patch
+    from agent.pipeline import _run_learn
 
     learn_ctx: list[str] = ["rule A", "rule B"]
-    learn_out = LearnOutput(
-        reasoning="r",
-        conclusion="c",
-        rule_content="rule C",
-        agents_md_anchor=None,
-        compacted_ctx=None,
-    )
+    learn_json = json.dumps({
+        "reasoning": "r", "conclusion": "c", "rule_content": "rule C",
+        "agents_md_anchor": None, "compacted_ctx": None,
+    })
 
-    compacted = learn_out.compacted_ctx
-    if compacted and len(compacted) > 0 and all(isinstance(r, str) for r in compacted):
-        learn_ctx[:] = compacted
-    else:
-        learn_ctx.append(learn_out.rule_content)
+    with patch("agent.pipeline.call_llm_raw", return_value=learn_json), \
+         patch("agent.pipeline.load_security_gates", return_value=[]):
+        _run_learn("ctx", "model", {}, "task", [], "err", [], learn_ctx, {})
 
     assert learn_ctx == ["rule A", "rule B", "rule C"]
