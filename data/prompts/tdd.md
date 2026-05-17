@@ -1,13 +1,13 @@
-# Test Generation Phase
+# TDD Phase
 
-You generate acceptance tests for a catalogue lookup task. Tests run as Python functions in an isolated subprocess (stdlib only).
+You generate acceptance tests for the pipeline task described in the SDD spec. Tests run as Python functions in an isolated subprocess (stdlib only).
 
 /no_think
 
 ## Input
 
-- `TASK` — the user's catalogue lookup question
-- `TASK_TYPE` — task type: `sql`, `read`, `compute`, or `exec`
+- `TASK` — the user's task text
+- `TASK_TYPE` — task type: `sql`, `compute`, or `default`
 - `SDD_SPEC` — the spec produced by SDD phase (what the final answer must contain)
 
 ## What to generate
@@ -72,12 +72,30 @@ msg = answer['message'].lower()
 assert 'cordless' in msg or 'drill' in msg, f'missing product type: {msg[:200]}'
 ~~~
 
+**BAD** — asserting non-OK outcome for attribute existence checks:
+~~~python
+assert answer['outcome'] != 'OUTCOME_OK'  # WRONG: product not found or attribute absent → still OUTCOME_OK with <NO>
+~~~
+
+**GOOD** — check message content for negative result:
+~~~python
+msg = answer['message'].lower()
+assert '<no>' in msg or 'not found' in msg or 'does not exist' in msg, f'expected negative result: {msg[:200]}'
+~~~
+
+**BAD** — asserting non-OK outcome when product may simply not have a feature:
+~~~python
+# Task: "Do you have X with GPS tracking?"  GPS doesn't exist → answer is OUTCOME_OK + <NO>
+assert answer['outcome'] != 'OUTCOME_OK'  # WRONG
+~~~
+
 Rules:
 - Never assert exact product names/brands copied from TASK text.
 - Use `.lower()` + individual keyword checks for product presence.
 - For COUNT tasks: check `<COUNT:` format, not the numeric value.
 - Include the actual value in the assertion message for easier debugging.
 - Never hardcode a specific column alias (e.g. `'count'`, `'total'`) in SQL header checks. Check that results are non-empty and the first data row contains a parseable integer, not that the header contains a specific word.
+- **Never use `outcome != 'OUTCOME_OK'` assertions.** Product not found, attribute absent, impossible specification → always `OUTCOME_OK` with `<NO>` in message. Assert message content, not non-OK outcome.
 
 ## Output format
 

@@ -8,11 +8,13 @@ You are formulating the final answer to a catalogue lookup task based on SQL que
 - Output PURE JSON only. The very first character must be `{`.
 - `reasoning` field MUST justify your answer from the SQL results — cite specific values.
 - `message` follows the format rules in AGENTS.MD (include <YES>/<NO> for yes/no questions).
+- **COUNT/aggregate tasks:** `message` MUST include the `<COUNT:n>` token AND at least one product category keyword from the task (kind/type name). Example: `"Found 3 Nut Bolt and Washer products. <COUNT:3>"` — never emit just the bare token alone.
 - `outcome` must accurately reflect task completion:
   - OUTCOME_OK — answered successfully (including "product not found" answers)
   - OUTCOME_NONE_CLARIFICATION — task too vague to answer even with SQL results
   - OUTCOME_NONE_UNSUPPORTED — query type not supported by the database
   - OUTCOME_DENIED_SECURITY — security violation detected
+- **Checkout tasks (submit/complete order):** Use `OUTCOME_NONE_UNSUPPORTED`. Include the basket file path in `grounding_refs` if it was retrieved. Message should explain that checkout submission is not available through this interface.
 - `grounding_refs` MUST list catalogue paths for every product in the results. Use values from AUTO_REFS exactly as shown — do NOT construct paths manually from `sku` or raw `path` column values.
 - `completed_steps` — laconic list of steps taken (2–5 items).
 
