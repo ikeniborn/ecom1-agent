@@ -4,15 +4,12 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from .llm import call_llm_raw
 from .json_extract import _extract_json_from_text
 from .models import PipelineEvalOutput
 from .prompt import load_prompt
 from . import knowledge_loader
-
-_EVAL_LOG = Path(__file__).parent.parent / "data" / "eval_log.jsonl"
 
 
 @dataclass
@@ -113,7 +110,6 @@ def _run(eval_input: EvalInput, model: str, cfg: dict) -> PipelineEvalOutput | N
     except Exception:
         return None
 
-    _append_log(eval_input, result)
     return result
 
 
@@ -136,25 +132,3 @@ def _build_eval_system(
     if guide:
         parts.append(guide)
     return "\n\n".join(parts)
-
-
-def _append_log(eval_input: EvalInput, result: PipelineEvalOutput) -> None:
-    entry = {
-        "task_id": eval_input.task_id,
-        "task_text": eval_input.task_text,
-        "task_type": eval_input.task_type,
-        "cycles": eval_input.cycles,
-        "final_outcome": eval_input.final_outcome,
-        "learn_ctx": eval_input.learn_ctx,
-        "score": result.score,
-        "best_cycle": result.best_cycle,
-        "best_answer": result.best_answer,
-        "comment": result.comment,
-        "prompt_optimization": result.prompt_optimization,
-        "rule_optimization": result.rule_optimization,
-        "security_optimization": result.security_optimization,
-        "reasoning": result.reasoning,
-    }
-    _EVAL_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with open(_EVAL_LOG, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")

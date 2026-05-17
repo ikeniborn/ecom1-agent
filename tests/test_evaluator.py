@@ -19,7 +19,7 @@ def _make_eval_input():
     )
 
 
-def test_run_evaluator_writes_to_log(tmp_path):
+def test_run_evaluator_returns_result(tmp_path):
     eval_json = json.dumps({
         "reasoning": "trace is good",
         "score": 9,
@@ -28,45 +28,31 @@ def test_run_evaluator_writes_to_log(tmp_path):
         "rule_optimization": [],
         "security_optimization": ["Add gate for UNION SELECT injection"],
     })
-    log_path = tmp_path / "eval_log.jsonl"
-    with patch("agent.evaluator.call_llm_raw", return_value=eval_json), \
-         patch("agent.evaluator._EVAL_LOG", log_path):
+    with patch("agent.evaluator.call_llm_raw", return_value=eval_json):
         result = run_evaluator(_make_eval_input(), model="test-model", cfg={})
 
     assert result is not None
     assert result.score == 9
     assert result.security_optimization == ["Add gate for UNION SELECT injection"]
-    line = json.loads(log_path.read_text().strip())
-    assert line["score"] == 9
-    assert line["task_text"] == "How many Lawn Mowers?"
-    assert line["final_outcome"] == "OUTCOME_OK"
-    assert line["security_optimization"] == ["Add gate for UNION SELECT injection"]
 
 
 def test_run_evaluator_llm_failure_returns_none(tmp_path):
     """LLM failure → returns None, no crash."""
-    log_path = tmp_path / "eval_log.jsonl"
-    with patch("agent.evaluator.call_llm_raw", return_value=None), \
-         patch("agent.evaluator._EVAL_LOG", log_path):
+    with patch("agent.evaluator.call_llm_raw", return_value=None):
         result = run_evaluator(_make_eval_input(), model="test-model", cfg={})
     assert result is None
-    assert not log_path.exists()
 
 
 def test_run_evaluator_parse_failure_returns_none(tmp_path):
     """Unparseable LLM response → returns None, no crash."""
-    log_path = tmp_path / "eval_log.jsonl"
-    with patch("agent.evaluator.call_llm_raw", return_value="not json at all"), \
-         patch("agent.evaluator._EVAL_LOG", log_path):
+    with patch("agent.evaluator.call_llm_raw", return_value="not json at all"):
         result = run_evaluator(_make_eval_input(), model="test-model", cfg={})
     assert result is None
 
 
 def test_run_evaluator_exception_returns_none(tmp_path):
     """Any exception in evaluator → returns None (fail-open)."""
-    log_path = tmp_path / "eval_log.jsonl"
-    with patch("agent.evaluator.call_llm_raw", side_effect=RuntimeError("network")), \
-         patch("agent.evaluator._EVAL_LOG", log_path):
+    with patch("agent.evaluator.call_llm_raw", side_effect=RuntimeError("network")):
         result = run_evaluator(_make_eval_input(), model="test-model", cfg={})
     assert result is None
 
@@ -114,12 +100,11 @@ def test_run_evaluator_loads_knowledge_into_system_prompt():
     assert "answer.md" in captured_system[0]
 
 
-def test_task_id_written_to_log(tmp_path):
+def test_task_id_preserved_in_result(tmp_path):
     eval_json = json.dumps({
         "reasoning": "ok", "score": 8, "comment": "fine",
         "prompt_optimization": [], "rule_optimization": [], "security_optimization": [],
     })
-    log_path = tmp_path / "eval_log.jsonl"
     inp = EvalInput(
         task_id="t07",
         task_text="How many products?",
@@ -128,11 +113,10 @@ def test_task_id_written_to_log(tmp_path):
         cycles=1,
         final_outcome="OUTCOME_OK",
     )
-    with patch("agent.evaluator.call_llm_raw", return_value=eval_json), \
-         patch("agent.evaluator._EVAL_LOG", log_path):
-        run_evaluator(inp, model="test-model", cfg={})
-    line = json.loads(log_path.read_text().strip())
-    assert line["task_id"] == "t07"
+    with patch("agent.evaluator.call_llm_raw", return_value=eval_json):
+        result = run_evaluator(inp, model="test-model", cfg={})
+    assert result is not None
+    assert result.score == 8
 
 
 def _make_eval_input_v2(**kwargs):
