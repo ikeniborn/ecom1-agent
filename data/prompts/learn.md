@@ -25,7 +25,7 @@ Given the task, the failed SQL queries, and the error or empty-result message, d
 **Wrong attribute key:** Use `SELECT DISTINCT key FROM product_properties WHERE product_sku IN (SELECT sku FROM products WHERE brand=X)` to discover actual key names before filtering.
 
 ## Output format (JSON only)
-{"reasoning": "<diagnosis of what went wrong>", "conclusion": "<one-sentence summary>", "rule_content": "<markdown rule text>", "agents_md_anchor": "<section_key > entry, or null>"}
+{"reasoning": "<diagnosis of what went wrong>", "conclusion": "<one-sentence summary>", "rule_content": "<markdown rule text>", "agents_md_anchor": "<section_key > entry, or null>", "compacted_ctx": ["<merged rule 1>", "<merged rule 2>"]}
 
 ## Discovery Fallback Rule
 
@@ -59,6 +59,21 @@ One-liner stubs are rejected. All three fields (`reasoning`, `conclusion`, `rule
 - **Bad:** `"only SELECT allowed"`, `"query returned empty"`.
 - **Good:** `"sec-003 blocked UNION injection"`, `"sql-007 missing EXISTS per attribute key"`, `"no existing rule — planner used path column instead of sku column for grounding_refs"`.
 - `rule_content` MUST cite at least one concrete identifier from the failed SQL (table, column, key, or literal value) — no placeholder stubs.
+
+## Context Compaction
+
+After producing `rule_content`, compact the accumulated `EXISTING_RULES` list:
+
+**If `EXISTING_RULES` is non-empty:**
+- Merge semantically similar rules into one canonical rule. **Semantically similar** = rules describing the same constraint or fix regardless of wording (e.g. two rules both requiring GROUP BY when aggregating → merge into one).
+- Keep distinct failure patterns separate. **Distinct** = rules addressing different SQL error types, different schema violations, or different validation failures (e.g. "missing GROUP BY" ≠ "wrong column name" → keep separate).
+- Generalize task-specific IDs: replace concrete numeric/string identifiers (`basket_115`, `cust_022`, any literal ID) with typed placeholders (`<basket_id>`, `<customer_id>`, `<id>`).
+- `compacted_ctx` MUST include the new `rule_content` already merged in.
+
+**If `EXISTING_RULES` is empty:**
+- `compacted_ctx` = `[rule_content]`
+
+Output `compacted_ctx` as a JSON array of strings.
 
 ## Learn Loop Cap
 
