@@ -258,6 +258,7 @@ def _run_learn(
     error_type: str = "semantic",
     cycle: int = 0,
     prior_learn_hashes: "set[str] | None" = None,
+    task_id: str = "",
 ) -> None:
     learn_model = _resolve_model_for_phase("learn", model)
     learn_guide = load_prompt("learn") or "# PHASE: learn"
@@ -289,9 +290,13 @@ def _run_learn(
                 anchor_lines = agents_md_index[anchor_section]
                 vault_rule = f"[{anchor_section}]\n" + "\n".join(anchor_lines)
                 learn_ctx.append(vault_rule)
+                if task_id:
+                    save_learned_ctx(task_id, learn_ctx)
                 print(f"{CLI_BLUE}[pipeline] LEARN: anchor={anchor!r}, vault rule added{CLI_CLR}")
                 return
         learn_ctx.append(learn_out.rule_content)
+        if task_id:
+            save_learned_ctx(task_id, learn_ctx)
         print(f"{CLI_BLUE}[pipeline] LEARN: rule added (total={len(learn_ctx)}){CLI_CLR}")
 
 
@@ -371,7 +376,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, [], last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="llm_fail", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes)
+                               prior_learn_hashes=prior_learn_hashes, task_id=task_id)
                     continue
 
                 # ── SDD ERROR CODES ────────────────────────────────────────────────
@@ -436,7 +441,7 @@ def run_pipeline(
                         _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                    sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="semantic", cycle=cycle + 1,
-                                   prior_learn_hashes=prior_learn_hashes)
+                                   prior_learn_hashes=prior_learn_hashes, task_id=task_id)
                         continue
 
                 # ── SECURITY CHECK (retry-loop guard only) ───────────────────────
@@ -457,7 +462,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="security", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes)
+                               prior_learn_hashes=prior_learn_hashes, task_id=task_id)
                     continue
 
                 # ── TDD (mandatory) ──────────────────────────────────────────────
@@ -469,7 +474,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, [], last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="llm_fail", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes)
+                               prior_learn_hashes=prior_learn_hashes, task_id=task_id)
                     continue
 
                 # ── EXECUTE (SQL steps) ───────────────────────────────────────────
@@ -564,7 +569,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="empty" if last_empty and not execute_error else "semantic",
-                               cycle=cycle + 1, prior_learn_hashes=prior_learn_hashes)
+                               cycle=cycle + 1, prior_learn_hashes=prior_learn_hashes, task_id=task_id)
                     continue
 
                 # ── SCHEMA REFRESH ────────────────────────────────────────────────
@@ -605,7 +610,7 @@ def run_pipeline(
                         _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                    sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="test_fail", cycle=cycle + 1,
-                                   prior_learn_hashes=prior_learn_hashes)
+                                   prior_learn_hashes=prior_learn_hashes, task_id=task_id)
                         continue
 
             # ── ANSWER ───────────────────────────────────────────────────────────
@@ -662,7 +667,7 @@ def run_pipeline(
                                    [s.query for s in (sdd_out.plan if sdd_out else []) if s.type == "sql" and s.query],
                                    last_error, sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="test_fail", cycle=cycle + 1,
-                                   prior_learn_hashes=prior_learn_hashes)
+                                   prior_learn_hashes=prior_learn_hashes, task_id=task_id)
                         continue
 
             # ── SUCCESS ───────────────────────────────────────────────────────────
@@ -706,9 +711,9 @@ def run_pipeline(
                 ))
             except Exception as e:
                 print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
-            if task_id and learn_ctx:
-                save_learned_ctx(task_id, learn_ctx)
-                print(f"{CLI_BLUE}[pipeline] learn_ctx persisted to data/learned/{task_id}.yaml{CLI_CLR}")
+            if task_id:
+                clear_learned_ctx(task_id)
+                print(f"{CLI_BLUE}[pipeline] learn_ctx cleared from data/learned/{task_id}.yaml{CLI_CLR}")
 
     except Exception:
         print(f"{CLI_RED}[pipeline] UNHANDLED: {traceback.format_exc()}{CLI_CLR}")
@@ -720,6 +725,8 @@ def run_pipeline(
             ))
         except Exception as e:
             print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
+        if task_id:
+            clear_learned_ctx(task_id)
 
     # ── EVALUATOR: only on success ────────────────────────────────────────────
     eval_thread: threading.Thread | None = None
