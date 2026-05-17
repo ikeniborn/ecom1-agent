@@ -330,13 +330,13 @@ def test_task_type_read():
     from agent.prephase import _determine_task_type, PrephaseResult
     pre = PrephaseResult()
     result = _determine_task_type("read the file /proc/stores/S01.json", pre)
-    assert result == "read"
+    assert result == "sql"  # "read" type dropped; defaults to "sql"
 
 
 def test_prephase_result_has_task_type():
     from agent.prephase import PrephaseResult
-    pre = PrephaseResult(task_type="read")
-    assert pre.task_type == "read"
+    pre = PrephaseResult(task_type="compute")
+    assert pre.task_type == "compute"
 
 
 def test_prephase_result_default_task_type():

@@ -15,7 +15,6 @@ from .llm import CLI_BLUE, CLI_CLR, CLI_GREEN, CLI_YELLOW
 
 _LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 _SCHEMA_TABLES = ["products", "product_properties", "inventory", "kinds", "carts", "cart_items"]
-_READ_KEYWORDS = ("read the file", "read file", "/proc/", ".json", ".txt", ".csv")
 _COMPUTE_KEYWORDS = ("calculate", "compute", "sum of", "average of")
 
 
@@ -149,10 +148,8 @@ def merge_schema_from_sqlite_results(
 
 
 def _determine_task_type(task_text: str, pre: "PrephaseResult") -> str:
-    """Heuristic task_type detection. Default 'sql' for backward compat."""
+    """Detect task type. Returns 'compute' or 'sql' (default fallback)."""
     lower = task_text.lower()
-    if any(kw in lower for kw in _READ_KEYWORDS):
-        return "read"
     if any(kw in lower for kw in _COMPUTE_KEYWORDS) and not pre.schema_digest.get("tables"):
         return "compute"
     return "sql"
