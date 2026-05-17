@@ -1,12 +1,14 @@
-"""System prompt builder — loads blocks from data/prompts/*.md."""
+"""Prompt loading utilities."""
 from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 _PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
+_CONFIG_DIR = Path(__file__).parent.parent / "data" / "config"
 
 _BLOCKS: dict[str, str] = {}
-_warned_missing_blocks: set[str] = set()
 
 
 def _load_all() -> None:
@@ -24,26 +26,13 @@ def load_prompt(name: str) -> str:
     return _BLOCKS.get(name, "")
 
 
-_TASK_BLOCKS: dict[str, list[str]] = {
-    "lookup":   ["core", "lookup", "catalogue"],
-    "temporal": ["core", "lookup"],
-    "capture":  ["core"],
-    "crm":      ["core", "lookup"],
-    "distill":  ["core", "lookup"],
-    "preject":  ["core"],
-    "default":  ["core", "lookup", "catalogue"],
-}
-
-
-def build_system_prompt(task_type: str) -> str:
-    """Assemble system prompt from file-based blocks for the given task type."""
-    if task_type not in _TASK_BLOCKS and task_type not in _warned_missing_blocks:
-        _warned_missing_blocks.add(task_type)
-        print(f"[PROMPT] task_type={task_type!r} has no _TASK_BLOCKS entry — using 'default'")
-    block_names = _TASK_BLOCKS.get(task_type, _TASK_BLOCKS["default"])
-    return "\n".join(load_prompt(name) for name in block_names)
-
-
-# Backward-compatibility aliases
-system_prompt = build_system_prompt("default")
-SYSTEM_PROMPT = build_system_prompt("default")
+def load_task_blocks(task_type: str) -> list[str]:
+    """Return list of prompt block stems for given task_type from data/config/task_blocks.yaml."""
+    cfg_file = _CONFIG_DIR / "task_blocks.yaml"
+    if not cfg_file.exists():
+        return []
+    try:
+        cfg = yaml.safe_load(cfg_file.read_text(encoding="utf-8"))
+        return list(cfg.get(task_type, cfg.get("default", [])))
+    except Exception:
+        return []
