@@ -24,7 +24,7 @@ from .models import SddOutput, TestOutput, LearnOutput, AnswerOutput
 from .test_runner import run_tests
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest, merge_schema_from_sqlite_results
 from .prompt import load_prompt
-from .prompt_assembler import assemble_prompt, save_learned_ctx, clear_learned_ctx
+from .prompt_assembler import assemble_prompt, load_learned_ctx, save_learned_ctx, clear_learned_ctx
 from .rules_loader import RulesLoader, _RULES_DIR
 from .schema_gate import check_schema_compliance
 from .sql_security import (
@@ -314,7 +314,8 @@ def run_pipeline(
     """SDD-based pipeline. Returns (stats dict, eval Thread or None)."""
     rules_loader = _get_rules_loader()
     security_gates = _get_security_gates() + (injected_security_gates or [])
-    learn_ctx: list[str] = list(injected_session_rules or [])
+    _persisted = load_learned_ctx(task_id) if task_id else []
+    learn_ctx: list[str] = list(dict.fromkeys(_persisted + list(injected_session_rules or [])))
     sgr_trace: list[dict] = []
     total_in_tok = 0
     total_out_tok = 0
