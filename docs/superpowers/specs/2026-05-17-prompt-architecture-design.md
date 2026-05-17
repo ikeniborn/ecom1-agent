@@ -104,7 +104,7 @@ def assemble_prompt(
 | `learn_ctx` (in-memory, текущая сессия) | 1 (высший) | Как добавлены (новейшие — последние, наивысший приоритет) |
 | `data/rules/*.yaml` (`verified: true`) | 2 | По имени файла |
 | `data/security/*.yaml` (`verified: true`) | 3 | ID + message (краткий) |
-| `data/prompts/` базовые блоки + task-type блоки | 4 | По `task_blocks.yaml` |
+| `data/prompts/` базовые блоки + task-type блоки | 4 | По `data/config/task_blocks.yaml` |
 | `prephase_result.schema_digest` + `db_schema` | metadata | Включается в секцию `# SCHEMA` unified_context |
 | `prephase_result.agents_md_index` (vault rules) | metadata | Включается в секцию `# VAULT` unified_context |
 
@@ -168,7 +168,7 @@ def assemble_prompt(
    - Проверить `learn.md`, `answer.md`, `pipeline_evaluator.md` — актуализировать
    - Удалить дублирующие/устаревшие секции
 
-3. **`data/prompts/task_blocks.yaml`** — новый файл, заменяет `_TASK_BLOCKS` dict в `prompt.py`:
+3. **`data/config/task_blocks.yaml`** — новый файл, заменяет `_TASK_BLOCKS` dict в `prompt.py`:
 ```yaml
 lookup:   [core, lookup, catalogue]
 temporal: [core, lookup]
@@ -226,7 +226,7 @@ default:  [core, lookup, catalogue]
 | Action | File |
 |--------|------|
 | CREATE | `agent/prompt_assembler.py` |
-| CREATE | `data/prompts/task_blocks.yaml` |
+| CREATE | `data/config/task_blocks.yaml` |
 | CREATE | `data/prompts/assembler.md` |
 | RENAME | `data/prompts/test_gen.md` → `data/prompts/tdd.md` |
 | MODIFY | `agent/pipeline.py` |
