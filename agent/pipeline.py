@@ -657,7 +657,7 @@ def run_pipeline(
                 if ans_warns:
                     print(f"{CLI_YELLOW}[VERIFY_ANSWER WARNING] answer: {ans_warns}{CLI_CLR}")
                 if not ans_passed:
-                    print(f"{CLI_YELLOW}[pipeline] VERIFY_ANSWER failed: {ans_err[:80]}{CLI_CLR}")
+                    print(f"{CLI_YELLOW}[pipeline] VERIFY_ANSWER failed: {ans_err[:300]}{CLI_CLR}")
                     last_error = ans_err[:500]
                     consecutive_answer_test_fails += 1
                     if consecutive_answer_test_fails >= 3:
@@ -712,9 +712,8 @@ def run_pipeline(
                 ))
             except Exception as e:
                 print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
-            if task_id:
-                clear_learned_ctx(task_id)
-                print(f"{CLI_BLUE}[pipeline] learn_ctx cleared from data/learned/{task_id}.yaml{CLI_CLR}")
+            if task_id and learn_ctx:
+                print(f"{CLI_BLUE}[pipeline] learn_ctx preserved in data/learned/{task_id}.yaml (total={len(learn_ctx)}){CLI_CLR}")
 
     except Exception:
         print(f"{CLI_RED}[pipeline] UNHANDLED: {traceback.format_exc()}{CLI_CLR}")
@@ -726,8 +725,6 @@ def run_pipeline(
             ))
         except Exception as e:
             print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
-        if task_id:
-            clear_learned_ctx(task_id)
 
     # ── EVALUATOR: only on success ────────────────────────────────────────────
     eval_thread: threading.Thread | None = None
