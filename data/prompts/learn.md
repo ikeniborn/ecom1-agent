@@ -60,6 +60,15 @@ One-liner stubs are rejected. All three fields (`reasoning`, `conclusion`, `rule
 - **Good:** `"sec-003 blocked UNION injection"`, `"sql-007 missing EXISTS per attribute key"`, `"no existing rule — planner used path column instead of sku column for grounding_refs"`.
 - `rule_content` MUST cite at least one concrete identifier from the failed SQL (table, column, key, or literal value) — no placeholder stubs.
 
+## Learn Loop Cap
+
+If the current failure topic (determined by keyword overlap with existing entries in `learn_ctx`) already appears **≥2 times** in `learn_ctx`, do NOT produce another rule. Instead:
+
+- Set `rule_content` to: `"Loop cap reached — topic already in learn_ctx >=2 times: <topic keyword>"`
+- Set `conclusion` to name the repeated topic explicitly.
+
+The pipeline will skip further LEARN cycles for this topic and proceed to answer with available data.
+
 ## Loop Prevention
 
 If the new corrected query would be identical to the failed query (whitespace/case-insensitive), set `rule_content` to explicitly state: "No structural fix available — escalate to clarification." Set `conclusion` to name the blocking constraint. Do NOT produce a trivially different cosmetic variant.

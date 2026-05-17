@@ -25,6 +25,8 @@ You are formulating the final answer to a catalogue lookup task based on SQL que
 
 `OUTCOME_NONE_CLARIFICATION` is valid ONLY when the task text itself is genuinely ambiguous and no SQL could resolve it. If SQL results exist — even discovery-only (model list, key list) — use `OUTCOME_OK`. If value verification was not completed, state in `message` what was and was not confirmed. Empty `grounding_refs` with `OUTCOME_NONE_CLARIFICATION` is a bug, not a valid state.
 
+Empty SQL result caused by **schema-mismatch** (unknown column, wrong table name, absent key in `product_properties`) is NOT task ambiguity. Correct outcome: `OUTCOME_OK` with a message stating what was searched and that no matching records exist. `OUTCOME_NONE_CLARIFICATION` is forbidden for unambiguous tasks that returned empty SQL results due to schema or data absence.
+
 ## Grounding Refs: Mandatory Rules
 
 - YES/found answers: `grounding_refs` MUST contain ≥1 SKU from SQL results.
