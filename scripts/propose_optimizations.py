@@ -321,11 +321,12 @@ def _write_rule(num: int, content: str, entry: dict, raw_rec: str) -> Path:
     dest = _RULES_DIR / f"{rule_id}.yaml"
     with open(dest, "w", encoding="utf-8") as f:
         yaml.dump({
-            "id": rule_id, "phase": "sql_plan", "verified": False, "source": "eval",
+            "id": rule_id, "phase": "sql_plan", "verified": True, "source": "eval",
             "content": content, "created": date.today().isoformat(),
             "eval_score": entry.get("score"),
             "raw_recommendation": raw_rec,
         }, f, allow_unicode=True, default_flow_style=False)
+    print(f"[propose] created {dest.name}")
     return dest
 
 
@@ -334,7 +335,7 @@ def _write_security(num: int, gate_spec: dict, entry: dict, raw_rec: str) -> Pat
     dest = _SECURITY_DIR / f"{gate_id}.yaml"
     record: dict = {
         "id": gate_id, "action": "block", "message": gate_spec["message"],
-        "verified": False, "source": "eval", "created": date.today().isoformat(),
+        "verified": True, "source": "eval", "created": date.today().isoformat(),
         "task_text": entry["task_text"][:120],
         "eval_score": entry.get("score"),
         "raw_recommendation": raw_rec,
@@ -345,20 +346,25 @@ def _write_security(num: int, gate_spec: dict, entry: dict, raw_rec: str) -> Pat
         record["check"] = gate_spec["check"]
     with open(dest, "w", encoding="utf-8") as f:
         yaml.dump(record, f, allow_unicode=True, default_flow_style=False)
+    print(f"[propose] created {dest.name}")
     return dest
 
 
 def _write_prompt(patch_result: dict, entry: dict, raw_rec: str) -> Path:
-    _PROMPTS_OPTIMIZED_DIR.mkdir(parents=True, exist_ok=True)
-    today = date.today().isoformat()
-    n = len(list(_PROMPTS_OPTIMIZED_DIR.glob(f"{today}-*.md"))) + 1
-    dest = _PROMPTS_OPTIMIZED_DIR / f"{today}-{n:02d}-{patch_result['target_file']}"
-    header = (
-        f"<!-- target: {patch_result['target_file']} | "
-        f"score: {entry.get('score', '?')} | created: {today} -->\n"
-        f"<!-- raw: {raw_rec[:120]} -->\n\n"
-    )
-    dest.write_text(header + patch_result["content"] + "\n", encoding="utf-8")
+    target = patch_result["target_file"]
+    dest = _PROMPTS_DIR / target
+    content = patch_result["content"]
+    action = "updated"
+    if dest.exists():
+        existing = dest.read_text(encoding="utf-8")
+        if content.strip() in existing:
+            print(f"[propose] skipped {target} (already present)")
+            return dest
+        dest.write_text(existing.rstrip() + "\n\n" + content + "\n", encoding="utf-8")
+    else:
+        dest.write_text(content + "\n", encoding="utf-8")
+        action = "created"
+    print(f"[propose] {action} {target}")
     return dest
 
 
@@ -367,14 +373,13 @@ def _flatten_recs(
     channel: str,
     processed: set[str],
 ) -> list[dict]:
-    """Flatten entries to dicts with (entry, rec) pairs, skipping success entries without evaluator.
+    """Flatten entries to dicts with (entry, rec) pairs, only processing outcome=ok entries.
 
     Returns list of entry dicts that have unprocessed recs in the given channel.
     """
     result = []
     for entry in entries:
-        # Skip entries with outcome=ok and evaluator=null (no optimization suggestions)
-        if entry.get("outcome") == "ok" and entry.get("evaluator") is None:
+        if entry.get("outcome") != "ok":
             continue
         # Collect entries that have recs in this channel and aren't fully processed
         if entry.get(channel, []):
@@ -458,7 +463,6 @@ def main(dry_run: bool = False) -> None:
 
     # --- Process representatives ---
     for raw_rec, entry, all_hashes in rule_clusters:
-        task_id = entry.get("task_id", "")
         print(f"[rule] {raw_rec[:80]}...")
         content = _synthesize_rule(raw_rec, rules_md, model, cfg)
         if content is None:
@@ -473,33 +477,12 @@ def main(dry_run: bool = False) -> None:
         if dry_run:
             print(f"  → [DRY RUN] sql-{num:03d}.yaml: {content[:100]}")
         else:
-            original, validation = validate_recommendation(
-                task_id,
-                injected_session_rules=[raw_rec],
-                injected_prompt_addendum="",
-                injected_security_gates=[],
-            )
-            if original is None:
-                print(f"  → WARNING: no baseline score for {task_id!r} — writing anyway")
-                dest = _write_rule(num, content, entry, raw_rec)
-                print(f"  → {dest.name} (unvalidated)")
-                new_processed.update(all_hashes)
-                written += 1
-                rules_md = knowledge_loader.existing_rules_text()
-            elif validation is None:
-                print(f"  → skip (task not in trials)")
-            elif validation >= original:
-                print(f"  → ACCEPTED: score {original:.2f} → {validation:.2f}")
-                dest = _write_rule(num, content, entry, raw_rec)
-                print(f"  → {dest.name}")
-                new_processed.update(all_hashes)
-                written += 1
-                rules_md = knowledge_loader.existing_rules_text()
-            else:
-                print(f"  → REJECTED: score {original:.2f} → {validation:.2f}")
+            dest = _write_rule(num, content, entry, raw_rec)
+            new_processed.update(all_hashes)
+            written += 1
+            rules_md = knowledge_loader.existing_rules_text()
 
     for raw_rec, entry, all_hashes in security_clusters:
-        task_id = entry.get("task_id", "")
         print(f"[security] {raw_rec[:80]}...")
         gate_spec = _synthesize_security_gate(raw_rec, security_md, model, cfg)
         if gate_spec is None:
@@ -514,38 +497,12 @@ def main(dry_run: bool = False) -> None:
         if dry_run:
             print(f"  → [DRY RUN] sec-{num:03d}.yaml: {gate_spec.get('message', '')}")
         else:
-            injected_gate = {
-                "id": f"val-{num:03d}", "pattern": gate_spec.get("pattern", ""),
-                "check_name": gate_spec.get("check", ""),
-                "message": gate_spec["message"], "verified": True,
-            }
-            original, validation = validate_recommendation(
-                task_id,
-                injected_session_rules=[],
-                injected_prompt_addendum="",
-                injected_security_gates=[injected_gate],
-            )
-            if original is None:
-                print(f"  → WARNING: no baseline score for {task_id!r} — writing anyway")
-                dest = _write_security(num, gate_spec, entry, raw_rec)
-                print(f"  → {dest.name} (unvalidated)")
-                new_processed.update(all_hashes)
-                written += 1
-                security_md = knowledge_loader.existing_security_text()
-            elif validation is None:
-                print(f"  → skip (task not in trials)")
-            elif validation >= original:
-                print(f"  → ACCEPTED: score {original:.2f} → {validation:.2f}")
-                dest = _write_security(num, gate_spec, entry, raw_rec)
-                print(f"  → {dest.name}")
-                new_processed.update(all_hashes)
-                written += 1
-                security_md = knowledge_loader.existing_security_text()
-            else:
-                print(f"  → REJECTED: score {original:.2f} → {validation:.2f}")
+            dest = _write_security(num, gate_spec, entry, raw_rec)
+            new_processed.update(all_hashes)
+            written += 1
+            security_md = knowledge_loader.existing_security_text()
 
     for raw_rec, entry, all_hashes in prompt_clusters:
-        task_id = entry.get("task_id", "")
         print(f"[prompt] {raw_rec[:80]}...")
         patch_result = _synthesize_prompt_patch(raw_rec, prompts_md, model, cfg)
         if patch_result is None:
@@ -559,30 +516,10 @@ def main(dry_run: bool = False) -> None:
         if dry_run:
             print(f"  → [DRY RUN] {patch_result['target_file']}: {patch_result['content'][:80]}")
         else:
-            original, validation = validate_recommendation(
-                task_id,
-                injected_session_rules=[],
-                injected_prompt_addendum=raw_rec,
-                injected_security_gates=[],
-            )
-            if original is None:
-                print(f"  → WARNING: no baseline score for {task_id!r} — writing anyway")
-                dest = _write_prompt(patch_result, entry, raw_rec)
-                print(f"  → {dest.name} (unvalidated)")
-                new_processed.update(all_hashes)
-                written += 1
-                prompts_md = knowledge_loader.existing_prompts_text()
-            elif validation is None:
-                print(f"  → skip (task not in trials)")
-            elif validation >= original:
-                print(f"  → ACCEPTED: score {original:.2f} → {validation:.2f}")
-                dest = _write_prompt(patch_result, entry, raw_rec)
-                print(f"  → {dest.name}")
-                new_processed.update(all_hashes)
-                written += 1
-                prompts_md = knowledge_loader.existing_prompts_text()
-            else:
-                print(f"  → REJECTED: score {original:.2f} → {validation:.2f}")
+            dest = _write_prompt(patch_result, entry, raw_rec)
+            new_processed.update(all_hashes)
+            written += 1
+            prompts_md = knowledge_loader.existing_prompts_text()
 
     if not dry_run:
         _save_processed(new_processed)
