@@ -174,18 +174,22 @@ def assemble_prompt(
    - `test_gen.md` → переименовать в `tdd.md`
    - Обновить содержимое `sdd.md` (убрать ссылки на SECURITY CHECK, обновить фазы)
    - Проверить `learn.md`, `answer.md`, `pipeline_evaluator.md` — актуализировать
-   - Удалить дублирующие/устаревшие секции
+   - **`core.md`, `lookup.md`, `catalogue.md`** — LEGACY (написаны для tool-calling loop/cc_client, содержат инструкции про `exec`/`read`/`report_completion` инструменты старого цикла). Нужно:
+     - Извлечь релевантное содержимое (SQL правила, grounding_refs, catalogue стратегия) и перенести в `sdd.md` / `answer.md`
+     - Удалить tool-specific инструкции
+     - Решить: оставить как domain-context блоки или удалить полностью
+   - Удалить дублирующие/устаревшие секции во всех блоках
 
 3. **`data/config/task_blocks.yaml`** — новый файл, заменяет `_TASK_BLOCKS` dict в `prompt.py`:
 ```yaml
-lookup:   [core, lookup, catalogue]
-temporal: [core, lookup]
-capture:  [core]
-crm:      [core, lookup]
-distill:  [core, lookup]
-preject:  [core]
-default:  [core, lookup, catalogue]
+# exec/read — шаги внутри SDD PLAN, не task_type
+sql:     [core, lookup, catalogue]   # запросы к БД (основной тип)
+compute: [core]                      # вычисления без БД
+default: [core, lookup, catalogue]   # fallback
 ```
+
+Старые типы (`lookup`, `temporal`, `capture`, `crm`, `distill`, `preject`) — удалить из кода и конфига.
+`_determine_task_type()` в `prephase.py` актуализировать: возвращает `sql` | `compute` | `default`.
 
 4. **Добавить `data/prompts/assembler.md`** — системный промт для LLM-ассемблера (инструкции по сборке unified_context).
 
