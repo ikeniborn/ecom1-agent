@@ -30,6 +30,7 @@ class LearnOutput(BaseModel):
     conclusion: str
     rule_content: str
     agents_md_anchor: str | None = None
+    compacted_ctx: list[str] | None = None
 
 
 class AnswerOutput(BaseModel):
