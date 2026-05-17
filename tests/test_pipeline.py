@@ -4,7 +4,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from agent.pipeline import run_pipeline
 from agent.prephase import PrephaseResult
+from agent.prompt_assembler import AssembledPrompt
 from pathlib import Path
+
+
+def _mock_assemble(*args, **kwargs):
+    return AssembledPrompt(unified_context="mocked-unified-context")
 
 
 def _make_pre(agents_md="AGENTS", db_schema="CREATE TABLE products(id INT, sku TEXT, path TEXT)"):
@@ -65,6 +70,7 @@ def test_happy_path(tmp_path):
     call_iter = iter(llm_seq)
 
     with patch("agent.pipeline.call_llm_raw", side_effect=lambda *a, **kw: next(call_iter)), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline._RULES_DIR", rules_dir), \
          patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
@@ -76,8 +82,8 @@ def test_happy_path(tmp_path):
     assert _thread is None
 
 
-def test_security_fail_triggers_learn_then_retry(tmp_path):
-    """SDD → SECURITY blocked → LEARN → retry SDD → success."""
+def test_schema_fail_triggers_learn_then_retry(tmp_path):
+    """SDD → SCHEMA blocked → LEARN → retry SDD → success."""
     vm = MagicMock()
     vm.exec.return_value = _make_exec_result('[{"count": 3}]')
     pre = _make_pre()
@@ -87,7 +93,7 @@ def test_security_fail_triggers_learn_then_retry(tmp_path):
     learn_json = json.dumps({
         "reasoning": "r",
         "conclusion": "c",
-        "rule_content": "do not use DROP",
+        "rule_content": "use correct column name",
         "agents_md_anchor": None,
     })
 
@@ -95,13 +101,13 @@ def test_security_fail_triggers_learn_then_retry(tmp_path):
     call_iter = iter(call_seq)
 
     with patch("agent.pipeline.call_llm_raw", side_effect=lambda *a, **kw: next(call_iter)), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline._RULES_DIR", rules_dir), \
          patch("agent.pipeline.load_security_gates", return_value=[]), \
-         patch("agent.pipeline.check_sql_queries", side_effect=[
-             "SECURITY: blocked",  # cycle 1 fail
-             None,                 # cycle 2 pass
+         patch("agent.pipeline.check_schema_compliance", side_effect=[
+             "SCHEMA: unknown column bad_col",  # cycle 1 fail
+             None,                               # cycle 2 pass
          ]), \
-         patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         stats, _ = run_pipeline(vm, "model", "task", pre, {})
 
@@ -134,10 +140,10 @@ def test_all_cycles_exhausted(tmp_path):
     call_iter = iter(call_seq)
 
     with patch("agent.pipeline.call_llm_raw", side_effect=lambda *a, **kw: next(call_iter)), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline._RULES_DIR", rules_dir), \
          patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
-         patch("agent.pipeline.check_sql_queries", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(False, "test failed", [])):
         stats, eval_thread = run_pipeline(vm, "model", "task", pre, {}, task_id="t01")
 
@@ -164,18 +170,18 @@ def test_learn_ctx_accumulates(tmp_path):
         if len(captured_user_msgs) == 3:
             return _sdd_json()  # SDD cycle 2
         if len(captured_user_msgs) == 4:
-            return _test_gen_json()  # TEST_GEN
+            return _test_gen_json()  # TDD
         if len(captured_user_msgs) == 5:
             return _answer_json()  # ANSWER
         return None
 
     with patch("agent.pipeline.call_llm_raw", side_effect=fake_llm), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline._RULES_DIR", rules_dir), \
          patch("agent.pipeline.load_security_gates", return_value=[]), \
-         patch("agent.pipeline.check_schema_compliance", return_value=None), \
-         patch("agent.pipeline.check_sql_queries", side_effect=[
-             "blocked",  # cycle 1
-             None,       # cycle 2
+         patch("agent.pipeline.check_schema_compliance", side_effect=[
+             "SCHEMA: bad column",  # cycle 1 blocked
+             None,                  # cycle 2 pass
          ]), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         stats, _ = run_pipeline(vm, "model", "task", pre, {})

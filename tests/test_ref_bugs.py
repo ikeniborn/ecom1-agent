@@ -4,6 +4,11 @@ from unittest.mock import MagicMock, patch
 from agent.json_extract import _obj_mutation_tool
 from agent.pipeline import _build_answer_user_msg, _extract_sku_refs, run_pipeline
 from agent.prephase import PrephaseResult
+from agent.prompt_assembler import AssembledPrompt
+
+
+def _mock_assemble(*args, **kwargs):
+    return AssembledPrompt(unified_context="mocked-unified-context")
 
 
 def _make_pre():
@@ -107,6 +112,7 @@ def test_run_pipeline_unhandled_exception_calls_vm_answer_once(tmp_path):
     rules_dir.mkdir()
 
     with patch("agent.pipeline._call_llm_phase", side_effect=AttributeError("str has no .get")), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline._RULES_DIR", rules_dir), \
          patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.run_resolve", return_value={}):

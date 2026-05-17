@@ -1,4 +1,4 @@
-"""SDD-based pipeline: PREPHASE → SDD → TEST_GEN → EXECUTE → VERIFY → ANSWER → VERIFY_ANSWER."""
+"""SDD-based pipeline: PREPHASE → SDD → TDD → EXECUTE → VERIFY → ANSWER → VERIFY_ANSWER."""
 from __future__ import annotations
 
 import json
@@ -13,7 +13,7 @@ from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
 
 from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
-from bitgn.vm.ecom.ecom_pb2 import AnswerRequest, ExecRequest
+from bitgn.vm.ecom.ecom_pb2 import AnswerRequest, ExecRequest, ReadRequest
 
 from .llm import (
     call_llm_raw, _resolve_model_for_phase, OUTCOME_BY_NAME,
@@ -24,11 +24,12 @@ from .models import SddOutput, TestOutput, LearnOutput, AnswerOutput
 from .test_runner import run_tests
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest, merge_schema_from_sqlite_results
 from .prompt import load_prompt
+from .prompt_assembler import assemble_prompt, save_learned_ctx, clear_learned_ctx
 from .rules_loader import RulesLoader, _RULES_DIR
 from .schema_gate import check_schema_compliance
 from .sql_security import (
-    check_sql_queries, check_path_access, load_security_gates,
-    check_where_literals, check_grounding_refs, check_learn_output,
+    check_path_access, load_security_gates,
+    check_grounding_refs, check_learn_output,
     check_retry_loop, make_json_hash,
 )
 from .trace import get_trace
@@ -153,72 +154,7 @@ def _call_llm_phase(
     return None, sgr_entry, tok_info
 
 
-def _gates_summary(gates: list[dict]) -> str:
-    return "\n".join(f"- [{g['id']}] {g.get('message', '')}" for g in gates)
-
-
 _format_schema_digest = _fmt_schema_digest
-
-
-def _relevant_agents_sections(agents_md_index: dict, task_text: str) -> dict[str, list[str]]:
-    task_words = {w.lower() for w in task_text.split() if len(w) > 3}
-    relevant = {}
-    for section, lines in agents_md_index.items():
-        section_text = (" ".join(lines) + " " + section).lower()
-        if any(w in section_text for w in task_words):
-            relevant[section] = lines
-    return relevant
-
-
-def _build_sdd_system(
-    pre: PrephaseResult,
-    rules_loader: RulesLoader,
-    security_gates: list[dict],
-    task_text: str = "",
-    injected_prompt_addendum: str = "",
-) -> list[dict]:
-    blocks: list[dict] = []
-
-    if pre.agent_id or pre.current_date:
-        ctx_lines = []
-        if pre.current_date:
-            ctx_lines.append(f"date: {pre.current_date}")
-        if pre.agent_id:
-            ctx_lines.append(f"customer_id: {pre.agent_id}")
-        blocks.append({"type": "text", "text": "# AGENT CONTEXT\n" + "\n".join(ctx_lines)})
-
-    if pre.agents_md_index and task_text:
-        relevant = _relevant_agents_sections(pre.agents_md_index, task_text)
-        index_line = "Section index: " + ", ".join(pre.agents_md_index.keys())
-        if relevant:
-            section_blocks = "\n\n".join(
-                f"### {k}\n" + "\n".join(lines) for k, lines in relevant.items()
-            )
-            blocks.append({"type": "text", "text": f"# VAULT RULES\n{index_line}\n\n{section_blocks}"})
-        elif pre.agents_md_content:
-            blocks.append({"type": "text", "text": f"# VAULT RULES\n{pre.agents_md_content}"})
-    elif pre.agents_md_content:
-        blocks.append({"type": "text", "text": f"# VAULT RULES\n{pre.agents_md_content}"})
-
-    rules_md = rules_loader.get_rules_markdown(phase="sql_plan", verified_only=True)
-    if rules_md:
-        blocks.append({"type": "text", "text": f"# PIPELINE RULES\n{rules_md}"})
-
-    if security_gates:
-        blocks.append({"type": "text", "text": f"# SECURITY GATES\n{_gates_summary(security_gates)}"})
-
-    if pre.schema_digest:
-        blocks.append({"type": "text", "text": f"# SCHEMA DIGEST\n{_format_schema_digest(pre.schema_digest)}"})
-
-    if pre.db_schema:
-        blocks.append({"type": "text", "text": f"# DATABASE SCHEMA\n{pre.db_schema}"})
-
-    guide = load_prompt("sdd")
-    guide_text = guide or "# PHASE: sdd\nGenerate spec and plan as JSON."
-    if injected_prompt_addendum:
-        guide_text += f"\n\n# INJECTED OPTIMIZATION\n{injected_prompt_addendum}"
-    blocks.append({"type": "text", "text": guide_text, "cache_control": {"type": "ephemeral"}})
-    return blocks
 
 
 def _build_sdd_user_msg(task_text: str, task_type: str, learn_ctx: list[str], last_error: str) -> str:
@@ -248,57 +184,6 @@ def _build_answer_user_msg(task_text: str, sql_results: list[str], auto_refs: li
         return base
     refs_block = "\n".join(auto_refs)
     return base + f"\n\nAUTO_REFS (catalogue paths for grounding_refs — use exactly as shown):\n{refs_block}"
-
-
-def _build_learn_system(
-    pre: PrephaseResult,
-    rules_loader: RulesLoader,
-    security_gates: list[dict],
-    task_text: str = "",
-    injected_prompt_addendum: str = "",
-) -> list[dict]:
-    blocks: list[dict] = []
-    if pre.agents_md_index and task_text:
-        relevant = _relevant_agents_sections(pre.agents_md_index, task_text)
-        index_line = "Section index: " + ", ".join(pre.agents_md_index.keys())
-        if relevant:
-            section_blocks = "\n\n".join(
-                f"### {k}\n" + "\n".join(lines) for k, lines in relevant.items()
-            )
-            blocks.append({"type": "text", "text": f"# VAULT RULES\n{index_line}\n\n{section_blocks}"})
-        elif pre.agents_md_content:
-            blocks.append({"type": "text", "text": f"# VAULT RULES\n{pre.agents_md_content}"})
-    elif pre.agents_md_content:
-        blocks.append({"type": "text", "text": f"# VAULT RULES\n{pre.agents_md_content}"})
-
-    rules_md = rules_loader.get_rules_markdown(phase="sql_plan", verified_only=True)
-    if rules_md:
-        blocks.append({"type": "text", "text": f"# PIPELINE RULES\n{rules_md}"})
-
-    if pre.schema_digest:
-        blocks.append({"type": "text", "text": f"# SCHEMA DIGEST\n{_format_schema_digest(pre.schema_digest)}"})
-
-    guide = load_prompt("learn")
-    guide_text = guide or "# PHASE: learn"
-    if injected_prompt_addendum:
-        guide_text += f"\n\n# INJECTED OPTIMIZATION\n{injected_prompt_addendum}"
-    blocks.append({"type": "text", "text": guide_text, "cache_control": {"type": "ephemeral"}})
-    return blocks
-
-
-def _build_answer_system(
-    pre: PrephaseResult,
-    injected_prompt_addendum: str = "",
-) -> list[dict]:
-    blocks: list[dict] = []
-    if pre.agents_md_content:
-        blocks.append({"type": "text", "text": f"# VAULT RULES\n{pre.agents_md_content}"})
-    guide = load_prompt("answer")
-    guide_text = guide or "# PHASE: answer"
-    if injected_prompt_addendum:
-        guide_text += f"\n\n# INJECTED OPTIMIZATION\n{injected_prompt_addendum}"
-    blocks.append({"type": "text", "text": guide_text, "cache_control": {"type": "ephemeral"}})
-    return blocks
 
 
 def _extract_sku_refs(queries: list[str], results: list[str]) -> list[str]:
@@ -341,14 +226,18 @@ def _run_test_gen(
     task_text: str,
     sdd_spec: str,
     task_type: str,
+    unified_context: str = "",
 ) -> "TestOutput | None":
-    test_gen_model = _resolve_model_for_phase("test_gen", model)
-    guide = load_prompt("test_gen")
-    system = guide or "# PHASE: test_gen\nGenerate sql_tests and answer_tests as JSON."
+    tdd_model = _resolve_model_for_phase("tdd", model)
+    tdd_guide = load_prompt("tdd") or "# PHASE: tdd\nGenerate sql_tests and answer_tests as JSON."
+    system: list[dict] = [
+        {"type": "text", "text": unified_context},
+        {"type": "text", "text": tdd_guide, "cache_control": {"type": "ephemeral"}},
+    ]
     user_msg = f"TASK: {task_text}\n\nTASK_TYPE: {task_type}\n\nSDD_SPEC:\n{sdd_spec}"
     out, _, _ = _call_llm_phase(
-        system, user_msg, test_gen_model, cfg, TestOutput,
-        phase="TEST_GEN", cycle=0,
+        system, user_msg, tdd_model, cfg, TestOutput,
+        phase="tdd", cycle=0,
     )
     if out:
         if t := get_trace():
@@ -357,7 +246,7 @@ def _run_test_gen(
 
 
 def _run_learn(
-    static_learn: "str | list[dict]",
+    unified_context: str,
     model: str,
     cfg: dict,
     task_text: str,
@@ -371,9 +260,14 @@ def _run_learn(
     prior_learn_hashes: "set[str] | None" = None,
 ) -> None:
     learn_model = _resolve_model_for_phase("learn", model)
+    learn_guide = load_prompt("learn") or "# PHASE: learn"
+    learn_system: list[dict] = [
+        {"type": "text", "text": unified_context},
+        {"type": "text", "text": learn_guide, "cache_control": {"type": "ephemeral"}},
+    ]
     learn_user = _build_learn_user_msg(task_text, queries, error, error_type)
     learn_out, sgr_learn, _ = _call_llm_phase(
-        static_learn, learn_user, learn_model, cfg, LearnOutput,
+        learn_system, learn_user, learn_model, cfg, LearnOutput,
         max_tokens=2048, phase="learn", cycle=cycle,
     )
     sgr_learn["error_type"] = error_type
@@ -395,10 +289,10 @@ def _run_learn(
                 anchor_lines = agents_md_index[anchor_section]
                 vault_rule = f"[{anchor_section}]\n" + "\n".join(anchor_lines)
                 learn_ctx.append(vault_rule)
-                print(f"{CLI_BLUE}[pipeline] LEARN: anchor={anchor!r}, vault rule added to learn_ctx{CLI_CLR}")
+                print(f"{CLI_BLUE}[pipeline] LEARN: anchor={anchor!r}, vault rule added{CLI_CLR}")
                 return
         learn_ctx.append(learn_out.rule_content)
-        print(f"{CLI_BLUE}[pipeline] LEARN: rule added to learn_ctx (total={len(learn_ctx)}){CLI_CLR}")
+        print(f"{CLI_BLUE}[pipeline] LEARN: rule added (total={len(learn_ctx)}){CLI_CLR}")
 
 
 def run_pipeline(
@@ -430,34 +324,41 @@ def run_pipeline(
 
     task_type = pre.task_type or "sql"
 
-    static_learn = _build_learn_system(
-        pre, rules_loader, security_gates,
-        task_text=task_text,
-        injected_prompt_addendum=injected_prompt_addendum,
-    )
-    static_answer = _build_answer_system(pre, injected_prompt_addendum=injected_prompt_addendum)
-    static_sdd = _build_sdd_system(
-        pre, rules_loader, security_gates,
-        task_text=task_text,
-        injected_prompt_addendum=injected_prompt_addendum,
-    )
-
     _skip_sdd = False
     outcome = "OUTCOME_NONE_CLARIFICATION"
     test_gen_out: TestOutput | None = None
     sdd_out: SddOutput | None = None
+    consecutive_answer_test_fails = 0
+    consecutive_sql_test_fails = 0
+    unified_context = ""
 
     try:
         for cycle in range(_MAX_CYCLES):
             cycles_used = cycle + 1
             print(f"\n{CLI_BLUE}[pipeline] cycle={cycle + 1}/{_MAX_CYCLES}{CLI_CLR}")
 
+            assembled = assemble_prompt(
+                task_text=task_text,
+                task_type=task_type,
+                prephase_result=pre,
+                learn_ctx=learn_ctx,
+                model=model,
+                cfg=cfg,
+                task_id=task_id,
+            )
+            unified_context = assembled.unified_context
+
             if not _skip_sdd:
                 # ── SDD ───────────────────────────────────────────────────────────
                 sdd_model = _resolve_model_for_phase("sdd", model)
                 user_msg = _build_sdd_user_msg(task_text, task_type, learn_ctx, last_error)
+                sdd_guide = load_prompt("sdd") or "# PHASE: sdd"
+                sdd_system: list[dict] = [
+                    {"type": "text", "text": unified_context},
+                    {"type": "text", "text": sdd_guide, "cache_control": {"type": "ephemeral"}},
+                ]
                 sdd_out, sgr_entry, tok = _call_llm_phase(
-                    static_sdd, user_msg, sdd_model, cfg, SddOutput,
+                    sdd_system, user_msg, sdd_model, cfg, SddOutput,
                     phase="sdd", cycle=cycle + 1,
                 )
                 total_in_tok += tok.get("input", 0)
@@ -465,13 +366,59 @@ def run_pipeline(
                 sgr_trace.append(sgr_entry)
 
                 if not sdd_out:
-                    print(f"{CLI_RED}[pipeline] SDD LLM call failed{CLI_CLR}")
-                    last_error = "SDD phase LLM call failed"
-                    _run_learn(static_learn, model, cfg, task_text, [], last_error,
+                    print(f"{CLI_RED}[pipeline] SDD LLM parse failed — running LEARN{CLI_CLR}")
+                    last_error = "SDD phase: failed to parse LLM output"
+                    _run_learn(unified_context, model, cfg, task_text, [], last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="llm_fail", cycle=cycle + 1,
                                prior_learn_hashes=prior_learn_hashes)
                     continue
+
+                # ── SDD ERROR CODES ────────────────────────────────────────────────
+                def _policy_refs(text: str) -> list[str]:
+                    t = text.lower()
+                    refs = ["/docs/security.md"]
+                    if any(k in t for k in ["3ds", "3d secure"]):
+                        refs = ["/docs/payments/3ds.md"] + refs
+                    elif any(k in t for k in ["discount", "service_recovery", "voucher"]):
+                        refs = ["/docs/discounts.md"] + refs
+                    elif any(k in t for k in ["checkout", "submit checkout", "place order"]):
+                        refs = ["/docs/checkout.md"] + refs
+                    return refs
+
+                if sdd_out.error == "DENIED_SECURITY":
+                    print(f"{CLI_YELLOW}[pipeline] SDD: security violation detected{CLI_CLR}")
+                    _refs = _policy_refs(task_text)
+                    try:
+                        vm.answer(AnswerRequest(
+                            message="Security violation detected — request rejected.",
+                            outcome=OUTCOME_BY_NAME["OUTCOME_DENIED_SECURITY"],
+                            refs=_refs,
+                        ))
+                    except Exception as e:
+                        print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
+                    _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx,
+                                     cycles_used, "OUTCOME_DENIED_SECURITY", None)
+                    success = True
+                    break
+
+                if sdd_out.error == "UNSUPPORTED":
+                    print(f"{CLI_YELLOW}[pipeline] SDD: unsupported operation{CLI_CLR}")
+                    _refs = _policy_refs(task_text)
+                    if "/docs/checkout.md" not in _refs:
+                        _refs = ["/docs/checkout.md"] + _refs
+                    try:
+                        vm.answer(AnswerRequest(
+                            message="This operation is not supported by the database.",
+                            outcome=OUTCOME_BY_NAME["OUTCOME_NONE_UNSUPPORTED"],
+                            refs=_refs,
+                        ))
+                    except Exception as e:
+                        print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
+                    _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx,
+                                     cycles_used, "OUTCOME_NONE_UNSUPPORTED", None)
+                    success = True
+                    break
 
                 sql_queries = [s.query for s in sdd_out.plan if s.type == "sql" and s.query]
                 print(f"{CLI_BLUE}[pipeline] SDD: {len(sdd_out.plan)} steps, {len(sql_queries)} SQL queries{CLI_CLR}")
@@ -486,35 +433,13 @@ def run_pipeline(
                     if index_terms_in_task:
                         last_error = "agents_md_refs empty despite known vocabulary terms in task"
                         print(f"{CLI_YELLOW}[pipeline] AGENTS.MD refs check failed{CLI_CLR}")
-                        _run_learn(static_learn, model, cfg, task_text, sql_queries, last_error,
+                        _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                    sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="semantic", cycle=cycle + 1,
                                    prior_learn_hashes=prior_learn_hashes)
                         continue
 
-                # ── SECURITY CHECK ────────────────────────────────────────────────
-                gate_err = check_sql_queries(sql_queries, security_gates)
-                if t := get_trace():
-                    t.log_gate_check(cycle + 1, "security", sql_queries, bool(gate_err), gate_err or None)
-                if gate_err:
-                    print(f"{CLI_YELLOW}[pipeline] SECURITY gate blocked: {gate_err}{CLI_CLR}")
-                    last_error = gate_err
-                    _run_learn(static_learn, model, cfg, task_text, sql_queries, last_error,
-                               sgr_trace, learn_ctx, pre.agents_md_index,
-                               error_type="security", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes)
-                    continue
-
-                literal_err = check_where_literals(sql_queries, task_text, security_gates)
-                if literal_err:
-                    print(f"{CLI_YELLOW}[pipeline] SECURITY literal blocked: {literal_err}{CLI_CLR}")
-                    last_error = literal_err
-                    _run_learn(static_learn, model, cfg, task_text, sql_queries, last_error,
-                               sgr_trace, learn_ctx, pre.agents_md_index,
-                               error_type="security", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes)
-                    continue
-
+                # ── SECURITY CHECK (retry-loop guard only) ───────────────────────
                 retry_err = check_retry_loop(sql_queries, prior_query_sets, security_gates)
                 if retry_err:
                     print(f"{CLI_RED}[pipeline] SECURITY hard-stop: {retry_err}{CLI_CLR}")
@@ -529,25 +454,23 @@ def run_pipeline(
                 if schema_err:
                     print(f"{CLI_YELLOW}[pipeline] SCHEMA gate blocked: {schema_err}{CLI_CLR}")
                     last_error = schema_err
-                    _run_learn(static_learn, model, cfg, task_text, sql_queries, last_error,
+                    _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="security", cycle=cycle + 1,
                                prior_learn_hashes=prior_learn_hashes)
                     continue
 
-                # ── TEST_GEN (mandatory) ──────────────────────────────────────────
-                test_gen_out = _run_test_gen(model, cfg, task_text, sdd_out.spec, task_type)
+                # ── TDD (mandatory) ──────────────────────────────────────────────
+                test_gen_out = _run_test_gen(model, cfg, task_text, sdd_out.spec, task_type,
+                                             unified_context=unified_context)
                 if test_gen_out is None:
-                    print(f"{CLI_RED}[pipeline] TEST_GEN parse failed — hard stop{CLI_CLR}")
-                    try:
-                        vm.answer(AnswerRequest(
-                            message="Test generation failed — cannot validate answer",
-                            outcome=OUTCOME_BY_NAME["OUTCOME_NONE_CLARIFICATION"],
-                            refs=[],
-                        ))
-                    except Exception as e:
-                        print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
-                    break
+                    print(f"{CLI_RED}[pipeline] TDD LLM parse failed — running LEARN{CLI_CLR}")
+                    last_error = "TDD phase: failed to parse test output"
+                    _run_learn(unified_context, model, cfg, task_text, [], last_error,
+                               sgr_trace, learn_ctx, pre.agents_md_index,
+                               error_type="llm_fail", cycle=cycle + 1,
+                               prior_learn_hashes=prior_learn_hashes)
+                    continue
 
                 # ── EXECUTE (SQL steps) ───────────────────────────────────────────
                 _exec_path = "/bin/sql"
@@ -591,12 +514,54 @@ def run_pipeline(
                         execute_error = f"Execute exception: {e}"
                         break
 
-                last_empty = not sql_results or not _csv_has_data(sql_results[-1])
+                # ── EXECUTE (exec steps: discount, payments, etc.) ────────────────
+                exec_results: list[str] = []
+                exec_steps = [s for s in sdd_out.plan if s.type == "exec" and s.operation]
+                if exec_steps and not execute_error:
+                    for step in exec_steps:
+                        op_path = step.operation
+                        assert op_path  # type narrowing
+                        path_err = check_path_access(op_path, security_gates)
+                        if path_err:
+                            execute_error = path_err
+                            break
+                        try:
+                            _t0 = time.monotonic()
+                            exec_res = vm.exec(ExecRequest(path=op_path, args=step.args or []))
+                            _dur = int((time.monotonic() - _t0) * 1000)
+                            exec_txt = _exec_result_text(exec_res)
+                            exec_results.append(exec_txt)
+                            sql_results.append(exec_txt)
+                            print(f"{CLI_BLUE}[pipeline] EXEC: {op_path} {step.args} → {exec_txt[:80]}{CLI_CLR}")
+                        except Exception as e:
+                            execute_error = f"Exec exception: {e}"
+                            break
+
+                # ── EXECUTE (read steps: file reads) ─────────────────────────────
+                read_results: list[str] = []
+                read_steps = [s for s in sdd_out.plan if s.type == "read" and s.args]
+                if read_steps and not execute_error:
+                    for step in read_steps:
+                        file_path = step.args[0] if step.args else (step.operation or "")
+                        if not file_path or file_path == "read":
+                            continue
+                        try:
+                            read_res = vm.read(ReadRequest(path=file_path))
+                            read_txt = read_res.content or ""
+                            read_results.append(read_txt)
+                            sql_results.append(f"# READ: {file_path}\n{read_txt}")
+                            sku_refs.append(file_path)
+                            print(f"{CLI_BLUE}[pipeline] READ: {file_path} → {read_txt[:80]}{CLI_CLR}")
+                        except Exception as e:
+                            print(f"{CLI_YELLOW}[pipeline] READ failed: {file_path}: {e}{CLI_CLR}")
+
+                has_exec_output = bool(exec_results) or bool(read_results)
+                last_empty = not sql_results or (not _csv_has_data(sql_results[-1]) and not has_exec_output)
                 if execute_error or last_empty:
                     err = execute_error or f"Empty result set: {(sql_results[-1] if sql_results else '').strip()[:120]}"
                     print(f"{CLI_YELLOW}[pipeline] EXECUTE failed: {err}{CLI_CLR}")
                     last_error = err
-                    _run_learn(static_learn, model, cfg, task_text, sql_queries, last_error,
+                    _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="empty" if last_empty and not execute_error else "semantic",
                                cycle=cycle + 1, prior_learn_hashes=prior_learn_hashes)
@@ -631,18 +596,28 @@ def run_pipeline(
                 if not sql_passed:
                     print(f"{CLI_YELLOW}[pipeline] SQL VERIFY failed: {sql_err[:80]}{CLI_CLR}")
                     last_error = sql_err[:500]
-                    _skip_sdd = False
-                    _run_learn(static_learn, model, cfg, task_text, sql_queries, last_error,
-                               sgr_trace, learn_ctx, pre.agents_md_index,
-                               error_type="test_fail", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes)
-                    continue
+                    consecutive_sql_test_fails += 1
+                    if consecutive_sql_test_fails >= 3:
+                        print(f"{CLI_YELLOW}[pipeline] sql test fail × {consecutive_sql_test_fails} — skip to ANSWER{CLI_CLR}")
+                        # fall through to ANSWER phase with current (possibly empty) results
+                    else:
+                        _skip_sdd = False
+                        _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
+                                   sgr_trace, learn_ctx, pre.agents_md_index,
+                                   error_type="test_fail", cycle=cycle + 1,
+                                   prior_learn_hashes=prior_learn_hashes)
+                        continue
 
             # ── ANSWER ───────────────────────────────────────────────────────────
             executor_model = _resolve_model_for_phase("executor", model)
             answer_user = _build_answer_user_msg(task_text, sql_results, sku_refs)
+            answer_guide = load_prompt("answer") or "# PHASE: answer"
+            answer_system: list[dict] = [
+                {"type": "text", "text": unified_context},
+                {"type": "text", "text": answer_guide, "cache_control": {"type": "ephemeral"}},
+            ]
             answer_out, sgr_answer, tok = _call_llm_phase(
-                static_answer, answer_user, executor_model, cfg, AnswerOutput,
+                answer_system, answer_user, executor_model, cfg, AnswerOutput,
                 phase="answer", cycle=cycle + 1,
             )
             total_in_tok += tok.get("input", 0)
@@ -678,15 +653,21 @@ def run_pipeline(
                 if not ans_passed:
                     print(f"{CLI_YELLOW}[pipeline] VERIFY_ANSWER failed: {ans_err[:80]}{CLI_CLR}")
                     last_error = ans_err[:500]
-                    _skip_sdd = True
-                    _run_learn(static_learn, model, cfg, task_text,
-                               [s.query for s in (sdd_out.plan if sdd_out else []) if s.type == "sql" and s.query],
-                               last_error, sgr_trace, learn_ctx, pre.agents_md_index,
-                               error_type="test_fail", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes)
-                    continue
+                    consecutive_answer_test_fails += 1
+                    if consecutive_answer_test_fails >= 3:
+                        print(f"{CLI_YELLOW}[pipeline] answer test fail × {consecutive_answer_test_fails} — force submit{CLI_CLR}")
+                    else:
+                        _skip_sdd = True
+                        _run_learn(unified_context, model, cfg, task_text,
+                                   [s.query for s in (sdd_out.plan if sdd_out else []) if s.type == "sql" and s.query],
+                                   last_error, sgr_trace, learn_ctx, pre.agents_md_index,
+                                   error_type="test_fail", cycle=cycle + 1,
+                                   prior_learn_hashes=prior_learn_hashes)
+                        continue
 
             # ── SUCCESS ───────────────────────────────────────────────────────────
+            consecutive_answer_test_fails = 0
+            consecutive_sql_test_fails = 0
             outcome = answer_out.outcome
             print(f"{CLI_GREEN}[pipeline] ANSWER: {outcome} — {answer_out.message[:100]}{CLI_CLR}")
             ref_err = check_grounding_refs(
@@ -711,6 +692,7 @@ def run_pipeline(
                 print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
 
             _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx, cycles_used, outcome, None)
+            clear_learned_ctx(task_id)
             success = True
             break
 
@@ -724,6 +706,9 @@ def run_pipeline(
                 ))
             except Exception as e:
                 print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
+            if task_id and learn_ctx:
+                save_learned_ctx(task_id, learn_ctx)
+                print(f"{CLI_BLUE}[pipeline] learn_ctx persisted to data/learned/{task_id}.yaml{CLI_CLR}")
 
     except Exception:
         print(f"{CLI_RED}[pipeline] UNHANDLED: {traceback.format_exc()}{CLI_CLR}")
@@ -736,10 +721,10 @@ def run_pipeline(
         except Exception as e:
             print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
 
-    # ── EVALUATOR: only on failure ────────────────────────────────────────────
+    # ── EVALUATOR: only on success ────────────────────────────────────────────
     eval_thread: threading.Thread | None = None
     eval_model = _resolve_model_for_phase("evaluator", model)
-    if not success and _EVAL_ENABLED and eval_model:
+    if success and _EVAL_ENABLED and eval_model:
         eval_thread = threading.Thread(
             target=_run_evaluator_safe,
             kwargs={

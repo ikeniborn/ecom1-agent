@@ -5,7 +5,12 @@ import pytest
 
 from agent.pipeline import run_pipeline
 from agent.prephase import PrephaseResult
+from agent.prompt_assembler import AssembledPrompt
 from agent.trace import TraceLogger, set_trace
+
+
+def _mock_assemble(*args, **kwargs):
+    return AssembledPrompt(unified_context="mocked-unified-context")
 
 
 def _make_pre(db_schema="CREATE TABLE products(id INT, brand TEXT, type TEXT, sku TEXT)"):
@@ -70,9 +75,9 @@ def test_llm_call_records_written_on_success(tmp_path):
     vm.exec.return_value = _exec_ok()
 
     with patch("agent.pipeline.call_llm_raw", side_effect=[_sdd_json(), _test_gen_json(), _answer_json()]), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline._get_rules_loader"), \
          patch("agent.pipeline._get_security_gates", return_value=[]), \
-         patch("agent.pipeline.check_sql_queries", return_value=None), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})
@@ -94,16 +99,16 @@ def test_llm_call_records_written_on_success(tmp_path):
 
 
 def test_gate_check_records_written(tmp_path):
-    """gate_check records for security + schema gates written every cycle."""
+    """gate_check record for schema gate written every cycle."""
     t, p = _collect_trace_records(tmp_path)
 
     vm = MagicMock()
     vm.exec.return_value = _exec_ok()
 
     with patch("agent.pipeline.call_llm_raw", side_effect=[_sdd_json(), _test_gen_json(), _answer_json()]), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline._get_rules_loader"), \
          patch("agent.pipeline._get_security_gates", return_value=[]), \
-         patch("agent.pipeline.check_sql_queries", return_value=None), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})
@@ -114,7 +119,6 @@ def test_gate_check_records_written(tmp_path):
     records = [json.loads(ln) for ln in p.read_text().splitlines() if ln.strip()]
     gate_records = [r for r in records if r["type"] == "gate_check"]
     gate_types = {r["gate_type"] for r in gate_records}
-    assert "security" in gate_types
     assert "schema" in gate_types
 
 
@@ -126,9 +130,9 @@ def test_sql_validate_and_execute_records(tmp_path):
     vm.exec.return_value = _exec_ok()
 
     with patch("agent.pipeline.call_llm_raw", side_effect=[_sdd_json(), _test_gen_json(), _answer_json()]), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline._get_rules_loader"), \
          patch("agent.pipeline._get_security_gates", return_value=[]), \
-         patch("agent.pipeline.check_sql_queries", return_value=None), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})

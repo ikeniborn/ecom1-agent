@@ -4,6 +4,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from agent.pipeline import run_pipeline
 from agent.prephase import PrephaseResult
+from agent.prompt_assembler import AssembledPrompt
+
+
+def _mock_assemble(*args, **kwargs):
+    return AssembledPrompt(unified_context="mocked-unified-context")
 
 
 def _make_pre():
@@ -56,6 +61,7 @@ def test_test_gen_mandatory_called(tmp_path):
         return next(call_seq)
 
     with patch("agent.pipeline.call_llm_raw", side_effect=fake_llm), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline._RULES_DIR", rules_dir), \
          patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
