@@ -2,7 +2,6 @@
 """Content-verification tests for data/ directory files."""
 from pathlib import Path
 import yaml
-import pytest
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 RULES_DIR = DATA_DIR / "rules"
