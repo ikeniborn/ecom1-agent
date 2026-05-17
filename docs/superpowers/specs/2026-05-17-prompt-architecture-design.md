@@ -44,30 +44,37 @@ pipeline_loop (up to MAX_STEPS):
 
     2. SDD   → system: unified_context + sdd.md
                → SPEC (описание задачи) + PLAN (шаги выполнения)
+               on failure → LEARN → next cycle
 
-    3. TDD   → system: unified_context + tdd.md (rename from test_gen.md)
+    3. TDD   → system: unified_context + tdd.md
                → тесты для всех шагов SDD PLAN
+               on failure → LEARN → next cycle
 
     4. EXECUTE → выполнить все шаги PLAN (SQL, read, exec, compute)
+                 on failure → LEARN → next cycle
 
     5. TESTING → запустить TDD-тесты против результатов EXECUTE
                  (покрывает все типы шагов из SDD)
+                 on failure → LEARN → next cycle
+                 *** ANSWER запускается ТОЛЬКО если TESTING прошёл ***
 
     6. ANSWER → system: unified_context + answer.md
                 → AnswerOutput
+                on failure (VERIFY_ANSWER не прошёл) → LEARN → next cycle
+                *** SUCCESS только если VERIFY_ANSWER прошёл ***
 
-    on failure at any step:
-        LEARN → system: unified_context + learn.md
-                → LLM extracts rule
-                → проверяет дубли против текущего learn_ctx
-                → если new: append learn_ctx
-                → continue loop
+    LEARN (при любом failure):
+        → system: unified_context + learn.md
+        → LLM extracts rule
+        → проверяет дубли против текущего learn_ctx
+        → если new: append learn_ctx
+        → continue loop (с нового assemble_prompt на следующем цикле)
 
-SUCCESS:
+SUCCESS (VERIFY_ANSWER прошёл):
     eval_log write (task_id, task_text, task_type, trace, learn_ctx, outcome=ok)
     if EVAL_ENABLED: evaluator async → добавляет recommendations в eval_log entry
 
-FAILURE (MAX_STEPS исчерпан):
+FAILURE (MAX_STEPS исчерпан без SUCCESS):
     eval_log НЕ пишется
     learn_ctx очищается (GC)
 ```
