@@ -9,7 +9,7 @@ SECURITY_DIR = DATA_DIR / "security"
 PROMPTS_DIR = DATA_DIR / "prompts"
 
 EXPECTED_RULE_IDS = {
-    "sql-015", "sql-016", "sql-017", "sql-031", "sql-032",
+    "sql-015", "sql-016", "sql-017", "sql-031",
     "sql-sku-required", "sql-retry-divergence", "sql-count-with-sample",
 }
 
