@@ -46,9 +46,12 @@ _STRIPPED_ENV_KEYS = frozenset({
 
 
 def _build_env() -> dict[str, str]:
-    if _CC_STRIP_PROJECT_ENV:
-        return {k: v for k, v in os.environ.items() if k not in _STRIPPED_ENV_KEYS}
-    return dict(os.environ)
+    env = {k: v for k, v in os.environ.items() if k not in _STRIPPED_ENV_KEYS} \
+        if _CC_STRIP_PROJECT_ENV else dict(os.environ)
+    # Explicitly name the telemetry project so iclaude wrapper doesn't fall back
+    # to basename(cwd) = cc_cwd_XXXX when spawned in a temp directory.
+    env.setdefault("ICLAUDE_PROJECT", "ecom1-agent")
+    return env
 
 
 def _collect_stdout(pipe, buf: list[str]) -> None:
