@@ -180,12 +180,16 @@ def assemble_prompt(
      - Решить: оставить как domain-context блоки или удалить полностью
    - Удалить дублирующие/устаревшие секции во всех блоках
 
-3. **`data/config/task_blocks.yaml`** — новый файл, заменяет `_TASK_BLOCKS` dict в `prompt.py`:
+3. **`data/config/task_blocks.yaml`** — новый файл, заменяет `_TASK_BLOCKS` dict в `prompt.py`.
+
+   Имена блоков определяются **после аудита** `data/prompts/` (п.2 выше).
+   Legacy-блоки (`core`, `lookup`, `catalogue`) будут переименованы/удалены.
+   Структура типов:
 ```yaml
 # exec/read — шаги внутри SDD PLAN, не task_type
-sql:     [core, lookup, catalogue]   # запросы к БД (основной тип)
-compute: [core]                      # вычисления без БД
-default: [core, lookup, catalogue]   # fallback
+sql:     [<новые блоки после аудита>]   # запросы к БД
+compute: [<domain-only блок>]           # вычисления без БД
+default: [<новые блоки после аудита>]   # fallback
 ```
 
 Старые типы (`lookup`, `temporal`, `capture`, `crm`, `distill`, `preject`) — удалить из кода и конфига.
