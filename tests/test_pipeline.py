@@ -190,3 +190,84 @@ def test_learn_ctx_accumulates(tmp_path):
     sdd_cycle2_msg = captured_user_msgs[2]
     assert "ACCUMULATED RULES" in sdd_cycle2_msg
     assert "rule_A" in sdd_cycle2_msg
+
+
+def test_learn_compaction_replaces_ctx(tmp_path):
+    """When compacted_ctx is valid non-empty, learn_ctx is replaced in-place."""
+    import json
+    from unittest.mock import patch, MagicMock
+    from agent.pipeline import run_pipeline
+
+    vm = MagicMock()
+    vm.exec.return_value = _make_exec_result('[{"count": 3}]')
+    pre = _make_pre()
+    rules_dir = tmp_path / "rules"
+    rules_dir.mkdir()
+
+    learn_json = json.dumps({
+        "reasoning": "found dupe",
+        "conclusion": "two rules merged",
+        "rule_content": "always use sku column",
+        "agents_md_anchor": None,
+        "compacted_ctx": ["always use sku column"],
+    })
+
+    call_seq = [_sdd_json(), learn_json, _sdd_json(), _test_gen_json(), _answer_json()]
+    call_iter = iter(call_seq)
+
+    with patch("agent.pipeline.call_llm_raw", side_effect=lambda *a, **kw: next(call_iter)), \
+         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
+         patch("agent.pipeline._RULES_DIR", rules_dir), \
+         patch("agent.pipeline.load_security_gates", return_value=[]), \
+         patch("agent.pipeline.check_schema_compliance", side_effect=[
+             "SCHEMA: bad column", None,
+         ]), \
+         patch("agent.pipeline.run_tests", return_value=(True, None, [])):
+        stats, _ = run_pipeline(vm, "model", "task", pre, {}, task_id="t_compact")
+
+    assert stats["outcome"] == "OUTCOME_OK"
+    assert stats["cycles_used"] == 2
+
+
+def test_learn_compaction_fallback_on_empty(tmp_path):
+    """When compacted_ctx is [], fall back to append."""
+    from agent.models import LearnOutput
+
+    learn_ctx: list[str] = ["existing rule"]
+    learn_out = LearnOutput(
+        reasoning="r",
+        conclusion="c",
+        rule_content="new rule",
+        agents_md_anchor=None,
+        compacted_ctx=[],
+    )
+
+    compacted = learn_out.compacted_ctx
+    if compacted and len(compacted) > 0 and all(isinstance(r, str) for r in compacted):
+        learn_ctx[:] = compacted
+    else:
+        learn_ctx.append(learn_out.rule_content)
+
+    assert learn_ctx == ["existing rule", "new rule"]
+
+
+def test_learn_compaction_fallback_on_none(tmp_path):
+    """When compacted_ctx is None (field omitted), fall back to append."""
+    from agent.models import LearnOutput
+
+    learn_ctx: list[str] = ["rule A", "rule B"]
+    learn_out = LearnOutput(
+        reasoning="r",
+        conclusion="c",
+        rule_content="rule C",
+        agents_md_anchor=None,
+        compacted_ctx=None,
+    )
+
+    compacted = learn_out.compacted_ctx
+    if compacted and len(compacted) > 0 and all(isinstance(r, str) for r in compacted):
+        learn_ctx[:] = compacted
+    else:
+        learn_ctx.append(learn_out.rule_content)
+
+    assert learn_ctx == ["rule A", "rule B", "rule C"]

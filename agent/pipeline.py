@@ -294,10 +294,15 @@ def _run_learn(
                     save_learned_ctx(task_id, learn_ctx)
                 print(f"{CLI_BLUE}[pipeline] LEARN: anchor={anchor!r}, vault rule added{CLI_CLR}")
                 return
-        learn_ctx.append(learn_out.rule_content)
+        compacted = learn_out.compacted_ctx
+        if compacted and len(compacted) > 0 and all(isinstance(r, str) for r in compacted):
+            learn_ctx[:] = compacted
+            print(f"{CLI_BLUE}[pipeline] LEARN: compacted to {len(learn_ctx)} rules{CLI_CLR}")
+        else:
+            learn_ctx.append(learn_out.rule_content)
+            print(f"{CLI_BLUE}[pipeline] LEARN: rule added (total={len(learn_ctx)}){CLI_CLR}")
         if task_id:
             save_learned_ctx(task_id, learn_ctx)
-        print(f"{CLI_BLUE}[pipeline] LEARN: rule added (total={len(learn_ctx)}){CLI_CLR}")
 
 
 def run_pipeline(
