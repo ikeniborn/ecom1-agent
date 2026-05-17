@@ -65,11 +65,12 @@ _HTTP_TIMEOUT = httpx.Timeout(
 
 # Per-phase model overrides — enable LLM routing by execution phase
 _PHASE_MODEL_MAP: dict[str, str | None] = {
-    "sdd":      os.environ.get("MODEL_SDD") or None,
-    "test_gen": os.environ.get("MODEL_TEST_GEN") or None,
-    "executor": os.environ.get("MODEL_EXECUTOR") or None,
-    "learn":    os.environ.get("MODEL_LEARN") or None,
+    "sdd":       os.environ.get("MODEL_SDD") or None,
+    "tdd":       None,  # TDD uses MODEL (same as SDD)
+    "executor":  os.environ.get("MODEL_EXECUTOR") or None,
+    "learn":     os.environ.get("MODEL_LEARN") or None,
     "evaluator": os.environ.get("MODEL_EVALUATOR") or None,
+    "assembler": os.environ.get("MODEL_ASSEMBLER") or None,
 }
 
 
