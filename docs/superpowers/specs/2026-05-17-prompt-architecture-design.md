@@ -73,10 +73,13 @@ pipeline_loop (up to MAX_STEPS):
 SUCCESS (VERIFY_ANSWER прошёл):
     eval_log write (task_id, task_text, task_type, trace, learn_ctx, outcome=ok)
     if EVAL_ENABLED: evaluator async → добавляет recommendations в eval_log entry
+    data/learned/{task_id}.yaml УДАЛЯЕТСЯ (уроки агрегированы в eval_log)
+    learn_ctx очищается (GC)
 
 FAILURE (MAX_STEPS исчерпан без SUCCESS):
     eval_log НЕ пишется
-    learn_ctx очищается (GC)
+    learn_ctx СОХРАНЯЕТСЯ в data/learned/{task_id}.yaml
+    (при перезапуске задачи — загружается как начальный learn_ctx)
 ```
 
 ---
@@ -116,6 +119,11 @@ def assemble_prompt(
 - Убери нерелевантные для этой задачи правила
 
 **Вызывается:** в начале каждого цикла pipeline loop (до SDD), передавая актуальный `learn_ctx`.
+
+**Инициализация `learn_ctx` при старте задачи:**
+- Проверить `data/learned/{task_id}.yaml`
+- Если файл существует (предыдущий FAILURE) → загрузить как начальный `learn_ctx`
+- Иначе → `learn_ctx = []`
 
 ---
 
@@ -226,6 +234,7 @@ default:  [core, lookup, catalogue]
 | Action | File |
 |--------|------|
 | CREATE | `agent/prompt_assembler.py` |
+| CREATE | `data/learned/` (директория, .gitkeep) |
 | CREATE | `data/config/task_blocks.yaml` |
 | CREATE | `data/prompts/assembler.md` |
 | RENAME | `data/prompts/test_gen.md` → `data/prompts/tdd.md` |
