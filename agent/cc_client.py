@@ -46,11 +46,21 @@ _STRIPPED_ENV_KEYS = frozenset({
 
 
 def _build_env() -> dict[str, str]:
+    import re as _re
     env = {k: v for k, v in os.environ.items() if k not in _STRIPPED_ENV_KEYS} \
         if _CC_STRIP_PROJECT_ENV else dict(os.environ)
-    # Explicitly name the telemetry project so iclaude wrapper doesn't fall back
-    # to basename(cwd) = cc_cwd_XXXX when spawned in a temp directory.
-    env.setdefault("ICLAUDE_PROJECT", "ecom1-agent")
+    # Override iclaude.project inside OTEL_RESOURCE_ATTRIBUTES so iclaude wrapper
+    # reports ecom1-agent instead of the temp cwd basename (cc_cwd_XXXX).
+    # We modify OTEL_RESOURCE_ATTRIBUTES rather than introducing a new env var to
+    # avoid inheritance pollution across nested subprocess chains.
+    otel = env.get("OTEL_RESOURCE_ATTRIBUTES", "")
+    if _re.search(r'iclaude\.project=', otel):
+        env["OTEL_RESOURCE_ATTRIBUTES"] = _re.sub(
+            r'iclaude\.project=[^,]*', 'iclaude.project=ecom1-agent', otel)
+    elif otel:
+        env["OTEL_RESOURCE_ATTRIBUTES"] = otel + ",iclaude.project=ecom1-agent"
+    else:
+        env["OTEL_RESOURCE_ATTRIBUTES"] = "iclaude.project=ecom1-agent"
     return env
 
 
