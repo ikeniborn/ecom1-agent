@@ -784,6 +784,7 @@ def _append_eval_log(
         "task_id": task_id,
         "task_text": task_text,
         "task_type": task_type,
+        "cycles_used": cycles,
         "prephase": {
             "agents_md": pre.agents_md_content[:500] if pre.agents_md_content else "",
             "schema_digest": pre.schema_digest,

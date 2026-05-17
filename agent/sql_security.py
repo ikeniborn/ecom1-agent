@@ -10,7 +10,7 @@ import yaml
 
 _SECURITY_DIR = Path(__file__).parent.parent / "data" / "security"
 
-_PLACEHOLDER_WORDS = {"foo", "bar", "baz", "x", "y", "z", "test", "xxx", "none", "n/a"}
+_PLACEHOLDER_WORDS = {"foo", "bar", "baz", "x", "y", "z", "test", "xxx", "none", "n/a", "rule", "todo", "tbd", "fixme", "placeholder"}
 
 
 def load_security_gates(directory: Path = _SECURITY_DIR) -> list[dict]:
@@ -93,10 +93,10 @@ def check_learn_output(
                 return f"[{gate['id']}] {gate['message']}"
         elif gate.get("check") == "rule_content_semantic_complexity":
             stripped = rule_content.strip()
-            if not stripped or re.match(r"^[a-zA-Z0-9]$", stripped):
-                return f"[{gate['id']}] {gate['message']}: content too short"
-            if set(stripped.lower().split()) <= _PLACEHOLDER_WORDS and len(stripped.split()) <= 3:
-                return f"[{gate['id']}] {gate['message']}: placeholder detected"
+            if not stripped or len(stripped) < 20:
+                return f"[{gate['id']}] {gate['message']}: content too short ({len(stripped)} chars)"
+            if set(stripped.lower().split()) <= _PLACEHOLDER_WORDS and len(stripped.split()) <= 5:
+                return f"[{gate['id']}] {gate['message']}: placeholder detected: {stripped!r}"
     return None
 
 
