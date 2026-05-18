@@ -355,6 +355,29 @@ def _synthesize_prompt_patch(raw_rec: str, existing_prompts_md: str, model: str,
     return parsed
 
 
+def _rewrite_prompt_file(
+    target: str,
+    new_recs: list[str],
+    model: str,
+    cfg: dict,
+) -> str | None:
+    """Reads data/prompts/<target> (empty string if missing).
+    LLM rewrites entire file incorporating new_recs with priority.
+    Returns complete rewritten content, or None on failure."""
+    dest = _PROMPTS_DIR / target
+    existing = dest.read_text(encoding="utf-8") if dest.exists() else ""
+    recs_block = "\n".join(f"- {r}" for r in new_recs)
+    system = (
+        "Rewrite the prompt file below, incorporating the new recommendations (which take priority). "
+        "Remove duplicates and contradictions. Return only the complete file content with no commentary."
+    )
+    user_msg = f"New recommendations:\n{recs_block}\n\nExisting file ({target}):\n{existing}"
+    raw = call_llm_raw_cluster(system, user_msg, model, cfg, max_tokens=2048, plain_text=True)
+    if not raw:
+        return None
+    return raw
+
+
 def _write_rule(num: int, content: str, entry: dict, raw_rec: str) -> Path:
     rule_id = f"sql-{num:03d}"
     dest = _RULES_DIR / f"{rule_id}.yaml"
@@ -388,23 +411,6 @@ def _write_security(num: int, gate_spec: dict, entry: dict, raw_rec: str) -> Pat
     print(f"[propose] created {dest.name}")
     return dest
 
-
-def _write_prompt(patch_result: dict, entry: dict, raw_rec: str) -> Path:
-    target = patch_result["target_file"]
-    dest = _PROMPTS_DIR / target
-    content = patch_result["content"]
-    action = "updated"
-    if dest.exists():
-        existing = dest.read_text(encoding="utf-8")
-        if content.strip() in existing:
-            print(f"[propose] skipped {target} (already present)")
-            return dest
-        dest.write_text(existing.rstrip() + "\n\n" + content + "\n", encoding="utf-8")
-    else:
-        dest.write_text(content + "\n", encoding="utf-8")
-        action = "created"
-    print(f"[propose] {action} {target}")
-    return dest
 
 
 def _flatten_recs(
@@ -557,6 +563,8 @@ def main(dry_run: bool = False) -> None:
             written += 1
             security_md = knowledge_loader.existing_security_text()
 
+    # Collect target_file → [(raw_rec, all_hashes)] using _synthesize_prompt_patch for routing only
+    target_to_recs: dict[str, list[tuple[str, list[str]]]] = {}
     for raw_rec, entry, all_hashes in prompt_clusters:
         print(f"[prompt] {raw_rec[:80]}...")
         patch_result = _synthesize_prompt_patch(raw_rec, prompts_md, model, cfg)
@@ -564,15 +572,22 @@ def main(dry_run: bool = False) -> None:
             new_processed.update(all_hashes)
             print("  → skip (null/vague)")
             continue
-        conflict = _check_contradiction(patch_result.get("content", ""), prompts_md, model, cfg)
-        if conflict:
-            print(f"  → skip (contradiction: {conflict})")
+        target = patch_result["target_file"]
+        target_to_recs.setdefault(target, []).append((raw_rec, all_hashes))
+
+    for target, rec_groups in target_to_recs.items():
+        all_recs = [r for r, _ in rec_groups]
+        all_hashes_flat = [h for _, hs in rec_groups for h in hs]
+        rewritten = _rewrite_prompt_file(target, all_recs, model, cfg)
+        if rewritten is None:
+            print(f"  → skip {target} (rewrite failed)")
             continue
         if dry_run:
-            print(f"  → [DRY RUN] {patch_result['target_file']}: {patch_result['content'][:80]}")
+            print(f"  → [DRY RUN] {target}: {rewritten[:200]}")
         else:
-            dest = _write_prompt(patch_result, entry, raw_rec)
-            new_processed.update(all_hashes)
+            (_PROMPTS_DIR / target).write_text(rewritten, encoding="utf-8")
+            print(f"[propose] rewrote {target}")
+            new_processed.update(all_hashes_flat)
             written += 1
             prompts_md = knowledge_loader.existing_prompts_text()
 

@@ -111,6 +111,8 @@ def test_writes_prompt_md(tmp_path):
          patch.object(po, "_synthesize_rule", return_value=None), \
          patch.object(po, "_synthesize_security_gate", return_value=None), \
          patch.object(po, "_synthesize_prompt_patch", return_value=patch_result), \
+         patch.object(po, "_rewrite_prompt_file",
+                      return_value="# Answer\n\nNever emit empty grounding_refs.\n"), \
          patch.object(po, "_check_contradiction", return_value=None):
         po.main(dry_run=False)
 
@@ -263,6 +265,7 @@ def test_synthesize_prompt_patch_receives_existing_context(tmp_path):
          patch.object(po, "_synthesize_security_gate", return_value=None), \
          patch.object(po, "_synthesize_prompt_patch", return_value=patch_result) as mock_prompt, \
          patch.object(kl, "existing_prompts_text", return_value="=== answer.md ===\n# Answer\n"), \
+         patch.object(po, "_rewrite_prompt_file", return_value="# Answer\n\nNever X.\n"), \
          patch.object(po, "_check_contradiction", return_value=None):
         po.main(dry_run=False)
 
@@ -869,3 +872,163 @@ def test_main_soft_disables_superseded_security(tmp_path):
 
     data = yaml.safe_load((security_dir / "sec-001.yaml").read_text())
     assert data["verified"] is False
+
+
+# --- Unit tests for _rewrite_prompt_file ---
+
+def test_rewrite_prompt_file_returns_rewritten_content(tmp_path):
+    prompts_dir = tmp_path / "prompts"
+    prompts_dir.mkdir()
+    (prompts_dir / "answer.md").write_text("# Answer\n\nOld rule.\n")
+
+    with patch.object(po, "_PROMPTS_DIR", prompts_dir), \
+         patch("scripts.propose_optimizations.call_llm_raw_cluster",
+               return_value="# Answer\n\nNew rule.\n"):
+        result = po._rewrite_prompt_file("answer.md", ["Add new rule"], "model", {})
+
+    assert result == "# Answer\n\nNew rule.\n"
+
+
+def test_rewrite_prompt_file_reads_existing_file(tmp_path):
+    prompts_dir = tmp_path / "prompts"
+    prompts_dir.mkdir()
+    existing_content = "# Answer\n\nExisting content.\n"
+    (prompts_dir / "answer.md").write_text(existing_content)
+
+    captured_user = []
+
+    def fake_llm(system, user_msg, model, cfg, **kwargs):
+        captured_user.append(user_msg)
+        return "rewritten"
+
+    with patch.object(po, "_PROMPTS_DIR", prompts_dir), \
+         patch("scripts.propose_optimizations.call_llm_raw_cluster", side_effect=fake_llm):
+        po._rewrite_prompt_file("answer.md", ["Add new rule"], "model", {})
+
+    assert existing_content in captured_user[0] or "Existing content" in captured_user[0]
+
+
+def test_rewrite_prompt_file_handles_missing_file(tmp_path):
+    prompts_dir = tmp_path / "prompts"
+    prompts_dir.mkdir()
+
+    with patch.object(po, "_PROMPTS_DIR", prompts_dir), \
+         patch("scripts.propose_optimizations.call_llm_raw_cluster",
+               return_value="# New content\n"):
+        result = po._rewrite_prompt_file("new.md", ["Add rule"], "model", {})
+
+    assert result == "# New content\n"
+
+
+def test_rewrite_prompt_file_returns_none_on_llm_failure(tmp_path):
+    prompts_dir = tmp_path / "prompts"
+    prompts_dir.mkdir()
+
+    with patch.object(po, "_PROMPTS_DIR", prompts_dir), \
+         patch("scripts.propose_optimizations.call_llm_raw_cluster", return_value=None):
+        result = po._rewrite_prompt_file("answer.md", ["rule"], "model", {})
+
+    assert result is None
+
+
+# --- Integration tests for new prompt loop ---
+
+def test_main_prompt_none_marks_processed_immediately(tmp_path):
+    """When _synthesize_prompt_patch returns None, hashes are marked processed."""
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    _write_eval_log(eval_log, [_eval_entry(prompt_opts=["vague rec"])])
+    h = po._entry_hash("Do you have product X with attr Y=3?", "prompt", "vague rec")
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_synthesize_rule", return_value=None), \
+         patch.object(po, "_synthesize_security_gate", return_value=None), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=None):
+        po.main(dry_run=False)
+
+    saved = set(processed.read_text().splitlines()) if processed.exists() else set()
+    assert h in saved
+
+
+def test_main_prompt_rewrites_file_via_rewrite_prompt_file(tmp_path):
+    """main() calls _rewrite_prompt_file and writes result to data/prompts/<target>."""
+    import agent.knowledge_loader as kl
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    _write_eval_log(eval_log, [_eval_entry(prompt_opts=["Add grounding guard"])])
+
+    patch_result = {"target_file": "answer.md", "content": "## Guard\nNever emit empty."}
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_synthesize_rule", return_value=None), \
+         patch.object(po, "_synthesize_security_gate", return_value=None), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=patch_result), \
+         patch.object(po, "_rewrite_prompt_file", return_value="# Answer\n\nNever emit empty.\n") as mock_rewrite, \
+         patch.object(po, "_check_contradiction", return_value=None):
+        po.main(dry_run=False)
+
+    mock_rewrite.assert_called_once()
+    call_args = mock_rewrite.call_args[0]
+    assert call_args[0] == "answer.md"
+    assert "Add grounding guard" in call_args[1]
+
+    dest = prompts_dir / "answer.md"
+    assert dest.exists()
+    assert "Never emit empty" in dest.read_text()
+
+
+def test_main_prompt_groups_multiple_recs_for_same_target(tmp_path):
+    """Two prompt recs for same target_file → one _rewrite_prompt_file call with both."""
+    import agent.knowledge_loader as kl
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    entry1 = _eval_entry(prompt_opts=["rec-A"])
+    entry2 = _eval_entry(prompt_opts=["rec-B"])
+    _write_eval_log(eval_log, [entry1, entry2])
+
+    patch_result = {"target_file": "answer.md", "content": "## X\nDo X."}
+
+    def passthrough_cluster(items, *a, **k):
+        return [(rec, ent, [h]) for rec, ent, h in items]
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_cluster_recs", side_effect=passthrough_cluster), \
+         patch.object(po, "_synthesize_rule", return_value=None), \
+         patch.object(po, "_synthesize_security_gate", return_value=None), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=patch_result), \
+         patch.object(po, "_rewrite_prompt_file", return_value="rewritten") as mock_rewrite, \
+         patch.object(po, "_check_contradiction", return_value=None):
+        po.main(dry_run=False)
+
+    assert mock_rewrite.call_count == 1
+    call_args = mock_rewrite.call_args[0]
+    recs_passed = call_args[1]
+    assert len(recs_passed) == 2
+
+
+def test_main_prompt_dry_run_prints_preview_no_write(tmp_path):
+    """dry-run: _rewrite_prompt_file is called, preview printed, no file written."""
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    _write_eval_log(eval_log, [_eval_entry(prompt_opts=["Add rule"])])
+
+    patch_result = {"target_file": "answer.md", "content": "## X\nDo X."}
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_synthesize_rule", return_value=None), \
+         patch.object(po, "_synthesize_security_gate", return_value=None), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=patch_result), \
+         patch.object(po, "_rewrite_prompt_file", return_value="# Answer\n\nPreview.\n"), \
+         patch.object(po, "_check_contradiction", return_value=None):
+        po.main(dry_run=True)
+
+    assert not (prompts_dir / "answer.md").exists()
+
+
+def test_write_prompt_removed():
+    """_write_prompt no longer exists after refactor."""
+    assert not hasattr(po, "_write_prompt"), "_write_prompt should be removed"
