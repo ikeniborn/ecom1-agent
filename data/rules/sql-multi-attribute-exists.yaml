@@ -1,0 +1,12 @@
+id: sql-multi-attribute-exists
+phase: sql_plan
+content: |
+  Use separate EXISTS subqueries per attribute — never a single JOIN with two key conditions on the same alias. A single product_properties join with `pp.key = 'A' AND pp.key = 'B'` always returns empty (one row cannot satisfy both simultaneously).
+  Correct pattern:
+    SELECT p.sku, p.path FROM products p
+    WHERE p.brand = 'Heco'
+      AND EXISTS (SELECT 1 FROM product_properties pp WHERE pp.sku = p.sku AND pp.key = 'diameter_mm' AND pp.value_number = 3)
+      AND EXISTS (SELECT 1 FROM product_properties pp2 WHERE pp2.sku = p.sku AND pp2.key = 'screw_type' AND pp2.value_text = 'wood screw')
+created: '2026-05-18'
+source: manual
+verified: true
