@@ -1,256 +1,329 @@
-# Graph Report - .  (2026-05-16)
+# Graph Report - .  (2026-05-18)
 
 ## Corpus Check
-- 8 files · ~0 words
-- Verdict: corpus is large enough that graph structure adds value.
+- Corpus is ~29,892 words - fits in a single context window. You may not need a graph.
 
 ## Summary
-- 960 nodes · 1610 edges · 54 communities (49 shown, 5 thin omitted)
-- Extraction: 81% EXTRACTED · 19% INFERRED · 0% AMBIGUOUS · INFERRED: 313 edges (avg confidence: 0.8)
+- 1204 nodes · 2102 edges · 72 communities (63 shown, 9 thin omitted)
+- Extraction: 81% EXTRACTED · 19% INFERRED · 0% AMBIGUOUS · INFERRED: 389 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_Community 0|Community 0]]
-- [[_COMMUNITY_Community 1|Community 1]]
-- [[_COMMUNITY_Community 2|Community 2]]
-- [[_COMMUNITY_Community 3|Community 3]]
-- [[_COMMUNITY_Community 4|Community 4]]
-- [[_COMMUNITY_Community 5|Community 5]]
-- [[_COMMUNITY_Community 6|Community 6]]
-- [[_COMMUNITY_Community 7|Community 7]]
-- [[_COMMUNITY_Community 8|Community 8]]
-- [[_COMMUNITY_Community 9|Community 9]]
-- [[_COMMUNITY_Community 10|Community 10]]
-- [[_COMMUNITY_Community 11|Community 11]]
-- [[_COMMUNITY_Community 12|Community 12]]
-- [[_COMMUNITY_Community 13|Community 13]]
-- [[_COMMUNITY_Community 14|Community 14]]
-- [[_COMMUNITY_Community 15|Community 15]]
-- [[_COMMUNITY_Community 16|Community 16]]
-- [[_COMMUNITY_Community 17|Community 17]]
-- [[_COMMUNITY_Community 18|Community 18]]
-- [[_COMMUNITY_Community 19|Community 19]]
-- [[_COMMUNITY_Community 20|Community 20]]
-- [[_COMMUNITY_Community 21|Community 21]]
-- [[_COMMUNITY_Community 22|Community 22]]
-- [[_COMMUNITY_Community 23|Community 23]]
-- [[_COMMUNITY_Community 24|Community 24]]
-- [[_COMMUNITY_Community 25|Community 25]]
-- [[_COMMUNITY_Community 26|Community 26]]
-- [[_COMMUNITY_Community 27|Community 27]]
-- [[_COMMUNITY_Community 28|Community 28]]
-- [[_COMMUNITY_Community 29|Community 29]]
-- [[_COMMUNITY_Community 30|Community 30]]
-- [[_COMMUNITY_Community 33|Community 33]]
-- [[_COMMUNITY_Community 34|Community 34]]
-- [[_COMMUNITY_Community 35|Community 35]]
-- [[_COMMUNITY_Community 36|Community 36]]
-- [[_COMMUNITY_Community 37|Community 37]]
-- [[_COMMUNITY_Community 38|Community 38]]
-- [[_COMMUNITY_Community 39|Community 39]]
-- [[_COMMUNITY_Community 40|Community 40]]
-- [[_COMMUNITY_Community 41|Community 41]]
-- [[_COMMUNITY_Community 42|Community 42]]
-- [[_COMMUNITY_Community 43|Community 43]]
-- [[_COMMUNITY_Community 53|Community 53]]
+- [[_COMMUNITY_SQL Security Checks|SQL Security Checks]]
+- [[_COMMUNITY_Contract & Evaluator Models|Contract & Evaluator Models]]
+- [[_COMMUNITY_Prephase & Schema Digest|Prephase & Schema Digest]]
+- [[_COMMUNITY_Trace Logging|Trace Logging]]
+- [[_COMMUNITY_JSON Extraction|JSON Extraction]]
+- [[_COMMUNITY_Optimization Pipeline|Optimization Pipeline]]
+- [[_COMMUNITY_Schema Gate|Schema Gate]]
+- [[_COMMUNITY_Prompt Assembler Core|Prompt Assembler Core]]
+- [[_COMMUNITY_Pipeline Test Helpers|Pipeline Test Helpers]]
+- [[_COMMUNITY_Prompt Loading|Prompt Loading]]
+- [[_COMMUNITY_LLM & Pipeline Core|LLM & Pipeline Core]]
+- [[_COMMUNITY_Evaluator|Evaluator]]
+- [[_COMMUNITY_Optimization Test Mocks|Optimization Test Mocks]]
+- [[_COMMUNITY_Pipeline Discovery & Resolve|Pipeline Discovery & Resolve]]
+- [[_COMMUNITY_Value Resolution|Value Resolution]]
+- [[_COMMUNITY_Rules Loader|Rules Loader]]
+- [[_COMMUNITY_Claude Client Config|Claude Client Config]]
+- [[_COMMUNITY_Mock VM|Mock VM]]
+- [[_COMMUNITY_Bitgn Harness|Bitgn Harness]]
+- [[_COMMUNITY_Optimization Test Patches|Optimization Test Patches]]
+- [[_COMMUNITY_Test Runner (TDD)|Test Runner (TDD)]]
+- [[_COMMUNITY_TDD Test Helpers|TDD Test Helpers]]
+- [[_COMMUNITY_Answer Phase|Answer Phase]]
+- [[_COMMUNITY_Core Agent Loop|Core Agent Loop]]
+- [[_COMMUNITY_CC Client|CC Client]]
+- [[_COMMUNITY_LLM Provider Routing|LLM Provider Routing]]
+- [[_COMMUNITY_Prompt Assembler Learn Ctx|Prompt Assembler Learn Ctx]]
+- [[_COMMUNITY_Optimization Test Scenarios|Optimization Test Scenarios]]
+- [[_COMMUNITY_ECOM Runtime Client|ECOM Runtime Client]]
+- [[_COMMUNITY_PCM Runtime Client|PCM Runtime Client]]
+- [[_COMMUNITY_Pipeline Models Config|Pipeline Models Config]]
+- [[_COMMUNITY_AGENTS.MD Parser|AGENTS.MD Parser]]
+- [[_COMMUNITY_Output Models|Output Models]]
+- [[_COMMUNITY_Orchestrator Tests|Orchestrator Tests]]
+- [[_COMMUNITY_Pipeline Phase Data|Pipeline Phase Data]]
+- [[_COMMUNITY_LLM Rationale Nodes|LLM Rationale Nodes]]
+- [[_COMMUNITY_LLM Module Tests|LLM Module Tests]]
+- [[_COMMUNITY_Eval Log & Rules Data|Eval Log & Rules Data]]
+- [[_COMMUNITY_LLM Capability Probing|LLM Capability Probing]]
+- [[_COMMUNITY_Optimization Test Rationale A|Optimization Test Rationale A]]
+- [[_COMMUNITY_Anthropic LLM Client|Anthropic LLM Client]]
+- [[_COMMUNITY_Connect Client|Connect Client]]
+- [[_COMMUNITY_README Docs|README Docs]]
+- [[_COMMUNITY_Trace Tests|Trace Tests]]
+- [[_COMMUNITY_Orchestrator|Orchestrator]]
+- [[_COMMUNITY_Knowledge Loader|Knowledge Loader]]
+- [[_COMMUNITY_Optimization Test Rationale B|Optimization Test Rationale B]]
+- [[_COMMUNITY_Optimization Test Rationale C|Optimization Test Rationale C]]
+- [[_COMMUNITY_Optimization Test Rationale D|Optimization Test Rationale D]]
+- [[_COMMUNITY_Optimization Test Rationale E|Optimization Test Rationale E]]
+- [[_COMMUNITY_Optimization Test Rationale F|Optimization Test Rationale F]]
+- [[_COMMUNITY_Optimization Test Rationale G|Optimization Test Rationale G]]
+- [[_COMMUNITY_Task Grounding Refs|Task Grounding Refs]]
+- [[_COMMUNITY_LLM Cache|LLM Cache]]
+- [[_COMMUNITY_LLM Response Format|LLM Response Format]]
+- [[_COMMUNITY_Optimization Test Rationale H|Optimization Test Rationale H]]
+- [[_COMMUNITY_LLM Routing Design|LLM Routing Design]]
+- [[_COMMUNITY_Bitgn Proto|Bitgn Proto]]
+- [[_COMMUNITY_CLAUDE.md Root|CLAUDE.md Root]]
+- [[_COMMUNITY_CLAUDE.md Agent|CLAUDE.md Agent]]
+- [[_COMMUNITY_Models JSON Config|Models JSON Config]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `run_pipeline()` - 51 edges
+1. `run_pipeline()` - 68 edges
 2. `main` - 36 edges
-3. `TraceLogger` - 32 edges
-4. `load_prompt()` - 21 edges
-5. `check_schema_compliance()` - 21 edges
-6. `_write_eval_log()` - 20 edges
-7. `_eval_entry()` - 20 edges
-8. `_setup()` - 20 edges
-9. `check_sql_queries()` - 19 edges
-10. `_base_patches()` - 19 edges
+3. `TraceLogger` - 34 edges
+4. `check_schema_compliance()` - 31 edges
+5. `load_prompt()` - 29 edges
+6. `check_sql_queries()` - 22 edges
+7. `_write_eval_log()` - 22 edges
+8. `_eval_entry()` - 22 edges
+9. `_setup()` - 22 edges
+10. `_base_patches()` - 21 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `_build_answer_user_msg()` --calls--> `test_build_answer_user_msg_with_refs()`  [INFERRED]
-  .worktrees/mock-validation/agent/pipeline.py → tests/test_pipeline_sku_refs.py
-- `_build_answer_user_msg()` --calls--> `test_build_answer_user_msg_no_refs()`  [INFERRED]
-  .worktrees/mock-validation/agent/pipeline.py → tests/test_pipeline_sku_refs.py
-- `_run_learn()` --calls--> `make_json_hash()`  [INFERRED]
-  .worktrees/mock-validation/agent/pipeline.py → /home/UF.RT.RU/i.y.tischenko/Документы/Git/ecom1-agent/agent/sql_security.py
 - `get_trace()` --calls--> `test_get_trace_none_by_default()`  [INFERRED]
   agent/trace.py → tests/test_trace.py
+- `agent/pipeline.py` --uses--> `prompt.py:load_prompt()`  [INFERRED]
+  /home/ikeniborn/Documents/Project/ecom1-agent/CLAUDE.md → agent/CLAUDE.md
 - `_run_single_task()` --calls--> `TraceLogger`  [INFERRED]
-  /home/UF.RT.RU/i.y.tischenko/Документы/Git/ecom1-agent/main.py → agent/trace.py
+  main.py → agent/trace.py
+- `_run_single_task()` --calls--> `set_trace()`  [INFERRED]
+  main.py → agent/trace.py
+- `_run_single_task()` --calls--> `run_agent()`  [INFERRED]
+  main.py → agent/orchestrator.py
 
-## Communities (54 total, 5 thin omitted)
+## Communities (72 total, 9 thin omitted)
 
-### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (52): parse_agents_md(), Parse AGENTS.MD into {section_name: [lines]} for each ## section., _build_schema_digest(), _exec_sql_text(), _parse_csv_rows(), PrephaseResult, run_prephase(), test_empty_section_has_empty_lines() (+44 more)
+### Community 0 - "SQL Security Checks"
+Cohesion: 0.05
+Nodes (55): check_grounding_refs(), check_learn_output(), check_path_access(), check_retry_loop(), check_sql_queries(), check_where_literals(), _has_where_clause(), _is_select() (+47 more)
 
-### Community 1 - "Community 1"
-Cohesion: 0.08
-Nodes (31): set_trace(), TraceLogger, _collect_trace_records(), _exec_ok(), _make_pre(), Verify pipeline instruments TraceLogger at all required points., sql_validate + sql_execute records written on successful cycle., Happy path: sql_plan + answer llm_call records written. (+23 more)
+### Community 1 - "Contract & Evaluator Models"
+Cohesion: 0.07
+Nodes (57): Contract, ContractRound, EvaluatorResponse, ExecutorProposal, _compute_eval_metrics(), Compute agents_md_coverage and schema_grounding. Returns dict with both floats., Compute agents_md_coverage and schema_grounding. Returns dict with both floats., AnswerOutput (+49 more)
 
-### Community 2 - "Community 2"
+### Community 2 - "Prephase & Schema Digest"
+Cohesion: 0.05
+Nodes (62): _build_schema_digest(), _determine_task_type(), _exec_sql_text(), _format_schema_digest(), _infer_role(), merge_schema_from_sqlite_results(), _parse_csv_rows(), PrephaseResult (+54 more)
+
+### Community 3 - "Trace Logging"
+Cohesion: 0.07
+Nodes (38): set_trace(), TraceLogger, _answer_json(), _collect_trace_records(), _exec_ok(), _make_pre(), Verify pipeline instruments TraceLogger at all required points., gate_check record for schema gate written every cycle. (+30 more)
+
+### Community 4 - "JSON Extraction"
+Cohesion: 0.07
+Nodes (46): _extract_json_from_text(), JSON extraction from free-form LLM text output.  Public API:   _obj_mutation_too, Try json5 parse; raises on failure (ImportError or parse error)., Lower tuple = preferred. Used by min() to break ties among same-tier candidates., Extract the most actionable valid JSON object from free-form model output., _richness_key(), _try_json5(), call_llm_raw() (+38 more)
+
+### Community 5 - "Optimization Pipeline"
 Cohesion: 0.05
 Nodes (48): Optimization Pipeline Design, call_llm_raw_cluster, _check_contradiction, _cluster_recs, _dedup_by_content_per_task, _entry_hash, _load_model_cfg, _load_processed (+40 more)
 
-### Community 3 - "Community 3"
+### Community 6 - "Schema Gate"
+Cohesion: 0.08
+Nodes (42): _build_alias_map(), _check_query(), check_schema_compliance(), _known_cols_by_table(), Schema-aware SQL validator: unknown columns, unverified literals, double-key JOI, Check queries against schema. Returns first error string or None if all pass., Return {alias_lower: table_name_lower} from FROM and JOIN clauses., Check queries against schema. Returns first error string or None if all pass. (+34 more)
+
+### Community 7 - "Prompt Assembler Core"
 Cohesion: 0.05
-Nodes (40): _call_raw_single_model(), get_anthropic_model_id(), get_provider(), get_response_format(), _get_static_hint(), is_claude_code_model(), is_claude_model(), is_ollama_model() (+32 more)
+Nodes (41): _obj_mutation_tool(), Return the mutation tool name if obj is a write/delete/exec action, else None., AssembledPrompt, _mock_assemble(), _mock_assemble(), _make_pre(), _mock_assemble(), Bug t21: unhandled exception in for-loop must call vm.answer exactly once. (+33 more)
 
-### Community 4 - "Community 4"
-Cohesion: 0.06
-Nodes (44): check_grounding_refs(), check_learn_output(), check_path_access(), check_retry_loop(), check_sql_queries(), check_where_literals(), _has_where_clause(), _is_select() (+36 more)
-
-### Community 5 - "Community 5"
-Cohesion: 0.09
-Nodes (40): _extract_json_from_text(), JSON extraction from free-form LLM text output.  Public API:   _obj_mutation_too, Try json5 parse; raises on failure (ImportError or parse error)., Lower tuple = preferred. Used by min() to break ties among same-tier candidates., Extract the most actionable valid JSON object from free-form model output., _richness_key(), _try_json5(), call_llm_raw() (+32 more)
-
-### Community 6 - "Community 6"
-Cohesion: 0.09
-Nodes (37): Contract, ContractRound, EvaluatorResponse, ExecutorProposal, _compute_eval_metrics(), Compute agents_md_coverage and schema_grounding. Returns dict with both floats., AnswerOutput, LearnOutput (+29 more)
-
-### Community 7 - "Community 7"
-Cohesion: 0.06
-Nodes (38): _obj_mutation_tool(), Return the mutation tool name if obj is a write/delete/exec action, else None., _extract_sku_refs(), Extract catalogue paths from SQL results. Uses 'path' column when present,     f, Extract catalogue paths from SQL results. Uses 'path' column when present,     f, Raw hierarchical paths stored verbatim in sku_refs., AUTO_REFS block must show full paths — LLM copies them verbatim to grounding_ref, test_build_answer_user_msg_no_refs() (+30 more)
-
-### Community 8 - "Community 8"
-Cohesion: 0.07
-Nodes (22): Minimal orchestrator for ecom benchmark., Execute a single benchmark task., run_agent(), HarnessServiceClientSync, _log_stats(), main(), _print_table_header(), _print_table_row() (+14 more)
-
-### Community 9 - "Community 9"
-Cohesion: 0.06
-Nodes (4): ConnectClient, Minimal Connect RPC client using JSON protocol over httpx., EcomRuntimeClientSync, PcmRuntimeClientSync
-
-### Community 10 - "Community 10"
-Cohesion: 0.09
-Nodes (28): _build_static_system(), _format_schema_digest(), Load SQL planning rules from data/rules/ (one YAML file per rule)., RulesLoader, _build_static_system('sql_plan') includes security gates; 'learn' does not., _build_static_system does not include IN-SESSION RULE (those go to user_msg)., _build_static_system returns list[dict], last block has cache_control., When injected_prompt_addendum is non-empty, appends to guide block. (+20 more)
-
-### Community 11 - "Community 11"
+### Community 8 - "Pipeline Test Helpers"
 Cohesion: 0.1
-Nodes (31): _build_alias_map(), _check_query(), check_schema_compliance(), _known_cols_by_table(), Schema-aware SQL validator: unknown columns, unverified literals, double-key JOI, Check queries against schema. Returns first error string or None if all pass., Return {table_name_lower: {col_name_lower, ...}}., Return {alias_lower: table_name_lower} from FROM and JOIN clauses. (+23 more)
+Nodes (39): _answer_json(), _make_exec_result(), _make_pre(), 3 cycles all fail → OUTCOME_NONE_CLARIFICATION without ANSWER LLM call., All cycles fail → clarification outcome, no eval_thread (EVAL_ENABLED=0)., DDL query → security gate blocks → LEARN → retry → success., learn_ctx grows across cycles; each SDD user_msg contains all prior rules., LEARN updates session_rules but does not write rule files (append_rule removed). (+31 more)
 
-### Community 12 - "Community 12"
+### Community 9 - "Prompt Loading"
+Cohesion: 0.1
+Nodes (30): build_system_prompt(), _load_all(), load_prompt(), load_task_blocks(), Prompt loading utilities., Return prompt block by file stem name. Returns '' if not found., Return prompt block by file stem name. Returns '' if not found., Return list of prompt block stems for given task_type from data/config/task_bloc (+22 more)
+
+### Community 10 - "LLM & Pipeline Core"
+Cohesion: 0.12
+Nodes (32): Return per-phase model from env, or default_model if not configured., _resolve_model_for_phase(), _append_eval_log(), _build_learn_user_msg(), _build_sdd_user_msg(), _build_sql_user_msg(), _build_static_system(), _call_llm_phase() (+24 more)
+
+### Community 11 - "Evaluator"
+Cohesion: 0.1
+Nodes (32): _append_log(), _build_eval_system(), EvalInput, Post-execution pipeline evaluator. Fail-open: any exception returns None., Evaluate pipeline trace. Returns PipelineEvalOutput or None on any failure., Evaluate pipeline trace. Returns PipelineEvalOutput or None on any failure., _run(), run_evaluator() (+24 more)
+
+### Community 12 - "Optimization Test Mocks"
+Cohesion: 0.08
+Nodes (29): _mock_entry(), _mock_scenario(), Valid LLM response → MockScenario., LLM returns None → None., LLM returns non-JSON → None., LLM returns JSON missing required fields → None., _generate_mock_scenario returns None → score=1.0 (fail-open)., candidate passes + baseline fails → score=1.0. (+21 more)
+
+### Community 13 - "Pipeline Discovery & Resolve"
+Cohesion: 0.07
+Nodes (29): _extract_discovery_results(), _format_confirmed_values(), Update confirmed_values in-place from DISTINCT query results., Update confirmed_values in-place from DISTINCT query results., Compat stub — discovery phase removed from SDD pipeline., Compat stub — confirmed_values removed from SDD pipeline., When compacted_ctx is [], _run_learn falls back to append., When compacted_ctx is None, _run_learn falls back to append. (+21 more)
+
+### Community 14 - "Value Resolution"
 Cohesion: 0.12
 Nodes (29): _all_values(), _build_resolve_system(), _exec_sql(), _first_value(), Resolve phase: confirm task identifiers against DB before pipeline cycles., Deprecated shim — kept for test backward compat. Use _all_values., Resolve identifiers in task_text against DB. Returns confirmed_values or {} on f, _run() (+21 more)
 
-### Community 13 - "Community 13"
+### Community 15 - "Rules Loader"
 Cohesion: 0.08
-Nodes (28): MockScenario, _mock_entry(), _mock_scenario(), Valid LLM response → MockScenario., LLM returns None → None., LLM returns non-JSON → None., LLM returns JSON missing required fields → None., _generate_mock_scenario returns None → score=1.0 (fail-open). (+20 more)
+Nodes (25): Load SQL planning rules from data/rules/ (one YAML file per rule)., RulesLoader, _build_static_system('sql_plan') includes security gates; 'learn' does not., _build_static_system does not include IN-SESSION RULE (those go to user_msg)., _build_static_system returns list[dict], last block has cache_control., When injected_prompt_addendum is non-empty, appends to guide block., When injected_prompt_addendum is empty, no injection section., _build_static_system injects AGENT CONTEXT block for sql_plan phase when agent_i (+17 more)
 
-### Community 14 - "Community 14"
+### Community 16 - "Claude Client Config"
 Cohesion: 0.09
 Nodes (30): AGENTS.MD, build_system_prompt, call_llm_raw, data/prompts/*.md, data/prompts/optimized/, data/rules/*.yaml, data/security/*.yaml, data/eval_log.jsonl (+22 more)
 
-### Community 15 - "Community 15"
+### Community 17 - "Mock VM"
 Cohesion: 0.12
 Nodes (22): _MockResult, MockVM, test_answer_captures_last_answer(), test_answer_does_not_raise(), test_exec_clamps_to_last_result(), test_exec_cycles_through_results(), test_exec_empty_mock_results_returns_empty_string(), test_exec_explain_case_insensitive() (+14 more)
 
-### Community 16 - "Community 16"
-Cohesion: 0.13
-Nodes (28): _answer_json(), _make_exec_result(), _make_pre(), 3 cycles all fail → OUTCOME_NONE_CLARIFICATION without ANSWER LLM call., DDL query → security gate blocks → LEARN → retry → success., LEARN updates session_rules but does not write rule files (append_rule removed)., total_in_tok and total_out_tok are non-zero after successful pipeline run., SQL_PLAN → VALIDATE ok → EXECUTE ok → ANSWER ok. (+20 more)
-
-### Community 17 - "Community 17"
-Cohesion: 0.17
-Nodes (28): _base_patches(), _eval_entry(), Second rule synthesis receives updated rules_md after first write., Second rule synthesis receives updated rules_md after first write., Second rule synthesis receives updated rules_md after first write., Accepted (mock_score >= 1.0) → file written., Rejected (mock_score < 1.0) → no file written., Same rec text for same task_id validated only once. (+20 more)
-
-### Community 18 - "Community 18"
-Cohesion: 0.08
-Nodes (27): /AGENTS.MD (vault rules), AnswerOutput, cc_client.py, data/prompts/{phase}.md, data/rules/*.yaml, data/security/*.yaml, JSON extraction mutation-first priority, json_extract.py (+19 more)
-
-### Community 19 - "Community 19"
-Cohesion: 0.13
-Nodes (21): build_system_prompt(), load_prompt(), System prompt builder — loads blocks from data/prompts/*.md., Return prompt block by file stem name. Returns '' if not found., Assemble system prompt from file-based blocks for the given task type., test_build_system_prompt_fallback_to_default_for_unknown(), test_build_system_prompt_lookup_contains_core_and_catalogue(), test_core_has_ecom_role() (+13 more)
-
-### Community 20 - "Community 20"
+### Community 18 - "Bitgn Harness"
 Cohesion: 0.1
-Nodes (22): _extract_discovery_results(), _format_confirmed_values(), Update confirmed_values in-place from DISTINCT query results., Update confirmed_values in-place from DISTINCT query results., _call_llm_phase returns (obj, sgr, tok) — tok has input/output keys., _run_learn with error_type='llm_fail' must not add to session_rules., LEARN sgr_trace entry must contain 'error_type' field., session_rules accumulates all LEARN rules — no truncation cap. (+14 more)
+Nodes (19): agents_md_index, bitgn/ (protobuf stubs), HarnessServiceClientSync, _log_stats(), main(), _print_table_header(), _print_table_row(), Execute one benchmark trial. (+11 more)
 
-### Community 21 - "Community 21"
-Cohesion: 0.2
-Nodes (20): _build_answer_user_msg(), _build_learn_user_msg(), _build_sql_user_msg(), _call_llm_phase(), _csv_has_data(), _exec_result_text(), _gates_summary(), _get_rules_loader() (+12 more)
-
-### Community 22 - "Community 22"
-Cohesion: 0.16
-Nodes (19): _append_log(), _build_eval_system(), EvalInput, Post-execution pipeline evaluator. Fail-open: any exception returns None., Evaluate pipeline trace. Returns PipelineEvalOutput or None on any failure., _run(), run_evaluator(), _run_evaluator_safe() (+11 more)
-
-### Community 23 - "Community 23"
-Cohesion: 0.18
-Nodes (16): _check_tdd_antipatterns(), Subprocess test runner for TDD pipeline., Run test_code in isolated subprocess. Returns (passed, error_message)., Run test_code in isolated subprocess. Returns (passed, error_message, warnings)., run_tests(), False-negative: regex does not match unescaped opposite-quote inside literal. Ac, test_answer_tests_signature(), test_antipattern_header_literal_always_warns() (+8 more)
-
-### Community 24 - "Community 24"
-Cohesion: 0.29
-Nodes (15): _answer_json(), _make_exec_result(), _make_pre(), sql_tests fail → LEARN + SQL_PLAN retry (_skip_sql=False) → sql_tests pass → ANS, answer_tests fail → LEARN + _skip_sql=True → next cycle skips SQL, retries ANSWE, TEST_GEN returns garbage → vm.answer(OUTCOME_NONE_CLARIFICATION), SQL never runs, TDD_ENABLED=0 → pipeline identical to current; run_tests never called., TDD_ENABLED=1 + all tests pass → OUTCOME_OK, vm.answer called once. (+7 more)
-
-### Community 25 - "Community 25"
+### Community 19 - "Optimization Test Patches"
 Cohesion: 0.19
-Nodes (9): _make_harness_mocks(), test_existing_prompts_text_empty_dir(), test_existing_prompts_text_returns_full_content(), test_existing_security_text_returns_id_message(), test_existing_security_text_skips_invalid(), test_validate_recommendation_accepted(), test_validate_recommendation_no_baseline(), test_validate_recommendation_rejected() (+1 more)
+Nodes (27): _base_patches(), _eval_entry(), Accepted (mock_score >= 1.0) → file written., Rejected (mock_score < 1.0) → no file written., --dry-run skips validate_mock entirely., Auto-apply: rule is written directly without calling validate_recommendation., Accepted (score doesn't regress) → file written., --dry-run prints intent but writes nothing. (+19 more)
 
-### Community 26 - "Community 26"
+### Community 20 - "Test Runner (TDD)"
+Cohesion: 0.15
+Nodes (20): _check_tdd_antipatterns(), Subprocess test runner for TDD pipeline., Run test_code in isolated subprocess. Returns (passed, error_message)., Run test_code in isolated subprocess. Returns (passed, error_message, warnings)., Run test_code in isolated subprocess. Returns (passed, error_message, warnings)., run_tests(), False-negative: regex does not match unescaped opposite-quote inside literal. Ac, test_aggregate_antipattern_force_fail() (+12 more)
+
+### Community 21 - "TDD Test Helpers"
+Cohesion: 0.21
+Nodes (20): _answer_json(), _make_exec_result(), _make_pre(), sql_tests fail → LEARN + SQL_PLAN retry (_skip_sql=False) → sql_tests pass → ANS, answer_tests fail → LEARN + _skip_sql=True → next cycle skips SQL, retries ANSWE, TEST_GEN returns garbage → vm.answer(OUTCOME_NONE_CLARIFICATION), SQL never runs, TEST_GEN LLM call MUST occur even without SDD_ENABLED env var., TDD_ENABLED=0 → pipeline identical to current; run_tests never called. (+12 more)
+
+### Community 22 - "Answer Phase"
+Cohesion: 0.19
+Nodes (14): _build_answer_user_msg(), _extract_sku_refs(), Extract catalogue paths from SQL results. Uses 'path' column when present,     f, Extract catalogue paths from SQL results. Uses 'path' column when present,     f, Raw hierarchical paths stored verbatim in sku_refs., AUTO_REFS block must show full paths — LLM copies them verbatim to grounding_ref, test_build_answer_user_msg_no_refs(), test_build_answer_user_msg_preserves_hierarchical_ref() (+6 more)
+
+### Community 23 - "Core Agent Loop"
+Cohesion: 0.15
+Nodes (15): /AGENTS.MD (vault rules), check_retry_loop (anti-infinite-loop guard), llm.py:call_llm_raw(), loop.py / dispatch.py removed, orchestrator.py:run_agent(), Pipeline Phase Execution Order, agent/pipeline.py, prephase.py:run_prephase() (+7 more)
+
+### Community 24 - "CC Client"
+Cohesion: 0.23
+Nodes (12): _build_env(), cc_complete(), _collect_stdout(), _parse_envelope(), Claude Code tier — spawn iclaude CLI as stateless LLM.  Bypasses applied (all re, Spawn iclaude once. Returns (stdout_lines, exit_code, fail_reason).     fail_rea, Spawn iclaude once. Returns (stdout_lines, exit_code, fail_reason).     fail_rea, Stateless LLM call via iclaude subprocess.      Returns assistant text (JSON str (+4 more)
+
+### Community 25 - "LLM Provider Routing"
+Cohesion: 0.19
+Nodes (12): get_provider(), is_claude_code_model(), is_claude_model(), is_ollama_model(), True for Ollama-format models (name:tag, no slash).     Examples: qwen3.5:9b, de, True for Ollama-format models (name:tag, no slash).     Examples: qwen3.5:9b, de, True for claude-code/* aliases routed to iclaude subprocess., True for claude-code/* aliases routed to iclaude subprocess. (+4 more)
+
+### Community 26 - "Prompt Assembler Learn Ctx"
+Cohesion: 0.22
+Nodes (11): assemble_prompt(), _build_sources(), clear_learned_ctx(), load_learned_ctx(), LLM-assembler: builds unified_context from all prompt sources per pipeline cycle, Call LLM assembler to produce unified_context from all sources., Load persisted learn_ctx from prior failed run, or [] if none., Delete data/learned/{task_id}.yaml on pipeline success. (+3 more)
+
+### Community 27 - "Optimization Test Scenarios"
+Cohesion: 0.21
+Nodes (8): _make_harness_mocks(), test_existing_prompts_text_empty_dir(), test_existing_security_text_returns_id_message(), test_existing_security_text_skips_invalid(), test_validate_recommendation_accepted(), test_validate_recommendation_no_baseline(), test_validate_recommendation_rejected(), test_validate_recommendation_task_not_in_trials()
+
+### Community 30 - "Pipeline Models Config"
+Cohesion: 0.19
+Nodes (13): AnswerOutput (Pydantic model), assemble_prompt() function, data/config/task_blocks.yaml, data/prompts/*.md, data/security/*.yaml, learn_ctx (in-session error learning), LearnOutput (Pydantic model), ANSWER phase (+5 more)
+
+### Community 31 - "AGENTS.MD Parser"
 Cohesion: 0.27
-Nodes (8): _build_env(), cc_complete(), _parse_envelope(), Claude Code tier — spawn iclaude CLI as stateless LLM.  Bypasses applied (all re, Spawn iclaude once. Returns (stdout_lines, exit_code, fail_reason).     fail_rea, Stateless LLM call via iclaude subprocess.      Returns assistant text (JSON str, Extract result text and token usage from iclaude --output-format json.     Envel, _spawn_once()
+Nodes (10): parse_agents_md(), Parse AGENTS.MD into {section_name: [lines]} for each ## section., test_empty_section_has_empty_lines(), test_empty_string_returns_empty_dict(), test_h1_heading_not_treated_as_section(), test_leading_content_before_first_section_ignored(), test_multiple_sections(), test_no_sections_returns_empty_dict() (+2 more)
 
-### Community 27 - "Community 27"
-Cohesion: 0.27
-Nodes (8): Test that all vault classes have been removed from models.py, Test that models.py contains exactly 8 BaseModel classes (4 pipeline + 2 resolve, Test that the 4 pipeline models are present in models.py, test_mock_scenario_fields(), test_models_has_exactly_seven_classes(), test_pipeline_models_present(), test_test_gen_output_fields(), test_vault_models_removed()
+### Community 32 - "Output Models"
+Cohesion: 0.18
+Nodes (12): AnswerOutput, agent/evaluator.py, JSON extraction priority (mutation > read), agent/json_extract.py, LearnOutput, agent/models.py, PipelineEvalOutput, SDD phase (+4 more)
 
-### Community 28 - "Community 28"
+### Community 33 - "Orchestrator Tests"
+Cohesion: 0.24
+Nodes (7): _make_vm_mock(), run_agent calls run_pipeline for all tasks., run_agent() result must not contain builder_*/contract_*/eval_rejection_count fi, run_agent() always returns a plain dict (public API unchanged)., test_lookup_routes_to_pipeline(), test_run_agent_no_dead_stats(), test_run_agent_returns_dict()
+
+### Community 34 - "Pipeline Phase Data"
+Cohesion: 0.2
+Nodes (11): data/learned/{task_id}.yaml, ASSEMBLE phase, EXECUTE phase, SCHEMA CHECK phase, TDD phase, VALIDATE phase, agent/prompt_assembler.py, run_pipeline() function (+3 more)
+
+### Community 35 - "LLM Rationale Nodes"
+Cohesion: 0.2
+Nodes (10): Flatten system prompt blocks to plain string for non-caching tiers., Flatten system prompt blocks to plain string for non-caching tiers., Flatten system prompt blocks to plain string for non-caching tiers., _system_as_str(), _system_as_str flattens list[dict] blocks to newline-joined text., _system_as_str flattens list[dict] blocks to newline-joined text., _system_as_str returns str unchanged., _system_as_str returns str unchanged. (+2 more)
+
+### Community 37 - "Eval Log & Rules Data"
+Cohesion: 0.2
+Nodes (8): data/eval_log.jsonl, data/rules/*.yaml, eval_log written only on success, _rules_loader_cache / _security_gates_cache (module-level), scripts/propose_optimizations.py, rules_loader.py:RulesLoader, agent/rules_loader.py, Reset module-level caches between tests.
+
+### Community 38 - "LLM Capability Probing"
+Cohesion: 0.22
+Nodes (9): _get_static_hint(), probe_structured_output(), Persist current cache to disk. Non-critical — failure is silently ignored., Persist current cache to disk. Non-critical — failure is silently ignored., Persist current cache to disk. Non-critical — failure is silently ignored., Detect if model supports response_format. Returns 'json_object' or 'none'.     C, Detect if model supports response_format. Returns 'json_object' or 'none'.     C, Detect if model supports response_format. Returns 'json_object' or 'none'.     C (+1 more)
+
+### Community 39 - "Optimization Test Rationale A"
+Cohesion: 0.22
+Nodes (9): _cluster_recs returns items as-is when LLM call fails., _cluster_recs returns items as-is when LLM call fails., _cluster_recs returns items as-is when LLM call fails., All hashes in a cluster group are marked processed after writing the representat, All hashes in a cluster group are marked processed after writing the representat, _cluster_recs returns items as-is when LLM call fails., All hashes in a cluster group are marked processed after writing the representat, test_cluster_recs_all_hashes_marked_on_write() (+1 more)
+
+### Community 40 - "Anthropic LLM Client"
+Cohesion: 0.25
+Nodes (8): _call_raw_single_model(), get_anthropic_model_id(), Lightweight LLM call with 3-tier routing and transient-error retry.     Returns, Lightweight LLM call with 3-tier routing and transient-error retry.     Returns, Lightweight LLM call with 3-tier routing and transient-error retry.     Returns, Map alias (e.g. 'anthropic/claude-haiku-4.5') to Anthropic API model ID., Map alias (e.g. 'anthropic/claude-haiku-4.5') to Anthropic API model ID., Map alias (e.g. 'anthropic/claude-haiku-4.5') to Anthropic API model ID.
+
+### Community 42 - "README Docs"
 Cohesion: 0.25
 Nodes (8): data/eval_log.jsonl, data/.eval_optimizations_processed (processed hashes), MODEL_EVALUATOR env var, prompt_optimization channel → data/prompts/optimized/, scripts/propose_optimizations.py, rule_optimization channel → data/rules/sql-NNN.yaml, security_optimization channel → data/security/sec-NNN.yaml, Three optimization channels (rule, security, prompt)
 
-### Community 29 - "Community 29"
-Cohesion: 0.29
-Nodes (7): _cluster_recs returns items as-is when LLM call fails., _cluster_recs returns items as-is when LLM call fails., All hashes in a cluster group are marked processed after writing the representat, _cluster_recs returns items as-is when LLM call fails., All hashes in a cluster group are marked processed after writing the representat, test_cluster_recs_all_hashes_marked_on_write(), test_cluster_recs_fallback_on_llm_failure()
-
-### Community 30 - "Community 30"
+### Community 43 - "Trace Tests"
 Cohesion: 0.33
 Nodes (5): Verify main.py creates/closes TraceLogger and calls log_header + log_task_result, main.log must contain stats rows but NOT pipeline cycle lines., After _run_single_task: .jsonl created, no .log file, log_header + log_task_resu, test_main_log_contains_only_stats(), test_run_single_task_creates_jsonl_and_removes_log()
 
-### Community 34 - "Community 34"
+### Community 46 - "Orchestrator"
+Cohesion: 0.33
+Nodes (5): Minimal orchestrator for ecom benchmark., Execute a single benchmark task., run_agent(), run_agent forwards injection params + task_id to run_pipeline., test_run_agent_passes_injection_params()
+
+### Community 48 - "Optimization Test Rationale B"
+Cohesion: 0.4
+Nodes (5): Rule with contradiction is not written and its hashes are not marked processed., Rule with contradiction is not written and its hashes are not marked processed., Rule with contradiction is not written and its hashes are not marked processed., Rule with contradiction is not written and its hashes are not marked processed., test_contradiction_blocks_write()
+
+### Community 49 - "Optimization Test Rationale C"
+Cohesion: 0.4
+Nodes (5): Returns conflict string when LLM finds contradiction., Returns conflict string when LLM finds contradiction., Returns conflict string when LLM finds contradiction., Returns conflict string when LLM finds contradiction., test_check_contradiction_returns_string_on_conflict()
+
+### Community 50 - "Optimization Test Rationale D"
+Cohesion: 0.4
+Nodes (5): Second rule synthesis receives updated rules_md after first write., Second rule synthesis receives updated rules_md after first write., Second rule synthesis receives updated rules_md after first write., Second rule synthesis receives updated rules_md after first write., test_rules_md_refreshed_between_writes()
+
+### Community 51 - "Optimization Test Rationale E"
+Cohesion: 0.4
+Nodes (5): Returns None when LLM says OK., Returns None when LLM says OK., Returns None when LLM says OK., Returns None when LLM says OK., test_check_contradiction_returns_none_on_ok()
+
+### Community 52 - "Optimization Test Rationale F"
+Cohesion: 0.4
+Nodes (5): Ensure propose_optimizations imports rules text from knowledge_loader, not its o, Ensure propose_optimizations imports rules text from knowledge_loader, not its o, Ensure propose_optimizations imports rules text from knowledge_loader, not its o, Ensure propose_optimizations imports rules text from knowledge_loader, not its o, test_main_uses_knowledge_loader_for_rules()
+
+### Community 53 - "Optimization Test Rationale G"
+Cohesion: 0.4
+Nodes (5): _cluster_recs returns fewer items when LLM merges duplicates., _cluster_recs returns fewer items when LLM merges duplicates., _cluster_recs returns fewer items when LLM merges duplicates., _cluster_recs returns fewer items when LLM merges duplicates., test_cluster_recs_merges_duplicates()
+
+### Community 54 - "Task Grounding Refs"
 Cohesion: 0.6
 Nodes (5): check_grounding_refs, clean_refs, p.path SQL column, sku_refs, t16 grounding refs bug
 
-### Community 35 - "Community 35"
+### Community 55 - "LLM Cache"
 Cohesion: 0.5
-Nodes (4): Returns conflict string when LLM finds contradiction., Returns conflict string when LLM finds contradiction., Returns conflict string when LLM finds contradiction., test_check_contradiction_returns_string_on_conflict()
+Nodes (4): _load_capability_cache(), Load persisted cache, filtering stale entries (>7 days)., Load persisted cache, filtering stale entries (>7 days)., Load persisted cache, filtering stale entries (>7 days).
 
-### Community 36 - "Community 36"
+### Community 56 - "LLM Response Format"
 Cohesion: 0.5
-Nodes (4): Ensure propose_optimizations imports rules text from knowledge_loader, not its o, Ensure propose_optimizations imports rules text from knowledge_loader, not its o, Ensure propose_optimizations imports rules text from knowledge_loader, not its o, test_main_uses_knowledge_loader_for_rules()
+Nodes (4): get_response_format(), Build response_format dict for the given mode, or None if mode='none'., Build response_format dict for the given mode, or None if mode='none'., Build response_format dict for the given mode, or None if mode='none'.
 
-### Community 37 - "Community 37"
+### Community 57 - "Optimization Test Rationale H"
 Cohesion: 0.5
-Nodes (4): Rule with contradiction is not written and its hashes are not marked processed., Rule with contradiction is not written and its hashes are not marked processed., Rule with contradiction is not written and its hashes are not marked processed., test_contradiction_blocks_write()
+Nodes (4): Same rec text for same task_id validated only once., Same rec text for same task_id synthesized only once., Same rec text for same task_id validated only once., test_content_hash_dedup_per_task()
 
-### Community 38 - "Community 38"
+### Community 58 - "LLM Routing Design"
 Cohesion: 0.5
-Nodes (4): _cluster_recs returns fewer items when LLM merges duplicates., _cluster_recs returns fewer items when LLM merges duplicates., _cluster_recs returns fewer items when LLM merges duplicates., test_cluster_recs_merges_duplicates()
-
-### Community 39 - "Community 39"
-Cohesion: 0.5
-Nodes (4): Returns None when LLM says OK., Returns None when LLM says OK., Returns None when LLM says OK., test_check_contradiction_returns_none_on_ok()
-
-### Community 41 - "Community 41"
-Cohesion: 0.67
-Nodes (3): --dry-run skips validate_mock entirely., candidate pipeline produces no answer → score=0.0., test_dry_run_skips_validation()
+Nodes (4): agent/cc_client.py, agent/llm.py, LLM routing (provider prefix tier system), models.json
 
 ## Knowledge Gaps
-- **306 isolated node(s):** `Create run dir, open main.log for stats, wrap stdout for [task_id] terminal pref`, `Execute one benchmark trial.`, `System prompt builder — loads blocks from data/prompts/*.md.`, `Return prompt block by file stem name. Returns '' if not found.`, `Assemble system prompt from file-based blocks for the given task type.` (+301 more)
+- **385 isolated node(s):** `Create run dir, open main.log for stats, wrap stdout for [task_id] terminal pref`, `Execute one benchmark trial.`, `Return prompt block by file stem name. Returns '' if not found.`, `Assemble system prompt from file-based blocks for the given task type.`, `SGR LLM call: returns (parsed_output_or_None, sgr_trace_entry, tok_info).` (+380 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `run_pipeline()` connect `Community 21` to `Community 1`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 10`, `Community 11`, `Community 12`, `Community 15`, `Community 16`, `Community 20`, `Community 23`, `Community 24`?**
-  _High betweenness centrality (0.353) - this node is a cross-community bridge._
-- **Why does `MockScenario` connect `Community 13` to `Community 27`, `Community 6`?**
-  _High betweenness centrality (0.155) - this node is a cross-community bridge._
-- **Are the 33 inferred relationships involving `run_pipeline()` (e.g. with `run_resolve()` and `check_sql_queries()`) actually correct?**
-  _`run_pipeline()` has 33 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `run_pipeline()` connect `LLM & Pipeline Core` to `SQL Security Checks`, `Prephase & Schema Digest`, `Trace Logging`, `JSON Extraction`, `Schema Gate`, `Prompt Assembler Core`, `Pipeline Test Helpers`, `Prompt Loading`, `Pipeline Discovery & Resolve`, `Value Resolution`, `Orchestrator`, `Mock VM`, `Test Runner (TDD)`, `TDD Test Helpers`, `Answer Phase`, `Prompt Assembler Learn Ctx`?**
+  _High betweenness centrality (0.364) - this node is a cross-community bridge._
+- **Why does `_run_single_task()` connect `Bitgn Harness` to `LLM & Pipeline Core`, `Trace Logging`, `Orchestrator`?**
+  _High betweenness centrality (0.120) - this node is a cross-community bridge._
+- **Why does `run_agent()` connect `Orchestrator` to `Orchestrator Tests`, `Prephase & Schema Digest`, `JSON Extraction`, `LLM & Pipeline Core`, `Bitgn Harness`, `ECOM Runtime Client`?**
+  _High betweenness centrality (0.118) - this node is a cross-community bridge._
+- **Are the 34 inferred relationships involving `run_pipeline()` (e.g. with `run_resolve()` and `check_sql_queries()`) actually correct?**
+  _`run_pipeline()` has 34 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 2 inferred relationships involving `main` (e.g. with `test_existing_security_text_returns_id_message` and `test_existing_prompts_text_returns_full_content`) actually correct?**
   _`main` has 2 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 15 inferred relationships involving `TraceLogger` (e.g. with `_run_single_task()` and `_collect_trace_records()`) actually correct?**
-  _`TraceLogger` has 15 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 18 inferred relationships involving `load_prompt()` (e.g. with `_build_static_system()` and `_run_test_gen()`) actually correct?**
-  _`load_prompt()` has 18 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 18 inferred relationships involving `check_schema_compliance()` (e.g. with `run_pipeline()` and `test_valid_query_passes()`) actually correct?**
-  _`check_schema_compliance()` has 18 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 16 inferred relationships involving `TraceLogger` (e.g. with `_run_single_task()` and `_collect_trace_records()`) actually correct?**
+  _`TraceLogger` has 16 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 25 inferred relationships involving `check_schema_compliance()` (e.g. with `test_valid_query_passes()` and `test_unknown_column_detected()`) actually correct?**
+  _`check_schema_compliance()` has 25 INFERRED edges - model-reasoned connections that need verification._

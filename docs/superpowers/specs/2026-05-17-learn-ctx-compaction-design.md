@@ -1,3 +1,30 @@
+---
+review:
+  spec_hash: 8214bb1a33930b03
+  last_run: 2026-05-17
+  phases:
+    structure:    { status: passed }
+    coverage:     { status: passed }
+    clarity:      { status: passed }
+    consistency:  { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: INFO
+      section: "### `data/prompts/learn.md` — extend output format"
+      section_hash: 01ece2c2b9eb52fb
+      text: "«merge semantically similar rules» — отсутствует явный критерий «семантической схожести»"
+      verdict: fixed
+      verdict_at: 2026-05-17
+    - id: F-002
+      phase: clarity
+      severity: INFO
+      section: "### `data/prompts/learn.md` — extend output format"
+      section_hash: 01ece2c2b9eb52fb
+      text: "«keep distinct failure patterns separate (do not collapse different root causes)» — отсутствует явный критерий различия «разных корневых причин»"
+      verdict: fixed
+      verdict_at: 2026-05-17
+---
 # Learn Context Compaction Design
 
 **Date:** 2026-05-17  
@@ -42,6 +69,8 @@ save_learned_ctx(task_id, learn_ctx)  ← clean list to disk
 Add compaction section:
 
 - If `EXISTING_RULES` is non-empty: merge semantically similar rules into one canonical rule; generalize task-specific IDs (`basket_115` → `<basket_id>`, `cust_022` → `<customer_id>`, any concrete numeric/string ID → typed placeholder); keep distinct failure patterns separate (do not collapse different root causes)
+  - **Semantically similar** = rules describing the same constraint or fix regardless of wording (e.g. two rules both requiring GROUP BY when aggregating → merge into one)
+  - **Distinct failure pattern** = rules addressing different SQL error types, different schema violations, or different validation failures (e.g. "missing GROUP BY" ≠ "wrong column name" → keep separate)
 - `compacted_ctx` must include the new `rule_content` already merged in
 - If `EXISTING_RULES` is empty: `compacted_ctx` = `[rule_content]`
 - Output: JSON array of strings

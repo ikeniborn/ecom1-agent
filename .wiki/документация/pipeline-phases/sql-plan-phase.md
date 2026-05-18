@@ -2,10 +2,11 @@
 wiki_sources:
   - "[[data/prompts/sql_plan.md]]"
   - "[[docs/superpowers/specs/2026-05-14-api-update-carts-design.md]]"
-wiki_updated: 2026-05-14
+  - "[[data/prompts/sdd.md]]"
+wiki_updated: 2026-05-17
 wiki_status: developing
 wiki_outgoing_links:
-  - "[[pipeline-phases/resolve-phase]]"
+  - "[[pipeline-phases/sdd-phase]]"
   - "[[pipeline-phases/answer-phase]]"
   - "[[design-decisions/grounding-refs]]"
 wiki_external_links: []
@@ -16,6 +17,8 @@ aliases:
   - "SQL Plan Phase"
   - "Фаза планирования SQL"
 ---
+
+> **Примечание (2026-05-17):** Фаза SQL_PLAN переименована в **SDD** (Spec-Driven Development) в рамках редизайна промп-архитектуры. Актуальная страница: [[pipeline-phases/sdd-phase]]. Данная страница сохранена для исторического контекста. CONFIRMED VALUES и RESOLVE phase — удалены из архитектуры.
 
 # Фаза SQL_PLAN
 
