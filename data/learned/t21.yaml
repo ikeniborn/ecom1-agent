@@ -1,0 +1,25 @@
+learn_ctx:
+- Always issue LIKE probe (`WHERE id LIKE '%<basket_id>%'` or `WHERE cart_id LIKE
+  '%<basket_id>%'`) before any exact-literal ID predicate against `carts.id` or `cart_items.cart_id`.
+  Gate exact-match on confirmed LIKE hit ≥1 row in same plan cycle — dispatching the
+  LIKE query is NOT sufficient; the result must be received and verified ≥1 row before
+  issuing exact literal. Interleaving schema queries or other JOINs does NOT satisfy
+  the gate.
+- 'Discovery sequence: `exact-kind query → if 0 rows → LIKE probe → count`. Never
+  skip LIKE probe on empty discovery. Empty result = ambiguous, not authoritative.
+  Proceed to count only after LIKE probe confirms absence or yields candidates.'
+- 'Multi-attribute JOIN: never filter `pp.key = ''A'' AND pp.key = ''B''` in single
+  join — use separate EXISTS subquery per attribute key. Join column is `product_properties.sku
+  = products.sku`.'
+- Numeric attributes use `value_number`; text attributes use `value_text` — never
+  mix types.
+- Payment workflow must be initiated through `payments` tool, not raw SQL writes.
+  Reserved quantity update required on commit via `payments` tool flow.
+- 'Basket ownership must be confirmed before checkout: basket''s `customer_id` must
+  match identity returned by `id` tool (currently `cust_060`). Cross-customer basket
+  access forbidden.'
+- 'Inventory gate: for each item in basket, `inventory.available_today >= item.quantity`;
+  block checkout if any item fails. JOIN inventory on both `sku` and `store_id`.'
+- 'Price source: `products.price_cents` and `products.price_currency` — no other price
+  fields.'
+task_id: t21
