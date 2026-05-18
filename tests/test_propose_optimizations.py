@@ -687,3 +687,152 @@ def test_flatten_only_processes_outcome_ok():
     assert "t01" in task_ids
     assert "t02" not in task_ids
     assert "t03" not in task_ids
+
+
+# --- Unit tests for _find_superseded ---
+
+def test_find_superseded_returns_ids():
+    with patch("scripts.propose_optimizations.call_llm_raw_cluster",
+               return_value='["sql-001", "sql-002"]'):
+        result = po._find_superseded("Never use SELECT *.", "- sql-001: ...\n- sql-002: ...", "model", {})
+    assert result == ["sql-001", "sql-002"]
+
+
+def test_find_superseded_empty_existing():
+    result = po._find_superseded("Never use SELECT *.", "", "model", {})
+    assert result == []
+
+
+def test_find_superseded_llm_failure_returns_empty():
+    with patch("scripts.propose_optimizations.call_llm_raw_cluster", return_value=None):
+        result = po._find_superseded("content", "existing", "model", {})
+    assert result == []
+
+
+def test_find_superseded_non_list_returns_empty():
+    with patch("scripts.propose_optimizations.call_llm_raw_cluster", return_value='"sql-001"'):
+        result = po._find_superseded("content", "existing", "model", {})
+    assert result == []
+
+
+# --- Unit tests for _soft_disable ---
+
+def test_soft_disable_sets_verified_false(tmp_path):
+    rules_dir = tmp_path / "rules"
+    rules_dir.mkdir()
+    (rules_dir / "sql-001.yaml").write_text(
+        "id: sql-001\nphase: sql_plan\nverified: true\ncontent: Never X.\n"
+    )
+    result = po._soft_disable("sql-001", rules_dir)
+    assert result is True
+    data = yaml.safe_load((rules_dir / "sql-001.yaml").read_text())
+    assert data["verified"] is False
+
+
+def test_soft_disable_returns_false_when_not_found(tmp_path):
+    rules_dir = tmp_path / "rules"
+    rules_dir.mkdir()
+    result = po._soft_disable("sql-999", rules_dir)
+    assert result is False
+
+
+def test_soft_disable_leaves_other_files_unchanged(tmp_path):
+    rules_dir = tmp_path / "rules"
+    rules_dir.mkdir()
+    (rules_dir / "sql-001.yaml").write_text("id: sql-001\nverified: true\n")
+    (rules_dir / "sql-002.yaml").write_text("id: sql-002\nverified: true\n")
+    po._soft_disable("sql-001", rules_dir)
+    data = yaml.safe_load((rules_dir / "sql-002.yaml").read_text())
+    assert data["verified"] is True
+
+
+# --- Integration tests for backward cleanup wiring ---
+
+def test_main_calls_find_superseded_after_rule_write(tmp_path):
+    """_find_superseded is called with the new rule content after writing."""
+    import agent.knowledge_loader as kl
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    _write_eval_log(eval_log, [_eval_entry(rule_opts=["Never use SELECT *"])])
+
+    captured_new_content = []
+
+    def fake_find_superseded(new_content, existing_md, model, cfg):
+        captured_new_content.append(new_content)
+        return []
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_synthesize_rule", return_value="Never use SELECT *."), \
+         patch.object(po, "_synthesize_security_gate", return_value=None), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=None), \
+         patch.object(po, "_check_contradiction", return_value=None), \
+         patch.object(po, "_find_superseded", side_effect=fake_find_superseded):
+        po.main(dry_run=False)
+
+    assert len(captured_new_content) == 1
+    assert "Never use SELECT *" in captured_new_content[0]
+
+
+def test_main_soft_disables_superseded_rule(tmp_path):
+    """When _find_superseded returns an id, _soft_disable is called for that id."""
+    import agent.knowledge_loader as kl
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    _write_eval_log(eval_log, [_eval_entry(rule_opts=["Never use SELECT *"])])
+
+    (rules_dir / "sql-001.yaml").write_text(
+        "id: sql-001\nphase: sql_plan\nverified: true\ncontent: Old rule.\n"
+    )
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_synthesize_rule", return_value="Never use SELECT *."), \
+         patch.object(po, "_synthesize_security_gate", return_value=None), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=None), \
+         patch.object(po, "_check_contradiction", return_value=None), \
+         patch.object(po, "_find_superseded", return_value=["sql-001"]):
+        po.main(dry_run=False)
+
+    data = yaml.safe_load((rules_dir / "sql-001.yaml").read_text())
+    assert data["verified"] is False
+
+
+def test_main_dry_run_calls_find_superseded_but_no_disable(tmp_path):
+    """dry-run: _find_superseded runs, _soft_disable not called."""
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    _write_eval_log(eval_log, [_eval_entry(rule_opts=["Never use SELECT *"])])
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_synthesize_rule", return_value="Never use SELECT *."), \
+         patch.object(po, "_synthesize_security_gate", return_value=None), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=None), \
+         patch.object(po, "_check_contradiction", return_value=None), \
+         patch.object(po, "_find_superseded", return_value=["sql-001"]) as mock_find, \
+         patch.object(po, "_soft_disable") as mock_disable:
+        po.main(dry_run=True)
+
+    mock_find.assert_called_once()
+    mock_disable.assert_not_called()
+
+
+def test_main_calls_find_superseded_after_security_write(tmp_path):
+    """_find_superseded is called after writing a security gate."""
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    _write_eval_log(eval_log, [_eval_entry(security_opts=["Block UNION SELECT"])])
+
+    gate_spec = {"pattern": "UNION.*SELECT", "check": None, "message": "UNION SELECT prohibited"}
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_synthesize_rule", return_value=None), \
+         patch.object(po, "_synthesize_security_gate", return_value=gate_spec), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=None), \
+         patch.object(po, "_check_contradiction", return_value=None), \
+         patch.object(po, "_find_superseded", return_value=[]) as mock_find:
+        po.main(dry_run=False)
+
+    mock_find.assert_called_once()

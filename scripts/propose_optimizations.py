@@ -230,6 +230,45 @@ def _check_contradiction(
     return None
 
 
+def _find_superseded(new_content: str, existing_md: str, model: str, cfg: dict) -> list[str]:
+    """One LLM call. Returns list of IDs from existing_md superseded by new_content. Returns [] on failure."""
+    if not existing_md:
+        return []
+    from agent.json_extract import _extract_json_from_text
+    system = (
+        "Given newly written content and existing items, identify which existing items "
+        "are now superseded or contradicted by the new content.\n"
+        "Return a JSON array of IDs (e.g. [\"sql-015\"]). Return [] if none.\n"
+        "Return only the JSON array, no other text."
+        + f"\n\nExisting items:\n{existing_md}"
+    )
+    raw = call_llm_raw_cluster(system, f"New content:\n{new_content}", model, cfg, max_tokens=256)
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw.strip())
+    except (json.JSONDecodeError, ValueError):
+        parsed = _extract_json_from_text(raw)
+    if not isinstance(parsed, list):
+        return []
+    return [s for s in parsed if isinstance(s, str)]
+
+
+def _soft_disable(rule_id: str, directory: Path) -> bool:
+    """Finds YAML file with matching id field, sets verified: false. Returns True if patched."""
+    for f in directory.glob("*.yaml"):
+        try:
+            data = yaml.safe_load(f.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data.get("id") == rule_id:
+                data["verified"] = False
+                with open(f, "w", encoding="utf-8") as fh:
+                    yaml.dump(data, fh, allow_unicode=True, default_flow_style=False)
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def _next_num(directory: Path, prefix: str) -> int:
     existing = []
     for f in directory.glob("*.yaml"):
@@ -476,8 +515,15 @@ def main(dry_run: bool = False) -> None:
         num = _next_num(_RULES_DIR, "sql-")
         if dry_run:
             print(f"  → [DRY RUN] sql-{num:03d}.yaml: {content[:100]}")
+            superseded = _find_superseded(content, rules_md, model, cfg)
+            for sid in superseded:
+                print(f"  → [DRY RUN] would disable {sid} (superseded)")
         else:
             dest = _write_rule(num, content, entry, raw_rec)
+            superseded = _find_superseded(content, rules_md, model, cfg)
+            for sid in superseded:
+                if _soft_disable(sid, _RULES_DIR):
+                    print(f"  → disabled {sid} (superseded)")
             new_processed.update(all_hashes)
             written += 1
             rules_md = knowledge_loader.existing_rules_text()
@@ -496,8 +542,15 @@ def main(dry_run: bool = False) -> None:
         num = _next_num(_SECURITY_DIR, "sec-")
         if dry_run:
             print(f"  → [DRY RUN] sec-{num:03d}.yaml: {gate_spec.get('message', '')}")
+            superseded = _find_superseded(gate_spec.get("message", ""), security_md, model, cfg)
+            for sid in superseded:
+                print(f"  → [DRY RUN] would disable {sid} (superseded)")
         else:
             dest = _write_security(num, gate_spec, entry, raw_rec)
+            superseded = _find_superseded(gate_spec.get("message", ""), security_md, model, cfg)
+            for sid in superseded:
+                if _soft_disable(sid, _SECURITY_DIR):
+                    print(f"  → disabled {sid} (superseded)")
             new_processed.update(all_hashes)
             written += 1
             security_md = knowledge_loader.existing_security_text()
