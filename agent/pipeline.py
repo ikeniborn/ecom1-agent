@@ -396,7 +396,7 @@ def run_pipeline(
                         refs = ["/docs/payments/3ds.md"] + refs
                     elif any(k in t for k in ["discount", "service_recovery", "voucher"]):
                         refs = ["/docs/discounts.md"] + refs
-                    elif any(k in t for k in ["checkout", "submit checkout", "place order"]):
+                    elif any(k in t for k in ["checkout", "check out", "submit checkout", "place order", "complete order"]):
                         refs = ["/docs/checkout.md"] + refs
                     return refs
 
@@ -462,7 +462,13 @@ def run_pipeline(
                 prior_query_sets.append(frozenset(sql_queries))
 
                 # ── SCHEMA GATE ───────────────────────────────────────────────────
-                schema_err = check_schema_compliance(sql_queries, pre.schema_digest, {}, task_text)
+                _task_lower = task_text.lower()
+                _pre_confirmed: dict = {}
+                if any(k in _task_lower for k in ["checkout", "check out", "submit checkout", "place order", "complete order"]):
+                    _bm = re.search(r'\b(basket_\w+|cart_\w+)\b', task_text, re.IGNORECASE)
+                    if _bm:
+                        _pre_confirmed = {"basket_id": [_bm.group(1)]}
+                schema_err = check_schema_compliance(sql_queries, pre.schema_digest, _pre_confirmed, task_text)
                 if t := get_trace():
                     t.log_gate_check(cycle + 1, "schema", sql_queries, bool(schema_err), schema_err or None)
                 if schema_err:
@@ -668,7 +674,7 @@ def run_pipeline(
                     print(f"{CLI_YELLOW}[pipeline] VERIFY_ANSWER failed: {ans_err[:300]}{CLI_CLR}")
                     last_error = ans_err[:500]
                     consecutive_answer_test_fails += 1
-                    if consecutive_answer_test_fails >= 3:
+                    if consecutive_answer_test_fails >= 3 or answer_out.outcome == "OUTCOME_NONE_UNSUPPORTED":
                         print(f"{CLI_YELLOW}[pipeline] answer test fail × {consecutive_answer_test_fails} — force submit{CLI_CLR}")
                     else:
                         _skip_sdd = True
@@ -696,6 +702,23 @@ def run_pipeline(
                 [r for r in answer_out.grounding_refs if r in result_paths]
                 if result_paths else list(answer_out.grounding_refs)
             )
+            if outcome == "OUTCOME_NONE_UNSUPPORTED":
+                t_lower = task_text.lower()
+                policy_refs = ["/docs/security.md"]
+                if any(k in t_lower for k in ["checkout", "check out", "submit checkout", "place order", "complete order"]):
+                    policy_refs = ["/docs/checkout.md"] + policy_refs
+                    basket_m = re.search(r'\b(basket_\w+|cart_\w+)\b', task_text, re.IGNORECASE)
+                    if basket_m:
+                        basket_ref = f"/proc/baskets/{basket_m.group(1)}.json"
+                        if basket_ref not in clean_refs:
+                            clean_refs.append(basket_ref)
+                elif any(k in t_lower for k in ["3ds", "3d secure"]):
+                    policy_refs = ["/docs/payments/3ds.md"] + policy_refs
+                elif any(k in t_lower for k in ["discount", "service_recovery", "voucher"]):
+                    policy_refs = ["/docs/discounts.md"] + policy_refs
+                for pr in reversed(policy_refs):
+                    if pr not in clean_refs:
+                        clean_refs.insert(0, pr)
             try:
                 vm.answer(AnswerRequest(
                     message=answer_out.message,

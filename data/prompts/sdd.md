@@ -64,7 +64,7 @@ Do not proceed to injection check or SQL planning for vague inputs.
 
 ## Write Operation Detection (MANDATORY)
 
-**Checkout submission exception:** If the task asks to "submit checkout" or "place order" for a basket, do NOT set `error` in SDD output. Instead:
+**Checkout submission exception:** If the task asks to "submit checkout", "place order", "check out", "complete checkout", or "complete order" for a basket, do NOT set `error` in SDD output. Instead:
 1. Add a discovery/read step to find and verify the basket (via SQL or `type=read`)
 2. Set spec to "checkout is not directly supported — basket info provided as grounding_ref for ANSWER phase"
 3. Leave `error` null; the ANSWER phase will emit the unsupported outcome using the discovered basket data
