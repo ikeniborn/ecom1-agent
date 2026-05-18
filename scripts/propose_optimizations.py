@@ -17,6 +17,7 @@ os.environ["EVAL_ENABLED"] = "0"   # must be before agent imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agent import knowledge_loader
+from agent.json_extract import _extract_json_from_text
 from agent.llm import call_llm_raw
 
 call_llm_raw_cluster = call_llm_raw  # alias — allows patch in tests without affecting call_llm_raw
@@ -234,7 +235,6 @@ def _find_superseded(new_content: str, existing_md: str, model: str, cfg: dict) 
     """One LLM call. Returns list of IDs from existing_md superseded by new_content. Returns [] on failure."""
     if not existing_md:
         return []
-    from agent.json_extract import _extract_json_from_text
     system = (
         "Given newly written content and existing items, identify which existing items "
         "are now superseded or contradicted by the new content.\n"
@@ -259,13 +259,13 @@ def _soft_disable(rule_id: str, directory: Path) -> bool:
     for f in directory.glob("*.yaml"):
         try:
             data = yaml.safe_load(f.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and data.get("id") == rule_id:
-                data["verified"] = False
-                with open(f, "w", encoding="utf-8") as fh:
-                    yaml.dump(data, fh, allow_unicode=True, default_flow_style=False)
-                return True
         except Exception:
-            pass
+            continue
+        if isinstance(data, dict) and data.get("id") == rule_id:
+            data["verified"] = False
+            with open(f, "w", encoding="utf-8") as fh:
+                yaml.dump(data, fh, allow_unicode=True, default_flow_style=False)
+            return True
     return False
 
 
@@ -514,6 +514,7 @@ def main(dry_run: bool = False) -> None:
             continue
         num = _next_num(_RULES_DIR, "sql-")
         if dry_run:
+            # rules_md is not refreshed in dry-run (intentional — no writes happen)
             print(f"  → [DRY RUN] sql-{num:03d}.yaml: {content[:100]}")
             superseded = _find_superseded(content, rules_md, model, cfg)
             for sid in superseded:
@@ -541,6 +542,7 @@ def main(dry_run: bool = False) -> None:
             continue
         num = _next_num(_SECURITY_DIR, "sec-")
         if dry_run:
+            # security_md is not refreshed in dry-run (intentional — no writes happen)
             print(f"  → [DRY RUN] sec-{num:03d}.yaml: {gate_spec.get('message', '')}")
             superseded = _find_superseded(gate_spec.get("message", ""), security_md, model, cfg)
             for sid in superseded:

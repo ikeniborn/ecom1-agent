@@ -836,3 +836,36 @@ def test_main_calls_find_superseded_after_security_write(tmp_path):
         po.main(dry_run=False)
 
     mock_find.assert_called_once()
+
+
+def test_soft_disable_ignores_malformed_yaml(tmp_path):
+    rules_dir = tmp_path / "rules"
+    rules_dir.mkdir()
+    (rules_dir / "bad.yaml").write_text("not: valid: yaml: [")
+    result = po._soft_disable("sql-001", rules_dir)
+    assert result is False
+
+
+def test_main_soft_disables_superseded_security(tmp_path):
+    """When _find_superseded returns an id after security write, _soft_disable is called."""
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    _write_eval_log(eval_log, [_eval_entry(security_opts=["Block UNION SELECT"])])
+
+    (security_dir / "sec-001.yaml").write_text(
+        "id: sec-001\naction: block\nmessage: Old gate.\nverified: true\n"
+    )
+
+    gate_spec = {"pattern": "UNION.*SELECT", "check": None, "message": "UNION SELECT prohibited"}
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_synthesize_rule", return_value=None), \
+         patch.object(po, "_synthesize_security_gate", return_value=gate_spec), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=None), \
+         patch.object(po, "_check_contradiction", return_value=None), \
+         patch.object(po, "_find_superseded", return_value=["sec-001"]):
+        po.main(dry_run=False)
+
+    data = yaml.safe_load((security_dir / "sec-001.yaml").read_text())
+    assert data["verified"] is False
