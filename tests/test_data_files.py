@@ -9,8 +9,20 @@ SECURITY_DIR = DATA_DIR / "security"
 PROMPTS_DIR = DATA_DIR / "prompts"
 
 EXPECTED_RULE_IDS = {
+    # Restored from git
     "sql-015", "sql-016", "sql-017", "sql-031",
     "sql-sku-required", "sql-retry-divergence", "sql-count-with-sample",
+    # New — from sdd.md
+    "sql-discovery-patterns", "sql-discovery-fallback",
+    "sql-multi-attribute-exists", "sql-store-discovery",
+    "sql-inventory-projection", "sql-cart-query",
+    "sql-product-line-model", "sql-not-found",
+    # New — from learn.md
+    "sql-learn-patterns",
+    # New — from answer.md
+    "sql-grounding-refs", "sql-model-name-fidelity",
+    "sql-key-existence-vs-sku", "sql-missing-numeric-field",
+    "sql-store-scope",
 }
 
 
@@ -72,6 +84,102 @@ def test_sql_count_with_sample_scoped_to_products():
     assert "path" in content
 
 
+def test_sql_discovery_patterns_like_no_ilike():
+    rules = _load_all_rules()
+    content = rules["sql-discovery-patterns"]["content"]
+    assert "LIKE" in content
+    assert "ILIKE" in content
+    assert "SQLite" in content or "sqlite" in content.lower()
+
+
+def test_sql_discovery_fallback_zero_rows():
+    rules = _load_all_rules()
+    content = rules["sql-discovery-fallback"]["content"]
+    assert "0 rows" in content or "fallback" in content.lower()
+
+
+def test_sql_multi_attribute_exists_subquery():
+    rules = _load_all_rules()
+    content = rules["sql-multi-attribute-exists"]["content"]
+    assert "EXISTS" in content
+    assert "product_properties" in content
+
+
+def test_sql_store_discovery_store_id():
+    rules = _load_all_rules()
+    content = rules["sql-store-discovery"]["content"]
+    assert "store_id" in content
+    assert "stores" in content
+
+
+def test_sql_inventory_projection_available_today():
+    rules = _load_all_rules()
+    content = rules["sql-inventory-projection"]["content"]
+    assert "available_today" in content
+    assert "store_id" in content
+
+
+def test_sql_cart_query_join_pattern():
+    rules = _load_all_rules()
+    content = rules["sql-cart-query"]["content"]
+    assert "cart_items" in content
+    assert "customer_id" in content
+
+
+def test_sql_product_line_model_column():
+    rules = _load_all_rules()
+    content = rules["sql-product-line-model"]["content"]
+    assert "model" in content
+    assert "series" in content
+
+
+def test_sql_not_found_grounding_refs_empty():
+    rules = _load_all_rules()
+    content = rules["sql-not-found"]["content"]
+    assert "grounding_refs" in content or "NO" in content
+
+
+def test_sql_learn_patterns_join_bug():
+    rules = _load_all_rules()
+    content = rules["sql-learn-patterns"]["content"]
+    assert "product_properties" in content
+    assert "EXISTS" in content or "join" in content.lower()
+
+
+def test_sql_grounding_refs_sku_mandatory():
+    rules = _load_all_rules()
+    content = rules["sql-grounding-refs"]["content"]
+    assert "sku" in content.lower()
+    assert "AUTO_REFS" in content
+
+
+def test_sql_model_name_fidelity_exact():
+    rules = _load_all_rules()
+    content = rules["sql-model-name-fidelity"]["content"]
+    assert "exact" in content.lower() or "SQL" in content
+
+
+def test_sql_key_existence_vs_sku_distinct():
+    rules = _load_all_rules()
+    content = rules["sql-key-existence-vs-sku"]["content"]
+    assert "discovery" in content.lower() or "filter" in content.lower()
+    assert "sku" in content.lower()
+
+
+def test_sql_missing_numeric_field_learn():
+    rules = _load_all_rules()
+    content = rules["sql-missing-numeric-field"]["content"]
+    assert "available_today" in content or "on_hand" in content
+    assert "LEARN" in content or "learn" in content.lower()
+
+
+def test_sql_store_scope_city_filter():
+    rules = _load_all_rules()
+    content = rules["sql-store-scope"]["content"]
+    assert "store_id" in content
+    assert "city" in content.lower() or "filter" in content.lower()
+
+
 # ── Security gates ───────────────────────────────────────────────────────────
 
 def test_security_gates_load_both_files():
@@ -116,24 +224,30 @@ def test_capability_keys_has_message_and_terms():
 
 # ── Prompt patches ───────────────────────────────────────────────────────────
 
-def test_sdd_plan_aborted_identical():
-    content = (PROMPTS_DIR / "sdd.md").read_text(encoding="utf-8")
+def test_plan_aborted_identical_in_rules():
+    rules = _load_all_rules()
+    content = rules["sql-retry-divergence"]["content"]
     assert "PLAN_ABORTED_IDENTICAL" in content
 
 
-def test_sdd_column_existence_unknown_column():
-    content = (PROMPTS_DIR / "sdd.md").read_text(encoding="utf-8")
-    assert "Column Existence" in content or "column existence" in content.lower()
+def test_column_existence_in_rules():
+    rules = _load_all_rules()
+    content = rules["sql-031"]["content"]
+    assert "column" in content.lower()
+    assert "digest" in content.lower() or "schema" in content.lower()
 
 
-def test_sdd_zero_column_table_skip():
-    content = (PROMPTS_DIR / "sdd.md").read_text(encoding="utf-8")
-    assert "0 columns" in content or "zero columns" in content.lower()
+def test_zero_column_table_skip_in_rules():
+    rules = _load_all_rules()
+    content = rules["sql-017"]["content"]
+    assert "kinds" in content
+    assert "products.name" in content
 
 
-def test_sdd_discovery_fallback_at_plan_time():
-    content = (PROMPTS_DIR / "sdd.md").read_text(encoding="utf-8")
-    assert "Discovery Fallback" in content or "discovery fallback" in content.lower()
+def test_discovery_fallback_in_rules():
+    rules = _load_all_rules()
+    content = rules["sql-discovery-fallback"]["content"]
+    assert "0 rows" in content or "fallback" in content.lower()
 
 
 def test_sdd_vague_task_gate():
@@ -147,8 +261,8 @@ def test_answer_schema_mismatch_clarification_forbidden():
     assert "schema-mismatch" in content or "schema mismatch" in content.lower()
 
 
-def test_learn_loop_cap_section():
-    content = (PROMPTS_DIR / "learn.md").read_text(encoding="utf-8")
-    assert "Loop Cap" in content
+def test_learn_loop_cap_in_rules():
+    rules = _load_all_rules()
+    content = rules["sql-016"]["content"]
     assert "learn_ctx" in content
     assert ">=2" in content or "≥2" in content or ">= 2" in content
