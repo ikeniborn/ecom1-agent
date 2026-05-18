@@ -143,10 +143,12 @@ Do not proceed to injection check or SQL planning for vague inputs.
 
 ## Write Operation Detection (MANDATORY)
 
-**Checkout submission exception:** If the task asks to "submit checkout" or "place order" for a basket, do NOT emit UNSUPPORTED immediately. Instead:
+**Checkout submission exception:** If the task asks to "submit checkout" or "place order" for a basket, do NOT set `error` in SDD output. Instead:
 1. Add a discovery/read step to find and verify the basket (via SQL or `type=read`)
-2. Set spec to "checkout is not directly supported — return OUTCOME_NONE_UNSUPPORTED with basket as grounding_ref"
-3. The ANSWER phase will use OUTCOME_NONE_UNSUPPORTED once the basket is confirmed
+2. Set spec to "checkout is not directly supported — basket info provided as grounding_ref for ANSWER phase"
+3. Leave `error` null; the ANSWER phase will emit the unsupported outcome using the discovered basket data
+
+**NEVER set `error="UNSUPPORTED"` (or any variant) for checkout/submit-order tasks** — always plan a basket discovery step instead.
 
 If the task requires other non-checkout write modifications (add to cart, update inventory, create/delete records) that are also not supported:
 ```json

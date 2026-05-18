@@ -416,7 +416,7 @@ def run_pipeline(
                     success = True
                     break
 
-                if sdd_out.error == "UNSUPPORTED":
+                if sdd_out.error in ("UNSUPPORTED", "OUTCOME_NONE_UNSUPPORTED"):
                     print(f"{CLI_YELLOW}[pipeline] SDD: unsupported operation{CLI_CLR}")
                     _refs = _policy_refs(task_text)
                     if "/docs/checkout.md" not in _refs:
