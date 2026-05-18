@@ -14,27 +14,8 @@ Given the task, the failed SQL queries, and the error or empty-result message, d
 - `rule_content` field: markdown text for the new rule — specific, actionable, starts with "Never" or "Always" or "Use".
 - `agents_md_anchor` field: if the failure was caused by ignoring an AGENTS.MD section (e.g. wrong brand alias, wrong kind synonym), set this to `"<section_key> > <specific_entry>"` (e.g. `"brand_aliases > Heco"`). Set to `null` if failure is unrelated to AGENTS.MD.
 
-## Common failure patterns to check first
-
-**Multi-attribute JOIN bug:** If the query joins `product_properties` once but filters `pp.key = 'A' AND pp.key = 'B'`, a single row can never satisfy both conditions → always empty. Fix: use separate EXISTS subquery per attribute. Join column is `product_properties.sku = products.sku`.
-
-**Wrong column name:** Check the schema — is it `product_sku`, `product_id`, or `sku`? Verify the join column.
-
-**Value type mismatch:** Numeric values (diameter, weight) go in `value_number`; text values go in `value_text`. Don't mix.
-
-**Wrong attribute key:** Use `SELECT DISTINCT key FROM product_properties WHERE product_sku IN (SELECT sku FROM products WHERE brand=X)` to discover actual key names before filtering.
-
 ## Output format (JSON only)
 {"reasoning": "<diagnosis of what went wrong>", "conclusion": "<one-sentence summary>", "rule_content": "<markdown rule text>", "agents_md_anchor": "<section_key > entry, or null>", "compacted_ctx": ["<merged rule 1>", "<merged rule 2>"]}
-
-## Discovery Fallback Rule
-
-When discovery query (kind lookup) returns 0 rows, MUST issue fallback `LIKE` probe before count step.
-
-- Empty discovery result = ambiguous, not authoritative.
-- Never skip to count on silent empty discovery.
-- Sequence: `discovery (exact kind) → if 0 rows → LIKE probe → count`.
-- Proceed to count only after LIKE probe confirms absence or yields candidates.
 
 ## Reasoning Field Discipline
 
@@ -74,15 +55,6 @@ After producing `rule_content`, compact the accumulated `EXISTING_RULES` list:
 - `compacted_ctx` = `[rule_content]`
 
 Output `compacted_ctx` as a JSON array of strings.
-
-## Learn Loop Cap
-
-If the current failure topic (determined by keyword overlap with existing entries in `learn_ctx`) already appears **≥2 times** in `learn_ctx`, do NOT produce another rule. Instead:
-
-- Set `rule_content` to: `"Loop cap reached — topic already in learn_ctx >=2 times: <topic keyword>"`
-- Set `conclusion` to name the repeated topic explicitly.
-
-The pipeline will skip further LEARN cycles for this topic and proceed to answer with available data.
 
 ## Loop Prevention
 
