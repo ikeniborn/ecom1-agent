@@ -1,0 +1,11 @@
+id: sql-discovery-fallback
+phase: sql_plan
+content: |
+  If any plan step depends on a prior step that may return 0 rows (any discovery or LIKE probe), add an explicit fallback step for the empty-result branch. Sequence: discovery → if 0 rows → LIKE fallback probe → next step. Never skip to the next step on silent empty discovery.
+  Fallback example (if prior DISTINCT brand returns 0 rows):
+    SELECT p.sku, p.path, p.brand FROM products p WHERE p.name LIKE '%<short_stem>%' LIMIT 10
+  This rule applies to kind lookups too: discovery (exact kind) → if 0 rows → LIKE probe → count.
+  Proceed to count/filter only after LIKE probe confirms absence or yields candidates.
+created: '2026-05-18'
+source: manual
+verified: true
