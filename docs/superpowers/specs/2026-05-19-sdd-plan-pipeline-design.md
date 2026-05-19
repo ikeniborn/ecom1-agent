@@ -19,9 +19,9 @@ ASSEMBLE → SDD → PLAN → EXECUTE → ANSWER
 | ASSEMBLE | `task_text` + `learn_ctx` | `unified_context` |
 | SDD | `unified_context` | `SddOutput` |
 | PLAN | `SddOutput` | `PlanOutput` |
-| EXECUTE | `PlanOutput.action` | results |
-| ANSWER | `unified_context` + results | `AnswerOutput` |
-| LEARN | `unified_context` + error + `SddOutput` + `PlanOutput` | updated `learn_ctx` |
+| EXECUTE | `PlanOutput` | `ExecuteOutput` (results) |
+| ANSWER | `ExecuteOutput` | `AnswerOutput` |
+| LEARN | `unified_context` + `SddOutput` + `PlanOutput` + `AnswerOutput` | updated `learn_ctx` |
 
 ## Data Models
 
@@ -45,11 +45,20 @@ class PlanOutput(BaseModel):
     action: str               # final SQL query or expression to execute (plain string)
 ```
 
+### ExecuteOutput (new)
+
+```python
+class ExecuteOutput(BaseModel):
+    results: list[dict]       # raw rows from execution
+    action: str               # echo of executed action
+```
+
 ## Components
 
 ### models.py
 - Add `spec_goal: str` and `success_criteria: list[str]` to `SddOutput`
 - Add new `PlanOutput` class
+- Add new `ExecuteOutput` class
 
 ### data/prompts/plan.md
 - New PLAN phase prompt
@@ -60,8 +69,9 @@ class PlanOutput(BaseModel):
 - Remove TDD phase entirely
 - Add PLAN phase after SDD, before EXECUTE
 - PLAN call: `_call_llm_phase(PlanOutput, system=[plan_guide], user_msg=sdd_out_serialized, phase="plan")`
-- EXECUTE receives `PlanOutput.action`
-- LEARN receives `unified_context` + error + `SddOutput` + `PlanOutput`
+- EXECUTE receives full `PlanOutput` (approach, steps, action) — understands decomposition context
+- ANSWER receives `ExecuteOutput` only — no `unified_context`
+- LEARN receives `unified_context` + `SddOutput` + `PlanOutput` + `AnswerOutput` — full picture: task intent, spec, plan, execution, wrong answer → lesson targets spec/plan quality
 
 ### llm.py
 - Add `"plan"` to `_resolve_model_for_phase`
@@ -73,7 +83,7 @@ class PlanOutput(BaseModel):
 
 ## Learning Loop
 
-LEARN sees: what was intended (spec_goal, success_criteria), how it was decomposed (steps, action), what failed (error). Produces a rule targeting the gap between spec intent and plan execution. Rule enters `learn_ctx` → ASSEMBLE includes it in `unified_context` → SDD and PLAN improve in next cycle.
+LEARN sees: task intent (unified_context), spec (SddOutput), decomposition (PlanOutput), wrong answer (AnswerOutput). Produces a rule targeting the gap between spec intent and plan execution. Rule enters `learn_ctx` → ASSEMBLE includes it in `unified_context` → SDD and PLAN improve in next cycle.
 
 ## Out of Scope
 
