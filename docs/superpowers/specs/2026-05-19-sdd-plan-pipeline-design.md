@@ -83,7 +83,7 @@ class ExecuteOutput(BaseModel):
 
 ## ASSEMBLE Sources
 
-- `AGENTS.md` — base agent instructions from harness (read via `vm.read("/AGENTS.MD")`). Structured as `##` sections parsed into `agents_md_index`: brand aliases, kind synonyms, folder roles, and other domain vocabulary. Describes system identity, constraints, and navigation conventions (e.g. `readme.md` files serve as sub-agents.md).
+- `AGENTS.md` — base agent instructions from harness (read via `vm.read("/AGENTS.MD")`). Structured as `##` sections parsed into `agents_md_index`. **Section names and content are dynamic** — they vary per deployment and must not be hardcoded. ASSEMBLE reads the index at runtime and passes all sections as-is into `unified_context`. Typical sections include domain vocabulary (brand aliases, kind synonyms), folder roles, and system constraints, but the agent must treat whatever is present as authoritative.
 - `/bin` utilities — executable tools provided by harness; AGENTS.md describes what each does and when to use them
 - `task_text` — specific task provided by harness
 - `tree /docs` — executed at ASSEMBLE start via `/bin` or harness util; gives agent visibility into available documentation structure before forming unified_context
