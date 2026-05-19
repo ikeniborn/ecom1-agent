@@ -16,7 +16,7 @@ ASSEMBLE → SDD → PLAN → EXECUTE → ANSWER
 
 | Phase | Input | Output |
 |-------|-------|--------|
-| ASSEMBLE | `task_text` + `learn_ctx` | `unified_context` |
+| ASSEMBLE | `AGENTS.md` + `task_text` + `tree /docs` + `learn_ctx` | `unified_context` |
 | SDD | `unified_context` | `SddOutput` |
 | PLAN | `SddOutput` | `PlanOutput` |
 | EXECUTE | `PlanOutput` | `ExecuteOutput` (results) |
@@ -80,6 +80,13 @@ class ExecuteOutput(BaseModel):
 ### data/prompts/learn.md
 - Update to reflect LEARN now receives SddOutput + PlanOutput
 - Lessons must target spec quality and plan decomposition, not just SQL
+
+## ASSEMBLE Sources
+
+- `AGENTS.md` — base agent instructions from harness: logic, constraints, how to use `/bin` utilities and `proc/` entities
+- `task_text` — specific task provided by harness
+- `tree /docs` — executed at ASSEMBLE start; gives agent visibility into available documentation structure
+- `learn_ctx` — lessons from previous failed cycles
 
 ## Learning Loop
 
