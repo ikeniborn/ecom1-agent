@@ -103,14 +103,10 @@ def check_learn_output(
 def check_retry_loop(
     queries: list[str],
     prior_query_sets: list[frozenset],
-    security_gates: list[dict],
 ) -> str | None:
-    """Block identical query retry without Learn mutation (sec-073)."""
-    for gate in security_gates:
-        if gate.get("check") != "no_identical_query_retry_without_learn_mutation":
-            continue
-        if frozenset(queries) in prior_query_sets:
-            return f"[{gate['id']}] {gate['message']}"
+    """Block identical query retry — anti-infinite-loop guard."""
+    if frozenset(queries) in prior_query_sets:
+        return "Identical query set detected — infinite loop prevention"
     return None
 
 

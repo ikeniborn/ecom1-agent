@@ -158,3 +158,19 @@ def test_no_outer_where_blocked():
     sql = "SELECT id FROM products"
     err = check_sql_queries([sql], _GATES)
     assert err is not None and "sec-002" in err
+
+
+def test_check_retry_loop_standalone_blocks_duplicate():
+    from agent.sql_security import check_retry_loop
+    queries = ["SELECT COUNT(*) FROM products"]
+    prior = [frozenset(queries)]
+    result = check_retry_loop(queries, prior)
+    assert result is not None
+    assert "identical" in result.lower() or "loop" in result.lower()
+
+
+def test_check_retry_loop_standalone_allows_new():
+    from agent.sql_security import check_retry_loop
+    queries = ["SELECT COUNT(*) FROM products"]
+    result = check_retry_loop(queries, [])
+    assert result is None

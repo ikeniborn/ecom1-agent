@@ -454,7 +454,7 @@ def run_pipeline(
                         continue
 
                 # ── SECURITY CHECK (retry-loop guard only) ───────────────────────
-                retry_err = check_retry_loop(sql_queries, prior_query_sets, security_gates)
+                retry_err = check_retry_loop(sql_queries, prior_query_sets)
                 if retry_err:
                     print(f"{CLI_RED}[pipeline] SECURITY hard-stop: {retry_err}{CLI_CLR}")
                     last_error = retry_err
