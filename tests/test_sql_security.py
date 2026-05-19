@@ -2,7 +2,7 @@
 import yaml
 import pytest
 from pathlib import Path
-from agent.sql_security import check_sql_queries, check_path_access, load_security_gates
+from agent.sql_security import check_sql_queries, check_path_access
 
 _GATES = [
     {"id": "sec-001", "pattern": "^\\s*(DROP|INSERT|UPDATE|DELETE|ALTER|CREATE)",
@@ -88,40 +88,6 @@ def test_path_catalog_blocked():
 def test_path_other_passes():
     err = check_path_access("/docs/readme.md", _GATES)
     assert err is None
-
-
-def test_load_security_gates_from_dir(tmp_path):
-    (tmp_path / "sec-001.yaml").write_text(
-        'id: "sec-001"\npattern: "^\\\\s*(DROP)"\naction: block\nmessage: "DDL prohibited"'
-    )
-    (tmp_path / "sec-002.yaml").write_text(
-        'id: "sec-002"\ncheck: "no_where_clause"\naction: block\nmessage: "Full scan prohibited"'
-    )
-    gates = load_security_gates(tmp_path)
-    assert len(gates) == 2
-    ids = {g["id"] for g in gates}
-    assert ids == {"sec-001", "sec-002"}
-
-
-def test_load_security_gates_empty_dir(tmp_path):
-    gates = load_security_gates(tmp_path)
-    assert gates == []
-
-
-def test_unverified_gate_is_skipped(tmp_path):
-    """Gates with verified: false are not loaded."""
-    import yaml
-    from agent.sql_security import load_security_gates
-    (tmp_path / "sec-active.yaml").write_text(yaml.dump({
-        "id": "sec-active", "pattern": "DROP", "action": "block", "message": "no drop"
-    }))
-    (tmp_path / "sec-unverified.yaml").write_text(yaml.dump({
-        "id": "sec-unverified", "pattern": "UNION", "action": "block",
-        "message": "no union", "verified": False
-    }))
-    gates = load_security_gates(tmp_path)
-    assert len(gates) == 1
-    assert gates[0]["id"] == "sec-active"
 
 
 def test_has_where_clause_subquery():

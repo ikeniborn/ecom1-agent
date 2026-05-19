@@ -1,4 +1,4 @@
-"""Security gate evaluation — gates loaded from data/security/*.yaml."""
+"""SQL security checks."""
 from __future__ import annotations
 
 import hashlib
@@ -6,24 +6,7 @@ import json as _json
 import re
 from pathlib import Path
 
-import yaml
-
-_SECURITY_DIR = Path(__file__).parent.parent / "data" / "security"
-
 _PLACEHOLDER_WORDS = {"foo", "bar", "baz", "x", "y", "z", "test", "xxx", "none", "n/a", "rule", "todo", "tbd", "fixme", "placeholder"}
-
-
-def load_security_gates(directory: Path = _SECURITY_DIR) -> list[dict]:
-    """Load all gate definitions from *.yaml files in directory, sorted by filename."""
-    gates = []
-    for f in sorted(directory.glob("*.yaml")):
-        try:
-            gate = yaml.safe_load(f.read_text(encoding="utf-8"))
-            if isinstance(gate, dict) and gate.get("verified", True):
-                gates.append(gate)
-        except Exception:
-            pass
-    return gates
 
 
 def check_sql_queries(queries: list[str], security_gates: list[dict]) -> str | None:
