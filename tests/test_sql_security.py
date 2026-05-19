@@ -2,7 +2,7 @@
 import yaml
 import pytest
 from pathlib import Path
-from agent.sql_security import check_sql_queries, check_path_access, load_security_gates
+from agent.sql_security import check_sql_queries, check_path_access
 
 _GATES = [
     {"id": "sec-001", "pattern": "^\\s*(DROP|INSERT|UPDATE|DELETE|ALTER|CREATE)",
@@ -90,40 +90,6 @@ def test_path_other_passes():
     assert err is None
 
 
-def test_load_security_gates_from_dir(tmp_path):
-    (tmp_path / "sec-001.yaml").write_text(
-        'id: "sec-001"\npattern: "^\\\\s*(DROP)"\naction: block\nmessage: "DDL prohibited"'
-    )
-    (tmp_path / "sec-002.yaml").write_text(
-        'id: "sec-002"\ncheck: "no_where_clause"\naction: block\nmessage: "Full scan prohibited"'
-    )
-    gates = load_security_gates(tmp_path)
-    assert len(gates) == 2
-    ids = {g["id"] for g in gates}
-    assert ids == {"sec-001", "sec-002"}
-
-
-def test_load_security_gates_empty_dir(tmp_path):
-    gates = load_security_gates(tmp_path)
-    assert gates == []
-
-
-def test_unverified_gate_is_skipped(tmp_path):
-    """Gates with verified: false are not loaded."""
-    import yaml
-    from agent.sql_security import load_security_gates
-    (tmp_path / "sec-active.yaml").write_text(yaml.dump({
-        "id": "sec-active", "pattern": "DROP", "action": "block", "message": "no drop"
-    }))
-    (tmp_path / "sec-unverified.yaml").write_text(yaml.dump({
-        "id": "sec-unverified", "pattern": "UNION", "action": "block",
-        "message": "no union", "verified": False
-    }))
-    gates = load_security_gates(tmp_path)
-    assert len(gates) == 1
-    assert gates[0]["id"] == "sec-active"
-
-
 def test_has_where_clause_subquery():
     """_has_where_clause correctly detects WHERE in queries with subqueries."""
     from agent.sql_security import _has_where_clause
@@ -158,3 +124,19 @@ def test_no_outer_where_blocked():
     sql = "SELECT id FROM products"
     err = check_sql_queries([sql], _GATES)
     assert err is not None and "sec-002" in err
+
+
+def test_check_retry_loop_standalone_blocks_duplicate():
+    from agent.sql_security import check_retry_loop
+    queries = ["SELECT COUNT(*) FROM products"]
+    prior = [frozenset(queries)]
+    result = check_retry_loop(queries, prior)
+    assert result is not None
+    assert "identical" in result.lower() or "loop" in result.lower()
+
+
+def test_check_retry_loop_standalone_allows_new():
+    from agent.sql_security import check_retry_loop
+    queries = ["SELECT COUNT(*) FROM products"]
+    result = check_retry_loop(queries, [])
+    assert result is None

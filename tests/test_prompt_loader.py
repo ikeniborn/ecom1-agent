@@ -42,10 +42,6 @@ def test_load_prompt_answer_exists():
     assert len(text) > 50
 
 
-def test_load_prompt_pipeline_evaluator_exists():
-    text = load_prompt("pipeline_evaluator")
-    assert len(text) > 50
-
 
 def test_email_prompt_not_loaded():
     assert load_prompt("email") == ""

@@ -4,10 +4,8 @@ from __future__ import annotations
 import json
 import os
 import re
-import threading
 import time
 import traceback
-from pathlib import Path
 
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
@@ -24,21 +22,14 @@ from .models import SddOutput, TestOutput, LearnOutput, AnswerOutput
 from .test_runner import run_tests
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest, merge_schema_from_sqlite_results
 from .prompt import load_prompt
-from .prompt_assembler import assemble_prompt, load_learned_ctx, save_learned_ctx, clear_learned_ctx
-from .rules_loader import RulesLoader, _RULES_DIR
+from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff
 from .schema_gate import check_schema_compliance
-from .sql_security import (
-    check_path_access, load_security_gates,
-    check_grounding_refs, check_learn_output,
-    check_retry_loop, make_json_hash,
-)
+from .sql_security import check_retry_loop
 from .trace import get_trace
 
 
 _MAX_CYCLES = int(os.environ.get("MAX_STEPS", "3"))
-_EVAL_ENABLED = os.environ.get("EVAL_ENABLED", "0") == "1"
 _SDD_ENABLED = os.environ.get("SDD_ENABLED", "1") == "1"
-_EVAL_LOG = Path(__file__).parent.parent / "data" / "eval_log.jsonl"
 _SQLITE_SCHEMA_RE = re.compile(r"\bsqlite_(?:schema|master)\b", re.IGNORECASE)
 
 # Compat stubs — referenced by older tests that patch these names; no-ops in new pipeline
@@ -57,23 +48,6 @@ def _extract_discovery_results(queries: list[str], results: list[str], confirmed
 def _format_confirmed_values(cv: dict) -> str:
     """Compat stub — confirmed_values removed from SDD pipeline."""
     return ""
-
-_rules_loader_cache: "RulesLoader | None" = None
-_security_gates_cache: "list[dict] | None" = None
-
-
-def _get_rules_loader() -> RulesLoader:
-    global _rules_loader_cache
-    if _rules_loader_cache is None:
-        _rules_loader_cache = RulesLoader(_RULES_DIR)
-    return _rules_loader_cache
-
-
-def _get_security_gates() -> list[dict]:
-    global _security_gates_cache
-    if _security_gates_cache is None:
-        _security_gates_cache = load_security_gates()
-    return _security_gates_cache
 
 
 def _exec_result_text(result) -> str:
@@ -169,13 +143,28 @@ def _build_sdd_user_msg(task_text: str, task_type: str, learn_ctx: list[str], la
     return "\n\n".join(parts)
 
 
-def _build_learn_user_msg(task_text: str, queries: list[str], error: str, error_type: str) -> str:
-    return (
+def _build_learn_user_msg(
+    task_text: str,
+    queries: list[str],
+    error: str,
+    error_type: str,
+    existing_entries: list[dict],
+) -> str:
+    base = (
         f"TASK: {task_text}\n"
         f"FAILED QUERIES: {json.dumps(queries)}\n"
         f"ERROR: {error}\n"
         f"ERROR_TYPE: {error_type}"
     )
+    if existing_entries:
+        rules_lines = "\n".join(
+            f"  - id: {e['id']}\n    content: {e['content']!r}"
+            for e in existing_entries
+            if e.get("status") == "active"
+        )
+        if rules_lines:
+            base += f"\n\nEXISTING_RULES:\n{rules_lines}"
+    return base
 
 
 def _build_answer_user_msg(task_text: str, sql_results: list[str], auto_refs: list[str]) -> str:
@@ -257,7 +246,6 @@ def _run_learn(
     agents_md_index: dict,
     error_type: str = "semantic",
     cycle: int = 0,
-    prior_learn_hashes: "set[str] | None" = None,
     task_id: str = "",
 ) -> None:
     learn_model = _resolve_model_for_phase("learn", model)
@@ -266,43 +254,47 @@ def _run_learn(
         {"type": "text", "text": unified_context},
         {"type": "text", "text": learn_guide, "cache_control": {"type": "ephemeral"}},
     ]
-    learn_user = _build_learn_user_msg(task_text, queries, error, error_type)
+    existing_entries = load_learned_entries(task_id) if task_id else []
+    learn_user = _build_learn_user_msg(task_text, queries, error, error_type, existing_entries)
     learn_out, sgr_learn, _ = _call_llm_phase(
         learn_system, learn_user, learn_model, cfg, LearnOutput,
         max_tokens=2048, phase="learn", cycle=cycle,
     )
     sgr_learn["error_type"] = error_type
     sgr_trace.append(sgr_learn)
-    if learn_out and error_type != "llm_fail":
-        if prior_learn_hashes is not None:
-            learn_hash = make_json_hash(learn_out.model_dump())
-            learn_gate_err = check_learn_output(
-                learn_out.rule_content, learn_hash, prior_learn_hashes, _get_security_gates()
-            )
-            if learn_gate_err:
-                print(f"{CLI_YELLOW}[pipeline] LEARN blocked: {learn_gate_err}{CLI_CLR}")
-                return
-            prior_learn_hashes.add(learn_hash)
-        anchor = learn_out.agents_md_anchor
-        if anchor:
-            anchor_section = anchor.split(">")[0].strip()
-            if anchor_section in agents_md_index:
-                anchor_lines = agents_md_index[anchor_section]
-                vault_rule = f"[{anchor_section}]\n" + "\n".join(anchor_lines)
-                learn_ctx.append(vault_rule)
-                if task_id:
-                    save_learned_ctx(task_id, learn_ctx)
-                print(f"{CLI_BLUE}[pipeline] LEARN: anchor={anchor!r}, vault rule added{CLI_CLR}")
-                return  # compacted_ctx ignored when anchor path taken
-        compacted = learn_out.compacted_ctx
-        if compacted and len(compacted) > 0 and all(isinstance(r, str) for r in compacted):
-            learn_ctx[:] = compacted
-            print(f"{CLI_BLUE}[pipeline] LEARN: compacted to {len(learn_ctx)} rules{CLI_CLR}")
-        else:
-            learn_ctx.append(learn_out.rule_content)
-            print(f"{CLI_BLUE}[pipeline] LEARN: rule added (total={len(learn_ctx)}){CLI_CLR}")
-        if task_id:
-            save_learned_ctx(task_id, learn_ctx)
+    if not learn_out or error_type == "llm_fail":
+        return
+    if learn_out.skip:
+        print(f"{CLI_BLUE}[pipeline] LEARN: skipped ({learn_out.skip_reason}){CLI_CLR}")
+        return
+    anchor = learn_out.agents_md_anchor
+    if anchor:
+        anchor_section = anchor.split(">")[0].strip()
+        if anchor_section in agents_md_index:
+            anchor_lines = agents_md_index[anchor_section]
+            vault_rule = f"[{anchor_section}]\n" + "\n".join(anchor_lines)
+            if task_id:
+                _apply_learn_diff(task_id, vault_rule, f"anchor:{anchor}", [], None, source="learn")
+            learn_ctx.append(vault_rule)
+            print(f"{CLI_BLUE}[pipeline] LEARN: anchor={anchor!r}, vault rule added{CLI_CLR}")
+            return
+    if task_id:
+        _apply_learn_diff(
+            task_id,
+            learn_out.rule_content,
+            learn_out.reasoning,
+            learn_out.deactivate,
+            learn_out.deactivate_reason,
+            source="learn",
+        )
+    if learn_out.deactivate:
+        deactivate_contents = {
+            e["content"] for e in existing_entries
+            if e.get("id") in learn_out.deactivate
+        }
+        learn_ctx[:] = [r for r in learn_ctx if r not in deactivate_contents]
+    learn_ctx.append(learn_out.rule_content)
+    print(f"{CLI_BLUE}[pipeline] LEARN: rule added, deactivated={learn_out.deactivate} (total active={len(learn_ctx)}){CLI_CLR}")
 
 
 def run_pipeline(
@@ -314,11 +306,8 @@ def run_pipeline(
     task_id: str = "",
     injected_session_rules: list[str] | None = None,
     injected_prompt_addendum: str = "",
-    injected_security_gates: list[dict] | None = None,
-) -> tuple[dict, threading.Thread | None]:
-    """SDD-based pipeline. Returns (stats dict, eval Thread or None)."""
-    rules_loader = _get_rules_loader()
-    security_gates = _get_security_gates() + (injected_security_gates or [])
+) -> tuple[dict, None]:
+    """SDD-based pipeline. Returns (stats dict, None)."""
     _persisted = load_learned_ctx(task_id) if task_id else []
     learn_ctx: list[str] = list(dict.fromkeys(_persisted + list(injected_session_rules or [])))
     sgr_trace: list[dict] = []
@@ -331,7 +320,6 @@ def run_pipeline(
     success = False
     cycles_used = 0
     prior_query_sets: list[frozenset] = []
-    prior_learn_hashes: set[str] = set()
 
     task_type = pre.task_type or "sql"
 
@@ -385,7 +373,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, [], last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type=sdd_err_type, cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                               task_id=task_id)
                     continue
 
                 # ── SDD ERROR CODES ────────────────────────────────────────────────
@@ -411,8 +399,6 @@ def run_pipeline(
                         ))
                     except Exception as e:
                         print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
-                    _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx,
-                                     cycles_used, "OUTCOME_DENIED_SECURITY", None)
                     success = True
                     break
 
@@ -429,8 +415,6 @@ def run_pipeline(
                         ))
                     except Exception as e:
                         print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
-                    _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx,
-                                     cycles_used, "OUTCOME_NONE_UNSUPPORTED", None)
                     success = True
                     break
 
@@ -450,11 +434,11 @@ def run_pipeline(
                         _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                    sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="semantic", cycle=cycle + 1,
-                                   prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                                   task_id=task_id)
                         continue
 
                 # ── SECURITY CHECK (retry-loop guard only) ───────────────────────
-                retry_err = check_retry_loop(sql_queries, prior_query_sets, security_gates)
+                retry_err = check_retry_loop(sql_queries, prior_query_sets)
                 if retry_err:
                     print(f"{CLI_RED}[pipeline] SECURITY hard-stop: {retry_err}{CLI_CLR}")
                     last_error = retry_err
@@ -477,7 +461,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="security", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                               task_id=task_id)
                     continue
 
                 # ── TDD (mandatory) ──────────────────────────────────────────────
@@ -489,12 +473,11 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, [], last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="llm_fail", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                               task_id=task_id)
                     continue
 
                 # ── EXECUTE (SQL steps) ───────────────────────────────────────────
-                _exec_path = "/bin/sql"
-                execute_error = check_path_access(_exec_path, security_gates)
+                execute_error = ""
                 sql_results = []
                 executed_sql_queries: list[str] = []
 
@@ -522,7 +505,7 @@ def run_pipeline(
                     # EXECUTE
                     try:
                         _t0 = time.monotonic()
-                        result = vm.exec(ExecRequest(path=_exec_path, args=[q]))
+                        result = vm.exec(ExecRequest(path="/bin/sql", args=[q]))
                         _dur = int((time.monotonic() - _t0) * 1000)
                         result_txt = _exec_result_text(result)
                         sql_results.append(result_txt)
@@ -541,10 +524,6 @@ def run_pipeline(
                     for step in exec_steps:
                         op_path = step.operation
                         assert op_path  # type narrowing
-                        path_err = check_path_access(op_path, security_gates)
-                        if path_err:
-                            execute_error = path_err
-                            break
                         try:
                             _t0 = time.monotonic()
                             exec_res = vm.exec(ExecRequest(path=op_path, args=step.args or []))
@@ -584,7 +563,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="empty" if last_empty and not execute_error else "semantic",
-                               cycle=cycle + 1, prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                               cycle=cycle + 1, task_id=task_id)
                     continue
 
                 # ── SCHEMA REFRESH ────────────────────────────────────────────────
@@ -625,7 +604,7 @@ def run_pipeline(
                         _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                    sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="test_fail", cycle=cycle + 1,
-                                   prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                                   task_id=task_id)
                         continue
 
             # ── ANSWER ───────────────────────────────────────────────────────────
@@ -682,7 +661,7 @@ def run_pipeline(
                                    [s.query for s in (sdd_out.plan if sdd_out else []) if s.type == "sql" and s.query],
                                    last_error, sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="test_fail", cycle=cycle + 1,
-                                   prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                                   task_id=task_id)
                         continue
 
             # ── SUCCESS ───────────────────────────────────────────────────────────
@@ -690,13 +669,6 @@ def run_pipeline(
             consecutive_sql_test_fails = 0
             outcome = answer_out.outcome
             print(f"{CLI_GREEN}[pipeline] ANSWER: {outcome} — {answer_out.message[:100]}{CLI_CLR}")
-            ref_err = check_grounding_refs(
-                answer_out.grounding_refs,
-                {Path(r).stem for r in sku_refs},
-                security_gates,
-            )
-            if ref_err:
-                print(f"{CLI_YELLOW}[pipeline] ANSWER grounding_refs blocked: {ref_err}{CLI_CLR}")
             result_paths = set(sku_refs)
             clean_refs = (
                 [r for r in answer_out.grounding_refs if r in result_paths]
@@ -728,10 +700,8 @@ def run_pipeline(
             except Exception as e:
                 print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
 
-            _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx, cycles_used, outcome, None)
-            if task_id and learn_ctx:
-                print(f"{CLI_BLUE}[pipeline] learn_ctx ({len(learn_ctx)} rules) moved to eval_log, data/learned/{task_id}.yaml cleared{CLI_CLR}")
-            clear_learned_ctx(task_id)
+            if task_id:
+                print(f"{CLI_BLUE}[pipeline] SUCCESS: {len(learn_ctx)} active rules in data/learned/{task_id}.yaml{CLI_CLR}")
             success = True
             break
 
@@ -759,32 +729,6 @@ def run_pipeline(
         except Exception as e:
             print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
 
-    # ── EVALUATOR: only on success ────────────────────────────────────────────
-    eval_thread: threading.Thread | None = None
-    eval_model = _resolve_model_for_phase("evaluator", model)
-    if success and _EVAL_ENABLED and eval_model:
-        eval_thread = threading.Thread(
-            target=_run_evaluator_safe,
-            kwargs={
-                "task_id": task_id,
-                "task_text": task_text,
-                "task_type": task_type,
-                "prephase": {
-                    "agents_md": pre.agents_md_content,
-                    "schema_digest": pre.schema_digest,
-                    "db_schema": pre.db_schema,
-                },
-                "learn_ctx": list(learn_ctx),
-                "sgr_trace": sgr_trace,
-                "cycles": cycles_used,
-                "final_outcome": outcome,
-                "model": eval_model,
-                "cfg": cfg,
-            },
-            daemon=False,
-        )
-        eval_thread.start()
-
     stats = {
         "outcome": outcome,
         "cycles_used": cycles_used,
@@ -794,99 +738,4 @@ def run_pipeline(
         "output_tokens": total_out_tok,
         "total_elapsed_ms": 0,
     }
-    return stats, eval_thread
-
-
-def _append_eval_log(
-    task_id: str,
-    task_text: str,
-    task_type: str,
-    pre: PrephaseResult,
-    sgr_trace: list[dict],
-    learn_ctx: list[str],
-    cycles: int,
-    outcome: str,
-    evaluator_result,
-) -> None:
-    entry: dict = {
-        "task_id": task_id,
-        "task_text": task_text,
-        "task_type": task_type,
-        "cycles_used": cycles,
-        "prephase": {
-            "agents_md": pre.agents_md_content[:500] if pre.agents_md_content else "",
-            "schema_digest": pre.schema_digest,
-        },
-        "trace": sgr_trace,
-        "learn_ctx": learn_ctx,
-        "outcome": "ok" if outcome == "OUTCOME_OK" else "fail",
-        "evaluator": None,
-    }
-    if evaluator_result is not None:
-        entry["evaluator"] = {
-            "best_cycle": getattr(evaluator_result, "best_cycle", 0),
-            "best_answer": getattr(evaluator_result, "best_answer", ""),
-            "score": getattr(evaluator_result, "score", 0.0),
-            "prompt_optimization": getattr(evaluator_result, "prompt_optimization", []),
-            "rule_optimization": getattr(evaluator_result, "rule_optimization", []),
-            "security_optimization": getattr(evaluator_result, "security_optimization", []),
-        }
-    _EVAL_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with open(_EVAL_LOG, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-
-def _run_evaluator_safe(
-    task_id: str = "",
-    task_text: str = "",
-    task_type: str = "sql",
-    prephase: dict | None = None,
-    learn_ctx: list[str] | None = None,
-    sgr_trace: list[dict] | None = None,
-    cycles: int = 0,
-    final_outcome: str = "",
-    model: str = "",
-    cfg: dict | None = None,
-) -> None:
-    try:
-        from .evaluator import run_evaluator, EvalInput
-        result = run_evaluator(
-            EvalInput(
-                task_id=task_id,
-                task_text=task_text,
-                task_type=task_type,
-                prephase=prephase or {},
-                learn_ctx=learn_ctx or [],
-                sgr_trace=sgr_trace or [],
-                cycles=cycles,
-                final_outcome=final_outcome,
-            ),
-            model=model,
-            cfg=cfg or {},
-        )
-        if result is not None:
-            _EVAL_LOG.parent.mkdir(parents=True, exist_ok=True)
-            lines = []
-            try:
-                lines = _EVAL_LOG.read_text(encoding="utf-8").splitlines()
-            except Exception:
-                pass
-            for i in range(len(lines) - 1, -1, -1):
-                try:
-                    entry = json.loads(lines[i])
-                    if entry.get("task_id") == task_id and entry.get("evaluator") is None:
-                        entry["evaluator"] = {
-                            "best_cycle": result.best_cycle,
-                            "best_answer": result.best_answer,
-                            "score": result.score,
-                            "prompt_optimization": result.prompt_optimization,
-                            "rule_optimization": result.rule_optimization,
-                            "security_optimization": result.security_optimization,
-                        }
-                        lines[i] = json.dumps(entry, ensure_ascii=False)
-                        _EVAL_LOG.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                        break
-                except Exception:
-                    continue
-    except Exception as e:
-        print(f"{CLI_YELLOW}[pipeline] evaluator error (non-fatal): {e}{CLI_CLR}")
+    return stats, None

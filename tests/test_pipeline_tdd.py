@@ -50,8 +50,6 @@ def test_test_gen_mandatory_called(tmp_path):
     """TEST_GEN LLM call MUST occur even without SDD_ENABLED env var."""
     vm = MagicMock()
     vm.exec.return_value = MagicMock(stdout='[{"count": 3}]')
-    rules_dir = tmp_path / "rules"
-    rules_dir.mkdir()
 
     call_seq = iter([_sdd_json(), _test_gen_json(), _answer_json()])
     calls = []
@@ -62,8 +60,6 @@ def test_test_gen_mandatory_called(tmp_path):
 
     with patch("agent.pipeline.call_llm_raw", side_effect=fake_llm), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._RULES_DIR", rules_dir), \
-         patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         stats, _ = run_pipeline(vm, "model", "count products", _make_pre(), {})

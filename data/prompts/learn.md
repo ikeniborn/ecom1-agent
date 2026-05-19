@@ -1,65 +1,75 @@
 # Learn Phase
 
-You are diagnosing a failed SQL query to derive a corrective rule.
+You are diagnosing a failed operation to derive a corrective rule and consolidate the knowledge base.
 
 /no_think
 
 ## Task
-Given the task, the failed SQL queries, and the error or empty-result message, diagnose what went wrong and produce a new rule to prevent recurrence.
 
-## Rules
+Given the task, the failed queries/operations, the error, and the EXISTING_RULES knowledge base, diagnose what went wrong and either:
+- Produce a new rule and specify which existing rules (if any) it supersedes, OR
+- Skip (if the new rule is already covered by an existing rule)
+
+## Output Rules
+
 - Output PURE JSON only. The very first character must be `{`.
-- `reasoning` field MUST contain your diagnosis: what assumption was wrong.
-- `conclusion` field: human-readable summary of the finding (one sentence).
-- `rule_content` field: markdown text for the new rule — specific, actionable, starts with "Never" or "Always" or "Use".
-- `agents_md_anchor` field: if the failure was caused by ignoring an AGENTS.MD section (e.g. wrong brand alias, wrong kind synonym), set this to `"<section_key> > <specific_entry>"` (e.g. `"brand_aliases > Heco"`). Set to `null` if failure is unrelated to AGENTS.MD.
+- All string fields must be non-empty and reference concrete identifiers (table, column, key, literal) — no generic phrases.
 
-## Output format (JSON only)
-{"reasoning": "<diagnosis of what went wrong>", "conclusion": "<one-sentence summary>", "rule_content": "<markdown rule text>", "agents_md_anchor": "<section_key > entry, or null>", "compacted_ctx": ["<merged rule 1>", "<merged rule 2>"]}
+## Output Format (JSON only)
 
-## Reasoning Field Discipline
-
-`reasoning` MUST have all four components:
-
-1. **Verbatim error quote** — copy exact error message or empty-result indicator. No paraphrase.
-2. **Root cause category** — label one of: `syntax`, `empty-result`, `wrong-filter`, `wrong-column`, `wrong-value-type`, `wrong-key`, `join-cardinality`.
-3. **Failing fragment citation** — quote the specific SQL fragment (WHERE predicate, JOIN clause, column reference) that triggered failure.
-4. **Derived rule linkage** — `rule_content` MUST reference the cited fragment, not abstract advice.
-
-Minimum structure:
-```
-Error: "<verbatim>". Category: <label>. Failing fragment: `<sql snippet>`. Cause: <why fragment failed>.
+```json
+{
+  "reasoning": "<diagnosis: verbatim error, root cause, failing fragment, rule linkage>",
+  "conclusion": "<one-sentence summary naming the precise mechanism of failure>",
+  "rule_content": "<new rule starting with Never/Always/Use — cite concrete identifier>",
+  "agents_md_anchor": "<section_key > entry, or null>",
+  "skip": false,
+  "skip_reason": null,
+  "deactivate": [],
+  "deactivate_reason": null
+}
 ```
 
-One-liner stubs are rejected. All three fields (`reasoning`, `conclusion`, `rule_content`) MUST be ≥20 characters AND reference schema identifiers (table name, column name, key, literal value) — not generic phrases like `"query failed"` or `"empty result"`.
+## Field Definitions
+
+**`reasoning`** — MUST contain all four components:
+1. Verbatim error quote (exact, no paraphrase)
+2. Root cause category: `syntax` | `empty-result` | `wrong-filter` | `wrong-column` | `wrong-value-type` | `wrong-key` | `join-cardinality`
+3. Failing fragment citation (SQL snippet, column ref, predicate)
+4. Rule linkage — `rule_content` must reference the cited fragment
+
+**`rule_content`** — actionable rule, starts with "Never", "Always", or "Use". Must cite ≥1 concrete identifier from the failed operation.
+
+**`agents_md_anchor`** — if failure was caused by ignoring an AGENTS.MD section: `"<section_key> > <entry>"`. Set to `null` otherwise.
+
+**`skip`** — set to `true` if the new rule would be semantically identical to or fully covered by an existing rule in EXISTING_RULES. When `skip=true`, set `skip_reason` to the id of the covering rule (e.g. `"r003"`). `rule_content` may be empty.
+
+**`deactivate`** — list of entry ids from EXISTING_RULES that the new rule supersedes or contradicts. Empty list if none.
+
+**`deactivate_reason`** — one sentence explaining why the listed entries are superseded. Set to `null` if `deactivate` is empty.
+
+## Consolidation Logic
+
+After producing `rule_content`, compare it against each entry in EXISTING_RULES:
+
+1. **Duplicate** — new rule says the same thing as existing rule `rXXX`:
+   - Set `skip=true`, `skip_reason="rXXX"`, `rule_content=""`, `deactivate=[]`
+
+2. **Supersedes** — new rule is more specific or correct, making `rXXX` obsolete:
+   - Set `skip=false`, `deactivate=["rXXX"]`, `deactivate_reason="<why rXXX is now wrong/redundant>"`
+
+3. **Novel** — new rule addresses a different failure pattern from all existing rules:
+   - Set `skip=false`, `deactivate=[]`, `deactivate_reason=null`
 
 ## Conclusion Specificity
 
-`conclusion` MUST name the precise mechanism of failure — not the symptom. If an existing rule or gate covers this pattern, cite it by ID (e.g. `sec-003`, `sql-014`). For novel failures with no existing rule, describe the exact mechanism instead.
+Name the precise mechanism — not the symptom. If an existing rule covers this pattern, cite it by id.
 
-- **Bad:** `"only SELECT allowed"`, `"query returned empty"`.
-- **Good:** `"sec-003 blocked UNION injection"`, `"sql-007 missing EXISTS per attribute key"`, `"no existing rule — planner used path column instead of sku column for grounding_refs"`.
-- `rule_content` MUST cite at least one concrete identifier from the failed SQL (table, column, key, or literal value) — no placeholder stubs.
-
-## Context Compaction
-
-After producing `rule_content`, compact the accumulated `EXISTING_RULES` list:
-
-**If `EXISTING_RULES` is non-empty:**
-- Merge semantically similar rules into one canonical rule. **Semantically similar** = rules describing the same constraint or fix regardless of wording (e.g. two rules both requiring GROUP BY when aggregating → merge into one).
-- Keep distinct failure patterns separate. **Distinct** = rules addressing different SQL error types, different schema violations, or different validation failures (e.g. "missing GROUP BY" ≠ "wrong column name" → keep separate).
-- Generalize task-specific IDs: replace concrete numeric/string identifiers (`basket_115`, `cust_022`, any literal ID) with typed placeholders (`<basket_id>`, `<customer_id>`, `<id>`).
-- `compacted_ctx` MUST include the new `rule_content` already merged in.
-
-**If `EXISTING_RULES` is empty:**
-- `compacted_ctx` = `[rule_content]`
-
-Output `compacted_ctx` as a JSON array of strings.
+- **Bad:** `"query returned empty"`, `"only SELECT allowed"`
+- **Good:** `"r003 already covers missing GROUP BY"`, `"no existing rule — planner used path column instead of sku for grounding_refs"`
 
 ## Loop Prevention
 
-If the new corrected query would be identical to the failed query (whitespace/case-insensitive), set `rule_content` to explicitly state: "No structural fix available — escalate to clarification." Set `conclusion` to name the blocking constraint. Do NOT produce a trivially different cosmetic variant.
-
-If `reasoning` is empty or identical to a previous LEARN cycle reasoning, name this in `conclusion` and set `rule_content` to request additional task information from the user.
-
-Grounding-aware rule: if LEARN diagnoses missing `grounding_refs`, corrective `rule_content` MUST mandate `sku` projection in next plan cycle — pair `COUNT(*)` with `SELECT sku ... LIMIT 5` using identical WHERE.
+If the corrected query would be identical to the failed query (whitespace/case-insensitive), set:
+- `rule_content`: `"No structural fix available — escalate to clarification"`
+- `conclusion`: name the blocking constraint

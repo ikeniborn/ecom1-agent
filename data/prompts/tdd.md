@@ -15,8 +15,8 @@ You generate acceptance tests for the pipeline task described in the SDD spec. T
 **`test_sql(results: list[str]) -> None`**
 Each element in `results` is a CSV string (first line = column headers, rest = data rows).
 Assert:
-- Required columns are present in the header (e.g., `sku`, `path`). For aggregate queries verify results are non-empty and the first data row contains a parseable integer — do not assert a specific column alias name.
-- Results are non-empty when the task implies products exist. (Skip this check for zero-count tasks — empty results are valid.)
+- Required columns are present in the header (e.g., `id`, `path`). For aggregate queries verify results are non-empty and the first data row contains a parseable integer — do not assert a specific column alias name.
+- Results are non-empty when the task implies records exist. (Skip this check for zero-count tasks — empty results are valid.)
 - Numeric values are plausible (e.g., COUNT ≥ 0).
 
 **`test_answer(sql_results: list[str], answer: dict) -> None`**
@@ -24,8 +24,8 @@ Assert:
 Assert:
 - `answer['outcome']` equals the expected outcome string (e.g., `'OUTCOME_OK'`).
 - `answer['message']` is non-empty.
-- `answer['grounding_refs']` is non-empty when `outcome == 'OUTCOME_OK'` and task implies products found. (Empty grounding_refs is allowed for zero-count / aggregate-only answers.)
-- `answer['message']` contains key product-related facts from the task (brand, type, etc.) when outcome is OK.
+- `answer['grounding_refs']` is non-empty when `outcome == 'OUTCOME_OK'` and task implies records found. (Empty grounding_refs is allowed for zero-count / aggregate-only answers.)
+- `answer['message']` contains key facts from the task when outcome is OK.
 
 ## Rules for test code
 
@@ -45,7 +45,7 @@ Assert:
 
 **BAD** — `len(rows) > 1` for aggregate queries:
 ~~~python
-# SQL was: SELECT COUNT(*) FROM products WHERE kind_id = 7
+# SQL was: SELECT COUNT(*) FROM records WHERE kind_id = 7
 rows = results[-1].split('\n')
 assert len(rows) > 1  # WRONG: COUNT(*) returns 1 header + 1 data row
 ~~~
@@ -69,12 +69,12 @@ assert 'Cordless Drill Driver' in answer['message']
 **GOOD** — case-insensitive, partial keyword check:
 ~~~python
 msg = answer['message'].lower()
-assert 'cordless' in msg or 'drill' in msg, f'missing product type: {msg[:200]}'
+assert 'cordless' in msg or 'drill' in msg, f'missing item type: {msg[:200]}'
 ~~~
 
 **BAD** — asserting non-OK outcome for attribute existence checks:
 ~~~python
-assert answer['outcome'] != 'OUTCOME_OK'  # WRONG: product not found or attribute absent → still OUTCOME_OK with <NO>
+assert answer['outcome'] != 'OUTCOME_OK'  # WRONG: record not found or attribute absent → still OUTCOME_OK with <NO>
 ~~~
 
 **GOOD** — check message content for negative result:
@@ -83,19 +83,19 @@ msg = answer['message'].lower()
 assert '<no>' in msg or 'not found' in msg or 'does not exist' in msg, f'expected negative result: {msg[:200]}'
 ~~~
 
-**BAD** — asserting non-OK outcome when product may simply not have a feature:
+**BAD** — asserting non-OK outcome when a record may simply not have a feature:
 ~~~python
 # Task: "Do you have X with GPS tracking?"  GPS doesn't exist → answer is OUTCOME_OK + <NO>
 assert answer['outcome'] != 'OUTCOME_OK'  # WRONG
 ~~~
 
 Rules:
-- Never assert exact product names/brands copied from TASK text.
-- Use `.lower()` + individual keyword checks for product presence.
+- Never assert exact names/values copied from TASK text.
+- Use `.lower()` + individual keyword checks for item presence.
 - For COUNT tasks: check `<COUNT:` format, not the numeric value.
 - Include the actual value in the assertion message for easier debugging.
 - Never hardcode a specific column alias (e.g. `'count'`, `'total'`) in SQL header checks. Check that results are non-empty and the first data row contains a parseable integer, not that the header contains a specific word.
-- **Never use `outcome != 'OUTCOME_OK'` assertions.** Product not found, attribute absent, impossible specification → always `OUTCOME_OK` with `<NO>` in message. Assert message content, not non-OK outcome.
+- **Never use `outcome != 'OUTCOME_OK'` assertions.** Record not found, attribute absent, impossible specification → always `OUTCOME_OK` with `<NO>` in message. Assert message content, not non-OK outcome.
 
 ## Output format
 

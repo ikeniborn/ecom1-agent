@@ -69,7 +69,6 @@ _PHASE_MODEL_MAP: dict[str, str | None] = {
     "tdd":       None,  # TDD uses MODEL (same as SDD)
     "executor":  os.environ.get("MODEL_EXECUTOR") or None,
     "learn":     os.environ.get("MODEL_LEARN") or None,
-    "evaluator": os.environ.get("MODEL_EVALUATOR") or None,
     "assembler": os.environ.get("MODEL_ASSEMBLER") or None,
 }
 

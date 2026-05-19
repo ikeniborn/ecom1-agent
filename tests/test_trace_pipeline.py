@@ -26,11 +26,9 @@ def _exec_ok(stdout="sku,path\nHeco-001,/proc/catalog/Heco-001.json"):
 @pytest.fixture(autouse=True)
 def reset_caches():
     import agent.pipeline
-    agent.pipeline._rules_loader_cache = None
-    agent.pipeline._security_gates_cache = None
+    agent.pipeline._SDD_ENABLED = True
     yield
-    agent.pipeline._rules_loader_cache = None
-    agent.pipeline._security_gates_cache = None
+    agent.pipeline._SDD_ENABLED = True
 
 
 def _collect_trace_records(tmp_path, task_id="t01"):
@@ -76,8 +74,6 @@ def test_llm_call_records_written_on_success(tmp_path):
 
     with patch("agent.pipeline.call_llm_raw", side_effect=[_sdd_json(), _test_gen_json(), _answer_json()]), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._get_rules_loader"), \
-         patch("agent.pipeline._get_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})
@@ -107,8 +103,6 @@ def test_gate_check_records_written(tmp_path):
 
     with patch("agent.pipeline.call_llm_raw", side_effect=[_sdd_json(), _test_gen_json(), _answer_json()]), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._get_rules_loader"), \
-         patch("agent.pipeline._get_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})
@@ -131,8 +125,6 @@ def test_sql_validate_and_execute_records(tmp_path):
 
     with patch("agent.pipeline.call_llm_raw", side_effect=[_sdd_json(), _test_gen_json(), _answer_json()]), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._get_rules_loader"), \
-         patch("agent.pipeline._get_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})

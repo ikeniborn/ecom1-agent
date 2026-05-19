@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class PlanStep(BaseModel):
@@ -26,11 +26,16 @@ class TestOutput(BaseModel):
 
 
 class LearnOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     reasoning: str
     conclusion: str
     rule_content: str
     agents_md_anchor: str | None = None
-    compacted_ctx: list[str] | None = None
+    deactivate: list[str] = []
+    deactivate_reason: str | None = None
+    skip: bool = False
+    skip_reason: str | None = None
 
 
 class AnswerOutput(BaseModel):
@@ -63,15 +68,4 @@ class ResolveOutput(BaseModel):
     candidates: list[ResolveCandidate]
 
 
-class PipelineEvalOutput(BaseModel):
-    reasoning: str
-    score: float
-    comment: str
-    best_cycle: int = 0
-    best_answer: str = ""
-    prompt_optimization: list[str]
-    rule_optimization: list[str]
-    security_optimization: list[str] = []
-    agents_md_coverage: float = 0.0
-    schema_grounding: float = 0.0
 

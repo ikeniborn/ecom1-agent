@@ -118,10 +118,8 @@ def test_run_agent_passes_injection_params():
             task_id="t01",
             injected_session_rules=["rule1"],
             injected_prompt_addendum="addon",
-            injected_security_gates=[{"id": "g1"}],
         )
     _args, kwargs = mock_pipeline.call_args
     assert kwargs["task_id"] == "t01"
     assert kwargs["injected_session_rules"] == ["rule1"]
     assert kwargs["injected_prompt_addendum"] == "addon"
-    assert kwargs["injected_security_gates"] == [{"id": "g1"}]
