@@ -506,7 +506,7 @@ def run_pipeline(
                     # EXECUTE
                     try:
                         _t0 = time.monotonic()
-                        result = vm.exec(ExecRequest(path=_exec_path, args=[q]))
+                        result = vm.exec(ExecRequest(path="/bin/sql", args=[q]))
                         _dur = int((time.monotonic() - _t0) * 1000)
                         result_txt = _exec_result_text(result)
                         sql_results.append(result_txt)
