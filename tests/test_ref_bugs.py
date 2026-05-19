@@ -108,13 +108,9 @@ def test_clean_refs_excludes_unmatched_ref():
 def test_run_pipeline_unhandled_exception_calls_vm_answer_once(tmp_path):
     """Bug t21: unhandled exception in for-loop must call vm.answer exactly once."""
     vm = MagicMock()
-    rules_dir = tmp_path / "rules"
-    rules_dir.mkdir()
 
     with patch("agent.pipeline._call_llm_phase", side_effect=AttributeError("str has no .get")), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._RULES_DIR", rules_dir), \
-         patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.run_resolve", return_value={}):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "checkout task", _make_pre(), {})
 

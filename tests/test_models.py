@@ -2,24 +2,28 @@ from agent.models import LearnOutput
 import pytest
 
 
-def test_learn_output_compacted_ctx_optional():
+def test_learn_output_minimal():
     out = LearnOutput(
         reasoning="r", conclusion="c", rule_content="use sku not id"
     )
-    assert out.compacted_ctx is None
+    assert out.rule_content == "use sku not id"
+    assert out.agents_md_anchor is None
+    assert out.skip is False
 
 
-def test_learn_output_compacted_ctx_populated():
+def test_learn_output_with_skip():
     out = LearnOutput(
-        reasoning="r", conclusion="c", rule_content="use sku not id",
-        compacted_ctx=["use sku not id", "always GROUP BY when aggregating"]
+        reasoning="r", conclusion="c", rule_content="",
+        skip=True, skip_reason="no new info",
     )
-    assert out.compacted_ctx == ["use sku not id", "always GROUP BY when aggregating"]
+    assert out.skip is True
+    assert out.skip_reason == "no new info"
 
 
-def test_learn_output_compacted_ctx_empty_list():
+def test_learn_output_with_deactivate():
     out = LearnOutput(
-        reasoning="r", conclusion="c", rule_content="use sku not id",
-        compacted_ctx=[]
+        reasoning="r", conclusion="c", rule_content="new rule",
+        deactivate=["old-rule-1"], deactivate_reason="superseded",
     )
-    assert out.compacted_ctx == []
+    assert out.deactivate == ["old-rule-1"]
+    assert out.deactivate_reason == "superseded"

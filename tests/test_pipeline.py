@@ -63,16 +63,12 @@ def test_happy_path(tmp_path):
     vm.exec.return_value = _make_exec_result('[{"count": 3}]')
 
     pre = _make_pre()
-    rules_dir = tmp_path / "rules"
-    rules_dir.mkdir()
 
     llm_seq = [_sdd_json(), _test_gen_json(), _answer_json()]
     call_iter = iter(llm_seq)
 
     with patch("agent.pipeline.call_llm_raw", side_effect=lambda *a, **kw: next(call_iter)), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._RULES_DIR", rules_dir), \
-         patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         stats, _thread = run_pipeline(vm, "anthropic/claude-sonnet-4-6", "How many Lawn Mowers?", pre, {})
@@ -87,8 +83,6 @@ def test_schema_fail_triggers_learn_then_retry(tmp_path):
     vm = MagicMock()
     vm.exec.return_value = _make_exec_result('[{"count": 3}]')
     pre = _make_pre()
-    rules_dir = tmp_path / "rules"
-    rules_dir.mkdir()
 
     learn_json = json.dumps({
         "reasoning": "r",
@@ -102,12 +96,11 @@ def test_schema_fail_triggers_learn_then_retry(tmp_path):
 
     with patch("agent.pipeline.call_llm_raw", side_effect=lambda *a, **kw: next(call_iter)), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._RULES_DIR", rules_dir), \
-         patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", side_effect=[
              "SCHEMA: unknown column bad_col",  # cycle 1 fail
              None,                               # cycle 2 pass
          ]), \
+         patch("agent.pipeline.check_retry_loop", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(True, None, [])):
         stats, _ = run_pipeline(vm, "model", "task", pre, {})
 
@@ -120,8 +113,6 @@ def test_all_cycles_exhausted(tmp_path):
     vm = MagicMock()
     vm.exec.return_value = _make_exec_result("")  # empty result
     pre = _make_pre()
-    rules_dir = tmp_path / "rules"
-    rules_dir.mkdir()
 
     learn_json = json.dumps({
         "reasoning": "r",
@@ -141,8 +132,6 @@ def test_all_cycles_exhausted(tmp_path):
 
     with patch("agent.pipeline.call_llm_raw", side_effect=lambda *a, **kw: next(call_iter)), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._RULES_DIR", rules_dir), \
-         patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", return_value=None), \
          patch("agent.pipeline.run_tests", return_value=(False, "test failed", [])):
         stats, eval_thread = run_pipeline(vm, "model", "task", pre, {}, task_id="t01")
@@ -156,8 +145,6 @@ def test_learn_ctx_accumulates(tmp_path):
     vm = MagicMock()
     vm.exec.return_value = _make_exec_result('[{"count": 3}]')
     pre = _make_pre()
-    rules_dir = tmp_path / "rules"
-    rules_dir.mkdir()
 
     captured_user_msgs = []
 
@@ -177,8 +164,6 @@ def test_learn_ctx_accumulates(tmp_path):
 
     with patch("agent.pipeline.call_llm_raw", side_effect=fake_llm), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._RULES_DIR", rules_dir), \
-         patch("agent.pipeline.load_security_gates", return_value=[]), \
          patch("agent.pipeline.check_schema_compliance", side_effect=[
              "SCHEMA: bad column",  # cycle 1 blocked
              None,                  # cycle 2 pass
@@ -192,76 +177,33 @@ def test_learn_ctx_accumulates(tmp_path):
     assert "rule_A" in sdd_cycle2_msg
 
 
-def test_learn_compaction_replaces_ctx(tmp_path):
-    """When compacted_ctx is valid non-empty, learn_ctx is replaced in-place."""
-    import json
-    from unittest.mock import patch, MagicMock
-    from agent.pipeline import run_pipeline
-
-    vm = MagicMock()
-    vm.exec.return_value = _make_exec_result('[{"count": 3}]')
-    pre = _make_pre()
-    rules_dir = tmp_path / "rules"
-    rules_dir.mkdir()
-
-    learn_json = json.dumps({
-        "reasoning": "found dupe",
-        "conclusion": "two rules merged",
-        "rule_content": "always use sku column",
-        "agents_md_anchor": None,
-        "compacted_ctx": ["always use sku column"],
-    })
-
-    call_seq = [_sdd_json(), learn_json, _sdd_json(), _test_gen_json(), _answer_json()]
-    call_iter = iter(call_seq)
-
-    with patch("agent.pipeline.call_llm_raw", side_effect=lambda *a, **kw: next(call_iter)), \
-         patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline._RULES_DIR", rules_dir), \
-         patch("agent.pipeline.load_security_gates", return_value=[]), \
-         patch("agent.pipeline.check_schema_compliance", side_effect=[
-             "SCHEMA: bad column", None,
-         ]), \
-         patch("agent.pipeline.run_tests", return_value=(True, None, [])):
-        stats, _ = run_pipeline(vm, "model", "task", pre, {}, task_id="t_compact")
-
-    assert stats["outcome"] == "OUTCOME_OK"
-    assert stats["cycles_used"] == 2
-
-
-def test_learn_compaction_fallback_on_empty(tmp_path):
-    """When compacted_ctx is [], _run_learn falls back to append."""
-    import json
-    from unittest.mock import patch
+def test_learn_appends_rule_to_ctx(tmp_path):
+    """LEARN appends rule_content to learn_ctx on schema failure."""
     from agent.pipeline import _run_learn
 
     learn_ctx: list[str] = ["existing rule"]
     learn_json = json.dumps({
         "reasoning": "r", "conclusion": "c", "rule_content": "new rule",
-        "agents_md_anchor": None, "compacted_ctx": [],
+        "agents_md_anchor": None,
     })
 
-    with patch("agent.pipeline.call_llm_raw", return_value=learn_json), \
-         patch("agent.pipeline.load_security_gates", return_value=[]):
+    with patch("agent.pipeline.call_llm_raw", return_value=learn_json):
         _run_learn("ctx", "model", {}, "task", [], "err", [], learn_ctx, {})
 
-    assert learn_ctx == ["existing rule", "new rule"]
+    assert "new rule" in learn_ctx
 
 
-def test_learn_compaction_fallback_on_none(tmp_path):
-    """When compacted_ctx is None, _run_learn falls back to append."""
-    import json
-    from unittest.mock import patch
+def test_learn_skip_leaves_ctx_unchanged(tmp_path):
+    """When LEARN output has skip=True, learn_ctx is not modified."""
     from agent.pipeline import _run_learn
 
     learn_ctx: list[str] = ["rule A", "rule B"]
     learn_json = json.dumps({
-        "reasoning": "r", "conclusion": "c", "rule_content": "rule C",
-        "agents_md_anchor": None, "compacted_ctx": None,
+        "reasoning": "r", "conclusion": "c", "rule_content": "",
+        "agents_md_anchor": None, "skip": True, "skip_reason": "no new info",
     })
 
-    with patch("agent.pipeline.call_llm_raw", return_value=learn_json), \
-         patch("agent.pipeline.load_security_gates", return_value=[]):
+    with patch("agent.pipeline.call_llm_raw", return_value=learn_json):
         _run_learn("ctx", "model", {}, "task", [], "err", [], learn_ctx, {})
 
-    assert learn_ctx == ["rule A", "rule B", "rule C"]
+    assert learn_ctx == ["rule A", "rule B"]

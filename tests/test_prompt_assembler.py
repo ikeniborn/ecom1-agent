@@ -16,14 +16,10 @@ def _make_pre():
 
 def test_assemble_returns_assembled_prompt(tmp_path):
     pre = _make_pre()
-    fake_unified = "# LEARNED\n\n# RULES\nrule1\n\n# SECURITY\nsec1\n\n# BASE\nbase"
+    fake_unified = "# LEARNED\n\n# BASE\nbase"
 
     with patch("agent.prompt_assembler.call_llm_raw", return_value=fake_unified), \
-         patch("agent.prompt_assembler._RULES_DIR", tmp_path / "rules"), \
-         patch("agent.prompt_assembler._SECURITY_DIR", tmp_path / "security"), \
          patch("agent.prompt_assembler._LEARNED_DIR", tmp_path / "learned"):
-        (tmp_path / "rules").mkdir()
-        (tmp_path / "security").mkdir()
         (tmp_path / "learned").mkdir()
         result = assemble_prompt(
             task_text="find products with sku ABC",
@@ -38,35 +34,25 @@ def test_assemble_returns_assembled_prompt(tmp_path):
     assert result.unified_context == fake_unified
 
 
-def test_assemble_loads_learned_ctx_from_file(tmp_path):
+def test_assemble_includes_learn_ctx_in_sources(tmp_path):
     pre = _make_pre()
-    learned_dir = tmp_path / "learned"
-    learned_dir.mkdir()
-    import yaml
-    (learned_dir / "t99.yaml").write_text(
-        yaml.dump({"task_id": "t99", "learn_ctx": ["persisted rule"]}),
-        encoding="utf-8",
-    )
+    captured_sources = []
 
-    calls = []
-    def fake_llm(system, user_msg, model, cfg, **kw):
-        calls.append(user_msg)
-        return "# LEARNED\npersisted rule\n\n# RULES\n\n# SECURITY\n\n# BASE\n"
+    def _capture_llm(system, user_msg, *args, **kwargs):
+        captured_sources.append(user_msg)
+        return "unified"
 
-    with patch("agent.prompt_assembler.call_llm_raw", side_effect=fake_llm), \
-         patch("agent.prompt_assembler._RULES_DIR", tmp_path / "rules"), \
-         patch("agent.prompt_assembler._SECURITY_DIR", tmp_path / "security"), \
-         patch("agent.prompt_assembler._LEARNED_DIR", learned_dir):
-        (tmp_path / "rules").mkdir()
-        (tmp_path / "security").mkdir()
-        result = assemble_prompt(
-            task_text="test task",
+    with patch("agent.prompt_assembler.call_llm_raw", side_effect=_capture_llm), \
+         patch("agent.prompt_assembler._LEARNED_DIR", tmp_path / "learned"):
+        (tmp_path / "learned").mkdir()
+        assemble_prompt(
+            task_text="find skus",
             task_type="sql",
             prephase_result=pre,
-            learn_ctx=[],
-            model="test-model",
+            learn_ctx=["Always SELECT sku"],
+            model="m",
             cfg={},
-            task_id="t99",
         )
 
-    assert "persisted rule" in calls[0]
+    assert "Always SELECT sku" in captured_sources[0]
+    assert "## LEARNED" in captured_sources[0]
