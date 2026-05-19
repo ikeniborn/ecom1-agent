@@ -24,13 +24,13 @@ from .models import SddOutput, TestOutput, LearnOutput, AnswerOutput
 from .test_runner import run_tests
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest, merge_schema_from_sqlite_results
 from .prompt import load_prompt
-from .prompt_assembler import assemble_prompt, load_learned_ctx, _apply_learn_diff
+from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff
 from .rules_loader import RulesLoader, _RULES_DIR
 from .schema_gate import check_schema_compliance
 from .sql_security import (
     check_path_access, load_security_gates,
-    check_grounding_refs, check_learn_output,
-    check_retry_loop, make_json_hash,
+    check_grounding_refs,
+    check_retry_loop,
 )
 from .trace import get_trace
 
@@ -169,13 +169,28 @@ def _build_sdd_user_msg(task_text: str, task_type: str, learn_ctx: list[str], la
     return "\n\n".join(parts)
 
 
-def _build_learn_user_msg(task_text: str, queries: list[str], error: str, error_type: str) -> str:
-    return (
+def _build_learn_user_msg(
+    task_text: str,
+    queries: list[str],
+    error: str,
+    error_type: str,
+    existing_entries: list[dict],
+) -> str:
+    base = (
         f"TASK: {task_text}\n"
         f"FAILED QUERIES: {json.dumps(queries)}\n"
         f"ERROR: {error}\n"
         f"ERROR_TYPE: {error_type}"
     )
+    if existing_entries:
+        rules_lines = "\n".join(
+            f"  - id: {e['id']}\n    content: {e['content']!r}"
+            for e in existing_entries
+            if e.get("status") == "active"
+        )
+        if rules_lines:
+            base += f"\n\nEXISTING_RULES:\n{rules_lines}"
+    return base
 
 
 def _build_answer_user_msg(task_text: str, sql_results: list[str], auto_refs: list[str]) -> str:
@@ -257,7 +272,6 @@ def _run_learn(
     agents_md_index: dict,
     error_type: str = "semantic",
     cycle: int = 0,
-    prior_learn_hashes: "set[str] | None" = None,
     task_id: str = "",
 ) -> None:
     learn_model = _resolve_model_for_phase("learn", model)
@@ -266,43 +280,48 @@ def _run_learn(
         {"type": "text", "text": unified_context},
         {"type": "text", "text": learn_guide, "cache_control": {"type": "ephemeral"}},
     ]
-    learn_user = _build_learn_user_msg(task_text, queries, error, error_type)
+    existing_entries = load_learned_entries(task_id) if task_id else []
+    learn_user = _build_learn_user_msg(task_text, queries, error, error_type, existing_entries)
     learn_out, sgr_learn, _ = _call_llm_phase(
         learn_system, learn_user, learn_model, cfg, LearnOutput,
         max_tokens=2048, phase="learn", cycle=cycle,
     )
-    sgr_learn["error_type"] = error_type
-    sgr_trace.append(sgr_learn)
-    if learn_out and error_type != "llm_fail":
-        if prior_learn_hashes is not None:
-            learn_hash = make_json_hash(learn_out.model_dump())
-            learn_gate_err = check_learn_output(
-                learn_out.rule_content, learn_hash, prior_learn_hashes, _get_security_gates()
-            )
-            if learn_gate_err:
-                print(f"{CLI_YELLOW}[pipeline] LEARN blocked: {learn_gate_err}{CLI_CLR}")
-                return
-            prior_learn_hashes.add(learn_hash)
-        anchor = learn_out.agents_md_anchor
-        if anchor:
-            anchor_section = anchor.split(">")[0].strip()
-            if anchor_section in agents_md_index:
-                anchor_lines = agents_md_index[anchor_section]
-                vault_rule = f"[{anchor_section}]\n" + "\n".join(anchor_lines)
-                learn_ctx.append(vault_rule)
-                if task_id:
-                    save_learned_ctx(task_id, learn_ctx)
-                print(f"{CLI_BLUE}[pipeline] LEARN: anchor={anchor!r}, vault rule added{CLI_CLR}")
-                return  # compacted_ctx ignored when anchor path taken
-        compacted = learn_out.compacted_ctx
-        if compacted and len(compacted) > 0 and all(isinstance(r, str) for r in compacted):
-            learn_ctx[:] = compacted
-            print(f"{CLI_BLUE}[pipeline] LEARN: compacted to {len(learn_ctx)} rules{CLI_CLR}")
-        else:
-            learn_ctx.append(learn_out.rule_content)
-            print(f"{CLI_BLUE}[pipeline] LEARN: rule added (total={len(learn_ctx)}){CLI_CLR}")
-        if task_id:
-            save_learned_ctx(task_id, learn_ctx)
+    sgr_lean = sgr_learn
+    sgr_lean["error_type"] = error_type
+    sgr_trace.append(sgr_lean)
+    if not learn_out or error_type == "llm_fail":
+        return
+    if learn_out.skip:
+        print(f"{CLI_BLUE}[pipeline] LEARN: skipped ({learn_out.skip_reason}){CLI_CLR}")
+        return
+    anchor = learn_out.agents_md_anchor
+    if anchor:
+        anchor_section = anchor.split(">")[0].strip()
+        if anchor_section in agents_md_index:
+            anchor_lines = agents_md_index[anchor_section]
+            vault_rule = f"[{anchor_section}]\n" + "\n".join(anchor_lines)
+            if task_id:
+                _apply_learn_diff(task_id, vault_rule, f"anchor:{anchor}", [], None, source="learn")
+            learn_ctx.append(vault_rule)
+            print(f"{CLI_BLUE}[pipeline] LEARN: anchor={anchor!r}, vault rule added{CLI_CLR}")
+            return
+    if task_id:
+        _apply_learn_diff(
+            task_id,
+            learn_out.rule_content,
+            learn_out.reasoning,
+            learn_out.deactivate,
+            learn_out.deactivate_reason,
+            source="learn",
+        )
+    if learn_out.deactivate:
+        deactivate_contents = {
+            e["content"] for e in existing_entries
+            if e.get("id") in learn_out.deactivate
+        }
+        learn_ctx[:] = [r for r in learn_ctx if r not in deactivate_contents]
+    learn_ctx.append(learn_out.rule_content)
+    print(f"{CLI_BLUE}[pipeline] LEARN: rule added, deactivated={learn_out.deactivate} (total active={len(learn_ctx)}){CLI_CLR}")
 
 
 def run_pipeline(
@@ -331,7 +350,6 @@ def run_pipeline(
     success = False
     cycles_used = 0
     prior_query_sets: list[frozenset] = []
-    prior_learn_hashes: set[str] = set()
 
     task_type = pre.task_type or "sql"
 
@@ -385,7 +403,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, [], last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type=sdd_err_type, cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                               task_id=task_id)
                     continue
 
                 # ── SDD ERROR CODES ────────────────────────────────────────────────
@@ -450,7 +468,7 @@ def run_pipeline(
                         _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                    sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="semantic", cycle=cycle + 1,
-                                   prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                                   task_id=task_id)
                         continue
 
                 # ── SECURITY CHECK (retry-loop guard only) ───────────────────────
@@ -477,7 +495,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="security", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                               task_id=task_id)
                     continue
 
                 # ── TDD (mandatory) ──────────────────────────────────────────────
@@ -489,7 +507,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, [], last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="llm_fail", cycle=cycle + 1,
-                               prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                               task_id=task_id)
                     continue
 
                 # ── EXECUTE (SQL steps) ───────────────────────────────────────────
@@ -584,7 +602,7 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="empty" if last_empty and not execute_error else "semantic",
-                               cycle=cycle + 1, prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                               cycle=cycle + 1, task_id=task_id)
                     continue
 
                 # ── SCHEMA REFRESH ────────────────────────────────────────────────
@@ -625,7 +643,7 @@ def run_pipeline(
                         _run_learn(unified_context, model, cfg, task_text, sql_queries, last_error,
                                    sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="test_fail", cycle=cycle + 1,
-                                   prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                                   task_id=task_id)
                         continue
 
             # ── ANSWER ───────────────────────────────────────────────────────────
@@ -682,7 +700,7 @@ def run_pipeline(
                                    [s.query for s in (sdd_out.plan if sdd_out else []) if s.type == "sql" and s.query],
                                    last_error, sgr_trace, learn_ctx, pre.agents_md_index,
                                    error_type="test_fail", cycle=cycle + 1,
-                                   prior_learn_hashes=prior_learn_hashes, task_id=task_id)
+                                   task_id=task_id)
                         continue
 
             # ── SUCCESS ───────────────────────────────────────────────────────────
@@ -729,9 +747,6 @@ def run_pipeline(
                 print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
 
             _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx, cycles_used, outcome, None)
-            if task_id and learn_ctx:
-                print(f"{CLI_BLUE}[pipeline] learn_ctx ({len(learn_ctx)} rules) moved to eval_log, data/learned/{task_id}.yaml cleared{CLI_CLR}")
-            clear_learned_ctx(task_id)
             success = True
             break
 
