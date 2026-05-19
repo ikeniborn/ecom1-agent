@@ -260,9 +260,8 @@ def _run_learn(
         learn_system, learn_user, learn_model, cfg, LearnOutput,
         max_tokens=2048, phase="learn", cycle=cycle,
     )
-    sgr_lean = sgr_learn
-    sgr_lean["error_type"] = error_type
-    sgr_trace.append(sgr_lean)
+    sgr_learn["error_type"] = error_type
+    sgr_trace.append(sgr_learn)
     if not learn_out or error_type == "llm_fail":
         return
     if learn_out.skip:
