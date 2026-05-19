@@ -83,10 +83,11 @@ class ExecuteOutput(BaseModel):
 
 ## ASSEMBLE Sources
 
-- `AGENTS.md` — base agent instructions from harness: logic, constraints, how to use `/bin` utilities and `proc/` entities
+- `AGENTS.md` — base agent instructions from harness (read via `vm.read("/AGENTS.MD")`). Structured as `##` sections parsed into `agents_md_index`: brand aliases, kind synonyms, folder roles, and other domain vocabulary. Describes system identity, constraints, and navigation conventions (e.g. `readme.md` files serve as sub-agents.md).
+- `/bin` utilities — executable tools provided by harness; AGENTS.md describes what each does and when to use them
 - `task_text` — specific task provided by harness
-- `tree /docs` — executed at ASSEMBLE start; gives agent visibility into available documentation structure
-- `learn_ctx` — lessons from previous failed cycles
+- `tree /docs` — executed at ASSEMBLE start via `/bin` or harness util; gives agent visibility into available documentation structure before forming unified_context
+- `learn_ctx` — lessons from previous failed cycles; highest priority in unified_context assembly
 
 ## Learning Loop
 
