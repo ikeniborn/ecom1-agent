@@ -1032,3 +1032,26 @@ def test_main_prompt_dry_run_prints_preview_no_write(tmp_path):
 def test_write_prompt_removed():
     """_write_prompt no longer exists after refactor."""
     assert not hasattr(po, "_write_prompt"), "_write_prompt should be removed"
+
+
+def test_main_prompt_rewrite_failure_marks_processed(tmp_path):
+    """When _rewrite_prompt_file returns None, hashes are marked processed (not retried)."""
+    eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed = _setup(tmp_path)
+    _write_eval_log(eval_log, [_eval_entry(prompt_opts=["Add grounding guard"])])
+    h = po._entry_hash("Do you have product X with attr Y=3?", "prompt", "Add grounding guard")
+
+    patch_result = {"target_file": "answer.md", "content": "## Guard\nNever emit empty."}
+
+    patches = _base_patches(eval_log, rules_dir, security_dir, prompts_dir, prom_dir, processed)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], \
+         patches[5], patches[6], patches[7], patches[8], \
+         patch.object(po, "_synthesize_rule", return_value=None), \
+         patch.object(po, "_synthesize_security_gate", return_value=None), \
+         patch.object(po, "_synthesize_prompt_patch", return_value=patch_result), \
+         patch.object(po, "_rewrite_prompt_file", return_value=None), \
+         patch.object(po, "_check_contradiction", return_value=None):
+        po.main(dry_run=False)
+
+    saved = set(processed.read_text().splitlines()) if processed.exists() else set()
+    assert h in saved
+    assert not (prompts_dir / "answer.md").exists()

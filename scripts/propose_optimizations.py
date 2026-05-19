@@ -581,6 +581,7 @@ def main(dry_run: bool = False) -> None:
         rewritten = _rewrite_prompt_file(target, all_recs, model, cfg)
         if rewritten is None:
             print(f"  → skip {target} (rewrite failed)")
+            new_processed.update(all_hashes_flat)
             continue
         if dry_run:
             print(f"  → [DRY RUN] {target}: {rewritten[:200]}")
