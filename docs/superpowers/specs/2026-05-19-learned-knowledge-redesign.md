@@ -1,3 +1,59 @@
+---
+review:
+  spec_hash: "81d0538a886e2a98"
+  last_run: "2026-05-19"
+  phases:
+    structure:    { status: passed }
+    coverage:     { status: passed }
+    clarity:      { status: passed }
+    consistency:  { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: WARNING
+      section: Updated_Prompts
+      section_hash: "f6e2851514c8fd33"
+      text: "«Clean — remove SQL/ECOM-specific hints» — нет DoD: по какому критерию файл считается очищённым?"
+      verdict: fixed
+      verdict_at: "2026-05-19"
+    - id: F-002
+      phase: clarity
+      severity: WARNING
+      section: LEARN_Phase
+      section_hash: "f2e31e3031c0a8b0"
+      text: "Шаг 4 «Update in-memory learn_ctx to reflect active entries» — неоднозначно: полная перезагрузка из файла, diff или только append?"
+      verdict: fixed
+      verdict_at: "2026-05-19"
+    - id: F-003
+      phase: clarity
+      severity: INFO
+      section: Migration_Notes
+      section_hash: "b63fd2739797103f"
+      text: "Migration script описан словесно, но не ясно — это обязательный deliverable или описание ручных шагов?"
+      verdict: fixed
+      verdict_at: "2026-05-19"
+    - id: F-004
+      phase: clarity
+      severity: INFO
+      section: LEARN_Phase
+      section_hash: "f2e31e3031c0a8b0"
+      text: "existing_entries в _run_learn(): источник не указан — свежая загрузка из файла или текущий in-memory learn_ctx?"
+      verdict: fixed
+      verdict_at: "2026-05-19"
+  section_hashes:
+    Problem: "5efbed197cb7dbce"
+    Goals: "3996e9ec38880c41"
+    Data_Schema: "f9b647f6a7fe681f"
+    LEARN_Phase: "f2e31e3031c0a8b0"
+    Pipeline_Changes: "c06cefd7a6d69c0c"
+    Assembler_Changes: "7cdeaa776cf0bbb8"
+    Deleted_Artifacts: "97b75982dd2766a9"
+    Updated_Prompts: "f6e2851514c8fd33"
+    Deleted_Env_Vars: "c97f47bea7bbe04d"
+    Testing_Impact: "08f82ee55285da4d"
+    Migration_Notes: "b63fd2739797103f"
+---
+
 # Spec: Learned Knowledge Redesign
 
 **Date:** 2026-05-19  
@@ -95,7 +151,7 @@ EXISTING_RULES:
    - Append new entry with next available id, `status=active`, `source=learn`
    - For each id in `deactivate`: set `status=inactive`, `deactivated_reason=...`
    - Write YAML
-4. Update in-memory `learn_ctx` to reflect active entries after mutation
+4. Update in-memory `learn_ctx`: remove `content` values of deactivated ids, append new `rule_content` if `action=add`. Do not reload from file — apply diff to current list.
 
 ---
 
@@ -111,7 +167,7 @@ EXISTING_RULES:
 **Changed:**
 - `load_learned_ctx(task_id)` → reads only `status: active` entries → `list[str]`
 - `save_learned_ctx()` renamed to `_apply_learn_diff()` — applies diff (add + deactivate)
-- `_run_learn()` → receives `existing_entries: list[dict]` (id + content of active rules) → passes to LLM → applies diff
+- `_run_learn()` → loads `existing_entries: list[dict]` (id + content) fresh from `data/learned/{task_id}.yaml` at call start (not from in-memory `learn_ctx`) → passes to LLM → applies diff
 
 **On success:** pipeline completes normally. No file deletion. `learn_ctx` retains session rules — they are already persisted from each `_run_learn()` call.
 
@@ -165,10 +221,10 @@ All task-specific content (SQL, ECOM, SKU references) removed. Prompts describe 
 | File | Action |
 |------|--------|
 | `assembler.md` | Update — remove RULES/SECURITY/PROMPT_BLOCKS section descriptions |
-| `sdd.md` | Clean — remove SQL/ECOM-specific hints |
+| `sdd.md` | Clean — remove SQL/ECOM-specific hints. DoD: no SQL keywords in examples, no domain terms (SKU, product.name, grounding_refs, inventory) |
 | `learn.md` | Extend — add consolidation logic (deactivate/skip fields) |
-| `tdd.md` | Clean — remove task-specific references |
-| `answer.md` | Clean — remove task-specific references |
+| `tdd.md` | Clean — remove task-specific references. DoD: no SQL keywords in examples, no domain terms |
+| `answer.md` | Clean — remove task-specific references. DoD: no SQL keywords in examples, no domain terms |
 | `pipeline_evaluator.md` | Delete |
 
 ---
@@ -194,5 +250,5 @@ All task-specific content (SQL, ECOM, SKU references) removed. Prompts describe 
 
 ## Migration Notes
 
-- Existing `data/learned/{task_id}.yaml` files (current flat `list[str]` format) must be migrated to new schema. Migration script: read existing list, convert each string to entry with `id=rNNN`, `status=active`, `source=learn`, `created=<today>`, `reasoning=""`, `deactivated_reason=null`.
+- Existing `data/learned/{task_id}.yaml` files (current flat `list[str]` format) must be migrated to new schema. **Required deliverable:** `scripts/migrate_learned.py` — reads each existing file, converts each string to an entry with `id=rNNN`, `status=active`, `source=learn`, `created=<today>`, `reasoning=""`, `deactivated_reason=null`. Must be run before the first pipeline run after deployment.
 - No rollback path for deleted rules — archive `data/rules/` and `data/security/` in git history before deletion.
