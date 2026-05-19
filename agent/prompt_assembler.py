@@ -7,13 +7,9 @@ from pathlib import Path
 import yaml
 
 from .llm import call_llm_raw, _resolve_model_for_phase
-from .prompt import load_prompt, load_task_blocks
+from .prompt import load_prompt
 from .prephase import PrephaseResult, _format_schema_digest
-from .rules_loader import RulesLoader
-from .sql_security import load_security_gates
 
-_RULES_DIR = Path(__file__).parent.parent / "data" / "rules"
-_SECURITY_DIR = Path(__file__).parent.parent / "data" / "security"
 _LEARNED_DIR = Path(__file__).parent.parent / "data" / "learned"
 
 
@@ -102,37 +98,17 @@ def _build_sources(
     learn_ctx: list[str],
 ) -> str:
     parts: list[str] = []
-
     parts.append(f"TASK_TEXT: {task_text}")
     parts.append(f"TASK_TYPE: {task_type}")
-
     if learn_ctx:
         parts.append("## LEARNED (highest priority)\n" + "\n".join(f"- {r}" for r in learn_ctx))
-
-    rules_loader = RulesLoader(_RULES_DIR)
-    rules_md = rules_loader.get_rules_markdown(phase="sql_plan", verified_only=True)
-    if rules_md:
-        parts.append(f"## RULES\n{rules_md}")
-
-    security_gates = load_security_gates(_SECURITY_DIR)
-    if security_gates:
-        gate_lines = "\n".join(f"- [{g['id']}] {g.get('message', '')}" for g in security_gates)
-        parts.append(f"## SECURITY\n{gate_lines}")
-
-    block_names = load_task_blocks(task_type)
-    block_texts = [load_prompt(name) for name in block_names if load_prompt(name)]
-    if block_texts:
-        parts.append("## PROMPT_BLOCKS\n" + "\n\n".join(block_texts))
-
     pre = prephase_result
     if pre.agents_md_content:
         parts.append(f"## VAULT\n{pre.agents_md_content}")
-
     if pre.schema_digest:
         parts.append(f"## SCHEMA_DIGEST\n{_format_schema_digest(pre.schema_digest)}")
     if pre.db_schema:
         parts.append(f"## DB_SCHEMA\n{pre.db_schema}")
-
     meta: list[str] = []
     if pre.current_date:
         meta.append(f"date: {pre.current_date}")
@@ -140,7 +116,6 @@ def _build_sources(
         meta.append(f"customer_id: {pre.agent_id}")
     if meta:
         parts.append("## AGENT_CONTEXT\n" + "\n".join(meta))
-
     return "\n\n".join(parts)
 
 
