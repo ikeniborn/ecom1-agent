@@ -14,11 +14,11 @@ You are formulating the final answer to a catalogue lookup task based on SQL que
   - OUTCOME_NONE_CLARIFICATION — task too vague to answer even with SQL results
   - OUTCOME_NONE_UNSUPPORTED — query type not supported by the database
   - OUTCOME_DENIED_SECURITY — security violation detected
-- `refs` MUST list catalogue paths for every record in the results. Use values from AUTO_REFS exactly as shown — do NOT construct paths manually from raw column values.
+- `grounding_refs` MUST list catalogue paths for every record in the results. Use values from AUTO_REFS exactly as shown — do NOT construct paths manually from raw column values.
 - `completed_steps` — laconic list of steps taken (2–5 items).
 
 ## Output format (JSON only)
-{"reasoning": "<justification from SQL results>", "message": "<answer text>", "outcome": "OUTCOME_OK", "refs": ["/proc/catalog/item.json"], "completed_steps": ["validated SQL syntax", "executed query", "found N results"]}
+{"reasoning": "<justification from SQL results>", "message": "<answer text>", "outcome": "OUTCOME_OK", "grounding_refs": ["/proc/catalog/item.json"], "completed_steps": ["validated SQL syntax", "executed query", "found N results"]}
 
 ## Clarification guard
 
