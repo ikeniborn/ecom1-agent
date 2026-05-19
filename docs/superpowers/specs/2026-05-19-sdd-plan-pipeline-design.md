@@ -4,6 +4,8 @@
 
 Embed superpowers spec→plan patterns into the agent pipeline. SDD becomes a structured spec phase; PLAN decomposes it into executable steps. LEARN updates from both to improve future cycles.
 
+The pipeline is **task-type agnostic** — tasks may involve SQL queries, document traversal, tool calls, verification checks, or any combination. ASSEMBLE studies the available tools and doc structure before SDD forms a spec; the spec and plan must reflect the actual task type, not assume SQL.
+
 ## Pipeline
 
 ```
@@ -25,16 +27,18 @@ ASSEMBLE → SDD → PLAN → EXECUTE → ANSWER
 
 ## Data Models
 
-### SddOutput (extended)
+### SddOutput (redesigned)
 
 ```python
 class SddOutput(BaseModel):
-    spec_goal: str            # one-sentence goal
-    success_criteria: list[str]  # 2-4 correctness conditions
-    plan: list[str]           # reasoning steps (existing)
-    sql_queries: list[str]    # candidate SQL (existing)
-    error_code: str = ""      # existing
+    spec_goal: str              # one-sentence goal
+    success_criteria: list[str] # 2-4 correctness conditions
+    plan: list[str]             # reasoning steps toward the goal
+    actions: list[str]          # candidate actions (SQL, tool calls, doc reads — type depends on task)
+    error_code: str = ""        # existing
 ```
+
+`actions` replaces `sql_queries` — not all tasks involve SQL. Each action is a plain string; its interpretation depends on task type (SQL query, `/bin` command, path read, etc.).
 
 ### PlanOutput (new)
 
@@ -42,7 +46,7 @@ class SddOutput(BaseModel):
 class PlanOutput(BaseModel):
     approach: str             # decomposition strategy
     steps: list[str]          # ordered execution steps
-    action: str               # final SQL query or expression to execute (plain string)
+    action: str               # final action to execute (SQL, tool call, path read — plain string; type inferred from task)
 ```
 
 ### ExecuteOutput (new)
@@ -56,14 +60,15 @@ class ExecuteOutput(BaseModel):
 ## Components
 
 ### models.py
+- Replace `sql_queries: list[str]` with `actions: list[str]` in `SddOutput`
 - Add `spec_goal: str` and `success_criteria: list[str]` to `SddOutput`
 - Add new `PlanOutput` class
 - Add new `ExecuteOutput` class
 
 ### data/prompts/plan.md
 - New PLAN phase prompt
-- Input context: full `SddOutput` (spec_goal, success_criteria, plan, sql_queries)
-- Output: approach, steps, final action
+- Input context: full `SddOutput` (spec_goal, success_criteria, plan, actions)
+- Output: approach, steps, final action (task-type agnostic)
 
 ### pipeline.py
 - Remove TDD phase entirely
@@ -83,11 +88,13 @@ class ExecuteOutput(BaseModel):
 
 ## ASSEMBLE Sources
 
-- `AGENTS.md` — base agent instructions from harness (read via `vm.read("/AGENTS.MD")`). Structured as `##` sections parsed into `agents_md_index`. **Section names and content are dynamic** — they vary per deployment and must not be hardcoded. ASSEMBLE reads the index at runtime and passes all sections as-is into `unified_context`. Typical sections include domain vocabulary (brand aliases, kind synonyms), folder roles, and system constraints, but the agent must treat whatever is present as authoritative.
-- `/bin` utilities — executable tools provided by harness; AGENTS.md describes what each does and when to use them
-- `task_text` — specific task provided by harness
-- `tree /docs` — executed at ASSEMBLE start via `/bin` or harness util; gives agent visibility into available documentation structure before forming unified_context
-- `learn_ctx` — lessons from previous failed cycles; highest priority in unified_context assembly
+- `AGENTS.md` — base agent instructions from harness (read via `vm.read("/AGENTS.MD")`). Structured as `##` sections parsed into `agents_md_index`. **Section names and content are dynamic** — they vary per deployment and must not be hardcoded. ASSEMBLE reads the index at runtime and passes all sections as-is into `unified_context`. Agent treats whatever is present as authoritative.
+- `/bin` utilities — executable tools provided by harness; AGENTS.md describes what each does and when to use them. **ASSEMBLE enumerates available tools** before passing to SDD so the spec can reference concrete capabilities.
+- `tree /docs` — executed at ASSEMBLE start; agent studies document structure to understand what knowledge is available before forming spec.
+- `task_text` — specific task provided by harness.
+- `learn_ctx` — lessons from previous failed cycles; highest priority in `unified_context` assembly.
+
+ASSEMBLE order: read AGENTS.md → enumerate /bin tools → run tree /docs → merge with learn_ctx → produce unified_context. SDD receives a complete picture of the environment before forming any spec.
 
 ## Learning Loop
 
