@@ -4,10 +4,8 @@ from __future__ import annotations
 import json
 import os
 import re
-import threading
 import time
 import traceback
-from pathlib import Path
 
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
@@ -25,20 +23,13 @@ from .test_runner import run_tests
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest, merge_schema_from_sqlite_results
 from .prompt import load_prompt
 from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff
-from .rules_loader import RulesLoader, _RULES_DIR
 from .schema_gate import check_schema_compliance
-from .sql_security import (
-    check_path_access, load_security_gates,
-    check_grounding_refs,
-    check_retry_loop,
-)
+from .sql_security import check_retry_loop
 from .trace import get_trace
 
 
 _MAX_CYCLES = int(os.environ.get("MAX_STEPS", "3"))
-_EVAL_ENABLED = os.environ.get("EVAL_ENABLED", "0") == "1"
 _SDD_ENABLED = os.environ.get("SDD_ENABLED", "1") == "1"
-_EVAL_LOG = Path(__file__).parent.parent / "data" / "eval_log.jsonl"
 _SQLITE_SCHEMA_RE = re.compile(r"\bsqlite_(?:schema|master)\b", re.IGNORECASE)
 
 # Compat stubs — referenced by older tests that patch these names; no-ops in new pipeline
@@ -57,23 +48,6 @@ def _extract_discovery_results(queries: list[str], results: list[str], confirmed
 def _format_confirmed_values(cv: dict) -> str:
     """Compat stub — confirmed_values removed from SDD pipeline."""
     return ""
-
-_rules_loader_cache: "RulesLoader | None" = None
-_security_gates_cache: "list[dict] | None" = None
-
-
-def _get_rules_loader() -> RulesLoader:
-    global _rules_loader_cache
-    if _rules_loader_cache is None:
-        _rules_loader_cache = RulesLoader(_RULES_DIR)
-    return _rules_loader_cache
-
-
-def _get_security_gates() -> list[dict]:
-    global _security_gates_cache
-    if _security_gates_cache is None:
-        _security_gates_cache = load_security_gates()
-    return _security_gates_cache
 
 
 def _exec_result_text(result) -> str:
@@ -333,11 +307,8 @@ def run_pipeline(
     task_id: str = "",
     injected_session_rules: list[str] | None = None,
     injected_prompt_addendum: str = "",
-    injected_security_gates: list[dict] | None = None,
-) -> tuple[dict, threading.Thread | None]:
-    """SDD-based pipeline. Returns (stats dict, eval Thread or None)."""
-    rules_loader = _get_rules_loader()
-    security_gates = _get_security_gates() + (injected_security_gates or [])
+) -> tuple[dict, None]:
+    """SDD-based pipeline. Returns (stats dict, None)."""
     _persisted = load_learned_ctx(task_id) if task_id else []
     learn_ctx: list[str] = list(dict.fromkeys(_persisted + list(injected_session_rules or [])))
     sgr_trace: list[dict] = []
@@ -429,8 +400,6 @@ def run_pipeline(
                         ))
                     except Exception as e:
                         print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
-                    _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx,
-                                     cycles_used, "OUTCOME_DENIED_SECURITY", None)
                     success = True
                     break
 
@@ -447,8 +416,6 @@ def run_pipeline(
                         ))
                     except Exception as e:
                         print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
-                    _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx,
-                                     cycles_used, "OUTCOME_NONE_UNSUPPORTED", None)
                     success = True
                     break
 
@@ -511,8 +478,7 @@ def run_pipeline(
                     continue
 
                 # ── EXECUTE (SQL steps) ───────────────────────────────────────────
-                _exec_path = "/bin/sql"
-                execute_error = check_path_access(_exec_path, security_gates)
+                execute_error = ""
                 sql_results = []
                 executed_sql_queries: list[str] = []
 
@@ -559,10 +525,6 @@ def run_pipeline(
                     for step in exec_steps:
                         op_path = step.operation
                         assert op_path  # type narrowing
-                        path_err = check_path_access(op_path, security_gates)
-                        if path_err:
-                            execute_error = path_err
-                            break
                         try:
                             _t0 = time.monotonic()
                             exec_res = vm.exec(ExecRequest(path=op_path, args=step.args or []))
@@ -708,13 +670,6 @@ def run_pipeline(
             consecutive_sql_test_fails = 0
             outcome = answer_out.outcome
             print(f"{CLI_GREEN}[pipeline] ANSWER: {outcome} — {answer_out.message[:100]}{CLI_CLR}")
-            ref_err = check_grounding_refs(
-                answer_out.grounding_refs,
-                {Path(r).stem for r in sku_refs},
-                security_gates,
-            )
-            if ref_err:
-                print(f"{CLI_YELLOW}[pipeline] ANSWER grounding_refs blocked: {ref_err}{CLI_CLR}")
             result_paths = set(sku_refs)
             clean_refs = (
                 [r for r in answer_out.grounding_refs if r in result_paths]
@@ -746,7 +701,8 @@ def run_pipeline(
             except Exception as e:
                 print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
 
-            _append_eval_log(task_id, task_text, task_type, pre, sgr_trace, learn_ctx, cycles_used, outcome, None)
+            if task_id:
+                print(f"{CLI_BLUE}[pipeline] SUCCESS: {len(learn_ctx)} active rules in data/learned/{task_id}.yaml{CLI_CLR}")
             success = True
             break
 
@@ -774,32 +730,6 @@ def run_pipeline(
         except Exception as e:
             print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
 
-    # ── EVALUATOR: only on success ────────────────────────────────────────────
-    eval_thread: threading.Thread | None = None
-    eval_model = _resolve_model_for_phase("evaluator", model)
-    if success and _EVAL_ENABLED and eval_model:
-        eval_thread = threading.Thread(
-            target=_run_evaluator_safe,
-            kwargs={
-                "task_id": task_id,
-                "task_text": task_text,
-                "task_type": task_type,
-                "prephase": {
-                    "agents_md": pre.agents_md_content,
-                    "schema_digest": pre.schema_digest,
-                    "db_schema": pre.db_schema,
-                },
-                "learn_ctx": list(learn_ctx),
-                "sgr_trace": sgr_trace,
-                "cycles": cycles_used,
-                "final_outcome": outcome,
-                "model": eval_model,
-                "cfg": cfg,
-            },
-            daemon=False,
-        )
-        eval_thread.start()
-
     stats = {
         "outcome": outcome,
         "cycles_used": cycles_used,
@@ -809,99 +739,4 @@ def run_pipeline(
         "output_tokens": total_out_tok,
         "total_elapsed_ms": 0,
     }
-    return stats, eval_thread
-
-
-def _append_eval_log(
-    task_id: str,
-    task_text: str,
-    task_type: str,
-    pre: PrephaseResult,
-    sgr_trace: list[dict],
-    learn_ctx: list[str],
-    cycles: int,
-    outcome: str,
-    evaluator_result,
-) -> None:
-    entry: dict = {
-        "task_id": task_id,
-        "task_text": task_text,
-        "task_type": task_type,
-        "cycles_used": cycles,
-        "prephase": {
-            "agents_md": pre.agents_md_content[:500] if pre.agents_md_content else "",
-            "schema_digest": pre.schema_digest,
-        },
-        "trace": sgr_trace,
-        "learn_ctx": learn_ctx,
-        "outcome": "ok" if outcome == "OUTCOME_OK" else "fail",
-        "evaluator": None,
-    }
-    if evaluator_result is not None:
-        entry["evaluator"] = {
-            "best_cycle": getattr(evaluator_result, "best_cycle", 0),
-            "best_answer": getattr(evaluator_result, "best_answer", ""),
-            "score": getattr(evaluator_result, "score", 0.0),
-            "prompt_optimization": getattr(evaluator_result, "prompt_optimization", []),
-            "rule_optimization": getattr(evaluator_result, "rule_optimization", []),
-            "security_optimization": getattr(evaluator_result, "security_optimization", []),
-        }
-    _EVAL_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with open(_EVAL_LOG, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-
-def _run_evaluator_safe(
-    task_id: str = "",
-    task_text: str = "",
-    task_type: str = "sql",
-    prephase: dict | None = None,
-    learn_ctx: list[str] | None = None,
-    sgr_trace: list[dict] | None = None,
-    cycles: int = 0,
-    final_outcome: str = "",
-    model: str = "",
-    cfg: dict | None = None,
-) -> None:
-    try:
-        from .evaluator import run_evaluator, EvalInput
-        result = run_evaluator(
-            EvalInput(
-                task_id=task_id,
-                task_text=task_text,
-                task_type=task_type,
-                prephase=prephase or {},
-                learn_ctx=learn_ctx or [],
-                sgr_trace=sgr_trace or [],
-                cycles=cycles,
-                final_outcome=final_outcome,
-            ),
-            model=model,
-            cfg=cfg or {},
-        )
-        if result is not None:
-            _EVAL_LOG.parent.mkdir(parents=True, exist_ok=True)
-            lines = []
-            try:
-                lines = _EVAL_LOG.read_text(encoding="utf-8").splitlines()
-            except Exception:
-                pass
-            for i in range(len(lines) - 1, -1, -1):
-                try:
-                    entry = json.loads(lines[i])
-                    if entry.get("task_id") == task_id and entry.get("evaluator") is None:
-                        entry["evaluator"] = {
-                            "best_cycle": result.best_cycle,
-                            "best_answer": result.best_answer,
-                            "score": result.score,
-                            "prompt_optimization": result.prompt_optimization,
-                            "rule_optimization": result.rule_optimization,
-                            "security_optimization": result.security_optimization,
-                        }
-                        lines[i] = json.dumps(entry, ensure_ascii=False)
-                        _EVAL_LOG.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                        break
-                except Exception:
-                    continue
-    except Exception as e:
-        print(f"{CLI_YELLOW}[pipeline] evaluator error (non-fatal): {e}{CLI_CLR}")
+    return stats, None
