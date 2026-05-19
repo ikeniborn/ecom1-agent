@@ -23,7 +23,13 @@ class AssembledPrompt:
 
 
 def load_learned_ctx(task_id: str) -> list[str]:
-    """Load persisted learn_ctx from prior failed run, or [] if none."""
+    """Return content of active entries from data/learned/{task_id}.yaml."""
+    entries = load_learned_entries(task_id)
+    return [e["content"] for e in entries if e.get("status") == "active"]
+
+
+def load_learned_entries(task_id: str) -> list[dict]:
+    """Return all entries (active + inactive) from data/learned/{task_id}.yaml."""
     if not task_id:
         return []
     path = _LEARNED_DIR / f"{task_id}.yaml"
@@ -31,29 +37,62 @@ def load_learned_ctx(task_id: str) -> list[str]:
         return []
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
-        return list(data.get("learn_ctx", []))
+        if not isinstance(data, dict):
+            return []
+        return list(data.get("entries", []))
     except Exception:
         return []
 
 
-def save_learned_ctx(task_id: str, learn_ctx: list[str]) -> None:
-    """Persist learn_ctx to data/learned/{task_id}.yaml on pipeline failure."""
-    if not task_id or not learn_ctx:
-        return
-    _LEARNED_DIR.mkdir(parents=True, exist_ok=True)
-    path = _LEARNED_DIR / f"{task_id}.yaml"
-    path.write_text(
-        yaml.dump({"task_id": task_id, "learn_ctx": learn_ctx}, allow_unicode=True),
-        encoding="utf-8",
-    )
+def _next_entry_id(entries: list[dict]) -> str:
+    """Generate next monotonic id rNNN (never reuses existing ids)."""
+    used: set[int] = set()
+    for e in entries:
+        eid = e.get("id", "")
+        if isinstance(eid, str) and eid.startswith("r") and eid[1:].isdigit():
+            used.add(int(eid[1:]))
+    return f"r{(max(used, default=0) + 1):03d}"
 
 
-def clear_learned_ctx(task_id: str) -> None:
-    """Delete data/learned/{task_id}.yaml on pipeline success."""
+def _apply_learn_diff(
+    task_id: str,
+    rule_content: str,
+    reasoning: str,
+    deactivate: list[str],
+    deactivate_reason: str | None,
+    source: str = "learn",
+) -> None:
+    """Append new rule entry and deactivate specified entries in data/learned/{task_id}.yaml."""
     if not task_id:
         return
+    from datetime import date
+    _LEARNED_DIR.mkdir(parents=True, exist_ok=True)
     path = _LEARNED_DIR / f"{task_id}.yaml"
-    path.unlink(missing_ok=True)
+    if path.exists():
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            data = {}
+    else:
+        data = {}
+    entries: list[dict] = list(data.get("entries", []))
+    for entry in entries:
+        if entry.get("id") in deactivate:
+            entry["status"] = "inactive"
+            entry["deactivated_reason"] = deactivate_reason or "Deactivated by consolidation"
+    entries.append({
+        "id": _next_entry_id(entries),
+        "content": rule_content,
+        "status": "active",
+        "source": source,
+        "created": str(date.today()),
+        "reasoning": reasoning,
+        "deactivated_reason": None,
+    })
+    path.write_text(
+        yaml.dump({"task_id": task_id, "entries": entries}, allow_unicode=True, default_flow_style=False),
+        encoding="utf-8",
+    )
 
 
 def _build_sources(
@@ -115,11 +154,8 @@ def assemble_prompt(
     task_id: str = "",
 ) -> AssembledPrompt:
     """Call LLM assembler to produce unified_context from all sources."""
-    persisted = load_learned_ctx(task_id)
-    merged_ctx = list(dict.fromkeys(persisted + learn_ctx))
-
     assembler_guide = load_prompt("assembler")
-    sources = _build_sources(task_text, task_type, prephase_result, merged_ctx)
+    sources = _build_sources(task_text, task_type, prephase_result, learn_ctx)
     assembler_model = _resolve_model_for_phase("assembler", model)
 
     raw = call_llm_raw(

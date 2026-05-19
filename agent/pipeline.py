@@ -24,7 +24,7 @@ from .models import SddOutput, TestOutput, LearnOutput, AnswerOutput
 from .test_runner import run_tests
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest, merge_schema_from_sqlite_results
 from .prompt import load_prompt
-from .prompt_assembler import assemble_prompt, load_learned_ctx, save_learned_ctx, clear_learned_ctx
+from .prompt_assembler import assemble_prompt, load_learned_ctx, _apply_learn_diff
 from .rules_loader import RulesLoader, _RULES_DIR
 from .schema_gate import check_schema_compliance
 from .sql_security import (
