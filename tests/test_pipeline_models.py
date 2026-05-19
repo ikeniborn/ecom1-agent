@@ -2,7 +2,7 @@
 from pydantic import ValidationError
 import pytest
 from agent.models import (
-    SddOutput, PlanStep, LearnOutput, AnswerOutput, PipelineEvalOutput,
+    SddOutput, PlanStep, LearnOutput, AnswerOutput,
     ResolveCandidate, ResolveOutput,
 )
 
@@ -58,17 +58,6 @@ def test_answer_output_invalid_outcome():
         )
 
 
-def test_pipeline_eval_output_valid():
-    obj = PipelineEvalOutput(
-        reasoning="trace looks good",
-        score=8.5,
-        comment="solid",
-        prompt_optimization=["add example SQL to sql_plan.md"],
-        rule_optimization=["add rule for brand filtering"],
-    )
-    assert 0.0 <= obj.score <= 10.0
-
-
 def test_sql_plan_output_agents_md_refs_defaults_empty():
     obj = SddOutput(reasoning="r", spec="s", plan=[])
     assert obj.agents_md_refs == []
@@ -87,25 +76,6 @@ def test_learn_output_agents_md_anchor_defaults_none():
 def test_learn_output_agents_md_anchor_set():
     obj = LearnOutput(reasoning="r", conclusion="c", rule_content="r", agents_md_anchor="brand_aliases > Heco")
     assert obj.agents_md_anchor == "brand_aliases > Heco"
-
-
-def test_pipeline_eval_output_new_metrics_default():
-    obj = PipelineEvalOutput(
-        reasoning="r", score=8, comment="c",
-        prompt_optimization=[], rule_optimization=[],
-    )
-    assert obj.agents_md_coverage == 0.0
-    assert obj.schema_grounding == 0.0
-
-
-def test_pipeline_eval_output_new_metrics_set():
-    obj = PipelineEvalOutput(
-        reasoning="r", score=8, comment="c",
-        prompt_optimization=[], rule_optimization=[],
-        agents_md_coverage=0.75, schema_grounding=1.0,
-    )
-    assert obj.agents_md_coverage == 0.75
-    assert obj.schema_grounding == 1.0
 
 
 def test_resolve_candidate_minimal():
@@ -137,3 +107,48 @@ def test_resolve_output_validate():
         ],
     )
     assert len(obj.candidates) == 1
+
+
+def test_learn_output_new_fields_defaults():
+    obj = LearnOutput(
+        reasoning="diagnosis",
+        conclusion="summary",
+        rule_content="Always use sku",
+    )
+    assert obj.deactivate == []
+    assert obj.deactivate_reason is None
+    assert obj.skip is False
+    assert obj.skip_reason is None
+
+
+def test_learn_output_skip_flag():
+    obj = LearnOutput(
+        reasoning="already covered",
+        conclusion="rule exists",
+        rule_content="",
+        skip=True,
+        skip_reason="Duplicate of r002",
+    )
+    assert obj.skip is True
+    assert obj.skip_reason == "Duplicate of r002"
+
+
+def test_learn_output_deactivate_list():
+    obj = LearnOutput(
+        reasoning="new rule supersedes old",
+        conclusion="updated",
+        rule_content="Use LIKE not equality",
+        deactivate=["r001", "r003"],
+        deactivate_reason="Superseded by more specific rule",
+    )
+    assert obj.deactivate == ["r001", "r003"]
+    assert obj.deactivate_reason == "Superseded by more specific rule"
+
+
+def test_learn_output_no_compacted_ctx():
+    import pydantic
+    with pytest.raises((pydantic.ValidationError, TypeError)):
+        LearnOutput(
+            reasoning="r", conclusion="c", rule_content="x",
+            compacted_ctx=["rule 1"],
+        )
