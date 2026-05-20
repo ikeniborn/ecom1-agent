@@ -5,6 +5,7 @@ import os
 import re
 import time
 import traceback
+from typing import Any
 
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
@@ -74,7 +75,7 @@ def _call_llm_phase(
     max_tokens: int = 4096,
     phase: str = "",
     cycle: int = 0,
-) -> tuple[object | None, dict, dict]:
+) -> tuple[Any, dict, dict]:
     tok_info: dict = {}
     t0 = time.monotonic()
     raw = call_llm_raw(system, user_msg, model, cfg, max_tokens=max_tokens, token_out=tok_info)
