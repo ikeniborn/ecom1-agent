@@ -123,3 +123,54 @@
 
 ---
 
+## 2026-05-19T00:00:00
+
+**Операция:** ingest (batch)
+**Источники:** CLAUDE.md, agent/CLAUDE.md, data/prompts/learn.md, data/prompts/assembler.md, data/prompts/sdd.md, data/prompts/tdd.md, data/prompts/answer.md, docs/superpowers/specs/2026-05-18-prompt-rules-separation-design.md, docs/superpowers/plans/2026-05-19-learned-knowledge-redesign.md
+**Домен:** документация
+
+**Затронуто страниц:** 6
+
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/learn-phase.md` — learned knowledge redesign (2026-05-19): новая сигнатура _run_learn (удалён prior_learn_hashes), новые поля LearnOutput (deactivate/skip вместо compacted_ctx), постоянный YAML-формат, consolidation logic через LLM, ссылки на test_learned_storage.py
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/assembler-phase.md` — новые входы: LEARNED из data/learned/; удалены RULES/SECURITY/PROMPT_BLOCKS секции; новый _build_sources
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/sdd-phase.md` — история изменений 2026-05-19: sdd.md очищается от domain-специфики; wiki_sources обновлены
+- ОБНОВЛЕНА: `.wiki/документация/agent-modules/pipeline-prompt-assembler.md` — новые API (load_learned_entries, _apply_learn_diff, _next_entry_id); удалены save/clear_learned_ctx; новый persist/load цикл без eval_log
+- СОЗДАНА: `.wiki/документация/plans/learned-knowledge-redesign.md` (stub) — план 15 задач: замена rules/security/eval_log постоянной per-task YAML базой
+- СОЗДАНА: `.wiki/документация/specs/prompt-rules-separation.md` (stub) — спека 2026-05-18: thin prompts, исправление sec-write-detect-001
+
+---
+
+## 2026-05-20T00:00:00
+
+**Операция:** ingest
+**Источники:** data/prompts/plan.md (NEW), data/prompts/sdd.md (UPDATED), data/prompts/learn.md (UPDATED)
+**Домен:** документация
+
+**Контекст:** Редизайн пайплайна ASSEMBLE→SDD→PLAN→EXECUTE→ANSWER. SddOutput переработан на spec_goal+success_criteria+plan+actions+error_code. Добавлена фаза PLAN. LEARN получает полный контекст цикла (SDD+PLAN+ANSWER outputs).
+
+**Затронуто страниц:** 4
+
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/sdd-phase.md` — SddOutput: spec_goal + success_criteria + plan (рассуждения) + actions (кандидаты) + error_code; убраны типизированные шаги и agents_md_refs; добавлена ссылка на plan-phase
+- СОЗДАНА: `.wiki/документация/pipeline-phases/plan-phase.md` (stub) — фаза PLAN: PlanOutput с approach+steps+action (выбор единственного из SddOutput.actions)
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/learn-phase.md` — расширены входы: SDD_OUTPUT + PLAN_OUTPUT + ANSWER_OUTPUT; правила нацелены на spec/plan quality, не raw SQL; добавлен раздел «Входы LEARN»
+- ОБНОВЛЕНА: `.wiki/.config/index.md` — добавлена запись plan-phase.md; обновлены описания sdd-phase и learn-phase
+
+---
+
+## 2026-05-20T01:00:00
+
+**Операция:** ingest
+**Источники:** CLAUDE.md, .env.example, data/prompts/consolidate.md, data/prompts/sdd.md
+**Домен:** документация
+
+**Контекст:** Новая фаза CONSOLIDATE — LLM-постобработка active rules для устранения дублей, перекрытий и противоречий. Добавлены переменные MODEL_CONSOLIDATE и MAX_TOKENS_CONSOLIDATE. SDD-фаза — без изменений (актуальна).
+
+**Затронуто страниц:** 4
+
+- СОЗДАНА: `.wiki/документация/pipeline-phases/consolidate-phase.md` (stub) — фаза CONSOLIDATE: ConsolidateOutput с skip/consolidations; устраняет дублирование в active rules; MODEL_CONSOLIDATE + MAX_TOKENS_CONSOLIDATE=2048
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/learn-phase.md` — добавлена ссылка на consolidate-phase; уточнена связь LEARN+CONSOLIDATE в consolidation logic
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/assembler-phase.md` — добавлена ссылка на consolidate-phase в wiki_outgoing_links
+- ОБНОВЛЕНА: `.wiki/.config/index.md` — добавлена запись consolidate-phase.md
+
+---
+

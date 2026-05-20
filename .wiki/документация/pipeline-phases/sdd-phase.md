@@ -1,11 +1,13 @@
 ---
 wiki_sources:
   - "[[data/prompts/sdd.md]]"
-wiki_updated: 2026-05-17
+  - "[[docs/superpowers/specs/2026-05-18-prompt-rules-separation-design.md]]"
+  - "[[docs/superpowers/plans/2026-05-19-learned-knowledge-redesign.md]]"
+wiki_updated: 2026-05-20
 wiki_status: developing
 wiki_outgoing_links:
+  - "[[pipeline-phases/plan-phase]]"
   - "[[pipeline-phases/answer-phase]]"
-  - "[[pipeline-phases/test-generation-phase]]"
   - "[[pipeline-phases/assembler-phase]]"
   - "[[design-decisions/grounding-refs]]"
 wiki_external_links: []
@@ -15,30 +17,43 @@ aliases:
   - "SDD"
   - "SDD Phase"
   - "Spec-Driven Development"
-  - "SQL плановая фаза"
+  - "SddOutput"
 ---
 
 # Фаза SDD (Spec-Driven Development)
 
-Вторая фаза пайплайна агента (после ASSEMBLE), заменившая устаревшую фазу SQL_PLAN. Получает unified_context из ASSEMBLE-фазы и задачу, возвращает: `spec` (описание что должен содержать ответ), `plan` (упорядоченный список шагов выполнения) и `agents_md_refs`.
+Вторая фаза пайплайна агента (после ASSEMBLE). Получает unified_context из ASSEMBLE-фазы и задачу, возвращает `SddOutput` — спецификацию с целью, критериями успеха, планом рассуждений и кандидатами действий. Следующая фаза PLAN выбирает одно действие из кандидатов.
 
 ## Основные характеристики
 
 - Входы: unified_context (из ASSEMBLE) + sdd.md (phase guide) + задача
 - Выходной формат: чистый JSON (первый символ обязательно `{`)
-- Поле `spec` — точное описание что финальный ответ должен содержать (факты, формат, ожидаемые grounding_refs)
-- Поле `plan` — упорядоченный список шагов; каждый шаг имеет `type` ∈ `["sql", "read", "compute", "exec"]`
-- Поле `agents_md_refs` — секции AGENTS.MD, которые были использованы
+- Поле `spec_goal` — одно предложение: что финальный ответ должен содержать
+- Поле `success_criteria` — 2–4 измеримых условия корректности
+- Поле `plan` — 2–5 шагов рассуждения на пути к цели (plain English, не типизированные шаги)
+- Поле `actions` — 1–3 кандидата действий (SQL-запросы, пути к инструментам, пути к файлам)
+- Поле `error_code` — заполняется только при hard-stop: `DENIED_SECURITY`, `OUTCOME_NONE_CLARIFICATION`, `UNSUPPORTED`, `PLAN_ABORTED_NON_SELECT`
 - Сбой SDD → LEARN-цикл (`error_type="llm_fail"`) → следующий цикл
 
-## Типы шагов плана
+## Формат SddOutput
 
-| type | Поля | Описание |
-|------|------|----------|
-| `sql` | `query` | SELECT-запрос к БД; запрос обязан начинаться с SELECT |
-| `read` | `operation="read"`, `args=["/path"]` | Чтение файла с VM |
-| `compute` | `operation="compute"`, `description` | Вычисление по предыдущим результатам |
-| `exec` | `operation`, `args` | Выполнение бинарного инструмента из `important_tools` |
+```json
+{
+  "spec_goal": "<one sentence: what the final answer must contain>",
+  "success_criteria": ["criterion 1", "criterion 2"],
+  "plan": ["reasoning step 1", "reasoning step 2"],
+  "actions": ["SELECT COUNT(*) FROM products WHERE type='Lawn Mower'"],
+  "error_code": ""
+}
+```
+
+## Типы actions
+
+- SQL-запросы: строки начинающиеся с `SELECT` (никогда DDL/DML, никогда `;` multi-statement)
+- Файловые пути: `/proc/...` или `/docs/...`
+- Инструменты: точный binary path из `# VAULT RULES > important_tools`
+
+PLAN-фаза выбирает единственное действие из `actions` для исполнения.
 
 ## Разрешение имён таблиц
 
@@ -120,3 +135,5 @@ SELECT DISTINCT store_id, name FROM stores WHERE name LIKE '%<location term>%' L
 
 - **2026-05-17** (из [[data/prompts/sdd.md]]): страница создана; SDD заменяет устаревшую фазу SQL_PLAN в рамках редизайна промп-архитектуры; CONFIRMED VALUES и RESOLVE phase удалены
 - **2026-05-17** (из [[data/prompts/sdd.md]], повторный ingest): добавлено «Исключение для checkout-задач» — при задачах submit/place order сначала discovery-шаг для корзины, только ANSWER выдаёт UNSUPPORTED; уточнены ограничения exec-инструментов
+- **2026-05-19** (из [[docs/superpowers/plans/2026-05-19-learned-knowledge-redesign.md]]): в рамках learned knowledge redesign — sdd.md очищается от ECOM/SQL-специфичного содержимого. Такие секции как «Table Name Resolution», «Discovery Steps», «Multi-Attribute Filtering», «SKU and Path Projection», «Store Name Discovery», «Cart Queries», «NOT FOUND Rule» перенесены в `data/learned/` (per-task knowledge base) вместо прежних `data/rules/*.yaml`. sdd.md содержит только структурное: роль, форматы вывода, типы шагов, безопасность.
+- **2026-05-20** (из [[data/prompts/sdd.md]]): SddOutput переработан — вместо `spec` + типизированных шагов `plan` теперь: `spec_goal` (одно предложение), `success_criteria` (2–4 условия), `plan` (рассуждения plain English), `actions` (1–3 кандидата), `error_code`. Добавлена фаза PLAN после SDD — она выбирает единственное действие из `actions`. Поле `agents_md_refs` удалено.

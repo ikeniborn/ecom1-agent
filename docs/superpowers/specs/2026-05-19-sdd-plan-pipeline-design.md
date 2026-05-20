@@ -1,3 +1,39 @@
+---
+review:
+  spec_hash: 4913bc41cce6dd94
+  last_run: 2026-05-19
+  phases:
+    structure:    { status: passed }
+    coverage:     { status: passed }
+    clarity:      { status: passed }
+    consistency:  { status: passed }
+  findings:
+    - id: F-001
+      phase: coverage
+      severity: WARNING
+      section: "### models.py"
+      section_hash: ab13a74c92d07b2d
+      text: "`plan: list[str]` field appears in redesigned SddOutput (§Data Models) but is absent from the models.py migration list in §Components — implementation following the spec may omit adding this field."
+      verdict: fixed
+      verdict_at: 2026-05-19
+    - id: F-002
+      phase: clarity
+      severity: INFO
+      section: "### data/prompts/learn.md"
+      section_hash: a72a1b389e5adb7c
+      text: "\"Lessons must target spec quality and plan decomposition\" — 'target' has no measurable acceptance criterion."
+      verdict: fixed
+      verdict_at: 2026-05-19
+    - id: F-003
+      phase: clarity
+      severity: INFO
+      section: "### pipeline.py"
+      section_hash: 34be540c72505000
+      text: "\"EXECUTE … understands decomposition context\" is a non-verifiable LLM behaviour claim, not a formal requirement."
+      verdict: fixed
+      verdict_at: 2026-05-19
+---
+
 # SDD+PLAN Pipeline Redesign
 
 ## Goal
@@ -61,7 +97,7 @@ class ExecuteOutput(BaseModel):
 
 ### models.py
 - Replace `sql_queries: list[str]` with `actions: list[str]` in `SddOutput`
-- Add `spec_goal: str` and `success_criteria: list[str]` to `SddOutput`
+- Add `spec_goal: str`, `success_criteria: list[str]`, and `plan: list[str]` to `SddOutput`
 - Add new `PlanOutput` class
 - Add new `ExecuteOutput` class
 
@@ -74,7 +110,7 @@ class ExecuteOutput(BaseModel):
 - Remove TDD phase entirely
 - Add PLAN phase after SDD, before EXECUTE
 - PLAN call: `_call_llm_phase(PlanOutput, system=[plan_guide], user_msg=sdd_out_serialized, phase="plan")`
-- EXECUTE receives full `PlanOutput` (approach, steps, action) — understands decomposition context
+- EXECUTE receives full `PlanOutput` (approach, steps, action) as user message — `approach` and `steps` are available in prompt context alongside `action`
 - ANSWER receives `ExecuteOutput` only — no `unified_context`
 - LEARN receives `unified_context` + `SddOutput` + `PlanOutput` + `AnswerOutput` — full picture: task intent, spec, plan, execution, wrong answer → lesson targets spec/plan quality
 
@@ -84,7 +120,7 @@ class ExecuteOutput(BaseModel):
 
 ### data/prompts/learn.md
 - Update to reflect LEARN now receives SddOutput + PlanOutput
-- Lessons must target spec quality and plan decomposition, not just SQL
+- Generated lessons must reference `spec_goal` or `success_criteria` from `SddOutput`, or `approach`/`steps` from `PlanOutput` — not raw SQL patterns
 
 ## ASSEMBLE Sources
 

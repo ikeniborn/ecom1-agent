@@ -1,11 +1,13 @@
 ---
 wiki_sources:
   - "[[data/prompts/assembler.md]]"
-wiki_updated: 2026-05-17
+  - "[[docs/superpowers/plans/2026-05-19-learned-knowledge-redesign.md]]"
+wiki_updated: 2026-05-19
 wiki_status: developing
 wiki_outgoing_links:
   - "[[pipeline-phases/sdd-phase]]"
   - "[[pipeline-phases/sql-pipeline-overview]]"
+  - "[[pipeline-phases/consolidate-phase]]"
   - "[[agent-modules/pipeline-prompt-assembler]]"
 wiki_external_links: []
 tags:
@@ -19,60 +21,53 @@ aliases:
 
 # Фаза ASSEMBLE
 
-Первая фаза каждого цикла пайплайна. LLM-ассемблер собирает `unified_context` — единый контекстный документ из всех источников (learn_ctx, rules, security gates, prompt blocks). Каждая последующая фаза цикла (SDD, TDD, LEARN, ANSWER) получает `[unified_context] + [phase_guide]` вместо собственного system builder.
+Первая фаза каждого цикла пайплайна. LLM-ассемблер собирает `unified_context` — единый контекстный документ. Каждая последующая фаза цикла (SDD, TDD, LEARN, ANSWER) получает `[unified_context] + [phase_guide]` вместо собственного system builder.
 
 ## Основные характеристики
 
 - Вызывается в начале каждого цикла pipeline loop (до SDD), с актуальным `learn_ctx`
 - Делает 1 LLM-вызов с инструкцией из `data/prompts/assembler.md`
 - Возвращает: `unified_context: str`
-- Разрешение противоречий: LEARNED > RULES > SECURITY > BASE
+- Разрешение противоречий: LEARNED > BASE
 - Модель: `MODEL_ASSEMBLER` (по умолчанию — `MODEL`)
 
-## Входы ассемблера
+## Входы ассемблера (learned knowledge redesign, 2026-05-19)
 
 | Источник | Приоритет | Секция в unified_context |
 |----------|-----------|--------------------------|
-| `learn_ctx` (in-memory, текущая сессия) + `data/learned/{task_id}.yaml` | 1 (высший) | `# LEARNED` |
-| `data/rules/*.yaml` (`verified: true`) | 2 | `# RULES` |
-| `data/security/*.yaml` (`verified: true`) | 3 | `# SECURITY` |
-| `data/prompts/` базовые блоки по `data/config/task_blocks.yaml` | 4 | `# BASE` |
+| `learn_ctx` (активные записи из `data/learned/{task_id}.yaml`) | 1 (высший) | `# LEARNED` |
+| VAULT (agents_md из prephase) | 2 | `# BASE` |
+| schema_digest + db_schema | — | `# SCHEMA` |
 
-Дополнительно включаются: schema_digest, db_schema, agents_md_index (vault rules), AGENT CONTEXT (customer_id, date).
+`data/rules/*.yaml`, `data/security/*.yaml`, `data/config/task_blocks.yaml` — удалены. SQL-планировочные правила теперь живут исключительно в `data/learned/{task_id}.yaml` как LEARNED-записи.
 
 ## Структура unified_context
 
 ```
 # LEARNED
-<правила из learn_ctx, новейшие последними; пропустить если пусто>
-
-# RULES
-<релевантные правила из data/rules/; исключить с нулевым пересечением с task_text>
-
-# SECURITY
-<сводки security gates из data/security/>
+<активные правила из learn_ctx, новейшие последними; пропустить если пусто>
 
 # BASE
-<объединённый domain context из PROMPT_BLOCKS; дедуплицировать>
+<domain rules из VAULT/AGENTS.MD, релевантные задаче>
+
+# SCHEMA
+<schema digest и db schema>
 ```
 
-## Фильтр релевантности для RULES
+## `_build_sources` (новая реализация)
 
-Правило остаётся если хотя бы одно из следующих совпадает с task_text:
-- тип сущности (product, cart, inventory, store, kind, sku, brand, model)
-- тип операции (count, find, list, sum, check, verify, compare)
-- domain-ключевое слово (любое существительное или глагол из task_text длиннее 3 символов)
-
-Правило исключается только при нулевом пересечении. При сомнении — оставить.
-
-## task_blocks.yaml
-
-Файл `data/config/task_blocks.yaml` определяет, какие дополнительные блоки из `data/prompts/*.md` включать по типу задачи:
-
-```yaml
-sql: []
-compute: []
-default: []
+```python
+def _build_sources(task_text, task_type, prephase_result, learn_ctx) -> str:
+    parts = [f"TASK_TEXT: {task_text}", f"TASK_TYPE: {task_type}"]
+    if learn_ctx:
+        parts.append("## LEARNED (highest priority)\n" + "\n".join(f"- {r}" for r in learn_ctx))
+    if pre.agents_md_content:
+        parts.append(f"## VAULT\n{pre.agents_md_content}")
+    if pre.schema_digest:
+        parts.append(f"## SCHEMA_DIGEST\n{_format_schema_digest(pre.schema_digest)}")
+    if pre.db_schema:
+        parts.append(f"## DB_SCHEMA\n{pre.db_schema}")
+    ...
 ```
 
-Поддерживаемые типы задач: `sql`, `compute`, `default`. Legacy-типы (lookup, temporal, capture, crm, distill, preject) — удалены.
+Убраны: загрузка `RulesLoader`, `load_security_gates`, `load_task_blocks`, директории `_RULES_DIR`, `_SECURITY_DIR`.

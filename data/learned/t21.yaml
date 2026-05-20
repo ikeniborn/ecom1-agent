@@ -71,4 +71,50 @@ entries:
   reasoning: ''
   source: learn
   status: active
+- content: Always retrieve basket data by querying the `carts` table via the `sql`
+    tool with `SELECT * FROM carts WHERE id = '<basket_id>'` (after confirming existence
+    via LIKE probe per r001). Never read basket data from `/proc/baskets/<basket_id>.json`
+    or any file path.
+  created: '2026-05-19'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Error: AssertionError: expected columns not found in [''# read: /proc/baskets/basket_191.json''].
+    Root cause: wrong-data-source — the operation attempted to read basket data from
+    a file path `/proc/baskets/basket_191.json` instead of querying the `carts` table
+    via the `sql` tool. The test expected columns from a SQL result (id, customer_id,
+    status, store_id, sku) but got a file read header. This violates the requirement
+    to use SQL for cart data retrieval. No existing rule covers data source selection.'
+  source: learn
+  status: active
+- content: Always invoke the `id` tool directly (no arguments) to retrieve the current
+    user identity; never use the literal string 'id' as a file path or argument to
+    any tool that expects an absolute path. The identity is returned on stdout, not
+    accessible via file read.
+  created: '2026-05-19'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: ''Exec exception: exec failed: invalid path: path must be absolute:
+    "id"''. Root cause: wrong-value-type — the agent used the literal string ''id''
+    as a file path argument to a path-expecting tool, instead of invoking the `id`
+    tool directly to retrieve the current identity. Failing fragment: passing the
+    string ''id'' where an absolute path was required. Rule linkage: new rule must
+    explicitly forbid using ''id'' as a path and mandate direct invocation of the
+    `id` tool.'
+  source: learn
+  status: active
+- content: Always abort further queries referencing a basket ID if the initial LIKE
+    probe on `carts.id` returns 0 rows; report the basket as non-existent immediately.
+  created: '2026-05-19'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Error: ''Empty result set:'' across all queries. Root cause: empty-result
+    — the basket_id ''basket_191'' does not exist in the `carts` table. The first
+    LIKE probe `SELECT COUNT(*) FROM carts WHERE id LIKE ''%basket_191%''` returned
+    0, confirming absence, yet the agent continued to issue exact-match queries on
+    `carts` and `cart_items`, violating r001''s gate (exact match only on LIKE hit
+    ≥1 row) and disregarding r002''s implication that absence should stop further
+    processing. Failing fragment: the sequence of queries after the 0-count LIKE probe
+    on carts.'
+  source: learn
+  status: active
 task_id: t21

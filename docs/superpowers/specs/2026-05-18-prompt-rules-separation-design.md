@@ -1,3 +1,22 @@
+---
+review:
+  spec_hash: 0336c00cb95a82b4
+  last_run: "2026-05-18"
+  phases:
+    structure:   { status: passed }
+    coverage:    { status: passed }
+    clarity:     { status: passed }
+    consistency: { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: WARNING
+      section: "## File Inventory"
+      section_hash: c79545ed84ad553d
+      text: "sql-015 listed for restore but has no corresponding source section in § What Changes (sdd.md/learn.md/answer.md tables). Unclear whether sql-015 restores prompt content not covered in migration tables, or is an independently deleted rule."
+      verdict: fixed
+      verdict_at: "2026-05-18"
+---
 # Prompt / Rules Separation — Design Spec
 
 **Date:** 2026-05-18  
@@ -109,7 +128,7 @@ Already clean — process only.
 ## File Inventory
 
 **Restore from git** (11 files):
-- `data/rules/`: sql-015, sql-016, sql-017, sql-031, sql-count-with-sample, sql-retry-divergence, sql-sku-required
+- `data/rules/`: sql-015 *(eval-learned, COUNT + product name — no prompt counterpart)*, sql-016, sql-017, sql-031, sql-count-with-sample, sql-retry-divergence, sql-sku-required
 - `data/security/`: sec-capability-keys, sec-learn-041, sec-learn-066, sec-write-detect-001
 
 **Create new** (14 rules files):

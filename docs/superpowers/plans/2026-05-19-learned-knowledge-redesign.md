@@ -1,3 +1,58 @@
+---
+review:
+  plan_hash: "c3c5f1841f045ae1"
+  spec_hash: "81d0538a886e2a98"
+  last_run: "2026-05-19"
+  phases:
+    structure:     { status: passed }
+    coverage:      { status: passed }
+    dependencies:  { status: passed }
+    verifiability: { status: passed }
+    consistency:   { status: passed }
+  findings:
+    - id: F-001
+      phase: coverage
+      severity: WARNING
+      section: "Task 14"
+      section_hash: "1200c1a902a3551e"
+      text: "Task 14 не упоминает .secrets.example при удалении MODEL_EVALUATOR; spec §Deleted_Env_Vars явно перечисляет его как цель."
+      verdict: fixed
+      verdict_at: "2026-05-19"
+    - id: F-002
+      phase: verifiability
+      severity: WARNING
+      section: "Task 6"
+      section_hash: "ba2160daa1c231a8"
+      text: "Task 6 Step 6 — нет ожидаемого вывода для прогона тестов; непонятно, допустимы ли падения на этом этапе."
+      verdict: fixed
+      verdict_at: "2026-05-19"
+    - id: F-003
+      phase: verifiability
+      severity: WARNING
+      section: "Task 7"
+      section_hash: "f6a27a1f5a74b5c9"
+      text: "Task 7 Step 3 — нет ожидаемого вывода; тесты упадут (test_prompt_assembler.py обновляется в Task 8, который идёт позже), но план этого не оговаривает."
+      verdict: fixed
+      verdict_at: "2026-05-19"
+  section_hashes:
+    File_Map: "13650032623a26c7"
+    Task_1: "e5ad6b122533e5a5"
+    Task_2: "7af8bcdd80c868a5"
+    Task_3: "7be16b101c98cd89"
+    Task_4: "b9b7c9f5065d77f7"
+    Task_5: "30a128b6eaa43b65"
+    Task_6: "ba2160daa1c231a8"
+    Task_7: "f6a27a1f5a74b5c9"
+    Task_8: "95c1e92b1c19389a"
+    Task_9: "ca5e98c2ffb3dec6"
+    Task_10: "6d41e1b0d57e01ce"
+    Task_11: "3fe5520e0ba05707"
+    Task_12: "f3e1386fcd8ff838"
+    Task_13: "ed91dd933ec14cdc"
+    Task_14: "1200c1a902a3551e"
+    Task_15: "a07b277377e49fbc"
+---
+
 # Learned Knowledge Redesign Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -702,6 +757,7 @@ Update return value to remove `eval_thread`:
 ```bash
 uv run pytest tests/test_pipeline.py -v 2>&1 | head -50
 ```
+Expected: failures OK — `tests/test_pipeline.py` is updated in Task 8.
 
 - [ ] **Step 7: Commit**
 
@@ -775,6 +831,7 @@ def _build_sources(
 ```bash
 uv run pytest tests/test_prompt_assembler.py -v
 ```
+Expected: failures OK — `tests/test_prompt_assembler.py` is updated in Task 8.
 
 - [ ] **Step 4: Commit**
 
@@ -1262,14 +1319,16 @@ git commit -m "feat: update assembler.md, clean sdd/tdd/answer prompts of domain
 - Modify: `CLAUDE.md`
 - Possibly modify: `agent/CLAUDE.md`
 
-- [ ] **Step 1: Remove `EVAL_ENABLED` and `MODEL_EVALUATOR` from `.env.example`**
+- [ ] **Step 1: Remove `EVAL_ENABLED` and `MODEL_EVALUATOR` from `.env.example` and `.secrets.example`**
 
-Delete the "Evaluator" section block:
+Delete the "Evaluator" section block from `.env.example`:
 ```
 # ─── Evaluator ──────────────────────────────────────────────────────────────
 EVAL_ENABLED=0                       # 1 = запускать evaluator после каждой задачи, пишет data/eval_log.jsonl
 MODEL_EVALUATOR=                     # модель для evaluator (напр. anthropic/claude-haiku-4-5); если пусто — evaluator не запускается
 ```
+
+Also remove `MODEL_EVALUATOR` from `.secrets.example` if present.
 
 - [ ] **Step 2: Update `CLAUDE.md` env vars table**
 
