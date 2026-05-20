@@ -2,7 +2,8 @@
 from unittest.mock import MagicMock, patch
 
 from agent.json_extract import _obj_mutation_tool
-from agent.pipeline import _build_answer_user_msg, _extract_sku_refs, run_pipeline
+from agent.pipeline import _build_answer_user_msg, run_pipeline
+from agent.models import ExecuteOutput
 from agent.prephase import PrephaseResult
 from agent.prompt_assembler import AssembledPrompt
 
@@ -45,34 +46,17 @@ def test_obj_mutation_tool_no_mutation():
     assert _obj_mutation_tool(obj) is None
 
 
-# ── Bug 2: _extract_sku_refs store_id ────────────────────────────────────────
-
-def test_extract_sku_refs_store_id_only():
-    """Bug t17: store_id column must produce /proc/stores/{id}.json."""
-    results = ["store_id\nstore_vienna_praterstern\n"]
-    refs = _extract_sku_refs([], results)
-    assert refs == ["/proc/stores/store_vienna_praterstern.json"]
-
-
-def test_extract_sku_refs_sku_and_store_id():
-    """Inventory query has both sku and store_id — both refs must appear."""
-    results = ["store_id,sku,available_today\nstore_vienna_praterstern,PLB-2GJZ9R7K,1\n"]
-    refs = _extract_sku_refs([], results)
-    assert "/proc/catalog/PLB-2GJZ9R7K.json" in refs
-    assert "/proc/stores/store_vienna_praterstern.json" in refs
-
-
 # ── Bug 1 / Part 1: _build_answer_user_msg ───────────────────────────────────
 
-def test_build_answer_user_msg_preserves_full_path():
-    """Bug t03: AUTO_REFS must show full hierarchical paths, not stem-only."""
-    msg = _build_answer_user_msg(
-        "find pipe fittings",
-        ["path\n/proc/catalog/plumbing/pipe_fittings/PLB-2GJZ9R7K.json\n"],
-        ["/proc/catalog/plumbing/pipe_fittings/PLB-2GJZ9R7K.json"],
+def test_build_answer_user_msg_includes_task_and_execute():
+    """_build_answer_user_msg includes task text and execute output in message."""
+    execute_out = ExecuteOutput(
+        results=[{"output": '[{"path": "/proc/catalog/plumbing/PLB-2GJZ9R7K.json"}]'}],
+        action="SELECT path FROM products WHERE type='Pipe Fittings'",
     )
-    assert "/proc/catalog/plumbing/pipe_fittings/PLB-2GJZ9R7K.json" in msg
-    assert msg.count("/proc/catalog/PLB-2GJZ9R7K.json") == 0
+    msg = _build_answer_user_msg("find pipe fittings", execute_out)
+    assert "find pipe fittings" in msg
+    assert "EXECUTE_OUTPUT" in msg
 
 
 # ── Bug 1 / Part 2: clean_refs exact-path filter ─────────────────────────────
