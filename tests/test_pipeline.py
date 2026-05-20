@@ -166,7 +166,8 @@ def test_all_cycles_exhausted():
 
     with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm(call_seq)), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline.check_retry_loop", return_value=None):
+         patch("agent.pipeline.check_retry_loop", return_value=None), \
+         patch("agent.pipeline.load_learned_entries", return_value=[]):
         stats, eval_thread = run_pipeline(vm, "model", "task", pre, {}, task_id="t01")
 
     assert stats["outcome"] == "OUTCOME_NONE_CLARIFICATION"

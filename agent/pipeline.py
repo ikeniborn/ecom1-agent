@@ -395,6 +395,7 @@ def run_pipeline(
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type=sdd_err_type, cycle=cycle + 1, task_id=task_id)
+                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
             # ── SDD ERROR CODES ────────────────────────────────────────────────
@@ -464,6 +465,7 @@ def run_pipeline(
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="llm_fail" if not raw_plan else "semantic",
                            cycle=cycle + 1, task_id=task_id, sdd_out=sdd_out)
+                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
             if not plan_out.action:
@@ -473,6 +475,7 @@ def run_pipeline(
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="semantic", cycle=cycle + 1, task_id=task_id,
                            sdd_out=sdd_out, plan_out=plan_out)
+                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
             print(f"{CLI_BLUE}[pipeline] PLAN: {plan_out.action[:80]!r}{CLI_CLR}")
@@ -498,6 +501,7 @@ def run_pipeline(
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="semantic", cycle=cycle + 1, task_id=task_id,
                            sdd_out=sdd_out, plan_out=plan_out)
+                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
             raw_output = execute_out.results[0].get("output", "") if execute_out.results else ""
@@ -508,6 +512,7 @@ def run_pipeline(
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="empty", cycle=cycle + 1, task_id=task_id,
                            sdd_out=sdd_out, plan_out=plan_out)
+                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
             if t := get_trace():
@@ -539,6 +544,7 @@ def run_pipeline(
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="semantic", cycle=cycle + 1, task_id=task_id,
                            sdd_out=sdd_out, plan_out=plan_out)
+                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
             # ── SUCCESS ───────────────────────────────────────────────────────
