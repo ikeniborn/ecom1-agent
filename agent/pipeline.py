@@ -18,7 +18,7 @@ from .llm import (
     CLI_BLUE, CLI_CLR, CLI_GREEN, CLI_RED, CLI_YELLOW,
 )
 from .json_extract import _extract_json_from_text
-from .models import SddOutput, PlanOutput, ExecuteOutput, LearnOutput, AnswerOutput
+from .models import SddOutput, PlanOutput, ExecuteOutput, LearnOutput, AnswerOutput, ConsolidateOutput
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest
 from .prompt import load_prompt
 from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff
@@ -279,6 +279,53 @@ def _run_learn(
         learn_ctx[:] = [r for r in learn_ctx if r not in deactivate_contents]
     learn_ctx.append(learn_out.rule_content)
     print(f"{CLI_BLUE}[pipeline] LEARN: rule added, deactivated={learn_out.deactivate} (total active={len(learn_ctx)}){CLI_CLR}")
+
+
+def _run_consolidate(
+    unified_context: str,
+    model: str,
+    cfg: dict,
+    task_id: str,
+    learn_ctx: list[str],
+    cycle: int,
+) -> None:
+    entries = load_learned_entries(task_id)
+    active = [e for e in entries if e.get("status") == "active"]
+    if len(active) < 2:
+        return
+    consolidate_model = _resolve_model_for_phase("consolidate", model)
+    consolidate_guide = load_prompt("consolidate") or "# PHASE: consolidate"
+    system: list[dict] = [
+        {"type": "text", "text": unified_context},
+        {"type": "text", "text": consolidate_guide, "cache_control": {"type": "ephemeral"}},
+    ]
+    rules_lines = "\n".join(
+        f"  - id: {e['id']}\n    content: {e['content']!r}"
+        for e in active
+    )
+    user_msg = f"ACTIVE_RULES:\n{rules_lines}"
+    out, _, _ = _call_llm_phase(
+        system, user_msg, consolidate_model, cfg, ConsolidateOutput,
+        max_tokens=_PHASE_MAX_TOKENS["consolidate"], phase="consolidate", cycle=cycle,
+    )
+    if not out or out.skip:
+        return
+    for item in out.consolidations:
+        if not item.merged_rule or not item.deactivate:
+            continue
+        _apply_learn_diff(
+            task_id,
+            item.merged_rule,
+            item.merged_reasoning,
+            item.deactivate,
+            "Consolidated: " + ", ".join(item.deactivate),
+        )
+        deactivate_contents = {
+            e["content"] for e in active if e.get("id") in item.deactivate
+        }
+        learn_ctx[:] = [r for r in learn_ctx if r not in deactivate_contents]
+        learn_ctx.append(item.merged_rule)
+    print(f"[pipeline] CONSOLIDATE: {len(out.consolidations)} merge(s), active={len(learn_ctx)}")
 
 
 def run_pipeline(
