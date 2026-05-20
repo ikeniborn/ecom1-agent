@@ -35,6 +35,18 @@ class LearnOutput(BaseModel):
     skip_reason: str | None = None
 
 
+class ConsolidationItem(BaseModel):
+    deactivate: list[str]
+    merged_rule: str
+    merged_reasoning: str
+
+
+class ConsolidateOutput(BaseModel):
+    skip: bool = True
+    skip_reason: str | None = None
+    consolidations: list[ConsolidationItem] = []
+
+
 class AnswerOutput(BaseModel):
     reasoning: str
     message: str
