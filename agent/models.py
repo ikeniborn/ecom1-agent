@@ -3,26 +3,23 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 
-class PlanStep(BaseModel):
-    type: Literal["sql", "exec", "read", "compute"]
-    description: str
-    query: str | None = None
-    operation: str | None = None
-    args: list[str] = []
-
-
 class SddOutput(BaseModel):
-    reasoning: str
-    spec: str
-    plan: list[PlanStep]
-    agents_md_refs: list[str] = []
-    error: str | None = None
+    spec_goal: str
+    success_criteria: list[str]
+    plan: list[str]
+    actions: list[str]
+    error_code: str = ""
 
 
-class TestOutput(BaseModel):
-    reasoning: str
-    sql_tests: str
-    answer_tests: str
+class PlanOutput(BaseModel):
+    approach: str
+    steps: list[str]
+    action: str
+
+
+class ExecuteOutput(BaseModel):
+    results: list[dict]
+    action: str
 
 
 class LearnOutput(BaseModel):
@@ -51,11 +48,6 @@ class AnswerOutput(BaseModel):
     completed_steps: list[str]
 
 
-# Aliases for old names — removed after Task 6 (pipeline.py rewrite) + Task 9 (resolve.py delete)
-SqlPlanOutput = SddOutput
-TestGenOutput = TestOutput
-
-
 class ResolveCandidate(BaseModel):
     term: str
     field: str
@@ -68,4 +60,8 @@ class ResolveOutput(BaseModel):
     candidates: list[ResolveCandidate]
 
 
-
+# Deprecated: TestOutput kept for backward compatibility; removed in Task 6
+class TestOutput(BaseModel):
+    reasoning: str
+    sql_tests: str
+    answer_tests: str
