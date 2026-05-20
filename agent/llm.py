@@ -70,6 +70,7 @@ _PHASE_MODEL_MAP: dict[str, str | None] = {
     "executor":  os.environ.get("MODEL_EXECUTOR") or None,
     "learn":     os.environ.get("MODEL_LEARN") or None,
     "assembler": os.environ.get("MODEL_ASSEMBLER") or None,
+    "consolidate": os.environ.get("MODEL_CONSOLIDATE") or None,
 }
 
 

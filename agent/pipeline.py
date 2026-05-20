@@ -35,6 +35,7 @@ _PHASE_MAX_TOKENS: dict[str, int] = {
     "learn":     int(os.environ.get("MAX_TOKENS_LEARN",     "2048")),
     "assembler": int(os.environ.get("MAX_TOKENS_ASSEMBLER", "4096")),
     "answer":    int(os.environ.get("MAX_TOKENS_ANSWER",    "4096")),
+    "consolidate": int(os.environ.get("MAX_TOKENS_CONSOLIDATE", "2048")),
 }
 
 # Compat stubs — referenced by older tests that patch these names; no-ops in new pipeline
