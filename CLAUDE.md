@@ -26,8 +26,14 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `MODEL_FALLBACK` | Fallback model after primary exhausts all tiers |
 | `MODEL_ASSEMBLER` | LLM for unified_context assembly (defaults to `MODEL`) |
 | `MODEL_SDD` | Override for SDD phase (defaults to `MODEL`) |
+| `MODEL_PLAN` | Override for PLAN phase (defaults to `MODEL`) |
 | `MODEL_LEARN` | Override for LEARN phase (defaults to `MODEL`) |
 | `MAX_STEPS` | Pipeline cycle limit per task (default 3) |
+| `MAX_TOKENS_SDD` | Max tokens for SDD phase response (default 8192) |
+| `MAX_TOKENS_PLAN` | Max tokens for PLAN phase response (default 4096) |
+| `MAX_TOKENS_LEARN` | Max tokens for LEARN phase response (default 2048) |
+| `MAX_TOKENS_ANSWER` | Max tokens for ANSWER phase response (default 4096) |
+| `MAX_TOKENS_ASSEMBLER` | Max tokens for ASSEMBLER phase response (default 4096) |
 | `LOG_LEVEL=DEBUG` | Full LLM response logging |
 | `OLLAMA_BASE_URL` | Ollama endpoint (default `http://localhost:11434/v1`) |
 | `CC_ENABLED=1` | Enable Claude Code CLI tier (iclaude subprocess, OAuth) |

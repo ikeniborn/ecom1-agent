@@ -29,6 +29,14 @@ from .trace import get_trace
 _MAX_CYCLES = int(os.environ.get("MAX_STEPS", "3"))
 _SDD_ENABLED = os.environ.get("SDD_ENABLED", "1") == "1"
 
+_PHASE_MAX_TOKENS: dict[str, int] = {
+    "sdd":       int(os.environ.get("MAX_TOKENS_SDD",       "8192")),
+    "plan":      int(os.environ.get("MAX_TOKENS_PLAN",      "4096")),
+    "learn":     int(os.environ.get("MAX_TOKENS_LEARN",     "2048")),
+    "assembler": int(os.environ.get("MAX_TOKENS_ASSEMBLER", "4096")),
+    "answer":    int(os.environ.get("MAX_TOKENS_ANSWER",    "4096")),
+}
+
 # Compat stubs — referenced by older tests that patch these names; no-ops in new pipeline
 def run_resolve(vm, model: str, task_text: str, pre, cfg: dict) -> dict:
     """Compat stub — RESOLVE phase removed from SDD pipeline."""
@@ -233,7 +241,7 @@ def _run_learn(
                                        sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out)
     learn_out, sgr_learn, _ = _call_llm_phase(
         learn_system, learn_user, learn_model, cfg, LearnOutput,
-        max_tokens=2048, phase="learn", cycle=cycle,
+        max_tokens=_PHASE_MAX_TOKENS["learn"], phase="learn", cycle=cycle,
     )
     sgr_learn["error_type"] = error_type
     sgr_trace.append(sgr_learn)
@@ -325,7 +333,7 @@ def run_pipeline(
             ]
             sdd_out, sgr_entry, tok = _call_llm_phase(
                 sdd_system, sdd_user, sdd_model, cfg, SddOutput,
-                phase="sdd", cycle=cycle + 1,
+                max_tokens=_PHASE_MAX_TOKENS["sdd"], phase="sdd", cycle=cycle + 1,
             )
             total_in_tok += tok.get("input", 0)
             total_out_tok += tok.get("output", 0)
@@ -394,7 +402,7 @@ def run_pipeline(
             ]
             plan_out, sgr_plan, tok = _call_llm_phase(
                 plan_system, sdd_out.model_dump_json(), plan_model, cfg, PlanOutput,
-                phase="plan", cycle=cycle + 1,
+                max_tokens=_PHASE_MAX_TOKENS["plan"], phase="plan", cycle=cycle + 1,
             )
             total_in_tok += tok.get("input", 0)
             total_out_tok += tok.get("output", 0)
@@ -470,7 +478,7 @@ def run_pipeline(
             ]
             answer_out, sgr_answer, tok = _call_llm_phase(
                 answer_system, answer_user, executor_model, cfg, AnswerOutput,
-                phase="answer", cycle=cycle + 1,
+                max_tokens=_PHASE_MAX_TOKENS["answer"], phase="answer", cycle=cycle + 1,
             )
             total_in_tok += tok.get("input", 0)
             total_out_tok += tok.get("output", 0)
