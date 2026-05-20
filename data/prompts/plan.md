@@ -56,3 +56,23 @@ Output:
   "action": "/proc/baskets/basket_117.json"
 }
 ```
+
+Input SddOutput actions: `["list:/proc/payments/"]`
+Output:
+```json
+{
+  "approach": "list payment directory to enumerate files",
+  "steps": ["list files under /proc/payments/"],
+  "action": "list:/proc/payments/"
+}
+```
+
+Input SddOutput actions: `["search:fraud /proc/payments/"]`
+Output:
+```json
+{
+  "approach": "search payment files for fraud keyword",
+  "steps": ["search for 'fraud' across all files in /proc/payments/"],
+  "action": "search:fraud /proc/payments/"
+}
+```

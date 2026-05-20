@@ -55,30 +55,30 @@ def test_load_learned_entries_returns_all(tmp_path):
 def test_apply_learn_diff_adds_first_entry(tmp_path):
     from agent.prompt_assembler import _apply_learn_diff, load_learned_ctx, load_learned_entries
     with patch("agent.prompt_assembler._LEARNED_DIR", tmp_path):
-        _apply_learn_diff("t01", "Always SELECT sku", "sku needed", [], None)
+        _apply_learn_diff("t01", "Always SELECT sku from the products table", "sku needed", [], None)
         entries = load_learned_entries("t01")
         assert len(entries) == 1
         assert entries[0]["id"] == "r001"
         assert entries[0]["status"] == "active"
         assert entries[0]["source"] == "learn"
-        assert load_learned_ctx("t01") == ["Always SELECT sku"]
+        assert load_learned_ctx("t01") == ["Always SELECT sku from the products table"]
 
 
 def test_apply_learn_diff_deactivates_entries(tmp_path):
     from agent.prompt_assembler import _apply_learn_diff, load_learned_ctx
     with patch("agent.prompt_assembler._LEARNED_DIR", tmp_path):
-        _apply_learn_diff("t01", "Rule 1", "reason 1", [], None)
-        _apply_learn_diff("t01", "Rule 2", "reason 2", ["r001"], "superseded by rule 2")
+        _apply_learn_diff("t01", "Always use list: for directory discovery", "reason 1", [], None)
+        _apply_learn_diff("t01", "Never use /bin/ls — use list: prefix instead", "reason 2", ["r001"], "superseded by rule 2")
         ctx = load_learned_ctx("t01")
-    assert ctx == ["Rule 2"]
+    assert ctx == ["Never use /bin/ls — use list: prefix instead"]
 
 
 def test_apply_learn_diff_id_monotonic(tmp_path):
     from agent.prompt_assembler import _apply_learn_diff, load_learned_entries
     with patch("agent.prompt_assembler._LEARNED_DIR", tmp_path):
-        _apply_learn_diff("t01", "Rule 1", "r1", [], None)
-        _apply_learn_diff("t01", "Rule 2", "r2", [], None)
-        _apply_learn_diff("t01", "Rule 3", "r3", [], None)
+        _apply_learn_diff("t01", "Always select sku from products table", "r1", [], None)
+        _apply_learn_diff("t01", "Never join product_properties without key filter", "r2", [], None)
+        _apply_learn_diff("t01", "Use search: prefix for content lookups in /proc/", "r3", [], None)
         entries = load_learned_entries("t01")
     assert [e["id"] for e in entries] == ["r001", "r002", "r003"]
 
@@ -86,8 +86,8 @@ def test_apply_learn_diff_id_monotonic(tmp_path):
 def test_apply_learn_diff_deactivated_ids_stay_in_file(tmp_path):
     from agent.prompt_assembler import _apply_learn_diff, load_learned_entries
     with patch("agent.prompt_assembler._LEARNED_DIR", tmp_path):
-        _apply_learn_diff("t01", "Old rule", "old reason", [], None)
-        _apply_learn_diff("t01", "New rule", "new reason", ["r001"], "superseded")
+        _apply_learn_diff("t01", "Always check schema before writing SQL", "old reason", [], None)
+        _apply_learn_diff("t01", "Never use /bin/ls in actions — VM has no shell", "new reason", ["r001"], "superseded")
         entries = load_learned_entries("t01")
     assert len(entries) == 2
     assert entries[0]["status"] == "inactive"

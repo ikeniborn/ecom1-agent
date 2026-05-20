@@ -2,7 +2,7 @@
 wiki_sources:
   - "[[data/prompts/assembler.md]]"
   - "[[docs/superpowers/plans/2026-05-19-learned-knowledge-redesign.md]]"
-wiki_updated: 2026-05-19
+wiki_updated: 2026-05-20
 wiki_status: developing
 wiki_outgoing_links:
   - "[[pipeline-phases/sdd-phase]]"
@@ -71,3 +71,27 @@ def _build_sources(task_text, task_type, prephase_result, learn_ctx) -> str:
 ```
 
 Убраны: загрузка `RulesLoader`, `load_security_gates`, `load_task_blocks`, директории `_RULES_DIR`, `_SECURITY_DIR`.
+
+## LAST_RUN handling (добавлено 2026-05-20)
+
+Ассемблер получает `LAST_RUN` — результат предыдущего запуска задачи (`status`, `outcome`, `date`, `grounding_refs_count`).
+
+| Условие | Поведение |
+|---------|-----------|
+| `LAST_RUN.status = failure` ИЛИ (`outcome = OUTCOME_OK` AND `grounding_refs_count = 0`) | LEARNED-правила помечаются как **suspect** — они были активны при упавшем или пустом прогоне и могут быть причиной |
+| `LAST_RUN.status = success` AND `grounding_refs_count > 0` | LEARNED-правила обрабатываются как обычно (высший приоритет) |
+
+При suspect-состоянии: в секцию `# LEARNED` добавляется преамбула:
+```
+> WARNING: previous run failed or returned no grounding refs. Rules below may be incorrect — LEARN phase should scrutinize them.
+```
+
+Правила при этом **не подавляются** — включаются полностью, чтобы LEARN мог оценить их и деактивировать плохие.
+
+## Разрешение противоречий
+
+Приоритет (высший → низший): `LEARNED` > `BASE`
+
+При противоречии двух элементов (противоположные инструкции для одного сценария) — сохранять элемент с более высоким приоритетом, удалять элемент с более низким.
+
+Семантически эквивалентные элементы из разных источников — объединять в один с наиболее точной формулировкой (deduplication).

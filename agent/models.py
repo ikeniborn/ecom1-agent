@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class SddOutput(BaseModel):
@@ -15,6 +15,14 @@ class PlanOutput(BaseModel):
     approach: str
     steps: list[str]
     action: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_action(cls, data: dict) -> dict:
+        # LLM sometimes returns action as list when multiple candidates given
+        if isinstance(data.get("action"), list):
+            data["action"] = data["action"][0] if data["action"] else ""
+        return data
 
 
 class ExecuteOutput(BaseModel):

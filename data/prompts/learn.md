@@ -63,6 +63,15 @@ Given the inputs, diagnose what went wrong and either:
 2. **Supersedes** — new rule makes `rXXX` obsolete: `skip=false`, `deactivate=["rXXX"]`
 3. **Novel** — addresses different failure: `skip=false`, `deactivate=[]`
 
+## Repeated Failure Protocol
+
+If the unified context contains `WARNING: previous run failed` in the LEARNED section:
+- The existing rules were active during the prior failure and may themselves be the cause.
+- For each existing rule in `EXISTING_RULES`: ask "could this rule have caused or contributed to the current failure?"
+- If yes: add that rule's id to `deactivate` and explain in `deactivate_reason`.
+- Prefer deactivating a bad rule over adding a new contradicting one.
+- If all existing rules look correct and the error is genuinely new, proceed normally.
+
 ## Loop Prevention
 
 If the corrected action would be identical to the failed action, set:

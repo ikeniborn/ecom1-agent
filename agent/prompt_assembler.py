@@ -40,6 +40,56 @@ def load_learned_entries(task_id: str) -> list[dict]:
         return []
 
 
+def load_last_run(task_id: str) -> dict | None:
+    """Return last_run metadata from data/learned/{task_id}.yaml, or None."""
+    if not task_id:
+        return None
+    path = _LEARNED_DIR / f"{task_id}.yaml"
+    if not path.exists():
+        return None
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return None
+        return data.get("last_run") or None
+    except Exception:
+        return None
+
+
+def save_last_run(
+    task_id: str,
+    status: str,
+    outcome: str,
+    cycles_used: int,
+    grounding_refs_count: int = 0,
+) -> None:
+    """Write last_run metadata to data/learned/{task_id}.yaml."""
+    if not task_id:
+        return
+    from datetime import date
+    _LEARNED_DIR.mkdir(parents=True, exist_ok=True)
+    path = _LEARNED_DIR / f"{task_id}.yaml"
+    if path.exists():
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            data = {}
+    else:
+        data = {}
+    data["task_id"] = task_id
+    data["last_run"] = {
+        "status": status,
+        "outcome": outcome,
+        "cycles_used": cycles_used,
+        "grounding_refs_count": grounding_refs_count,
+        "date": str(date.today()),
+    }
+    path.write_text(
+        yaml.dump(data, allow_unicode=True, default_flow_style=False),
+        encoding="utf-8",
+    )
+
+
 def _next_entry_id(entries: list[dict]) -> str:
     """Generate next monotonic id rNNN (never reuses existing ids)."""
     used: set[int] = set()
@@ -76,13 +126,19 @@ def _apply_learn_diff(
         if entry.get("id") in deactivate:
             entry["status"] = "inactive"
             entry["deactivated_reason"] = deactivate_reason or "Deactivated by consolidation"
+    _content = (rule_content or "").strip()
+    _reasoning = (reasoning or "").strip()
+    _MIN_CONTENT = 20
+    _VALID_STARTS = ("never", "always", "use", "do not", "when", "if", "prefer")
+    if len(_content) < _MIN_CONTENT or not _content.lower().startswith(_VALID_STARTS):
+        return
     entries.append({
         "id": _next_entry_id(entries),
-        "content": rule_content,
+        "content": _content,
         "status": "active",
         "source": source,
         "created": str(date.today()),
-        "reasoning": reasoning,
+        "reasoning": _reasoning,
         "deactivated_reason": None,
     })
     path.write_text(
@@ -96,10 +152,19 @@ def _build_sources(
     task_type: str,
     prephase_result: PrephaseResult,
     learn_ctx: list[str],
+    last_run: dict | None = None,
 ) -> str:
     parts: list[str] = []
     parts.append(f"TASK_TEXT: {task_text}")
     parts.append(f"TASK_TYPE: {task_type}")
+    if last_run:
+        parts.append(
+            "## LAST_RUN\n"
+            f"status: {last_run.get('status', 'unknown')}\n"
+            f"outcome: {last_run.get('outcome', 'unknown')}\n"
+            f"cycles_used: {last_run.get('cycles_used', '?')}\n"
+            f"date: {last_run.get('date', 'unknown')}"
+        )
     if learn_ctx:
         parts.append("## LEARNED (highest priority)\n" + "\n".join(f"- {r}" for r in learn_ctx))
     pre = prephase_result
@@ -130,7 +195,8 @@ def assemble_prompt(
 ) -> AssembledPrompt:
     """Call LLM assembler to produce unified_context from all sources."""
     assembler_guide = load_prompt("assembler")
-    sources = _build_sources(task_text, task_type, prephase_result, learn_ctx)
+    last_run = load_last_run(task_id) if task_id else None
+    sources = _build_sources(task_text, task_type, prephase_result, learn_ctx, last_run)
     assembler_model = _resolve_model_for_phase("assembler", model)
 
     raw = call_llm_raw(

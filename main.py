@@ -98,6 +98,7 @@ from bitgn.harness_pb2 import (
 from connectrpc.errors import ConnectError
 
 from agent import run_agent
+from agent.prompt_assembler import save_last_run
 from agent.trace import TraceLogger, get_trace, set_trace
 
 BITGN_URL = os.getenv("BENCHMARK_HOST") or "https://api.bitgn.com"
@@ -158,6 +159,14 @@ def _run_single_task(trial_id: str, task_filter: list) -> tuple:
         result = client.end_trial(EndTrialRequest(trial_id=trial.trial_id))
         score = result.score
         detail = list(result.score_detail)
+        if task_id and float(score) < 1.0:
+            save_last_run(
+                task_id=task_id,
+                status="failure",
+                outcome=token_stats.get("outcome", "OUTCOME_OK"),
+                cycles_used=token_stats.get("cycles_used", 0),
+                grounding_refs_count=token_stats.get("grounding_refs_count", 0),
+            )
         if t := get_trace():
             t.log_task_result(
                 outcome=token_stats.get("outcome", ""),

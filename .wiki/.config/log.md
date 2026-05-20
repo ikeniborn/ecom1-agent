@@ -174,3 +174,19 @@
 
 ---
 
+## 2026-05-20T02:00:00
+
+**Операция:** ingest (batch)
+**Источники:** data/prompts/answer.md, data/prompts/assembler.md, data/prompts/learn.md, data/prompts/plan.md, data/prompts/sdd.md
+**Домен:** документация
+
+**Затронуто страниц:** 5
+
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/answer-phase.md` — синхронизация с актуальным промптом: удалены устаревшие разделы (OUTCOME_NEED_MORE_DATA, Cart Answers, checkout, inventory validation); добавлены clarification guard и таблица источников grounding_refs по типу execute-результата
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/assembler-phase.md` — добавлены LAST_RUN handling (suspect-state при failure/empty-grounding_refs, WARNING-преамбула) и раздел «Разрешение противоречий» (LEARNED > BASE)
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/learn-phase.md` — добавлены Repeated Failure Protocol (деактивация виновных правил при WARNING) и Loop Prevention (детали)
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/plan-phase.md` — исправлена env var модели с MODEL_SDD на MODEL_PLAN
+- ОБНОВЛЕНА: `.wiki/документация/pipeline-phases/sdd-phase.md` — добавлен раздел ACCUMULATED RULES (hard-constraint блок от LEARN-фазы)
+
+---
+

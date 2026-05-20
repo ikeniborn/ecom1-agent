@@ -11,7 +11,10 @@ from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
 
 from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
-from bitgn.vm.ecom.ecom_pb2 import AnswerRequest, ExecRequest, ReadRequest
+from bitgn.vm.ecom.ecom_pb2 import (
+    AnswerRequest, ExecRequest, FindRequest, ListRequest,
+    ReadRequest, SearchRequest, TreeRequest,
+)
 
 from .llm import (
     call_llm_raw, _resolve_model_for_phase, OUTCOME_BY_NAME,
@@ -21,7 +24,7 @@ from .json_extract import _extract_json_from_text
 from .models import SddOutput, PlanOutput, ExecuteOutput, LearnOutput, AnswerOutput, ConsolidateOutput
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest
 from .prompt import load_prompt
-from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff
+from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff, save_last_run
 from .sql_security import check_retry_loop
 from .trace import get_trace
 
@@ -177,10 +180,18 @@ def _build_answer_user_msg(task_text: str, execute_out) -> str:
 
 
 def _infer_action_type(action: str) -> str:
-    """Infer action type from plain string: sql | read | exec."""
+    """Infer action type from plain string: sql | read | exec | list | search | find | tree."""
     s = action.strip()
     if re.match(r"^SELECT\b", s, re.IGNORECASE):
         return "sql"
+    if s.startswith("list:"):
+        return "list"
+    if s.startswith("search:"):
+        return "search"
+    if s.startswith("find:"):
+        return "find"
+    if s.startswith("tree:"):
+        return "tree"
     if s.startswith("/bin/") or s.startswith("/usr/"):
         return "exec"
     if s.startswith("/"):
@@ -204,6 +215,37 @@ def _run_execute(vm, plan_out, cycle: int) -> "tuple[ExecuteOutput | None, str]"
         elif action_type == "read":
             result = vm.read(ReadRequest(path=action))
             raw = result.content or ""
+            return ExecuteOutput(results=[{"output": raw}], action=action), ""
+        elif action_type == "list":
+            path = action[len("list:"):].strip()
+            result = vm.list(ListRequest(path=path))
+            entries = getattr(result, "entries", [])
+            raw = "\n".join(e.name for e in entries) if entries else ""
+            return ExecuteOutput(results=[{"output": raw}], action=action), ""
+        elif action_type == "search":
+            # format: search:pattern /optional/root
+            rest = action[len("search:"):].strip()
+            parts = rest.split(None, 1)
+            pattern = parts[0] if parts else rest
+            root = parts[1].strip() if len(parts) > 1 else "/"
+            result = vm.search(SearchRequest(root=root, pattern=pattern, limit=20))
+            matches = getattr(result, "matches", [])
+            raw = "\n".join(f"{m.path}:{m.line}:{m.line_text}" for m in matches) if matches else ""
+            return ExecuteOutput(results=[{"output": raw}], action=action), ""
+        elif action_type == "find":
+            # format: find:name /optional/root
+            rest = action[len("find:"):].strip()
+            parts = rest.split(None, 1)
+            name = parts[0] if parts else rest
+            root = parts[1].strip() if len(parts) > 1 else "/"
+            result = vm.find(FindRequest(root=root, name=name, limit=20))
+            nodes = getattr(result, "nodes", [])
+            raw = "\n".join(n.path for n in nodes) if nodes else ""
+            return ExecuteOutput(results=[{"output": raw}], action=action), ""
+        elif action_type == "tree":
+            root = action[len("tree:"):].strip() or "/"
+            result = vm.tree(TreeRequest(root=root, level=2))
+            raw = str(result) if result else ""
             return ExecuteOutput(results=[{"output": raw}], action=action), ""
         else:
             parts = action.split()
@@ -354,6 +396,7 @@ def run_pipeline(
     sdd_out: SddOutput | None = None
     plan_out: PlanOutput | None = None
     unified_context = ""
+    final_grounding_refs_count = 0
 
     try:
         for cycle in range(_MAX_CYCLES):
@@ -484,8 +527,13 @@ def run_pipeline(
             retry_err = check_retry_loop([plan_out.action], prior_action_sets)
             if retry_err:
                 print(f"{CLI_RED}[pipeline] SECURITY hard-stop: {retry_err}{CLI_CLR}")
-                last_error = retry_err
-                break
+                last_error = f"Repeated action detected — must use a different query or approach. Action was: {plan_out.action[:120]}"
+                _run_learn(unified_context, model, cfg, task_text, last_error,
+                           sgr_trace, learn_ctx, pre.agents_md_index,
+                           error_type="semantic", cycle=cycle + 1, task_id=task_id,
+                           sdd_out=sdd_out, plan_out=plan_out)
+                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
+                continue
             prior_action_sets.append(frozenset([plan_out.action]))
 
             # ── EXECUTE ───────────────────────────────────────────────────────
@@ -547,6 +595,17 @@ def run_pipeline(
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
+            # ── ANSWER CLARIFICATION: retry if cycles remain ──────────────────
+            if answer_out.outcome == "OUTCOME_NONE_CLARIFICATION" and cycle + 1 < _MAX_CYCLES:
+                last_error = f"ANSWER clarification: {answer_out.message[:200]}"
+                print(f"{CLI_YELLOW}[pipeline] ANSWER: OUTCOME_NONE_CLARIFICATION — retrying (cycle {cycle + 1}/{_MAX_CYCLES}){CLI_CLR}")
+                _run_learn(unified_context, model, cfg, task_text, last_error,
+                           sgr_trace, learn_ctx, pre.agents_md_index,
+                           error_type="semantic", cycle=cycle + 1, task_id=task_id,
+                           sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out)
+                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
+                continue
+
             # ── SUCCESS ───────────────────────────────────────────────────────
             outcome = answer_out.outcome
             print(f"{CLI_GREEN}[pipeline] ANSWER: {outcome} — {answer_out.message[:100]}{CLI_CLR}")
@@ -556,6 +615,7 @@ def run_pipeline(
                 sku_refs.append(plan_out.action)
 
             clean_refs = list(answer_out.grounding_refs)
+            final_grounding_refs_count = len(clean_refs)
             if outcome == "OUTCOME_NONE_UNSUPPORTED":
                 t_lower = task_text.lower()
                 policy_refs = ["/docs/security.md"]
@@ -612,9 +672,21 @@ def run_pipeline(
         except Exception as e:
             print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
 
+    if task_id:
+        _SUCCESSFUL_OUTCOMES = {"OUTCOME_OK", "OUTCOME_DENIED_SECURITY", "OUTCOME_NONE_UNSUPPORTED"}
+        last_run_status = "success" if outcome in _SUCCESSFUL_OUTCOMES else "failure"
+        save_last_run(
+            task_id=task_id,
+            status=last_run_status,
+            outcome=outcome,
+            cycles_used=cycles_used,
+            grounding_refs_count=final_grounding_refs_count,
+        )
+
     stats = {
         "outcome": outcome,
         "cycles_used": cycles_used,
+        "grounding_refs_count": final_grounding_refs_count,
         "step_facts": [f"pipeline cycles={cycles_used}"],
         "done_ops": [],
         "input_tokens": total_in_tok,

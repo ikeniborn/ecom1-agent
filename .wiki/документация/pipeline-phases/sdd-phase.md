@@ -131,9 +131,14 @@ SELECT DISTINCT store_id, name FROM stores WHERE name LIKE '%<location term>%' L
 
 После 2 неудачных попыток SQL без результатов — выдать один широкий запрос (LIKE с коротким стемом). Если снова нет совпадений → `<NO> Product not found in catalogue` с `grounding_refs=[]`.
 
+## ACCUMULATED RULES
+
+Если в system-контексте присутствует блок `# ACCUMULATED RULES` — каждое правило трактуется как жёсткое ограничение. LEARN-фаза добавляет правила именно в этот блок через `data/learned/{task_id}.yaml`.
+
 ## История изменений
 
 - **2026-05-17** (из [[data/prompts/sdd.md]]): страница создана; SDD заменяет устаревшую фазу SQL_PLAN в рамках редизайна промп-архитектуры; CONFIRMED VALUES и RESOLVE phase удалены
 - **2026-05-17** (из [[data/prompts/sdd.md]], повторный ingest): добавлено «Исключение для checkout-задач» — при задачах submit/place order сначала discovery-шаг для корзины, только ANSWER выдаёт UNSUPPORTED; уточнены ограничения exec-инструментов
 - **2026-05-19** (из [[docs/superpowers/plans/2026-05-19-learned-knowledge-redesign.md]]): в рамках learned knowledge redesign — sdd.md очищается от ECOM/SQL-специфичного содержимого. Такие секции как «Table Name Resolution», «Discovery Steps», «Multi-Attribute Filtering», «SKU and Path Projection», «Store Name Discovery», «Cart Queries», «NOT FOUND Rule» перенесены в `data/learned/` (per-task knowledge base) вместо прежних `data/rules/*.yaml`. sdd.md содержит только структурное: роль, форматы вывода, типы шагов, безопасность.
 - **2026-05-20** (из [[data/prompts/sdd.md]]): SddOutput переработан — вместо `spec` + типизированных шагов `plan` теперь: `spec_goal` (одно предложение), `success_criteria` (2–4 условия), `plan` (рассуждения plain English), `actions` (1–3 кандидата), `error_code`. Добавлена фаза PLAN после SDD — она выбирает единственное действие из `actions`. Поле `agents_md_refs` удалено.
+- **2026-05-20** (из [[data/prompts/sdd.md]], re-ingest): добавлен раздел ACCUMULATED RULES — блок в system-контексте с hard-constraint правилами от LEARN-фазы

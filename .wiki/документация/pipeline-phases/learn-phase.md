@@ -119,6 +119,16 @@ LEARN теперь получает полный контекст всего ц�
 
 Правило нацелено на качество **spec или plan** — не на raw SQL паттерны. `rule_content` обязан ссылаться на идентификатор из `SDD_OUTPUT`, `PLAN_OUTPUT` или `ANSWER_OUTPUT`.
 
+## Repeated Failure Protocol (добавлено 2026-05-20)
+
+Если unified_context содержит `WARNING: previous run failed` в секции `# LEARNED` (установленное ASSEMBLE-фазой при suspect-state):
+
+- Существующие правила были активны при предыдущем сбое и могут сами быть причиной
+- LEARN проверяет каждое правило из `EXISTING_RULES`: могло ли оно вызвать или способствовать текущему сбою?
+- Если да → добавить id правила в `deactivate`, объяснить в `deactivate_reason`
+- Предпочитать деактивацию плохого правила над добавлением нового противоречащего
+- Если все существующие правила корректны и ошибка действительно новая → действовать в штатном режиме
+
 ## Prompt-файл
 
 `data/prompts/learn.md` — phase guide для LLM. Разделы:
@@ -129,7 +139,8 @@ LEARN теперь получает полный контекст всего ц�
 - **Output Format (JSON only)** — схема вывода с полями deactivate/skip
 - **Field Definitions** — детальное описание каждого поля (4 обязательных компонента reasoning)
 - **Consolidation Logic** — инструкции для dedup: Duplicate / Supersedes / Novel
-- **Loop Prevention** — если исправленный action идентичен упавшему
+- **Repeated Failure Protocol** — при WARNING в unified_context: проверять существующие правила на причастность к сбою, деактивировать виновные
+- **Loop Prevention** — если исправленный action идентичен упавшему → `rule_content: "No structural fix available — escalate to clarification"`, `conclusion` называет блокирующее ограничение
 
 ## Файл хранилища знаний
 
@@ -168,3 +179,4 @@ entries:
 
 - **2026-05-19** (из [[docs/superpowers/plans/2026-05-19-learned-knowledge-redesign.md]]): redesign learn_ctx — compacted_ctx и PipelineEvalOutput удалены; LLM-driven dedup через skip/deactivate; хранилище `data/learned/{task_id}.yaml`
 - **2026-05-20** (из [[data/prompts/learn.md]]): расширены входы — LEARN теперь получает `SDD_OUTPUT` + `PLAN_OUTPUT` + `ANSWER_OUTPUT` (не только task+error); правила нацелены на spec/plan quality gaps, а не raw SQL паттерны; `rule_content` обязан цитировать идентификатор из одного из этих выводов
+- **2026-05-20** (из [[data/prompts/learn.md]], re-ingest): добавлен Repeated Failure Protocol — при WARNING в unified_context LEARN проверяет существующие правила на причастность к сбою и деактивирует виновные; добавлен Loop Prevention (если исправленный action идентичен упавшему → специальный rule_content)

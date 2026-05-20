@@ -27,7 +27,7 @@ aliases:
 - Поле `approach` — одно предложение: как будет разрешена спецификация
 - Поле `steps` — 2–5 упорядоченных шагов выполнения (plain English)
 - Поле `action` — единственное действие из `SddOutput.actions`, скопированное дословно
-- Модель: `MODEL_SDD` (Override через `MODEL_SDD`, по умолчанию `MODEL`)
+- Модель: `MODEL_PLAN` (Override через `MODEL_PLAN`, по умолчанию `MODEL`)
 
 ## Формат PlanOutput
 
