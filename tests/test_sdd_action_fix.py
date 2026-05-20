@@ -9,23 +9,18 @@ from tests.test_pipeline import (
 )
 
 
-def _nl_sdd_json():
+def _failing_exec_sdd_json():
     return json.dumps({
         "spec_goal": "list payment files",
         "success_criteria": ["files listed"],
         "plan": ["list files in payments dir"],
-        "actions": ["List the payment record files in proc/payments/ directory,"],
+        "actions": ["/bin/xyznotacommand"],
         "error_code": "",
     })
 
 
-def test_pipeline_retries_when_sdd_emits_prose_action():
-    """Natural-language action → plan picks SQL → empty result → LEARN → retry → success.
-
-    The NL prose action in SDD output causes no useful result. PLAN still picks a SQL
-    action (since PLAN is mocked), which returns empty → triggers LEARN → retry → success.
-    This tests that a cycle with a bad SDD output (prose action) feeds into LEARN and retries.
-    """
+def test_pipeline_retries_on_exec_runtime_error():
+    """Exec action fails at runtime → pipeline routes to LEARN → retry with SQL action → success."""
     vm = MagicMock()
     # Cycle 1: PLAN picks SQL → EXPLAIN(empty) + SQL exec(empty) → empty result → LEARN
     # Cycle 2: valid SQL → EXPLAIN(ok) + SQL exec(data) → success
@@ -38,12 +33,12 @@ def test_pipeline_retries_when_sdd_emits_prose_action():
     pre = _make_pre()
 
     with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm([
-             _nl_sdd_json(),   # SDD cycle 1: prose action
-             _plan_json(),     # PLAN cycle 1
-             _learn_json(),    # LEARN cycle 1 (empty result)
-             _sdd_json(),      # SDD cycle 2: valid SQL action
-             _plan_json(),     # PLAN cycle 2
-             _answer_json(),   # ANSWER cycle 2
+             _failing_exec_sdd_json(),  # SDD cycle 1: exec action that fails at runtime
+             _plan_json(),              # PLAN cycle 1
+             _learn_json(),             # LEARN cycle 1 (empty result)
+             _sdd_json(),               # SDD cycle 2: valid SQL action
+             _plan_json(),              # PLAN cycle 2
+             _answer_json(),            # ANSWER cycle 2
          ])), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None), \
@@ -51,4 +46,4 @@ def test_pipeline_retries_when_sdd_emits_prose_action():
          patch("agent.pipeline.load_learned_ctx", return_value=[]):
         stats, _ = run_pipeline(vm, "model", "task", pre, {}, task_id="t99")
 
-    assert stats["outcome"] != "OUTCOME_NONE_CLARIFICATION"
+    assert stats["outcome"] == "OUTCOME_OK"

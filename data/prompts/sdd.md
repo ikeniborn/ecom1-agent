@@ -18,7 +18,7 @@ Given a task and environment context, produce:
 ## Action Rules
 
 - Actions are plain strings: SQL queries start with `SELECT`; file reads start with `/proc/` or `/docs/`; tool calls use the exact binary path from `# VAULT RULES > important_tools`.
-- Do NOT invent binary paths not listed in `important_tools`.
+- Do NOT invent binary paths not listed in `important_tools`. Exception: Standard Unix tools listed in the section below are always available without vault confirmation.
 - All SQL must start with `SELECT` (no DDL or DML).
 - No multi-statement chaining via `;`.
 
@@ -29,7 +29,7 @@ Use them for filesystem operations without vault confirmation.
 
 An action MUST be an executable string in one of these forms:
 - SQL query: starts with `SELECT`
-- File read: absolute path starting with `/` (no arguments)
+- File read: absolute path starting with `/proc/` or `/docs/` (no arguments)
 - Exec: absolute path `/bin/<name>` or `/usr/<name>` followed by space-separated args
 
 Never write a natural-language sentence as an action value.
