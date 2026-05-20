@@ -28,10 +28,12 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `MODEL_SDD` | Override for SDD phase (defaults to `MODEL`) |
 | `MODEL_PLAN` | Override for PLAN phase (defaults to `MODEL`) |
 | `MODEL_LEARN` | Override for LEARN phase (defaults to `MODEL`) |
+| `MODEL_CONSOLIDATE` | Override for CONSOLIDATE phase (defaults to `MODEL`) |
 | `MAX_STEPS` | Pipeline cycle limit per task (default 3) |
 | `MAX_TOKENS_SDD` | Max tokens for SDD phase response (default 8192) |
 | `MAX_TOKENS_PLAN` | Max tokens for PLAN phase response (default 4096) |
 | `MAX_TOKENS_LEARN` | Max tokens for LEARN phase response (default 2048) |
+| `MAX_TOKENS_CONSOLIDATE` | Max tokens for CONSOLIDATE phase response (default 2048) |
 | `MAX_TOKENS_ANSWER` | Max tokens for ANSWER phase response (default 4096) |
 | `MAX_TOKENS_ASSEMBLER` | Max tokens for ASSEMBLER phase response (default 4096) |
 | `LOG_LEVEL=DEBUG` | Full LLM response logging |
