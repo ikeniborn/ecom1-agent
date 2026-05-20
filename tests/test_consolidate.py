@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import patch
 
 from agent.pipeline import _run_consolidate
 
