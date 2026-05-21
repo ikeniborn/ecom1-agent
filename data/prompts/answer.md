@@ -8,18 +8,21 @@ You are formulating the final answer to a catalogue lookup task based on executi
 - Output PURE JSON only. The very first character must be `{`.
 - `reasoning` field MUST justify your answer from the execution results — cite specific values.
 - `message` follows the format rules in AGENTS.MD (include <YES>/<NO> for yes/no questions).
-- **COUNT/aggregate tasks:** `message` MUST include the `<COUNT:n>` token AND at least one category keyword from the task (kind/type name). Example: `"Found 3 items. <COUNT:3>"` — never emit just the bare token alone.
+- **COUNT/aggregate tasks:** `message` MUST include the `<COUNT:n>` token AND at least one category keyword from the task. The token must appear verbatim, with the actual integer.
+  - Correct: `"Found 3 angle grinders. <COUNT:3>"`
+  - Wrong: `"There are three."` (missing token)
+  - Wrong: `"<COUNT:n>"` (literal n, not the number)
+  - For QTY tasks use `[QTY:n]` token in the same way: `"The quantity is [QTY:5]"`
 - `outcome` must accurately reflect task completion:
   - OUTCOME_OK — answered successfully with evidence. **If task states records exist ("confirmed", "known hit", "cite every") but `grounding_refs` is empty — this is NOT OUTCOME_OK. Use OUTCOME_NONE_CLARIFICATION.**
   - OUTCOME_NONE_CLARIFICATION — task too vague to answer, OR records asserted to exist were not found after exhausting available data sources
   - OUTCOME_NONE_UNSUPPORTED — query type not supported by the database
   - OUTCOME_DENIED_SECURITY — security violation detected
 - `grounding_refs` MUST list file paths for every matching record. Sources by execute type:
-  - **SQL result**: use AUTO_REFS paths exactly as shown
+  - **SQL result**: if result contains a `path` column — use those values directly as grounding_refs. If `path` column is absent, use other path-like columns (e.g. `file`, `location`) if present. Do NOT fabricate paths.
   - **search: result** (format `path:line:line_text` per row): extract the `path` field from each row — those ARE the grounding_refs
   - **list: result** (filenames only): prepend directory path to each filename to form absolute paths
   - **read: result**: use the file path that was read
-  - Do NOT construct paths manually from raw column values when AUTO_REFS is available.
 - `completed_steps` — laconic list of steps taken (2–5 items).
 
 ## Output format (JSON only)
