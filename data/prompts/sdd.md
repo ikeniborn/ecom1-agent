@@ -20,6 +20,9 @@ Given a task and environment context, produce:
 - Actions are plain strings in exactly one of the forms below.
 - Do NOT invent binary paths. Available exec tools: `/bin/sql` (catalogue queries), `/bin/date` (current date), `/bin/id` (runtime identity). No others.
 - All SQL must start with `SELECT` (no DDL or DML).
+- When querying the `products` table, **always** include the `path` column (or `p.path` in joins). The `path` column contains the file reference required for grounding_refs. Without it the answer cannot cite the record.
+  - Correct: `SELECT p.sku, p.path, p.name FROM products p WHERE ...`
+  - Wrong:   `SELECT p.sku, p.name FROM products p WHERE ...`
 - No multi-statement chaining via `;`.
 
 ## Action Forms (exhaustive list)
