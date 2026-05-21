@@ -1,6 +1,6 @@
 import json
 from unittest.mock import MagicMock, patch
-from agent.pipeline import run_pipeline, _run_learn
+from agent.pipeline import run_pipeline, _run_learn, _build_plan_user_msg
 from agent.prephase import PrephaseResult
 from agent.prompt_assembler import AssembledPrompt
 
@@ -271,7 +271,6 @@ def test_file_read_action_uses_vm_read():
 
 def test_plan_user_msg_includes_prior_actions():
     """PLAN user message must include list of already-tried actions."""
-    from agent.pipeline import _build_plan_user_msg
     sdd_json = '{"spec_goal":"test","actions":["search:x /proc/"]}'
     prior = ["search:x /proc/", "list:/proc/payments/"]
     msg = _build_plan_user_msg(sdd_json, prior_actions=prior)
