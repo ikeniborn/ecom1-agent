@@ -54,11 +54,11 @@ These are not contradictory but they overlap. Merge into one rule using highest-
 
 Result (JSON output the model should produce):
 
-    {
-      "skip": false,
-      "consolidations": [{
-        "deactivate": ["r014", "r015"],
-        "merged_rule": "For spec_goal '...Kai Möller...': read /proc/stores/store_linz_hauptplatz.json directly (do not use search:Kai Möller; do not list /proc/employees/ unless store file lacks employee reference).",
-        "merged_reasoning": "r014+r015+r018 all address same spec_goal; r018 subsumes with corrections"
-      }]
-    }
+{
+  "skip": false,
+  "consolidations": [{
+    "deactivate": ["r014", "r015"],
+    "merged_rule": "For spec_goal '...Kai Möller...': read /proc/stores/store_linz_hauptplatz.json directly (do not use search:Kai Möller; do not list /proc/employees/ unless store file lacks employee reference).",
+    "merged_reasoning": "r014+r015+r018 all address same spec_goal; r018 subsumes with corrections"
+  }]
+}
