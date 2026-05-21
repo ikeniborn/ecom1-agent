@@ -478,8 +478,6 @@ def run_pipeline(
             if sdd_out.error_code in ("UNSUPPORTED", "OUTCOME_NONE_UNSUPPORTED"):
                 print(f"{CLI_YELLOW}[pipeline] SDD: unsupported operation{CLI_CLR}")
                 _refs = _policy_refs(task_text)
-                if "/docs/checkout.md" not in _refs:
-                    _refs = ["/docs/checkout.md"] + _refs
                 _basket_m = re.search(r'\b(basket_\w+|cart_\w+)\b', task_text, re.IGNORECASE)
                 if _basket_m:
                     _basket_ref = f"/proc/baskets/{_basket_m.group(1)}.json"
