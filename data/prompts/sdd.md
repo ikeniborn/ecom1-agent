@@ -18,7 +18,8 @@ Given a task and environment context, produce:
 ## Action Rules
 
 - Actions are plain strings in exactly one of the forms below.
-- Do NOT invent binary paths. Available exec tools: `/bin/sql` (catalogue queries), `/bin/date` (current date), `/bin/id` (runtime identity). No others.
+- Exec tools available are defined in the `## Important tools` section of BASE (from AGENTS.MD). Use them exactly as described there. Built-in tools always available: `/bin/sql` (catalogue queries), `/bin/date` (current date), `/bin/id` (runtime identity).
+- When BASE mentions "discount tool" or "payments tool", use them via their `/bin/` path with appropriate arguments. Run the tool with `--help` as first action if you need to discover its argument format.
 - All SQL must start with `SELECT` (no DDL or DML).
 - When querying the `products` table, **always** include the `path` column (or `p.path` in joins). The `path` column contains the file reference required for grounding_refs. Without it the answer cannot cite the record.
   - Correct: `SELECT p.sku, p.path, p.name FROM products p WHERE ...`
@@ -35,6 +36,7 @@ Given a task and environment context, produce:
 | Search content | `search:fraud /proc/payments/` | find files containing a keyword — use this to locate fraud/specific records |
 | Find by name | `find:*.md /proc/payments/` | find files matching a name glob |
 | Tree | `tree:/proc/` | explore directory hierarchy |
+| Tool exec | `/bin/discount basket_033 --type service_recovery --max-allowed` | write operations listed in AGENTS.MD Important tools |
 
 **Selection rule:** `list:` returns only filenames — useless alone for content tasks. When the task requires finding records by content (fraud, status, keyword), use `search:` directly. `list:` → `read each file` requires multiple cycles; `search:keyword /dir/` does it in one.
 
@@ -66,7 +68,12 @@ If `task_text` < 10 characters or matches `/^task$|^test$/i`:
 - Set `spec_goal` to "checkout not directly supported — basket file provided as grounding ref".
 - Leave `error_code` empty.
 
-**Other write operations** (create/update/delete records):
+**Supported write operations** — use the appropriate tool from AGENTS.MD `## Important tools`:
+- Basket discounts → `/bin/discount <basket_id> --type <type> [--max-allowed]`
+- Payment/3DS workflow → `/bin/payments <basket_id> --recover-3ds <pay_id>`
+- Run tool with `--help` first if argument format is unknown.
+
+**Unsupported write operations** (not covered by any tool in AGENTS.MD Important tools):
 ```json
 {"spec_goal":"","success_criteria":[],"plan":[],"actions":[],"error_code":"UNSUPPORTED"}
 ```
