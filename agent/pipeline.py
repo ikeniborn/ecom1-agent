@@ -144,6 +144,14 @@ def _build_sdd_user_msg(task_text: str, last_error: str) -> str:
     return "\n\n".join(parts)
 
 
+def _build_plan_user_msg(sdd_json: str, prior_actions: list[str] | None = None) -> str:
+    parts = [sdd_json]
+    if prior_actions:
+        parts.append("PRIOR_ACTIONS (already tried — do NOT select these):\n" +
+                     "\n".join(f"  - {a}" for a in prior_actions))
+    return "\n\n".join(parts)
+
+
 def _build_learn_user_msg(
     task_text: str,
     error: str,
@@ -497,8 +505,10 @@ def run_pipeline(
                 {"type": "text", "text": unified_context},
                 {"type": "text", "text": plan_guide, "cache_control": {"type": "ephemeral"}},
             ]
+            _prior = [a for s in prior_action_sets for a in s]
+            plan_user = _build_plan_user_msg(sdd_out.model_dump_json(), prior_actions=_prior)
             plan_out, sgr_plan, tok = _call_llm_phase(
-                plan_system, sdd_out.model_dump_json(), plan_model, cfg, PlanOutput,
+                plan_system, plan_user, plan_model, cfg, PlanOutput,
                 max_tokens=_PHASE_MAX_TOKENS["plan"], phase="plan", cycle=cycle + 1,
             )
             total_in_tok += tok.get("input", 0)

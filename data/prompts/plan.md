@@ -19,6 +19,7 @@ Given `SddOutput` (spec_goal, success_criteria, plan reasoning, candidate action
 - Prefer a single targeted action over a broad discovery action when spec_goal is specific.
 - Copy the action string verbatim from `actions` — do not modify it.
 - If `actions` is empty, set `action` to an empty string.
+- If the user message contains a `PRIOR_ACTIONS` block, **never** select any action listed there. Those actions have already been tried and failed or been blocked.
 
 ## Output Format (JSON only)
 

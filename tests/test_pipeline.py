@@ -267,3 +267,14 @@ def test_file_read_action_uses_vm_read():
 
     vm.read.assert_called_once()
     assert stats["outcome"] == "OUTCOME_NONE_UNSUPPORTED"
+
+
+def test_plan_user_msg_includes_prior_actions():
+    """PLAN user message must include list of already-tried actions."""
+    from agent.pipeline import _build_plan_user_msg
+    sdd_json = '{"spec_goal":"test","actions":["search:x /proc/"]}'
+    prior = ["search:x /proc/", "list:/proc/payments/"]
+    msg = _build_plan_user_msg(sdd_json, prior_actions=prior)
+    assert "PRIOR_ACTIONS" in msg
+    assert "search:x /proc/" in msg
+    assert "list:/proc/payments/" in msg
