@@ -1,0 +1,122 @@
+entries:
+- content: Always start store identification by first retrieving all store names (SELECT
+    id, name FROM stores) to understand naming patterns, then construct a LIKE filter
+    using separate conditions for city and store chain (e.g., WHERE name LIKE '%Innsbruck%'
+    AND name LIKE '%PowerTool%' or using appropriate columns) to avoid empty results.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''Empty result: id,name''. Root cause category: wrong-filter.
+    The action ''SELECT id, name FROM stores WHERE name LIKE ''%Innsbruck%PowerTool%''''
+    returned empty because the LIKE pattern did not match any store name in the database,
+    likely due to a different naming convention (e.g., ''PowerTool'' may be written
+    as ''Power Tool'' or the store is identified by city/chain columns). The spec_goal
+    required identifying the store_id for ''central Innsbruck PowerTool shop'', but
+    the action assumed a substring pattern that was too narrow. Rule linkage: The
+    new rule will require exploring store table naming before applying LIKE filters,
+    targeting the spec_goal''s requirement to identify the correct store_id.'
+  source: learn
+  status: active
+- content: Never stop after executing only the 'SELECT id, name FROM stores' action;
+    ensure the plan includes subsequent actions for retrieving each product's SKU
+    (via brand/model and property filters) and checking available_today from inventory
+    at the identified store, so that the final count can be derived.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''Unable to provide a count because inventory data for
+    the specified products at the Innsbruck PowerTool shop was not queried. Please
+    run inventory checks.'' Root cause category: wrong-action. Failing fragment: plan_output
+    action = ''SELECT id, name FROM stores'', which was the only action in the plan.
+    The plan decomposed the task into a single store query and omitted any actions
+    for product SKU retrieval or inventory checks, making it impossible to compute
+    the count. Rule linkage: The new rule will explicitly require that the plan includes
+    actions for product SKU and inventory queries, preventing incomplete plans.'
+  source: learn
+  status: active
+- content: Always ensure that the spec's `actions` list includes a concrete action
+    for every step in the `plan` that involves executing a database query (e.g., product
+    SKU retrieval, inventory check), so that the agent can execute the full sequence
+    without stopping early.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''ANSWER clarification: The count of products with at
+    least 1 item available cannot be determined because inventory data was not retrieved.
+    Further steps are required to check stock levels for each product.'' Root cause
+    category: ''wrong-spec'' because the spec''s actions list omitted the SKU retrieval
+    and inventory check steps that were present in the plan. Failing fragment citation:
+    SDD_OUTPUT ''actions'' field only contains two actions (schema query and store
+    identification), while ''plan'' includes steps for product SKU location and inventory
+    query. Rule linkage: The new rule will require that spec actions match plan steps,
+    citing spec_goal and actions.'
+  source: learn
+  status: active
+- content: Always include in the spec's actions list at least one explicit query per
+    product to retrieve its SKU(s) using brand, series, and property filters, and
+    at least one explicit query per SKU to check available_today >= 4 at the identified
+    store, after the store identification step, as required by the plan step 'For
+    each of the 6 products, construct a query to find SKUs matching brand + series
+    and then filter by the specific property via product_properties, and check inventory
+    at the identified store for available_today >= 4.'
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''ANSWER clarification: The required stock data has
+    not been retrieved.'' Root cause category: wrong-spec. Failing fragment: In SDD_OUTPUT,
+    the ''actions'' list includes only three actions: store query (SELECT id, name
+    FROM stores), a broad product query with LIMIT 20, and a broad properties query
+    with LIMIT 20. The plan step ''For each of the 6 products, construct a query to
+    find SKUs matching brand + series and then filter by the specific property via
+    product_properties, and check inventory at the identified store'' is not reflected
+    in any action. This omission caused the agent to stop after the store query, unable
+    to retrieve stock data. Rule linkage: existing rule r003 (''Always ensure that
+    the spec''s actions list includes a concrete action for every step in the plan'')
+    was violated. A more specific rule is needed to enforce per-product SKU retrieval
+    and inventory check actions.'
+  source: learn
+  status: active
+- content: Always include in the spec's actions list, for each product SKU retrieval
+    query (e.g., for brand and series), an immediately following inventory query of
+    the form `SELECT available_today FROM inventory WHERE sku = '<retrieved_sku>'
+    AND store_id = '<identified_store_id>' AND available_today >= 4`, so that the
+    agent can execute inventory checks without stopping after product queries.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''I was unable to complete the task because only the
+    store identification was performed; inventory data for the listed products was
+    not retrieved.'' Root cause category: ''wrong-spec'' — the spec''s actions list
+    includes store ID and product SKU queries but omits inventory check queries for
+    each SKU, so the agent had no subsequent actions to execute after product retrieval,
+    causing it to stop. Failing fragment: SDD_OUTPUT ''actions'' list contains 7 items
+    (store query + 6 product SKU queries) but lacks any inventory query; plan step
+    ''For each found SKU, query inventory table for available_today >= 4 at the identified
+    store'' is not reflected in actions. Rule linkage: new rule must require that
+    after each product SKU retrieval action, a corresponding inventory check action
+    is included, referencing the spec''s actions list and plan step.'
+  source: learn
+  status: active
+- content: Always prefix each raw SQL query in the actions list with the executable
+    command (e.g., `/bin/sql '<query>'`) so that the agent can execute the query directly
+    without path interpretation errors.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verbatim error: ''exec failed: invalid path: path must be absolute:
+    "WITH"''. Root cause category: wrong-action — the spec''s action list contains
+    a raw SQL string without an executable command prefix, causing the execution tool
+    to treat the SQL as a file path. Failing fragment: the sole action in SDD_OUTPUT.actions:
+    ''WITH store AS (SELECT id FROM stores WHERE name LIKE ''%Ljubljana%'' AND name
+    LIKE ''%PowerTool%'' LIMIT 1) SELECT ...''. Rule linkage: new rule will require
+    actions to be shell commands like `/bin/sql ''...''`, directly addressing this
+    gap.'
+  source: learn
+  status: active
+last_run:
+  cycles_used: 4
+  date: '2026-05-21'
+  grounding_refs_count: 0
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t14

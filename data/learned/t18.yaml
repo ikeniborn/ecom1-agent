@@ -1,0 +1,70 @@
+entries:
+- content: Always verify the exact property key names by querying 'SELECT DISTINCT
+    key FROM product_properties' before constructing property filters in the action,
+    to ensure keys like those in spec_goal for 'screw type' and 'diameter' match the
+    actual data.
+  created: '2026-05-21'
+  deactivated_reason: r001 encouraged separate schema discovery queries, which led
+    the agent to produce an incomplete action that only verified keys and did not
+    retrieve the final answer. The new rule supersedes it by requiring a single, complete
+    action.
+  id: r001
+  reasoning: 'ERROR: ''Empty result: sku,path''. Root cause category: wrong-filter.
+    The failing action in SDD_OUTPUT and PLAN_OUTPUT is the SQL query that joins products
+    and product_properties with keys ''screw_type'' and ''diameter_mm''. This returned
+    zero rows, likely because the actual property key names differ from the assumed
+    ones (e.g., ''screw_type'' might be ''type'' or ''screw type''; ''diameter_mm''
+    might be ''diameter'' or ''size''). The spec_goal explicitly requires filtering
+    by ''screw type wood screw'' and ''diameter 8 mm'', but the action uses hardcoded
+    key names without verifying the schema. The rule will prevent empty results by
+    forcing a schema discovery step before constructing property filters.'
+  source: learn
+  status: inactive
+- content: Always construct the action in PLAN_OUTPUT as a single SQL query that directly
+    computes the required answer, embedding any needed property key discovery (e.g.,
+    via subqueries or known key names from prior analysis) so that the action produces
+    the final result (e.g., SUM of available_today across all Graz stores) without
+    requiring subsequent queries.
+  created: '2026-05-21'
+  deactivated_reason: r002 forced a single SQL query embedding property discovery,
+    but the assumed property key 'connector_type' was incorrect or missing, leading
+    to product not found. Deactivating r002 allows multi-step plans that include verification
+    of property keys.
+  id: r002
+  reasoning: 'Verbatim error: ''Unable to compute quantity — schema discovered, but
+    no store or product records were retrieved. Further queries are needed.'' Root
+    cause category: wrong-action. Failing fragment citation: action="SELECT DISTINCT
+    key FROM product_properties WHERE key LIKE ''%screw%'' OR key LIKE ''%diameter%''"
+    from PLAN_OUTPUT. Rule linkage: new rule must ensure the action is a complete
+    query that directly satisfies spec_goal ''total available_today units of the specified
+    ... across all Graz PowerTool branches''. Existing rule r001 (''Always verify
+    the exact property key names...'') encouraged separate schema discovery, leading
+    to incomplete action; deactivating it and replacing with a rule for complete action.'
+  source: learn
+  status: inactive
+- content: Always verify property keys and values for the target product by querying
+    product_properties with the known brand='Geberit', series='Geberit Mapress Silent
+    IC5-GU6', name LIKE '%Valve and Connector%' before applying the property filter
+    (e.g., connector_type='shower hose') in the final summing action.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''The query returned 0 units available across Vienna
+    PowerTool branches. However, the product record for the specified "Valve and Connector"
+    from Geberit Mapress Silent IC5-GU6 with connector type shower hose was not found
+    in the catalog.'' Root cause category: wrong-key — the property key ''connector_type''
+    assumed in the product identification does not exist or the value mismatch for
+    the target product. Failing fragment: the action SQL in PLAN_OUTPUT that hardcodes
+    the property key ''connector_type'' in the subquery joining products and product_properties.
+    Rule linkage: existing rule r002 mandates a single SQL query with embedded property
+    discovery, but this discovery was based on an unverified key; the failure could
+    have been avoided with a preliminary verification step.'
+  source: learn
+  status: active
+last_run:
+  cycles_used: 2
+  date: '2026-05-21'
+  grounding_refs_count: 2
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t18

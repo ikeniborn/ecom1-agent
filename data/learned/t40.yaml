@@ -1,202 +1,313 @@
 entries:
-- content: Always resolve proc/payments path by listing directory contents before
-    searching; then execute all fallback search terms ('fraud', 'flagged', 'suspicious',
-    'chargeback', 'dispute') in sequence within a single cycle before returning empty
-    result — never exit on first zero-hit search when plan defines fallbacks.
-  created: '2026-05-20'
-  deactivated_reason: 'Consolidated: r001, r003'
+- content: Never search in /proc/ for archived payment records or historical data;
+    instead, use /bin/sql to query the database or search in a designated file system
+    directory (e.g., /data/payments/).
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r010'
   id: r001
-  reasoning: 'Verbatim error: ''Empty result:''. Root cause: wrong-key — the search
-    targeted keyword ''fraud'' in /proc/payments/ but returned zero results, meaning
-    fraud indicators use different terminology or the path is wrong. Failing fragment:
-    action ''search:fraud /proc/payments/'' and spec_goal ''Every payment file containing
-    fraud keyword is found''. The plan had a fallback to ''flagged''/''suspicious''/''chargeback''
-    but the cycle ended before executing it, and the path /proc/payments/ (with leading
-    slash) may differ from the actual relative path proc/payments. Rule must mandate:
-    (1) try relative path proc/payments not /proc/payments, (2) execute all fallback
-    terms before declaring empty result, and (3) list directory first to confirm path
-    exists.'
+  reasoning: 'Verbatim error: ''ERROR: Empty result: ''. Root cause: wrong-spec -
+    the spec_goal ''Identify and cite every payment record that belongs to the confirmed
+    fraud hit in the older archived payment history.'' and action ''search:fraud /proc/''
+    incorrectly assumed payment records are stored in /proc/, which is a virtual filesystem
+    for processes, not archived data. This led to an empty result. Rule linkage: new
+    rule will cite the action identifier ''search:fraud /proc/'' and spec_goal phrase
+    ''older archived payment history''.'
   source: learn
   status: inactive
-- content: Always emit PLAN phase output as valid JSON with an 'actions' array of
-    bare action strings (e.g. 'search:fraud /proc/payments/'); never emit prose, markdown,
-    or explanatory text as PLAN phase output — the harness parser rejects non-JSON
-    and blocks execution.
-  created: '2026-05-20'
-  deactivated_reason: null
+- content: Never assume that fraud records are literally tagged with the keyword 'fraud'
+    in the payment files under /data/payments/; instead, for the spec_goal 'Identify
+    and cite all payment records under /data/payments/ that belong to the known fraud
+    hit', first query /bin/sql for fraud-related fields (e.g., a 'fraud_flag' column
+    or specific transaction IDs) and use the resulting identifiers to locate and cite
+    the corresponding files.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r002, r003'
   id: r002
-  reasoning: 'Verbatim error: ''PLAN phase: failed to parse LLM output. Raw: No filesystem
-    tools available in current tool set (no Bash, Grep, Read, Glob).'' Root cause:
-    wrong-action — the PLAN phase LLM attempted to emit raw narrative text describing
-    PCM tool calls instead of valid JSON action descriptors the harness could parse.
-    Failing fragment: actions array [''search:fraud /proc/payments/'', ''search:flagged
-    /proc/payments/'', ...] — these are correct action identifiers but the LLM output
-    in PLAN phase was unparseable prose wrapping them. Rule linkage: r001 addresses
-    search sequencing but does not address the output format requirement for PLAN
-    phase; the PLAN LLM must emit structured JSON only, never prose. The existing
-    r001 rule may have contributed by being verbose enough to push the PLAN LLM into
-    narrative explanation mode rather than JSON output mode.'
+  reasoning: 'Verbatim error: ''search failed: not found''. Root cause category: wrong-filter
+    — the filter ''fraud'' was assumed to appear literally in payment files under
+    /data/payments/, but no files matched. Failing fragment: spec_goal phrase ''Identify
+    and cite all payment records under /data/payments/ that belong to the known fraud
+    hit'' and action ''search:fraud /data/payments/''. Rule linkage: new rule must
+    forbid assuming keyword presence and instead require obtaining specific identifiers
+    from Risk Ops or querying the database.'
   source: learn
-  status: active
-- content: 'Never emit OUTCOME_NONE_CLARIFICATION after a list:/proc/payments/ result
-    returning filenames-only; a directory listing is a prerequisite step only — always
-    proceed immediately to execute every search: action in SDD_OUTPUT.actions before
-    any clarification or early-exit, because spec_goal ''Identify and cite all payment
-    records that belong to the confirmed fraud incident'' requires content-level evidence,
-    not filename enumeration.'
-  created: '2026-05-20'
-  deactivated_reason: 'Consolidated: r001, r003'
+  status: inactive
+- content: Always first query sqlite_master to discover all tables and their schemas
+    before executing any query against a specific table; for the spec_goal 'Identify
+    and cite all payment records under the payments directory that belong to the known
+    fraud hit', if no fraud_flag column is found in any payment-adjacent table, explore
+    other tables (e.g., fraud_hits) and alternative columns (e.g., is_fraud, fraud_status)
+    to locate fraud-associated identifiers.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r002, r003'
   id: r003
-  reasoning: 'Verbatim error: ''Only a directory listing was returned — no file contents,
-    no fraud flags, no SQL results. Cannot identify fraud records from filenames alone.''
-    Root cause category: wrong-action — after list:/proc/payments/ returned 700+ filenames,
-    ANSWER phase emitted OUTCOME_NONE_CLARIFICATION and halted without executing any
-    of the subsequent search: actions explicitly listed in SDD_OUTPUT.actions ([''search:fraud
-    /proc/payments/'', ''search:flagged /proc/payments/'', ...]). Failing fragment:
-    ANSWER_OUTPUT.completed_steps = [''received list: result for /proc/payments/'',
-    ''observed 700+ payment filenames, no content'', ''determined no fraud indicators
-    present in filenames alone'', ''concluded file reads or search needed''] — agent
-    treated list: result as terminal evidence of insufficiency rather than as a prerequisite
-    step. r001 says ''execute all fallback search terms in sequence within a single
-    cycle'' but does not explicitly state that a list: result returning filenames-only
-    is NOT a terminal result and must not trigger OUTCOME_NONE_CLARIFICATION. The
-    new rule must close this gap: list: success ≠ task completion when spec_goal requires
-    content-level evidence.'
+  reasoning: 'Verbatim error: ''Empty result:'' from action ''SELECT t.id, t.file_name,
+    t.transaction_id, t.fraud_flag FROM payments t WHERE t.fraud_flag IS NOT NULL
+    AND t.fraud_flag != '''';''. Root cause category: wrong-spec (spec assumed existence
+    of table ''payments'' and column ''fraud_flag'' without verification). Failing
+    fragment: action in PLAN_OUTPUT that directly queried assumed table/column without
+    schema discovery. Rule linkage: new rule must enforce schema discovery before
+    assuming any table/column for the spec_goal ''Identify and cite all payment records
+    under the payments directory that belong to the known fraud hit''.'
   source: learn
   status: inactive
-- content: 'Never emit OUTCOME_NONE_CLARIFICATION after a list:/proc/payments/ result
-    returning filenames-only; a directory listing is a prerequisite step only — always
-    proceed immediately to execute every search: action in sequence (''fraud'', ''flagged'',
-    ''suspicious'', ''chargeback'', ''dispute'') within a single cycle before any
-    clarification or early-exit, because spec_goal ''Identify and cite all payment
-    records that belong to the confirmed fraud incident'' requires content-level evidence,
-    not filename enumeration. Never exit on first zero-hit search when plan defines
-    fallbacks.'
-  created: '2026-05-20'
-  deactivated_reason: 'Consolidated: r004'
+- content: Never assume that fraud records are literally tagged with the keyword 'fraud'
+    in the payment files under /data/payments/. Instead, for the spec_goal 'Identify
+    and cite all payment records under /data/payments/ that belong to the known fraud
+    hit', first query /bin/sql against sqlite_master to discover all tables and their
+    schemas. Then query payment-adjacent tables for fraud-related fields (e.g., fraud_flag,
+    is_fraud, fraud_status, or specific transaction IDs). If no fraud_flag column
+    is found in any payment-adjacent table, explore other tables (e.g., fraud_hits)
+    and alternative columns to locate fraud-associated identifiers. Use the resulting
+    identifiers (e.g., transaction_id, path, file_name) to locate and cite the corresponding
+    files under /data/payments/. Do not ask for clarification if such a column exists;
+    only request clarification if no fraud-related column is found in any table.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r004, r005'
   id: r004
-  reasoning: 'r001 and r003 address the same execution flow: list /proc/payments/
-    first, then run all fallback search terms without early exit. r003 (higher id)
-    adds the explicit prohibition on OUTCOME_NONE_CLARIFICATION after listing and
-    the ''prerequisite step only'' framing. Merged rule takes r003 as base and folds
-    in r001''s explicit fallback term list (''fraud'',''flagged'',''suspicious'',''chargeback'',''dispute'')
-    and the ''single cycle'' constraint. r002 is orthogonal (PLAN phase JSON format)
-    — left unchanged.'
+  reasoning: 'Merged r002 (about not assuming keyword ''fraud'' and using /bin/sql
+    for fraud fields) with r003 (about first querying sqlite_master and exploring
+    alternative tables/columns). The merged rule combines the full workflow: discover
+    schema, identify fraud columns by various names, fall back to other tables if
+    needed, and use the identifiers to locate files. r001 is distinct and not included.'
   source: learn
   status: inactive
-- content: 'Never terminate with empty result for spec_goal ''Identify and cite all
-    payment records that belong to the confirmed fraud incident'' after keyword searches
-    alone; when search:fraud, search:flagged, search:suspicious, search:chargeback,
-    and search:dispute all return empty results against /proc/payments/, immediately
-    execute list:/proc/payments/ then read: every listed file in sequence, because
-    fraud indicators may be encoded as status codes, numeric flags, or structured
-    fields rather than keyword text.'
-  created: '2026-05-20'
-  deactivated_reason: r005 and r006 describe the required fallback behavior but do
-    not enforce that the actions array includes all fallback actions; the failure
-    shows that narrative plan alone is insufficient. The new rule supersedes by mandating
-    the actions array content.
+- content: Always, after querying sqlite_master for table names, obtain the column
+    names of each candidate table using 'PRAGMA table_info' or 'SELECT sql FROM sqlite_master
+    WHERE name=...' and use only those column names when constructing queries. For
+    the spec_goal 'Identify and cite all payment records under /data/payments/ that
+    belong to the known fraud hit', do not hardcode column names like 'fraud_flag'
+    or 'status' until you have verified they exist in the table's schema.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r004, r005'
   id: r005
-  reasoning: 'Verbatim error: ''Empty result''. Root cause: wrong-action — all keyword
-    searches (fraud, flagged, suspicious, chargeback, dispute) returned zero hits,
-    yet the pipeline has no fallback beyond keyword searching. Failing fragment: SDD
-    actions array only lists 3 of 5 keywords (''search:fraud /proc/payments/'', ''search:flagged
-    /proc/payments/'', ''search:suspicious /proc/payments/'') — ''chargeback'' and
-    ''dispute'' absent from actions despite appearing in plan text; more critically,
-    even if all 5 ran, spec_goal ''Identify and cite all payment records that belong
-    to the confirmed fraud incident'' cannot be satisfied by keyword search alone
-    when payment files may encode fraud via status codes, numeric flags, or structured
-    fields rather than literal keyword text. r004 prevents early-exit on first zero-hit
-    but does not mandate a read-all-files fallback when every search returns empty.
-    Rule linkage: new rule must mandate list: + read: fallback when all content searches
-    for spec_goal return empty.'
+  reasoning: 'Verbatim error: ''Empty result: ''. Root cause category: wrong-column.
+    Failing fragment: action ''SELECT * FROM fraud_hits WHERE fraud_flag = 1 OR status
+    LIKE ''%confirm%'' LIMIT 5'' from SDD_OUTPUT actions. The spec_goal ''Identify
+    and cite all payment records under /data/payments/ that belong to the known fraud
+    hit'' assumes existence of an entity and columns that may not match reality. The
+    agent did not verify the table''s schema before using column names ''fraud_flag''
+    and ''status'', causing an empty result. New rule prevents hardcoding column names
+    without schema confirmation.'
   source: learn
   status: inactive
-- content: 'Never terminate with empty result for spec_goal ''Identify and cite all
-    payment records that belong to the confirmed fraud incident'' without exhausting
-    the full pipeline: (1) after list:/proc/payments/ returns filenames, immediately
-    execute every search: action in sequence (''fraud'', ''flagged'', ''suspicious'',
-    ''chargeback'', ''dispute'') — never emit OUTCOME_NONE_CLARIFICATION on a directory
-    listing alone; (2) when all keyword searches return empty results, immediately
-    read: every listed file in sequence, because fraud indicators may be encoded as
-    status codes, numeric flags, or structured fields rather than keyword text. Never
-    exit on first zero-hit search when plan defines fallbacks.'
-  created: '2026-05-20'
-  deactivated_reason: r005 and r006 describe the required fallback behavior but do
-    not enforce that the actions array includes all fallback actions; the failure
-    shows that narrative plan alone is insufficient. The new rule supersedes by mandating
-    the actions array content.
+- content: Never assume that fraud records are literally tagged with the keyword 'fraud'
+    in the payment files under /data/payments/. For the spec_goal 'Identify and cite
+    all payment records under /data/payments/ that belong to the known fraud hit',
+    always first query /bin/sql against sqlite_master to discover all table names,
+    and then obtain the column names of each candidate table using 'PRAGMA table_info'
+    or 'SELECT sql FROM sqlite_master WHERE name=...'. Use only those verified column
+    names when constructing queries; do not hardcode column names like 'fraud_flag'
+    or 'status' until you have verified they exist in the table's schema. Then query
+    payment-adjacent tables for fraud-related fields (e.g., fraud_flag, is_fraud,
+    fraud_status, or specific transaction IDs). If no fraud_flag column is found in
+    any payment-adjacent table, explore other tables (e.g., fraud_hits) and alternative
+    columns to locate fraud-associated identifiers. Use the resulting identifiers
+    (e.g., transaction_id, path, file_name) to locate and cite the corresponding files
+    under /data/payments/. Do not ask for clarification if such a column exists; only
+    request clarification if no fraud-related column is found in any table.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r006, r007'
   id: r006
-  reasoning: r004 covers post-listing → run all searches; r005 covers post-searches-empty
-    → read all files. Sequential stages of same pipeline. r005 is base (highest id);
-    extended with r004's prohibition on early OUTCOME_NONE_CLARIFICATION and the directory-listing-as-prerequisite-only
-    constraint.
+  reasoning: r004 and r005 both target the same spec_goal ('Identify and cite all
+    payment records under /data/payments/ that belong to the known fraud hit'). r005
+    extends r004 by mandating the use of PRAGMA table_info to verify column names
+    and prohibiting hardcoded column names. r004 adds the initial principle (never
+    assume 'fraud' keyword) and the fallback exploration of other tables. Merging
+    them into one comprehensive rule eliminates redundancy and ensures all steps are
+    captured as a single directive.
   source: learn
   status: inactive
-- content: Always populate the 'actions' array in PLAN_OUTPUT with every atomic action
-    from the plan steps in order, including fallback search actions (e.g., search:flagged,
-    search:suspicious, search:chargeback, search:dispute) and file listing/reading
-    actions, so that the harness executes the full pipeline without early termination.
-  created: '2026-05-20'
-  deactivated_reason: 'Consolidated: r007, r008'
+- content: Never request clarification when the spec_goal mentions a 'known fraud
+    hit' without explicit identifier; instead, always query the database for a table
+    named 'fraud_hits' or any table containing fraud case identifiers (e.g., hit_id,
+    fraud_case_id, transaction_id) and retrieve those identifiers to join with payment
+    records; only request clarification after fully exploring all tables and finding
+    no fraud-related data.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r006, r007'
   id: r007
-  reasoning: 'Error: ''Empty result''. Root cause category: wrong-action — the PLAN_OUTPUT
-    actions array contained only ''search:fraud /proc/payments/'', omitting the fallback
-    steps described in the plan steps (search:flagged, search:suspicious, search:chargeback,
-    search:dispute, list, read). Failing fragment: action ''search:fraud /proc/payments/''
-    in actions array; spec_goal ''Identify and cite all payment records that belong
-    to the confirmed fraud incident''. Rule linkage: new rule requires that the actions
-    array includes all planned fallback actions to ensure the harness executes the
-    full pipeline.'
+  reasoning: 'Verbatim error: ''ANSWER clarification: The task indicates a confirmed
+    fraud hit in archived payment history, but no specific fraud hit identifier or
+    criteria were provided.'' Root cause category: wrong-action – the system requested
+    clarification instead of performing the necessary database queries to discover
+    the fraud hit identifier. Failing fragments: action ''SELECT name, sql FROM sqlite_schema
+    WHERE sql IS NOT NULL ORDER BY type, name;'' and spec_goal phrase ''known fraud
+    hit''. The agent only retrieved the schema and then stopped, never querying for
+    a fraud_hits table or similar to obtain the hit identifier. Rule linkage: new
+    rule will reference the spec_goal ''Identify all payment files (full paths) associated
+    with the known fraud hit'' to enforce explicit exploration before clarification.'
   source: learn
   status: inactive
-- content: Always include a 'list:' or 'tree:' action for the target archive directory
-    before attempting 'search:fraud' in that directory, and populate the actions array
-    with fallback search actions (e.g., search:flagged, search:suspicious, search:chargeback,
-    search:dispute) to ensure robustness when the primary keyword is not found.
-  created: '2026-05-20'
-  deactivated_reason: 'Consolidated: r007, r008'
+- content: Never assume that fraud records are literally tagged with the keyword 'fraud'
+    in the payment files under /data/payments/. For the spec_goal 'Identify and cite
+    all payment records under /data/payments/ that belong to the known fraud hit',
+    always first query /bin/sql against sqlite_master to discover all table names,
+    and then obtain the column names of each candidate table using 'PRAGMA table_info'
+    or 'SELECT sql FROM sqlite_master WHERE name=...'. Use only those verified column
+    names when constructing queries; do not hardcode column names like 'fraud_flag'
+    or 'status' until you have verified they exist in the table's schema. Then query
+    payment-adjacent tables for fraud-related fields (e.g., fraud_flag, is_fraud,
+    fraud_status, or specific transaction IDs). If no fraud_flag column is found in
+    any payment-adjacent table, explore other tables (e.g., fraud_hits) and alternative
+    columns to locate fraud-associated identifiers. Use the resulting identifiers
+    (e.g., transaction_id, path, file_name) to locate and cite the corresponding files
+    under /data/payments/. Never request clarification when the spec_goal mentions
+    a 'known fraud hit' without explicit identifier; instead, always query the database
+    for a table named 'fraud_hits' or any table containing fraud case identifiers
+    (e.g., hit_id, fraud_case_id, transaction_id) and retrieve those identifiers to
+    join with payment records; only request clarification after fully exploring all
+    tables and finding no fraud-related data.
+  created: '2026-05-21'
+  deactivated_reason: These rules reference /data/payments/ which is not the payment
+    directory in this task; the task uses /proc/payments/. The new rule corrects the
+    path and consolidates the behavior, making these obsolete.
   id: r008
-  reasoning: 'Verbatim error: "Search for ''fraud'' keyword across all files in /proc/archiv]:
-    search failed: not found". Root cause category: wrong-action — the plan specified
-    only a single search action without verifying directory existence or including
-    fallback keywords. Failing fragment: action "search:fraud /proc/archive/" and
-    plan step "Run the search action to find all files in /proc/archive/ containing
-    the keyword ''fraud''." Rule linkage: the new rule must mandate listing before
-    searching and fallback keywords to address the missing exploration and alternative
-    queries.'
+  reasoning: r006 and r007 both address the same spec_goal about identifying payment
+    records belonging to a known fraud hit. r006 provides a detailed procedural flow
+    for querying the database and locating files; r007 explicitly forbids premature
+    clarification and emphasizes exploring all tables before asking. These rules overlap
+    completely in scope and are consistent. r007 (higher id) is used as the base and
+    extended with the step-by-step guidance from r006. r001 is unrelated (search location)
+    and is not part of this consolidation.
   source: learn
   status: inactive
-- content: Always populate the 'actions' array in PLAN_OUTPUT with every atomic action
-    from the plan steps in order, including fallback search actions (e.g., search:flagged,
-    search:suspicious, search:chargeback, search:dispute) and file listing/reading
-    actions. In particular, before searching for fraud in an archive directory, include
-    a 'list:' or 'tree:' action for that directory. This ensures robustness when the
-    primary keyword is not found and prevents early termination.
-  created: '2026-05-20'
-  deactivated_reason: null
+- content: Always, for the spec_goal 'Identify and cite every payment record under
+    /data/payments/ that belongs to the known fraud hit discovered from the database',
+    after retrieving the fraud hit identifier from the database, query all tables
+    that potentially contain file paths (e.g., payments, payment_files, transactions)
+    using PRAGMA table_info to find columns like path, file_path, or filename. Join
+    the fraud hit identifier with rows in such tables to obtain concrete file paths.
+    Only if no mapping table exists should you fall back to searching file contents
+    or filenames with the identifier.
+  created: '2026-05-21'
+  deactivated_reason: These rules reference /data/payments/ which is not the payment
+    directory in this task; the task uses /proc/payments/. The new rule corrects the
+    path and consolidates the behavior, making these obsolete.
   id: r009
-  reasoning: 'Merged r007 and r008: both require fallback search actions and file
-    listing/reading actions; r008 adds specific requirement for list/tree before fraud
-    search in archive dir; r007 adds general requirement for all atomic actions in
-    order and file listing/reading actions. Combined into a single rule covering both
-    aspects.'
+  reasoning: 'Verbatim error: ''Empty result''. Root cause category: empty-result.
+    The SDD_OUTPUT plan assumed existence of a ''fraud_hits'' table and that the identifier
+    could be directly used to search /data/payments/ via grep (action ''search:${FRAUD_HIT_ID}
+    /data/payments/''). This resulted in no matches because the connection between
+    the fraud hit identifier and actual payment file paths was missing. The spec_goal
+    specified ''Identify and cite every payment record under /data/payments/ that
+    belongs to the known fraud hit discovered from the database'', but the plan did
+    not include a step to query the database for a table that maps fraud identifiers
+    to file paths (e.g., payments, payment_files, transactions). The existing rule
+    r008 correctly guides schema exploration but does not mandate joining fraud identifiers
+    with a file-path table before resorting to filesystem search. This gap caused
+    the empty result.'
   source: learn
-  status: active
-- content: Always scope tree and list actions to the smallest relevant directory;
-    when spec_goal mentions 'archived payment history', first list /proc/payments/
-    to identify the archive subdirectory, then tree that archive subdirectory only;
-    never run tree directly on /proc/payments/ without prior size confirmation.
-  created: '2026-05-20'
-  deactivated_reason: null
+  status: inactive
+- content: Never request clarification for the spec_goal 'Identify and cite every
+    payment record under /proc/payments/ that belongs to the known fraud hit discovered
+    from the database'; instead, always query /bin/sql against sqlite_master to discover
+    all table names, then obtain column names using PRAGMA table_info, and explore
+    all tables for fraud-related fields (e.g., fraud_hits table, fraud_flag, is_fraud,
+    hit_id, transaction_id). Only after fully exploring all tables and finding no
+    fraud-related data should you request clarification. For any spec_goal targeting
+    /proc/payments/, treat the identical logic as previously applied to /data/payments/.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r010'
   id: r010
-  reasoning: 'Verbatim error: ''The read operation timed out''. Root cause: wrong-spec
-    — the SDD_OUTPUT specified action ''tree:/proc/payments/'' which is too broad
-    for the task, causing a timeout. The spec_goal states ''archived payment history'',
-    implying a subdirectory within /proc/payments/ should be targeted. The failing
-    fragment is the action ''tree:/proc/payments/'' from SDD_OUTPUT and PLAN_OUTPUT.
-    Rule linkage: the new rule will cite spec_goal ''archived payment history'' and
-    require scoping tree to the archive subdirectory after listing the top-level /proc/payments/.'
+  reasoning: 'Verbatim error: ''ANSWER clarification: The task references a known
+    fraud hit in older payment history, but no identifier or criteria for that hit
+    were provided. I need clarification on what constitutes the fraud hit (e.g., transaction
+    ID,''. Root cause category: ''wrong-action'' – agent requested clarification instead
+    of continuing to explore database tables. Failing fragment: spec_goal ''Identify
+    and cite every payment record under /proc/payments/ that belongs to the known
+    fraud hit discovered from the database'' and the action ''SELECT name FROM sqlite_master
+    ...'' which was not followed by further table exploration. Rule linkage: existing
+    rule r008 explicitly forbids requesting clarification for this spec_goal and mandates
+    full table exploration before asking, but the agent violated it, likely because
+    r008 references /data/payments/ while the spec uses /proc/payments/, causing the
+    agent to treat the rule as inapplicable.'
+  source: learn
+  status: inactive
+- content: Never search in /proc/ for payment records or historical data, except when
+    the spec_goal explicitly requires identifying records under /proc/payments/ (e.g.,
+    'Identify and cite every payment record under /proc/payments/ that belongs to
+    the known fraud hit discovered from the database'). In such cases, always query
+    /bin/sql against sqlite_master to discover all table names, obtain column names
+    using PRAGMA table_info, and explore all tables for fraud-related fields (e.g.,
+    fraud_hits table, fraud_flag, is_fraud, hit_id, transaction_id). Only after fully
+    exploring all tables and finding no fraud-related data should you request clarification.
+    For any spec_goal targeting /proc/payments/, treat the identical logic as previously
+    applied to /data/payments/.
+  created: '2026-05-21'
+  deactivated_reason: r011 mandated the exact action that led to the repeated query
+    error; the new rule supersedes it by restricting repetition and guiding to the
+    next step.
+  id: r011
+  reasoning: 'Merged r001 (general prohibition on searching /proc/ for payments) with
+    r010 (specific process for spec_goal targeting /proc/payments/). The two rules
+    contradict: r001 says never search in /proc/, r010 says to do so for a specific
+    goal. The merged rule resolves the conflict by adding an exception for the spec_goal
+    while retaining the general prohibition. r010''s process logic is incorporated
+    verbatim as the highest-id rule.'
+  source: learn
+  status: inactive
+- content: Never repeat the query 'SELECT name FROM sqlite_master WHERE type='table'
+    ORDER BY name' in consecutive actions; after the first successful execution, proceed
+    to examine the columns of the discovered tables using PRAGMA table_info without
+    re-querying sqlite_master. This applies to spec_goal 'Identify and cite every
+    payment record under /proc/payments/ that belongs to the known fraud hit discovered
+    from the database.'
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r012'
+  id: r012
+  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
+    or approach. Action was: SELECT name FROM sqlite_master WHERE type=''table'' ORDER
+    BY name''. Root cause: wrong-action because the same schema discovery query was
+    executed again instead of progressing to column inspection. Failing fragment:
+    the action string ''SELECT name FROM sqlite_master WHERE type=''table'' ORDER
+    BY name'' from SDD_OUTPUT/PLAN_OUTPUT. Rule linkage: new rule must prevent repeating
+    this action and mandate a different next step.'
+  source: learn
+  status: inactive
+- content: Always query the database (sqlite_master and PRAGMA table_info on all tables)
+    to discover any fraud-related tables or columns (e.g., fraud_hits, fraud_flag,
+    is_fraud) before requesting clarification on a known fraud hit. Only after fully
+    examining all tables and finding no fraud-related identifiers should clarification
+    be requested. This applies to spec_goal 'Identify and cite all payment record
+    files under /data/payments/ that belong to the known fraud hit discovered from
+    the database.'
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Verbatim error: ''The task references a known fraud hit but does not
+    specify which hit. Please provide an identifier (e.g., payment ID, customer ID,
+    date range, or the fraud case reference) so the specific payment records can be
+    located.'' Root cause: wrong-spec — the spec_goal intended the fraud hit to be
+    discovered from the database, but the assistant prematurely requested a human-provided
+    identifier instead of querying the database. Failing fragment: spec_goal ''Identify
+    and cite all payment record files under /data/payments/ that belong to the known
+    fraud hit discovered from the database.'' Rule linkage: the new rule must enforce
+    that the database is queried first per the spec_goal''s assumption that the hit
+    is discoverable there.'
   source: learn
   status: active
+- content: Always query the database (sqlite_master and PRAGMA table_info on all tables)
+    to discover any fraud-related tables or columns (e.g., fraud_hits, fraud_flag,
+    is_fraud) before requesting clarification on a known fraud hit. Only after fully
+    examining all tables and finding no fraud-related identifiers should clarification
+    be requested. Never repeat the sqlite_master query in consecutive actions; after
+    the first successful execution, proceed to examine the columns of the discovered
+    tables using PRAGMA table_info without re-querying sqlite_master. This applies
+    to spec_goals that require identifying and citing payment records belonging to
+    a known fraud hit discovered from the database.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r014
+  reasoning: Merged r013 (higher id, broader rule) with r012 (specific constraint
+    on not repeating sqlite_master query). r012's additional restriction is compatible
+    and fills a gap; deactivating r012 reduces redundancy while preserving all guidance.
+  source: learn
+  status: active
+last_run:
+  cycles_used: 15
+  date: '2026-05-21'
+  grounding_refs_count: 0
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
 task_id: t40

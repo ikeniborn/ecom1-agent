@@ -1,0 +1,60 @@
+entries:
+- content: Always avoid using WITH (Common Table Expression) in SQL queries when executing
+    actions; rewrite CTEs as nested subqueries or join patterns for the /bin/sql tool.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''Execute exception [''Identify the store ID, match
+    each product by brand/name/pro]: exec failed: invalid path: path must be absolute:
+    "WITH"''. Root cause category: wrong-action — the SQL tool /bin/sql interprets
+    the query starting with ''WITH'' as an absolute file path. Failing fragment: the
+    action in both SDD_OUTPUT and PLAN_OUTPUT begins with ''WITH store AS (SELECT
+    id FROM stores ...)''. Rule linkage: the new rule must forbid use of WITH clauses
+    in actions for this tool, and cite the plan action or spec_goal as the target.'
+  source: learn
+  status: active
+- content: Always verify that any table referenced in support of a spec_goal concerning
+    a specific store location (e.g., 'Jakomini PowerTool store in Graz') actually
+    exists in the schema before constructing queries on it; if the table does not
+    exist, examine the inventory or other tables that contain store_id to derive store
+    identity.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: "Empty result: ". Root cause category: wrong-spec. Failing fragment:
+    the action "SELECT id, name, location FROM stores WHERE name LIKE ''%Jakomini%''
+    AND location LIKE ''%Graz%'';" from PLAN_OUTPUT and the spec_goal phrase "Jakomini
+    PowerTool store in Graz" both assume a stores table exists. However, the SCHEMA
+    digest lists no stores table — only products, product_properties, inventory, kinds,
+    carts, cart_items. The inventory table has store_id, but no separate stores table
+    exists. Thus the query returned empty because the table does not exist. Rule linkage:
+    the new rule will instruct to verify table existence when store references appear
+    in spec_goal.'
+  source: learn
+  status: active
+- content: Always execute product resolution and inventory queries for each SKU after
+    identifying the target store when the spec_goal requires counting products with
+    sufficient availability at a specific store; never declare inventory data missing
+    without querying the inventory table with the SKU and store_id.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''The store PowerTool Graz Jakomini exists, but inventory
+    data for the specified products is missing. Unable to compute the count of items
+    with at least 4 available. Please provide inventory information''. Root cause:
+    wrong-action: agent stopped after store lookup and concluded inventory data missing
+    without querying the inventory table for any product SKU. Failing fragment: action
+    ''SELECT id, name, city FROM stores WHERE name LIKE ''%Jakomini%'' OR name LIKE
+    ''%PowerTool%'' OR city = ''Graz'';'' was executed in isolation; plan steps 3-5
+    (product resolution and inventory queries) were never attempted. Rule linkage:
+    new rule will mandate completing the full plan when spec_goal requires counting
+    availability of specific products at a specific store.'
+  source: learn
+  status: active
+last_run:
+  cycles_used: 3
+  date: '2026-05-21'
+  grounding_refs_count: 0
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t15

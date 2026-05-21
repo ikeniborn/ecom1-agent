@@ -1,0 +1,87 @@
+entries:
+- content: Always include in the plan actions for each product description a specific
+    SQL query that joins products with product_properties using brand, series, and
+    property keys to find the SKU, before checking inventory.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r002, r003'
+  id: r001
+  reasoning: 'Error: ''Empty result: '' with type empty. Root cause: wrong-spec —
+    the plan''s only action was the schema query ''/bin/sql ''select name, sql from
+    sqlite_schema where sql is not null order by type, name;'''', which does not perform
+    the product identification needed to count availability. The spec_goal ''Count
+    how many of the 6 specified products have at least 1 item available today at the
+    Graz Jakomini hardware store'' lacks explicit steps to map each product description
+    to a SKU using the schema. Without those queries, no SKUs were found, resulting
+    in an empty answer.'
+  source: learn
+  status: inactive
+- content: Always include a step to retrieve distinct series values for each brand
+    using LIKE with the product description keywords (e.g., '%SYS 3JJ-9LM%') to confirm
+    the exact series string, and query store names using LIKE (e.g., '%Wilten PowerTool%')
+    with single wildcard only, before building the inventory count query. Reference
+    the action 'SELECT COUNT(DISTINCT sku) FROM ...' as the stage that must be preceded
+    by exploration.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r002, r003'
+  id: r002
+  reasoning: 'Verbatim error: ''Empty result: ''. Root cause category: empty-result
+    — the SQL query returned zero rows. Failing fragment: the action SQL query (SELECT
+    COUNT(DISTINCT sku) FROM ...) that uses exact equality for series names (e.g.,
+    ''Festool Stackable SYS 3JJ-9LM Tool Box and Bag'') and store name LIKE with both
+    substrings. This likely fails because the series string in the database does not
+    match verbatim or the store name lacks one of the substrings. Rule linkage: new
+    rule will require verifying series and store name via partial matching or exploration
+    before the final query.'
+  source: learn
+  status: inactive
+- content: Always ensure the actions field in the SDD output contains, for each distinct
+    product description referenced in the plan, an action that specifies an SQL query
+    joining products with product_properties using brand, series, and the property
+    keys and values from the product description to find its SKU, and a final action
+    querying inventory for those SKUs at the identified store with available_today
+    >= 4.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r002, r003'
+  id: r003
+  reasoning: 'Verbatim error: ''Unable to determine the count because the required
+    product, store, and inventory data were not retrieved from the database. No inventory
+    information is available in the execution results.'' Root cause category: wrong-action
+    — the actions list in SDD output only contained schema exploration and store query,
+    omitting the per‑product SKU identification queries and final inventory query.
+    Failing fragment citation: SDD_OUTPUT.actions = ["SELECT name, sql FROM sqlite_schema
+    WHERE sql IS NOT NULL ORDER BY type, name;", "SELECT id, name, city FROM stores
+    WHERE name LIKE ''%Wilten PowerTool%'';"] — no actions for the four product descriptions
+    despite plan steps describing that work. Rule linkage: new rule must require that
+    the actions field includes the explicit SQL joins for each product description,
+    referencing the plan''s step ''For each product description, find the exact series
+    string... then build a query joining products and product_properties to find the
+    SKU''.'
+  source: learn
+  status: inactive
+- content: 'Always ensure the actions field in the SDD output contains, for each distinct
+    product description referenced in the plan: (1) an action to retrieve distinct
+    series values for each brand using LIKE with the product description keywords
+    (e.g., ''%SYS 3JJ-9LM%'') to confirm the exact series string, and query store
+    names using LIKE (e.g., ''%Wilten PowerTool%'') with single wildcard only; (2)
+    an action specifying an SQL query joining products with product_properties using
+    brand, series, and the property keys and values from the product description to
+    find its SKU; and (3) a final action querying inventory for those SKUs at the
+    identified store with available_today >= 4. Reference the action ''SELECT COUNT(DISTINCT
+    sku) FROM ...'' as the stage that must be preceded by exploration.'
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r004
+  reasoning: Merged r001 (basic join requirement), r002 (series verification and store
+    name query steps, plus reference to SELECT COUNT(DISTINCT sku) stage), and r003
+    (explicit SDD output structure with inventory condition) into a single comprehensive
+    rule. r001 is a subset of r003; r002 adds necessary detail; all are compatible
+    and non-contradictory.
+  source: learn
+  status: active
+last_run:
+  cycles_used: 3
+  date: '2026-05-21'
+  grounding_refs_count: 0
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t13

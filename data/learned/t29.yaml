@@ -1,0 +1,390 @@
+entries:
+- content: Always use the format 'search:<absolute_path> <query>' when constructing
+    search actions, where <absolute_path> is a valid absolute directory path (e.g.,
+    '/proc/employees/') and <query> is the search term (e.g., 'Moritz Günther').
+  created: '2026-05-21'
+  deactivated_reason: r001 instructed the colon-separated format which caused the
+    search action to fail due to invalid path; replaced by corrected format.
+  id: r001
+  reasoning: 'Verbatim error: ''search failed: invalid path: path must be absolute:
+    "Günther /proc/employees/"'' Root cause category: syntax. Failing fragment: action
+    ''search:Moritz Günther /proc/employees/'' from SDD_OUTPUT and PLAN_OUTPUT plan.
+    Rule linkage: rule_content cites the action identifier and specifies correct search
+    syntax with absolute path before query.'
+  source: learn
+  status: inactive
+- content: Always use the format 'search <absolute_path> <query>' (space after 'search',
+    no colon) when constructing search actions.
+  created: '2026-05-21'
+  deactivated_reason: r002 provided an incorrect action format ('search') that caused
+    the execution failure; it is superseded by the new rule and by existing r006.
+  id: r002
+  reasoning: 'Error verbatim: ''search failed: invalid path: path must be absolute:
+    "Moritz Günther"''. Root cause: wrong-action – the search action format used a
+    colon (search:/proc/employees/ ...) which the tool interprets incorrectly, causing
+    the path to be parsed as ''Moritz Günther'' instead of ''/proc/employees/''. Failing
+    fragment: action ''search:/proc/employees/ Moritz Günther'' from PLAN_OUTPUT (also
+    present in SDD_OUTPUT actions). Rule linkage: existing rule r001 explicitly instructs
+    the colon-separated format ''search:<absolute_path> <query>'', which directly
+    caused the failure; a corrected rule must replace it.'
+  source: learn
+  status: inactive
+- content: Always format the answer to spec_goal 'Confirm whether Moritz Günther is
+    the store manager at PowerTool Ljubljana Center, and if so, provide their direct
+    work email address.' with a leading <YES> or <NO> token, and if <YES> include
+    the email on the next line.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''ANSWER phase: failed to parse LLM output''. Root cause
+    category: wrong-action – the answer format was not structured with required tokens,
+    causing a semantic parse failure. The failing fragment is the answer output, which
+    should have included a <YES> or <NO> token per the session instructions for yes/no
+    questions, but the LLM likely omitted or misformatted it, and the email (if applicable)
+    was not placed on a separate line. This violates success_criterion ''Work email
+    is extracted and returned.'' The new rule will enforce the required format for
+    the spec_goal verbatim.'
+  source: learn
+  status: active
+- content: Never use the 'search' action for store or employee lookups in the spec_goal
+    'Confirm whether Moritz Günther is the store manager at PowerTool Ljubljana Center,
+    and if so, provide their direct work email address.' if that action was already
+    attempted in a previous cycle; instead, use the SQL tool (e.g., /bin/sql 'SELECT
+    * FROM stores WHERE ...') to query the database directly, ensuring a different
+    approach.
+  created: '2026-05-21'
+  deactivated_reason: r004 and r005 incorrectly recommend using SQL for store/employee
+    lookups, which fails because store data is stored in files under proc/stores.
+    The new rule supersedes them.
+  id: r004
+  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
+    or approach. Action was: search:PowerTool Ljubljana Center /proc/stores/''. Root
+    cause category: wrong-action (the same filesystem search action was repeated across
+    cycles without variation). Failing fragment: action `search:PowerTool Ljubljana
+    Center /proc/stores/` from PLAN_OUTPUT.action. Rule linkage: new rule will forbid
+    repeating filesystem search for this spec_goal and mandate a SQL-based alternative
+    to guarantee novelty.'
+  source: learn
+  status: inactive
+- content: Always execute all steps in the plan when answering the spec_goal 'Confirm
+    whether Moritz Günther is the store manager at PowerTool Ljubljana Center, and
+    if so, provide their direct work email address.' In particular, after listing
+    database tables, immediately proceed to query the stores table for 'PowerTool
+    Ljubljana Center' and then query the employees table to retrieve the manager's
+    email.
+  created: '2026-05-21'
+  deactivated_reason: r004 and r005 incorrectly recommend using SQL for store/employee
+    lookups, which fails because store data is stored in files under proc/stores.
+    The new rule supersedes them.
+  id: r005
+  reasoning: 'Verbatim error: ''ANSWER clarification: I cannot verify whether Moritz
+    Günther is the store manager at PowerTool Ljubljana Center because no employee
+    or store data was retrieved. No email can be provided. The database contains tables
+    for em''. Root cause category: incomplete-execution. Failing fragment: plan actions
+    in SDD include ''SELECT * FROM stores WHERE name=''PowerTool Ljubljana Center'';''
+    but the agent only executed ''SELECT name FROM sqlite_master WHERE type=''table'';''
+    and never executed the subsequent store query. Rule linkage: new rule must enforce
+    completing all steps in the plan, especially the data retrieval queries for the
+    spec_goal.'
+  source: learn
+  status: inactive
+- content: Always retrieve store manager and email information by reading the store
+    profile file from `proc/stores` and the employee profile file from `proc/employees`
+    using file read actions (e.g., `cat /proc/stores/<store_name>`, `cat /proc/employees/<employee_name>`),
+    because store and employee data are stored as files, not in SQL tables. For spec_goal
+    'Confirm whether Moritz Günther is the store manager at PowerTool Ljubljana Center,
+    and if so, provide their direct work email address.', the action should be to
+    read the store file and the employee file, not to query the SQL database.
+  created: '2026-05-21'
+  deactivated_reason: Existing rules r006 and r007 recommended file reads but did
+    not explicitly prohibit directory listing, which contributed to the repeated listing
+    action in this failure. The new rule subsumes their intent and adds the necessary
+    prohibition.
+  id: r006
+  reasoning: 'Verbatim error: ''Empty result:''. Root cause category: ''wrong-filter''
+    or ''wrong-action'' – the SQL query ''SELECT id, name, manager FROM stores WHERE
+    name = "PowerTool Ljubljana Center"'' returned no rows because store data is not
+    stored in an SQL table but in file system files under `proc/stores`. The SDD_plan
+    and actions incorrectly assume a SQL stores table. Failing fragment: action ''/bin/sql
+    ''SELECT id, name, manager FROM stores WHERE name = "PowerTool Ljubljana Center"''''.
+    Rule linkage: new rule will require file reads instead.'
+  source: learn
+  status: inactive
+- content: Never use 'search' in actions; for file-based lookups (e.g., store profiles,
+    employee profiles), always directly read the file using 'cat /proc/stores/<store_name>'
+    or 'cat /proc/employees/<employee_name>'. For spec_goal 'Confirm whether Moritz
+    Günther is the store manager at PowerTool Ljubljana Center, and if so, provide
+    their direct work email address.', the action must be a file read, not a search.
+  created: '2026-05-21'
+  deactivated_reason: Existing rules r006 and r007 recommended file reads but did
+    not explicitly prohibit directory listing, which contributed to the repeated listing
+    action in this failure. The new rule subsumes their intent and adds the necessary
+    prohibition.
+  id: r007
+  reasoning: 'Verbatim error: "exec failed: invalid path: path must be absolute: "search"".
+    Root cause category: wrong-action. Failing fragment: action "search /proc/stores/
+    PowerTool Ljubljana Center" from SDD_OUTPUT. Rule linkage: r002 instructed the
+    format ''search <absolute_path> <query>'', which was used to construct this action,
+    but the tool does not support a ''search'' command and expects direct file reads
+    like ''cat''. The failure is caused by following r002 instead of the correct guidance
+    in r006.'
+  source: learn
+  status: inactive
+- content: Never use directory listing ('list:' actions) for store profile lookup;
+    always directly read the store file using 'cat /proc/stores/<store_name>'. For
+    spec_goal 'Confirm whether Moritz Günther is the store manager at PowerTool Ljubljana
+    Center, and if so, provide their direct work email address.', the first action
+    must be a direct file read of the store profile (e.g., 'cat /proc/stores/PowerTool_Ljubljana_Center'),
+    not a directory listing. Additionally, obtain the email by reading the employee
+    profile file with 'cat /proc/employees/<employee_name>'.
+  created: '2026-05-21'
+  deactivated_reason: r008 prohibits directory listing, which directly caused the
+    failure by requiring a direct read of a non-existent file path. Allowing directory
+    listing is necessary to resolve the 'not found' error.
+  id: r008
+  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
+    or approach. Action was: list:/proc/stores/'' Root cause category: wrong-action.
+    Failing fragment: action "list:/proc/stores/" from SDD_OUTPUT and PLAN_OUTPUT.
+    Rule linkage: The new rule must explicitly forbid directory listing for this spec_goal
+    because existing rules r006 and r007 recommend file reads but did not prohibit
+    listing, allowing the repeated listing action.'
+  source: learn
+  status: inactive
+- content: Always first list the /proc/stores directory (e.g., 'ls /proc/stores')
+    to discover the exact file name for the store, then read that file. For spec_goal
+    'Confirm whether Moritz Günther is the store manager at PowerTool Ljubljana Center',
+    do not assume the file name without verification.
+  created: '2026-05-21'
+  deactivated_reason: r009 requires listing /proc/stores/ first for this spec_goal,
+    but the spec explicitly avoids listing /proc/stores/ (uses search instead). Deactivating
+    r009 removes the contradiction.
+  id: r009
+  reasoning: 'Verbatim error: ''read failed: not found''. Root cause: wrong-action
+    — the action ''/proc/stores/PowerTool_Ljubljana_Center'' does not correspond to
+    an existing file. The approach in PLAN_OUTPUT assumed this exact path, but the
+    store profile file may have a different name. Existing rule r008 mandates direct
+    file read without prior directory listing, which prevented discovery of the correct
+    file name. The failing fragment is the action ''/proc/stores/PowerTool_Ljubljana_Center''
+    in both SDD_OUTPUT and PLAN_OUTPUT. Rule linkage: r008 prohibits directory listing,
+    leading to an incorrect fixed path assumption.'
+  source: learn
+  status: inactive
+- content: Always include an explicit 'read:/proc/employees/<filename>' action immediately
+    after the 'list:/proc/employees/' action in the SDD actions list for spec_goal
+    'Confirm whether Moritz Günther is the store manager at PowerTool Ljubljana Center,
+    and if so, provide their direct work email address.' Never use 'list:/proc/stores/'
+    for this spec_goal; use search or an alternative method as specified in the success
+    criteria.
+  created: '2026-05-21'
+  deactivated_reason: r010 mandates the list action, which is now blocked and causes
+    repeated failure; deactivating it allows the plan to skip the list and directly
+    read the employee file.
+  id: r010
+  reasoning: 'Verbatim error: ''Unable to verify Moritz Günther''s role or email because
+    only a directory listing was obtained.'' Root cause: wrong-spec — the SDD_OUTPUT
+    actions list [''list:/proc/employees/'', ''search:PowerTool Ljubljana Center /proc/stores/'']
+    omitted the critical ''read:/proc/employees/<file>'' action, causing execution
+    to stop after the directory listing without reading the employee file. Failing
+    fragment: actions list in SDD_OUTPUT does not include a read action for the employee
+    file. Rule linkage: new rule must ensure the read action is explicitly included
+    in actions for this spec_goal.'
+  source: learn
+  status: inactive
+- content: Never, for spec_goal 'Confirm whether Moritz Günther is the store manager
+    at PowerTool Ljubljana Center, and if so, provide their direct work email address.',
+    include 'list:/proc/employees/' if it has already been attempted; instead, directly
+    read '/proc/employees/Moritz_Günther' (or a variant based on the employee name)
+    without listing.
+  created: '2026-05-21'
+  deactivated_reason: r011 only forbade 'list:/proc/employees/' but not 'find' patterns;
+    the new rule covers both and mandates direct read, making r011 obsolete.
+  id: r011
+  reasoning: 'Error: ''Repeated action detected — must use a different query or approach.
+    Action was: list:/proc/employees/''. Root cause: wrong-action — the plan repeats
+    a blocked list action. Failing fragment: the action ''list:/proc/employees/''
+    in both PLAN_OUTPUT and SDD actions. Existing rule r010 mandates including this
+    list action, which forces the repetition. The new rule must instruct to skip the
+    list if it has been blocked.'
+  source: learn
+  status: inactive
+- content: Never, for spec_goal 'Confirm whether Moritz Günther is the store manager
+    at PowerTool Ljubljana Center, and if so, provide their direct work email address.',
+    use 'find' or 'list' commands on /proc/employees/ to locate Moritz Günther; instead,
+    directly read '/proc/employees/Moritz_Günther' (or the exact file name based on
+    the employee name) without any search or listing.
+  created: '2026-05-21'
+  deactivated_reason: r012 prohibits searching for the employee file for the Moritz
+    Günther task; the same mindset may have prevented the agent from listing employees
+    to find the correct filename for Kai Möller, leading to the direct-read failure.
+  id: r012
+  reasoning: 'Verbatim error: ''ERROR: Empty result:'' with ERROR_TYPE ''empty''.
+    Root cause: wrong-action — the ''find:Moritz* /proc/employees/'' action returned
+    no results. Failing fragment: action ''find:Moritz* /proc/employees/'' from SDD_OUTPUT.
+    Rule linkage: new rule must explicitly cite this action and the spec_goal ''Confirm
+    whether Moritz Günther is the store manager at PowerTool Ljubljana Center, and
+    if so, provide their direct work email address.'' The existing rule r011 only
+    forbade ''list:/proc/employees/'' but did not cover ''find'' commands, so the
+    system incorrectly used find and got empty result. The correct approach is to
+    directly read the employee file without any search.'
+  source: learn
+  status: inactive
+- content: Always, for spec_goal 'Confirm whether Kai Möller is the store manager
+    at PowerTool Linz Hauptplatz, and if so, provide their direct work email address.',
+    first list the contents of /proc/employees/ to discover the exact filename for
+    Kai Möller (e.g., search for files containing 'Kai' or 'Möller'), then read that
+    file to verify role and extract email. Do not assume the filename is 'Kai_Möller'
+    without verification.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r013, r014'
+  id: r013
+  reasoning: 'Verbatim error: ''read failed: not found''. Root cause category: ''wrong-action''
+    — the action assumed the employee file exists at ''/proc/employees/Kai_Möller''
+    without verification. Failing fragment: action ''/proc/employees/Kai_Möller''
+    from spec_goal ''Confirm whether Kai Möller is the store manager at PowerTool
+    Linz Hauptplatz, and if so, provide their direct work email address.''. Rule linkage:
+    new rule will require listing the directory first for this spec_goal to discover
+    the correct filename.'
+  source: learn
+  status: inactive
+- content: Always, for spec_goal 'Confirm whether Kai Möller is the store manager
+    at PowerTool Linz Hauptplatz, and if so, provide their direct work email address.',
+    use the exact action 'list /proc/employees/' to first discover the filename for
+    Kai Möller, as specified in existing rule r013.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r013, r014'
+  id: r014
+  reasoning: 'Verbatim error: ''Execute exception ["Search employee directory for
+    Kai Möller''s profile to confi]: search failed: invalid path: path must be absolute:
+    "Möller /proc/employees/""''. Root cause category: wrong-action. Failing fragment:
+    action ''search:Kai Möller /proc/employees/''. Rule linkage: existing rule r013
+    explicitly instructs to first list the contents of /proc/employees/ to discover
+    the exact filename, but the generated plan used a search action that combined
+    query and path, which the tool rejected as an invalid path. The action did not
+    follow the prescribed approach.'
+  source: learn
+  status: inactive
+- content: Always, for spec_goal 'Confirm whether Kai Möller is the store manager
+    at PowerTool Linz Hauptplatz, and if so, provide their direct work email address.',
+    use the exact action 'list /proc/employees/' to first discover the exact filename
+    for Kai Möller (e.g., search for files containing 'Kai' or 'Möller'), then read
+    that file to verify role and extract email. Do not assume the filename is 'Kai_Möller'
+    without verification.
+  created: '2026-05-21'
+  deactivated_reason: r015 only instructed to list first and then read, but the plan
+    output only included the list action; the rule did not ensure the read action
+    was part of the plan, leading to incomplete execution.
+  id: r015
+  reasoning: r013 and r014 both address the same spec_goal (Kai Möller at Linz Hauptplatz).
+    r014 is redundant with r013—it only restates the first step (list /proc/employees/)
+    while r013 provides the full workflow (list, search, read, avoid assumption).
+    Merged rule takes the content of r014 (higher id) as base and extends it with
+    the full details from r013, including the search hint and the warning against
+    assuming the filename.
+  source: learn
+  status: inactive
+- content: 'Always, when spec_goal is ''Confirm whether Kai Möller is the store manager
+    at PowerTool Linz Hauptplatz, and if so, provide their direct work email address.'',
+    ensure the SDD actions array contains exactly two actions: first ''list:/proc/employees/''
+    to discover the exact filename, and second ''read:/proc/employees/<discovered_filename>''
+    (with the exact filename from the listing) to verify the role and extract email.
+    Additionally, the plan''s action list must include both actions.'
+  created: '2026-05-21'
+  deactivated_reason: Rule r016 mandates the action list:/proc/employees/ as the first
+    step, which causes a repeated action error. Deactivating it allows the agent to
+    use an alternative approach (e.g., skip listing if filename already known) to
+    avoid repetition.
+  id: r016
+  reasoning: 'ERROR: ''I could not confirm whether Kai Möller manages PowerTool Linz
+    Hauptplatz because only the directory listing was retrieved, not the employee
+    details.'' Root cause category: wrong-action. The SDD actions array contained
+    only [''list:/proc/employees/''] and the plan action was ''list:/proc/employees/''.
+    The missing read action prevented verifying the manager role and extracting the
+    email, resulting in a clarification. Existing rule r015 states ''use the exact
+    action list /proc/employees/ to first discover… then read that file'', but it
+    did not enforce that both actions appear in the plan, so the agent only generated
+    the list action. The new rule must mandate both actions in the SDD and plan.'
+  source: learn
+  status: inactive
+- content: Never repeat the action list:/proc/employees/ when spec_goal is 'Confirm
+    whether Kai Möller is the store manager at PowerTool Linz Hauptplatz, and if so,
+    provide their direct work email address.'; instead, use the previously discovered
+    employee filename from the first listing to perform the read action directly.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r017
+  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
+    or approach. Action was: list:/proc/employees/''. Root cause category: wrong-action
+    (action is rejected as repeated). Failing fragment: action ''list:/proc/employees/''
+    from SDD actions array and PLAN_OUTPUT action field. Rule linkage: existing rule
+    r016 mandates exactly two actions starting with ''list:/proc/employees/'', forcing
+    the repeated use of that action, which is now disallowed by the system. Therefore
+    r016 must be deactivated.'
+  source: learn
+  status: active
+- content: Always include a read action for the identified store file (e.g., read:/proc/stores/store_linz_hauptplatz.json)
+    immediately after the list:/proc/stores/ action when spec_goal is 'Confirm whether
+    Kai Möller is the store manager at PowerTool Linz Hauptplatz, and if so, provide
+    their direct work email address.'
+  created: '2026-05-21'
+  deactivated_reason: r018 contains the flawed 'read:' prefix that caused the invalid
+    path error; the new rule corrects this by requiring plain absolute paths.
+  id: r018
+  reasoning: 'Verbatim error: ''I found the store file for Linz Hauptplatz at /proc/stores/store_linz_hauptplatz.json.
+    However, I have not read its contents yet.'' Root cause: empty-result (plan omitted
+    the read action for the store file). Failing fragment: actions in SDD_OUTPUT are
+    [''list:/proc/stores/'', ''search:Kai Möller /proc/employees/''] — no read action
+    for the store file. Rule linkage: new rule must enforce that a read action for
+    the store file is always included in the plan/actions when spec_goal is ''Confirm
+    whether Kai Möller is the store manager at PowerTool Linz Hauptplatz, and if so,
+    provide their direct work email address.'' Existing rule r017 addresses employee
+    file reading but not store file reading; it is not the cause. No rules are deactivated.'
+  source: learn
+  status: inactive
+- content: Never include a 'read:' prefix when specifying a file path as an action;
+    use the absolute path directly (e.g., '/proc/stores/store_linz_hauptplatz.json')
+    for spec_goal 'Confirm whether Kai Möller is the store manager at PowerTool Linz
+    Hauptplatz, and if so, provide their direct work email address.'
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r019
+  reasoning: 'Verbatim error: ''exec failed: invalid path: path must be absolute:
+    "read:/proc/stores/store_linz_hauptplatz.json"''. Root cause category: wrong-action.
+    Failing fragment: action in SDD_OUTPUT: ''read:/proc/stores/store_linz_hauptplatz.json''.
+    Rule linkage: r018 explicitly specifies ''read:/proc/stores/store_linz_hauptplatz.json''
+    as the action, which causes the invalid path error because the ''read:'' prefix
+    is not an absolute path format.'
+  source: learn
+  status: active
+- content: Always list /proc/stores/ to identify the exact store filename for PowerTool
+    Linz Hauptplatz before reading, when spec_goal is 'Confirm whether Kai Möller
+    is the store manager at PowerTool Linz Hauptplatz, and if so, provide their direct
+    work email address.'
+  created: '2026-05-21'
+  deactivated_reason: r020 mandates listing /proc/stores/ unconditionally, which directly
+    caused the repeated action error. It is superseded by the new rule that prevents
+    repetition.
+  id: r020
+  reasoning: 'Verbatim error: ''Empty result: ''. Root cause: empty-result – the find
+    glob pattern ''*linz_hauptplatz*'' on /proc/stores/ returned no files. Failing
+    fragment: action ''find:*linz_hauptplatz* /proc/stores/'' from SDD_OUTPUT and
+    PLAN_OUTPUT. The glob pattern assumed a file naming convention that does not match
+    the actual store file name for PowerTool Linz Hauptplatz. Rule linkage: new rule
+    will mandate listing the directory first to obtain the correct filename instead
+    of relying on an untested glob pattern.'
+  source: learn
+  status: inactive
+- content: Never repeat the action list:/proc/stores/ when spec_goal is 'Confirm whether
+    Kai Möller is the store manager at PowerTool Linz Hauptplatz, and if so, provide
+    their direct work email address.'; instead, use the previously discovered store
+    filename from the first listing to perform the read action directly.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r021
+  reasoning: 'Error: ''Repeated action detected — must use a different query or approach.
+    Action was: list:/proc/stores/''. Root cause: semantic (repetition of action that
+    was already performed in a prior cycle). Failing fragment: action ''list:/proc/stores/''
+    from SDD_OUTPUT and PLAN_OUTPUT, which is mandated by existing rule r020. Rule
+    linkage: new rule must override r020 to prevent repetition.'
+  source: learn
+  status: active
+task_id: t29

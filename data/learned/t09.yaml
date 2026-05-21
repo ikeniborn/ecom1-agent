@@ -1,0 +1,45 @@
+entries:
+- content: Always verify that the 'kinds' table exists before querying its schema;
+    if absent, immediately execute the fallback method from the plan (counting products
+    via category_id or name patterns) to satisfy the spec_goal 'Count the number of
+    products classified as Nut, Bolt, and Washer' without aborting.
+  created: '2026-05-21'
+  deactivated_reason: 'r001''s generic instruction allowed the use of a SELECT name
+    query that returns empty result when table absent, causing the ''Empty result:
+    name'' error; replaced by more specific rule ensuring non-empty result.'
+  id: r001
+  reasoning: 'Error: ''Empty result: sql''. The query ''SELECT sql FROM sqlite_schema
+    WHERE name=''kinds'''' returned zero rows because the ''kinds'' table does not
+    exist in the schema. Root cause category: wrong-spec (spec assumed ''kinds'' table
+    exists without verification). Failing fragment: action ''SELECT sql FROM sqlite_schema
+    WHERE name=''kinds'''' from PLAN_OUTPUT. The plan included a fallback for missing
+    kinds table, but the pipeline aborted when the query returned empty, preventing
+    execution of fallback steps. A new rule is needed to ensure existence checks and
+    fallback execution whenever the spec_goal relies on a potentially missing table.'
+  source: learn
+  status: inactive
+- content: Always verify table existence using a query that returns a count or an
+    EXISTS flag (e.g., 'SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND
+    name='kinds'') rather than selecting a column that may produce an empty result
+    set, to satisfy the spec_goal 'Count the number of products classified as Nut,
+    Bolt, and Washer'.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''Empty result: name''. Root cause: wrong-action — the
+    existence check query ''SELECT name FROM sqlite_master WHERE name=''kinds''''
+    returns an empty result set when the kinds table is absent, causing the system
+    to fail on extracting a column from no rows before any fallback can occur. Failing
+    fragment: action ''SELECT name FROM sqlite_master WHERE name=''kinds'';'' from
+    SDD_OUTPUT actions and PLAN_OUTPUT. Rule linkage: existing rule r001 says to verify
+    existence and fallback, but does not specify a safe method, allowing this flawed
+    query. The new rule must enforce a non-empty returning existence check.'
+  source: learn
+  status: active
+last_run:
+  cycles_used: 2
+  date: '2026-05-21'
+  grounding_refs_count: 0
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t09

@@ -1,0 +1,260 @@
+entries:
+- content: Always ensure that the action field contains the final query that completes
+    all required steps from the plan, specifically including inventory retrieval and
+    aggregation when the spec_goal involves summing available_today across stores
+    (e.g., 'Determine the total units available today ... across all PowerTool stores
+    in Vienna').
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r002'
+  id: r001
+  reasoning: 'Verbatim error: ''The product AlcaPlast Universal Basic 1CT-04J ball
+    valve 32mm was identified (SKU PLB-2GPWMO8V). However, no inventory data for Vienna
+    branches was retrieved, so the total units available across branches is unknown.''
+    Root cause category: wrong-action — the executed action only covered product identification,
+    not the required inventory aggregation. Failing fragment citation: plan action
+    ''SELECT sku, name, brand, series, model, properties FROM products WHERE brand
+    = \''AlcaPlast\'' AND (name LIKE \''%Valve and Connector%\'' OR name LIKE \''%Universal
+    Basic 1CT-04J%\'');'' which omits the inventory query. Rule linkage: new rule
+    ensures the final action includes all necessary queries from the plan, specifically
+    citing spec_goal ''Determine the total units available today for a specific product
+    ... across all PowerTool stores in Vienna'' and success_criterion ''Sum available_today
+    from inventory''.'
+  source: learn
+  status: inactive
+- content: Always format the action as a complete shell command using the sql tool,
+    e.g., `/bin/sql 'WITH product AS ...'`, enclosing the SQL query in single quotes,
+    so that the query is passed as stdin when the spec_goal involves aggregating inventory
+    across stores (e.g., 'Determine the total units available today across all PowerTool
+    stores in Vienna').
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r002'
+  id: r002
+  reasoning: 'Verbatim error: ''Execute exception ["Identify the specific AlcaPlast
+    product using product prope"]: exec failed: invalid path: path must be absolute:
+    "WITH"''. Root cause category: wrong-action. Failing fragment: the action field
+    in both SDD_OUTPUT and PLAN_OUTPUT, which contains the raw SQL query starting
+    with ''WITH'' without the required tool invocation. Rule linkage: new rule must
+    enforce that the action includes the sql tool command prefix to avoid being treated
+    as a file path.'
+  source: learn
+  status: inactive
+- content: Always include in the plan a preliminary SQL query to retrieve the distinct
+    city values from the stores table when the spec_goal involves filtering stores
+    by a specific city name (e.g., 'Vienna'), to confirm the correct city string before
+    forming the final aggregation query.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r003, r012'
+  id: r003
+  reasoning: 'Verbatim error: ''Empty result''. Root cause category: empty-result
+    — the SQL query returned zero rows despite UNION ALL of stores, product, and sum.
+    The failing fragment is the action query: ''/bin/sql ''WITH vienna_stores AS (SELECT
+    id, name, city FROM stores WHERE city = "Vienna") ...'' . The plan assumed city=''Vienna''
+    without verifying the actual city names in the stores table. This leads to an
+    empty vienna_stores CTE if the stored city differs (e.g., ''Wien'', ''Vienna,
+    Austria''), causing the entire query to return no rows. Rule linkage: new rule
+    targets the spec_goal''s implicit assumption about store city filtering.'
+  source: learn
+  status: inactive
+- content: Always verify the exact property keys in `product_properties` by querying
+    distinct keys for the brand's products (e.g., `SELECT DISTINCT key FROM product_properties
+    WHERE sku IN (SELECT sku FROM products WHERE brand = 'AlcaPlast')`) before building
+    the product identification query when the spec_goal involves filtering by product
+    properties (e.g., 'Valve and Connector from AlcaPlast ... that has connector type
+    ball valve and diameter 32 mm').
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r004, r005'
+  id: r004
+  reasoning: 'Verbatim error: ''Empty result: '' (no rows returned). Root cause category:
+    wrong-key. The action performed a product identification query joining `products`
+    and `product_properties` with keys ''connector_type'' and ''diameter_mm''. The
+    spec_goal specifies ''connector type ball valve'', but the actual key in `product_properties`
+    may use a different naming (e.g., ''connector type'', ''connector-type'', or not
+    exist). The query returned empty because the property key mismatch. Failing fragment:
+    action `/bin/sql ''SELECT p.sku, p.name, p.brand FROM products p JOIN product_properties
+    pp1 ON p.sku = pp1.sku AND pp1.key = "connector_type" ...''`. Rule linkage: New
+    rule must cite the spec_goal phrase ''Valve and Connector ... that has connector
+    type ball valve and diameter 32 mm'' to ensure property keys are verified before
+    building the join.'
+  source: learn
+  status: inactive
+- content: Always include in the plan a step that retrieves all distinct property
+    keys for the brand's products (e.g., `SELECT DISTINCT key FROM product_properties
+    WHERE sku IN (SELECT sku FROM products WHERE brand = 'AlcaPlast')`) before constructing
+    any query that filters product_properties by specific keys when the spec_goal
+    involves filtering by product properties (e.g., 'Valve and Connector from AlcaPlast
+    ... that has connector type ball valve and diameter 32 mm').
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r004, r005'
+  id: r005
+  reasoning: 'Verbatim error: ''Empty result:''. Root cause: wrong-key — the product_properties
+    query used key ''connector type'' (with space) and ''diameter_mm'', but the actual
+    stored key for connector type is likely ''connector_type'' (underscore), resulting
+    in no matching rows. Failing fragment: action "/bin/sql \"SELECT sku, key, value_text,
+    value_number FROM product_properties WHERE sku IN (SELECT sku FROM products WHERE
+    brand = ''AlcaPlast'' AND series = ''Universal Basic'' AND model = ''1CT-04J'')
+    AND key IN (''connector type'', ''diameter_mm'');\"". Rule linkage: new rule will
+    enforce inclusion of a plan step to discover exact property keys before building
+    such a filter, targeting the spec_goal phrase ''Valve and Connector from AlcaPlast
+    ... that has connector type ball valve and diameter 32 mm''.'
+  source: learn
+  status: inactive
+- content: Always format the action as a complete shell command using the sql tool,
+    e.g., `/bin/sql 'WITH product AS ...'`, enclosing the SQL query in single quotes
+    so that the query is passed as stdin. Ensure that the action field contains the
+    final query that completes all required steps from the plan, specifically including
+    inventory retrieval and aggregation when the spec_goal involves summing available_today
+    across stores (e.g., 'Determine the total units available today across all PowerTool
+    stores in Vienna').
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'r001 and r002 both address the same scenario: preparing the final action
+    for inventory aggregation queries. r002 specifies formatting as a shell command,
+    r001 specifies content completeness. Merged into a single rule covering both aspects.'
+  source: learn
+  status: active
+- content: Always include in the plan a step that retrieves all distinct property
+    keys for the brand's products (e.g., `SELECT DISTINCT key FROM product_properties
+    WHERE sku IN (SELECT sku FROM products WHERE brand = 'AlcaPlast')`) before constructing
+    any query that filters product_properties by specific keys when the spec_goal
+    involves filtering by product properties (e.g., 'Valve and Connector from AlcaPlast
+    ... that has connector type ball valve and diameter 32 mm').
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r007'
+  id: r007
+  reasoning: r004 and r005 both require querying distinct property keys before filtering
+    product_properties. r005 is the more general formulation (covers any filtering
+    query), so it subsumes r004. Merged into a single rule.
+  source: learn
+  status: inactive
+- content: Always use the property keys confirmed by the preliminary key retrieval
+    query (step 2 in plan) in the final SQL when filtering product_properties; never
+    hardcode key names like 'device_type', 'color_family', or 'ip_rating' without
+    validating their presence, and if the expected keys are not among the retrieved
+    list, treat the product as non-existent (0 available) and cite all stores with
+    zero.
+  created: '2026-05-21'
+  deactivated_reason: r008 and r009 required validating property keys but did not
+    ensure the existence of the product with those key-value combinations, which contributed
+    to the empty-result failure when keys existed but no product matched. The new
+    rule supersedes both by adding a product existence check.
+  id: r008
+  reasoning: 'Error: ''Empty result'' (ERROR_TYPE: empty). Root cause category: wrong-key.
+    The final action SQL hardcoded property key names ''device_type'', ''color_family'',
+    ''ip_rating'' without verifying they exist among Legrand''s product properties.
+    The plan included step 2 to retrieve distinct keys, but the action ignored those
+    results, leading to an empty product match. The failing fragment is the action:
+    `/bin/sql "WITH matched_sku AS (...) AND EXISTS ... key=''device_type'' ..."`.
+    The spec_goal references ''device type terminal clamp, color family White, and
+    ip rating IP44''. Existing rules r003 and r007 mandate preliminary queries but
+    do not enforce using the actual keys, so the plan-action gap is unaddressed. The
+    new rule must ensure the final SQL uses confirmed property keys.'
+  source: learn
+  status: inactive
+- content: Always use the property keys confirmed by the preliminary key retrieval
+    query (included as a step in the plan) in the final SQL when filtering product_properties;
+    never hardcode key names like 'device_type', 'color_family', or 'ip_rating' without
+    validating their presence, and if the expected keys are not among the retrieved
+    list, treat the product as non-existent (0 available) and cite all stores with
+    zero. Additionally, always include in the plan a step that retrieves all distinct
+    property keys for the brand's products (e.g., `SELECT DISTINCT key FROM product_properties
+    WHERE sku IN (SELECT sku FROM products WHERE brand = 'AlcaPlast')`) before constructing
+    any query that filters product_properties by specific keys when the spec_goal
+    involves filtering by product properties (e.g., 'Valve and Connector from AlcaPlast
+    ... that has connector type ball valve and diameter 32 mm').
+  created: '2026-05-21'
+  deactivated_reason: r008 and r009 required validating property keys but did not
+    ensure the existence of the product with those key-value combinations, which contributed
+    to the empty-result failure when keys existed but no product matched. The new
+    rule supersedes both by adding a product existence check.
+  id: r009
+  reasoning: 'Merged r007 and r008: r007 mandates the preliminary property key retrieval
+    step, and r008 mandates using those keys in the final query and forbids hardcoding.
+    They cover the same scenario (filtering by product properties) and are complementary
+    — the combined rule describes the full procedure from plan to execution.'
+  source: learn
+  status: inactive
+- content: Always include in the plan a step to verify the existence of a product
+    matching all specified property key-value combinations (e.g., device_type='terminal
+    clamp', color_family='White', ip_rating='IP44') for the given brand/series, after
+    confirming that the property keys exist; if no product matches, immediately set
+    total to 0 and cite all stores without attempting a complex join. Ensure the final
+    SQL action is structured to produce output rows even when no product exists (e.g.,
+    by starting from the stores list and left joining to product and inventory).
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: ''Empty result: '' (empty-result). The final SQL query used CROSS
+    JOIN with target_product CTE; when that CTE returned no rows (no product matched
+    the property filters), the entire query returned empty, failing to produce any
+    output. The plan included steps to confirm city and property keys (per r003, r008,
+    r009), but lacked a step to verify the existence of a product with the exact property
+    values (device_type=''terminal clamp'', color_family=''White'', ip_rating=''IP44'').
+    The action string: ''... FROM vienna_stores vs LEFT JOIN inventory i ... CROSS
+    JOIN target_product tp ...'' fails silently on empty CTE. Existing rules r008/r009
+    only covered missing property keys, not missing product when keys exist. New rule
+    must mandate a pre-check for product existence or restructure the query to always
+    yield rows.'
+  source: learn
+  status: active
+- content: Always output the final message as exactly the format string specified
+    in the spec_goal (e.g., '[QTY:%d]') without any additional explanatory text; place
+    citations and explanations in the reasoning or grounding_refs fields.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Verbatim error: ''ANSWER clarification: ... [QTY''. Root cause category:
+    wrong-action (answer formatting violated exact format). Failing fragment: the
+    message field in ANSWER_OUTPUT includes extra explanatory text (''Across all Vienna
+    branches, there are 0 units available today. However, the product record ... was
+    not found in the database.'') before the required format string ''[QTY:0]''. Rule
+    linkage: new rule will cite spec_goal ''Answer exactly as ''[QTY:%d]'''' and the
+    plan step ''Format the final answer as ''[QTY:%d]'' and cite each city store record
+    plus the product record'' which allowed ambiguity.'
+  source: learn
+  status: active
+- content: 'Always include in the plan a step after the preliminary city query to
+    handle the case where it returns no rows: immediately set total to 0, cite that
+    no stores exist in that city (e.g., ''no Vienna stores found''), and produce the
+    final answer as [QTY:0] without executing the main product join query. This addresses
+    the success_criterion ''All Vienna store IDs are cited as grounding references''
+    by omitting store IDs when none exist.'
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r003, r012'
+  id: r012
+  reasoning: 'Error: ''Empty result: ''. Root cause: The preliminary SQL query to
+    confirm city values returned no rows (no Vienna stores), and the pipeline could
+    not produce an answer because the plan lacked a contingency for this case. The
+    failing fragment is the spec_goal phrase ''including stores with 0 availability''
+    — ambiguous about zero stores — and the success_criterion ''All Vienna store IDs
+    are cited as grounding references'' which becomes unsatisfiable when no stores
+    exist. The existing rules (r003, r006, r010, r011) do not cover the missing-handling
+    of an empty city query. The plan step ''Retrieve distinct city values from stores
+    table to confirm ''''Vienna'''' exists.'' was executed, but no step dictated how
+    to proceed if the result set is empty.'
+  source: learn
+  status: inactive
+- content: Always include in the plan a preliminary SQL query to retrieve distinct
+    city values from the stores table when the spec_goal involves filtering stores
+    by a specific city name (e.g., 'Vienna'), to confirm the correct city string before
+    forming the final aggregation query. After that preliminary query, if it returns
+    no rows, immediately set total to 0, cite that no stores exist in that city (e.g.,
+    'no Vienna stores found'), and produce the final answer as [QTY:0] without executing
+    the main product join query. Otherwise, proceed with the main product/inventory
+    join query.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r013
+  reasoning: r003 (preliminary city query) and r012 (handle empty city query results)
+    are part of the same logical workflow when the spec_goal involves filtering stores
+    by city. r012 extends r003 by adding the empty-result branch. Merging removes
+    the redundancy of having two separate rules that both must be applied in sequence.
+  source: learn
+  status: active
+last_run:
+  cycles_used: 6
+  date: '2026-05-21'
+  grounding_refs_count: 2
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t19

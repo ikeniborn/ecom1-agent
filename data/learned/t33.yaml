@@ -1,0 +1,305 @@
+entries:
+- content: Always, before executing a query that filters on product_properties values,
+    first query the product_properties table to validate that the key-value pairs
+    (mask_type='dust mask', protection_class='ffp2', size='one size') exist for at
+    least one SKU matching brand='Honeywell' and series LIKE '%HW 2GM-UMP%'; if they
+    do not, use the actual key-value strings retrieved from the database.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r003'
+  id: r001
+  reasoning: 'Verbatim error: ''Empty result: '' (empty). Root cause category: empty-result,
+    specifically wrong-filter (incorrect property values or series pattern). Failing
+    fragment: action query: ''SELECT p.sku, p.name, p.brand, p.series, s.id AS store_id,
+    s.name AS store_name, inv.available_today FROM products p JOIN inventory inv ON
+    p.sku = inv.sku JOIN stores s ON inv.store_id = s.id JOIN product_properties pp1
+    ON p.sku = pp1.sku AND pp1.key=''mask_type'' AND pp1.value=''dust mask'' JOIN
+    product_properties pp2 ON p.sku = pp2.sku AND pp2.key=''protection_class'' AND
+    pp2.value=''ffp2'' JOIN product_properties pp3 ON p.sku = pp3.sku AND pp3.key=''size''
+    AND pp3.value=''one size'' WHERE p.brand=''Honeywell'' AND p.series LIKE ''%HW
+    2GM-UMP%'' AND s.city=''Vienna''''. The spec_goal includes ''mask type dust mask,
+    protection class ffp2, size one size'', but the actual database may store these
+    values differently (e.g., case, underscore, or different wording). The plan included
+    a step to explore schema if empty, but the agent did not execute it before the
+    main query. Rule linkage: the new rule must mandate verification of property values
+    before constructing the join, explicitly citing the keys and values from the action.'
+  source: learn
+  status: inactive
+- content: Never include the action 'SELECT name, sql FROM sqlite_schema WHERE sql
+    IS NOT NULL ORDER BY type, name;' in a plan if that exact query has already been
+    executed in the current session; instead, proceed directly to the next distinct
+    action in the plan.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r002, r008'
+  id: r002
+  reasoning: 'Verbatim error: "Repeated action detected — must use a different query
+    or approach. Action was: SELECT name, sql FROM sqlite_schema WHERE sql IS NOT
+    NULL ORDER BY type, name;" Root cause category: wrong-action — the plan included
+    a schema exploration action that had already been executed earlier in the session,
+    causing a repeated-action guard to fire. Failing fragment citation: action "SELECT
+    name, sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY type, name;" from
+    the plan. Rule linkage: the new rule will explicitly prohibit repeating this action
+    identifier.'
+  source: learn
+  status: inactive
+- content: Always include a separate action (SQL query) to validate the existence
+    of the exact key-value pairs (mask_type, protection_class, size) in product_properties
+    before the action that filters products by those properties; if validation yields
+    zero rows, include a subsequent action to retrieve the actual key-value strings
+    for products matching brand='Honeywell' and series LIKE '%HW 2GM-UMP%' and use
+    those in subsequent filters.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r003'
+  id: r003
+  reasoning: 'Error: Empty result: sku,name,brand,series. Root cause category: empty-result.
+    Failing fragment: action ''SELECT p.sku, p.name, p.brand, p.series FROM products
+    p WHERE p.brand = ''Honeywell'' AND p.series LIKE ''%HW 2GM-UMP%'' AND EXISTS
+    ...'' returned zero rows. The spec_goal includes ''Validate existence of a product
+    matching brand, series, and the three property key-value pairs'', but the plan''s
+    first action directly executed the combined query without a separate validation
+    step as required by existing rule r001. The rule r001 mandates first querying
+    product_properties to validate key-value pairs and use actual strings if hardcoded
+    ones fail. The plan omitted that validation, leading to an empty result when hardcoded
+    strings did not match database values.'
+  source: learn
+  status: inactive
+- content: Always include in the plan's action list the SQL queries necessary to identify
+    all Vienna store records (e.g., SELECT id FROM stores WHERE city='Vienna') and
+    to sum available_today from inventory for the matching product SKU across those
+    stores (e.g., SELECT SUM(available_today) FROM inventory WHERE store_id IN (...)
+    AND sku=...), as required by the success_criteria 'All Vienna stores accounted
+    for' and 'Available_today from inventory used'.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''ANSWER clarification: I need to query specific stores
+    and inventory data to answer. <NO>''. Root cause category: wrong-action — the
+    plan''s action list in SDD_OUTPUT contains only two queries (schema exploration
+    and product_properties validation) but omits the subsequent actions required to
+    identify Vienna store IDs and sum available_today from inventory, as demanded
+    by the success_criteria (''All Vienna stores accounted for'', ''Available_today
+    from inventory used''). The agent stopped after schema and issued a clarification
+    because the action list was incomplete. Rule linkage: the new rule will mandate
+    inclusion of the missing actions by citing the spec_goal (''Calculate total units
+    available today across all Vienna branches'') and the success_criteria.'
+  source: learn
+  status: active
+- content: Always, before executing a query that filters on product_properties values,
+    include a separate SQL query to validate that the key-value pairs (mask_type='dust
+    mask', protection_class='ffp2', size='one size') exist for at least one SKU matching
+    brand='Honeywell' and series LIKE '%HW 2GM-UMP%'; if validation yields zero rows,
+    include a subsequent action to retrieve the actual key-value strings for products
+    matching brand='Honeywell' and series LIKE '%HW 2GM-UMP%' and use those in subsequent
+    filters.
+  created: '2026-05-21'
+  deactivated_reason: r005's conditional structure ('if validation yields zero rows,
+    include...') allowed the agent to omit the retrieval action from the action list
+    entirely. The new rule mandates unconditional inclusion of the retrieval action,
+    superseding r005's weaker conditional requirement.
+  id: r005
+  reasoning: r001 and r003 are semantically identical, both requiring validation of
+    specific key-value pairs before filtering and fallback to actual values. Merged
+    using r003 as base, incorporating the explicit values from r001 for precision.
+  source: learn
+  status: inactive
+- content: Always include in the plan's action list a SQL query to retrieve the actual
+    product_properties key-value strings (pp.key, pp.value_text) for products matching
+    brand='Honeywell' and series LIKE '%HW 2GM-UMP%', in addition to the validation
+    query for exact property matches (mask_type='dust mask', protection_class='ffp2',
+    size='one size'); this retrieval query must be listed explicitly and executed
+    if the validation returns zero rows, and the retrieved key-value strings must
+    be used in subsequent filters instead of the presumed exact ones.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r006, r013'
+  id: r006
+  reasoning: 'Verbatim error: ''I do not have the product record for the specified
+    Honeywell Respiratory Protection item or inventory data''. Root cause: empty-result
+    — the validation query (action 2 in SDD_OUTPUT actions) returned zero rows for
+    the exact property key-value pairs (mask_type=''dust mask'', protection_class=''ffp2'',
+    size=''one size''), but the plan''s action list did not include a fallback query
+    to retrieve the actual key-value strings from product_properties for products
+    matching brand=''Honeywell'' and series LIKE ''%HW 2GM-UMP%''. The SDD_OUTPUT
+    actions only listed the validation, main product, and inventory queries, omitting
+    the retrieval of actual property strings. This directly caused the agent to issue
+    a clarification instead of proceeding with actual data. Existing rule r005 already
+    requires this fallback, but the plan failed to include the retrieval action in
+    the action list; the rule''s conditional phrasing may have allowed the agent to
+    disregard the action if it assumed validation would pass. The new rule must make
+    the retrieval action an explicit, unconditional part of the action list to ensure
+    it is always available.'
+  source: learn
+  status: inactive
+- content: Always execute all actions in the plan sequentially without issuing clarifications
+    or awaiting user approval after any action; continue until all actions are executed
+    and the success_criteria 'All Vienna stores accounted for' and 'Available_today
+    from inventory used' are met.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Verbatim error: ''ANSWER clarification: I found two Vienna branches:
+    PowerTool Vienna Praterstern and PowerTool Vienna Meidling. However, I still need
+    to locate the product (Honeywell Pro HW 2GM-UMP Respiratory Protection, dust mask,
+    FFP2, one size) and check inventory at these stores. Please proceed with those
+    queries.'' Root cause category: wrong-action — agent issued a clarification asking
+    to proceed, instead of continuing to execute the remaining actions in the plan
+    (the product property retrieval and inventory sum). Failing fragment: the clarification
+    message in ANSWER_OUTPUT, which interrupted the planned sequence. Rule linkage:
+    the new rule must enforce sequential execution without clarification until all
+    success_criteria are met (''All Vienna stores accounted for'', ''Available_today
+    from inventory used''). Existing rules (r002, r004, r006) address plan composition
+    but do not prevent this interruption.'
+  source: learn
+  status: active
+- content: Always include 'SELECT name, sql FROM sqlite_schema WHERE sql IS NOT NULL
+    ORDER BY type, name;' as the first action in the plan, before any table-specific
+    queries, to discover all relevant tables and their schemas, unless that exact
+    query has already been executed in the current session. This ensures that tables
+    like products, product_properties, and inventory are identified before proceeding
+    with subsequent queries.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r002, r008'
+  id: r008
+  reasoning: 'Verbatim error: ''Unable to determine the quantity; the database does
+    not contain product or inventory data needed to identify the specified Respiratory
+    Protection item or its availability across Vienna branches.'' Root cause: incomplete
+    schema exploration (empty-result / wrong-action) — the plan''s first action only
+    retrieved the schema of the ''stores'' table, not the overall schema. Failing
+    fragment: action ''SELECT sql FROM sqlite_schema WHERE name=''stores'';'' from
+    SDD_OUTPUT actions. Rule linkage: new rule must require a full schema exploration
+    as the initial action to discover all relevant tables (products, product_properties,
+    inventory) before proceeding, preventing premature conclusion of missing data.'
+  source: learn
+  status: inactive
+- content: Always include 'SELECT name, sql FROM sqlite_schema WHERE sql IS NOT NULL
+    ORDER BY type, name;' as the first action in a plan, before any table-specific
+    queries, to discover all relevant tables and their schemas, unless that exact
+    query has already been executed in the current session; if it has already been
+    executed, proceed directly to the next distinct action in the plan without including
+    it again.
+  created: '2026-05-21'
+  deactivated_reason: r009 addresses execution-time skipping but does not prevent
+    inclusion of already-executed queries in the plan's action list; the new rule
+    supersedes by mandating omission during plan construction, which prevents the
+    repeated action error earlier.
+  id: r009
+  reasoning: 'Merged r002 and r008: both address schema query inclusion; r008 provides
+    the inclusion rule, r002 provides the skip-if-already-executed condition; combined
+    into a single coherent rule.'
+  source: learn
+  status: inactive
+- content: Never execute a SQL query that has already been executed in the current
+    session; if the same logical query is needed, use a different SQL representation
+    (e.g., add a comment, reorder columns, use aliases, or append LIMIT) to avoid
+    an exact string match.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: ''Repeated action detected — must use a different query or approach.
+    Action was: SELECT id, name FROM stores WHERE city=''Vienna'';''. Root cause category:
+    wrong-action. Failing fragment: action ''SELECT id, name FROM stores WHERE city=''Vienna'';''
+    from plan. The system rejected this action because it had already been executed
+    in the session (e.g., from a prior cycle or an earlier step). The plan included
+    this exact SQL string as required by rule r004, but re-executing it triggered
+    the semantic error. The new rule must ensure that if a query has already been
+    run, it is not repeated; if the same logical query is needed, a different representation
+    (e.g., with a comment or aliases) must be used to avoid exact duplication.'
+  source: learn
+  status: active
+- content: Always include in the plan's action list SQL queries to retrieve product_properties
+    (key, value_text) for candidate SKUs matching brand='DeWalt' and series LIKE '%DCG
+    2BH-302%', to filter those SKUs by disc diameter='180 mm' and power='850 W' from
+    the property key-value pairs, and to sum available_today from inventory for the
+    confirmed SKU across all Vienna stores, as required by the success_criteria 'Product
+    correctly identified by brand='DeWalt', series like '%DCG 2BH-302%', disc diameter=180mm,
+    power=850W' and 'Available_today from inventory used' in the spec_goal 'Sum available_today
+    units for the specified DeWalt angle grinder across all Vienna PowerTool stores.'
+  created: '2026-05-21'
+  deactivated_reason: r011 hardcodes exact property key names without a retrieval
+    step, which directly caused the empty result by assuming keys that may not exist;
+    the new rule supersedes it by enforcing a prior retrieval of actual key-value
+    strings from the database.
+  id: r011
+  reasoning: 'Verbatim error: ''ANSWER clarification: Unable to determine the quantity:
+    product identification and store inventory data are required but were not retrieved
+    in the execution step. <NO>''. Root cause category: ''wrong-action'' — the plan''s
+    action list in SDD_OUTPUT omitted queries to retrieve product_properties (for
+    disc diameter and power) and to sum available_today from inventory. The failing
+    fragment: SDD_OUTPUT actions only includes [''SELECT name, sql FROM sqlite_schema
+    ...'', ''SELECT id, name, city FROM stores WHERE city=''Vienna'';'', ''SELECT
+    sku, brand, series, model, name FROM products WHERE brand=''DeWalt'' AND series
+    LIKE ''%DCG 2BH-302%'';''] — missing the product property validation and inventory
+    sum queries required by the success_criteria ''Product correctly identified by
+    brand=''DeWalt'', series like ''%DCG 2BH-302%'', disc diameter=180mm, power=850W''
+    and ''Available_today from inventory used''. The new rule must cite these success_criteria
+    identifiers and spec_goal ''Sum available_today units for the specified DeWalt
+    angle grinder across all Vienna PowerTool stores.'''
+  source: learn
+  status: inactive
+- content: Always include 'SELECT name, sql FROM sqlite_schema WHERE sql IS NOT NULL
+    ORDER BY type, name;' as the first action in a plan's action list, unless that
+    exact query has already been executed in the current session; if it has already
+    been executed, omit it from the action list entirely and start with the next distinct
+    action.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
+    or approach. Action was: SELECT name, sql FROM sqlite_schema WHERE sql IS NOT
+    NULL ORDER BY type, name;''
+
+    Root cause category: wrong-spec — the plan''s action list included a schema discovery
+    query that had already been executed in the session.
+
+    Failing fragment: SDD_OUTPUT actions[0] = ''SELECT name, sql FROM sqlite_schema
+    WHERE sql IS NOT NULL ORDER BY type, name;''
+
+    Rule linkage: existing rules r009 and r010 address execution-time duplication
+    avoidance, but they do not prevent inclusion of already-executed queries in the
+    plan''s action list during construction. The new rule targets the plan generation
+    phase to eliminate the duplicate at the source.'
+  source: learn
+  status: active
+- content: Always include in the plan's action list a SQL query to retrieve all product_properties
+    (key, value_text) for the candidate SKUs matching the brand and series before
+    applying any property-value filter; then use the retrieved key-value strings to
+    identify the correct property keys (e.g., by searching for value_text containing
+    the required specifications) and build subsequent filter queries accordingly,
+    as required by the success_criteria 'Product correctly identified by brand='DeWalt',
+    series like '%DCG 2BH-302%', disc diameter=180mm, power=850W' in the spec_goal
+    'Sum available_today units for the specified DeWalt angle grinder across all Vienna
+    PowerTool stores.'
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r006, r013'
+  id: r013
+  reasoning: 'Error: ''Empty result: sku,key,value_text''. Root cause category: wrong-key.
+    Failing fragment: action ''SELECT pp.sku, pp.key, pp.value_text FROM product_properties
+    pp WHERE pp.sku IN (SELECT sku FROM products WHERE brand=''DeWalt'' AND series
+    LIKE ''%DCG 2BH-302%'') AND ((pp.key=''disc diameter'' AND pp.value_text=''180
+    mm'') OR (pp.key=''power'' AND pp.value_text=''850 W''))'' assumes exact property
+    key names (''disc diameter'', ''power'') without verifying the actual keys in
+    the database, leading to an empty result. Rule linkage: existing rule r011 explicitly
+    directs using those exact keys, but the plan omitted a retrieval query to discover
+    the actual key-value strings for the candidate SKUs, causing the empty result.
+    The spec_goal and success_criteria also hardcode those key names, but the data
+    may store the properties under different keys (e.g., ''disc_diameter'', ''power_w'',
+    etc.).'
+  source: learn
+  status: inactive
+- content: When filtering products by property values (e.g., brand, series, and specific
+    property-value pairs), always include in the plan's action list a SQL query to
+    retrieve all product_properties (key, value_text) for the candidate SKUs matching
+    the brand and series before applying any property-value filter. Use the retrieved
+    key-value strings to identify the correct property keys (by searching value_text
+    for the required specifications) and build subsequent filter queries accordingly.
+    Do not assume exact property keys or value_text in advance.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r014
+  reasoning: r006 and r013 both mandate retrieval of actual product_properties key-value
+    strings before filtering, using retrieved values instead of presumed exact ones.
+    r013 generalizes this pattern for any brand/series, while r006 is specific to
+    Honeywell HW 2GM-UMP but also requires a validation query with fallback. The merged
+    rule eliminates redundancy by adopting the retrieval-first approach from r013,
+    which subsumes the fallback behavior of r006 and applies universally.
+  source: learn
+  status: active
+task_id: t33

@@ -1,0 +1,51 @@
+entries:
+- content: Always, when the spec_goal requires counting products with dual attributes
+    (e.g., 'Anchor' and 'Wall Plug'), first search for those values across all relevant
+    columns — including category_id, kind_id, family_id in products, and value_text
+    in product_properties — using a combined preliminary query before constructing
+    the final count.
+  created: '2026-05-21'
+  deactivated_reason: Existing rule r001 mandates a preliminary search but does not
+    account for string variations (case, plural), leading to the empty result; the
+    new rule supersedes it by requiring fuzzy discovery to ensure matches.
+  id: r001
+  reasoning: 'Verbatim error: ''Empty result:''. Root cause category: empty-result.
+    Failing fragment: The plan''s second action ''select distinct category_id from
+    products union select distinct kind_id from products union select distinct family_id
+    from products;'' omitted the product_properties table, which is where attribute
+    values like ''Anchor'' and ''Wall Plug'' are likely stored (as property key-value
+    pairs). Without checking product_properties, the distinct query returned no matches,
+    leading to a subsequent count query that returned zero rows and an empty answer
+    output. Rule linkage: The new rule must ensure that the spec_goal''s phrase ''catalogue
+    products that are classified as both Anchor and Wall Plug'' is addressed by including
+    product_properties in attribute searches.'
+  source: learn
+  status: inactive
+- content: Always, when the spec_goal requires matching string values like 'Pliers'
+    and 'Wrenches' across category_id, kind_id, family_id, or product_properties.value_text,
+    first retrieve distinct values from those columns using case-insensitive or pattern
+    matching (e.g., LIKE with wildcards or COLLATE NOCASE) to discover the actual
+    stored forms, then adapt the filter strings accordingly before constructing the
+    final count query.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''Empty result: ''. Root cause: wrong-filter — the preliminary
+    search queried for exact strings ''Pliers'' and ''Wrenches'' in category_id, kind_id,
+    family_id, and value_text, but the actual database values may differ in case,
+    plurality, or form (e.g., ''Pliers'' vs ''pliers'' or ''Wrench'' vs ''Wrenches''),
+    causing zero matches. Failing fragment: the preliminary search action "/bin/sql
+    SELECT ''category_id'' AS col, category_id AS val FROM products WHERE category_id
+    IN (''Pliers'',''Wrenches'')..." and the spec_goal phrase ''based on category_id,
+    kind_id, family_id, or product_properties.value_text''. Rule linkage: the new
+    rule directly targets this mismatch by requiring case-insensitive or pattern discovery
+    of actual values before constructing filters.'
+  source: learn
+  status: active
+last_run:
+  cycles_used: 2
+  date: '2026-05-21'
+  grounding_refs_count: 0
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t12

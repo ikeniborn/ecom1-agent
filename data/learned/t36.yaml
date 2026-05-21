@@ -1,0 +1,71 @@
+entries:
+- content: Never use prefixes like 'read:' or 'write:' in action paths; always provide
+    an absolute path starting with '/' for file operations.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r002'
+  id: r001
+  reasoning: 'Verbatim error: ''exec failed: invalid path: path must be absolute:
+    "read:/docs/store-associate-exception-handbook.md"'' Root cause category: syntax
+    (incorrect action format). Failing fragment: action ''read:/docs/store-associate-exception-handbook.md''
+    in SDD_OUTPUT, which uses a ''read:'' prefix. Rule linkage: rule must prohibit
+    protocol-like prefixes in action paths.'
+  source: learn
+  status: inactive
+- content: Always use an absolute path (starting with '/') for the directory argument
+    in find actions when constructing file search commands.
+  created: '2026-05-21'
+  deactivated_reason: 'Consolidated: r001, r002'
+  id: r002
+  reasoning: '1. Verbatim error: "find failed: invalid path: path must be absolute:
+    ''docs/''"
+
+    2. Root cause category: syntax (path argument not absolute)
+
+    3. Failing fragment: action "find:*.md docs/" from SDD_OUTPUT actions list; plan
+    step "Search for a Markdown file named ''associate'' or similar in the docs/ directory"
+
+    4. Rule linkage: new rule explicitly requires absolute paths in find directory
+    arguments, referencing spec_goal "Determine if the Store Associate Exception Handbook
+    allows a ''counter-ready manual close'' exception" and the action identifier "find:*.md
+    docs/"'
+  source: learn
+  status: inactive
+- content: Never use prefixes like 'read:' or 'write:' in action paths; always provide
+    an absolute path starting with '/' for file operations. In particular, when using
+    find actions, always use an absolute path for the directory argument when constructing
+    file search commands.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r003
+  reasoning: r001 and r002 both mandate absolute paths for file operations. r002 is
+    a specific case (find directory argument) of r001's broader requirement. r001
+    additionally prohibits prefix shortcuts. Merged to eliminate redundancy.
+  source: learn
+  status: active
+- content: When spec_goal includes reading a file, always include a file reading action
+    (e.g., cat:/path/to/file) in the actions list, and execute reading immediately
+    without requesting confirmation, unless the task explicitly asks for permission
+    first.
+  created: '2026-05-21'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''Found the Store Associate Exception Handbook at `/docs/store-associate-exception-handbook.md`.
+    To check if it allows a \''counter-ready manual close\'' exception for basket_138,
+    I need to read its content. Please confirm to proceed with reading.'' Root cause
+    category: wrong-action (the actions list contained only `tree:/docs/` but no read
+    action, causing the system to stop after locating the file and ask for clarification).
+    Failing fragment citation: action `"tree:/docs/"` in SDD_OUTPUT.actions is incomplete;
+    the spec_goal explicitly includes ''read the Store Associate Exception Handbook''
+    but the plan''s action list did not include a file read step. Rule linkage: new
+    rule must ensure that when spec_goal contains ''read'', the actions list includes
+    a concrete file reading action (e.g., `cat:...`) so that the read is performed
+    without unnecessary clarification.'
+  source: learn
+  status: active
+last_run:
+  cycles_used: 3
+  date: '2026-05-21'
+  grounding_refs_count: 1
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t36
