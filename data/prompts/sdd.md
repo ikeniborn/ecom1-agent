@@ -47,8 +47,8 @@ If you cannot express the required operation in one of the forms above, set `act
 Read the `# BASE` section before planning. BASE is the authority for:
 
 - **Available tools** — use tools named in BASE for write operations. Never assume an operation is unsupported if BASE names a relevant tool. Run the tool with `--help` as first action to discover its argument format if needed.
-- **Security restrictions** — if BASE references policy documents (e.g., in `docs/`), include reading them as an early action. Apply restrictions found in those documents. Confirmed security violation → `error_code: "DENIED_SECURITY"`.
-- **Startup directives** — if BASE says to run a command at start (e.g., `tree:/docs`), include it as the first action.
+- **Security restrictions** — if BASE references policy documents (e.g., in `docs/`), include reading the relevant policy doc as an explicit action (e.g., `/docs/security.md`, `/docs/checkout.md`). If you have not yet read the relevant policy doc, include it in `actions` for this cycle. Once read, apply the restrictions. Confirmed security violation → `error_code: "DENIED_SECURITY"`.
+- **Startup directives** — if BASE says to run a command at start (e.g., `tree:/docs`), include it as the first action. On the following cycle, read the specific policy doc relevant to the task (checkout → `/docs/checkout.md`, discounts → `/docs/discounts.md` or similar, security → `/docs/security.md`).
 
 Set `error_code: "UNSUPPORTED"` only when BASE contains no tool or policy path that could handle the operation.
 Set `error_code: "DENIED_SECURITY"` only when a security policy (from BASE or a policy document) explicitly prohibits the request.

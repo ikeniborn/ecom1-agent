@@ -14,10 +14,10 @@ You are formulating the final answer to a catalogue lookup task based on executi
   - Wrong: `"<COUNT:n>"` (literal n, not the number)
   - For QTY tasks use `[QTY:n]` token in the same way: `"The quantity is [QTY:5]"`
 - `outcome` must accurately reflect task completion:
-  - OUTCOME_OK — answered successfully with evidence. **If task states records exist ("confirmed", "known hit", "cite every") but `grounding_refs` is empty — this is NOT OUTCOME_OK. Use OUTCOME_NONE_CLARIFICATION.**
-  - OUTCOME_NONE_CLARIFICATION — task too vague to answer, OR records asserted to exist were not found after exhausting available data sources
-  - OUTCOME_NONE_UNSUPPORTED — query type not supported by the database
-  - OUTCOME_DENIED_SECURITY — security violation detected
+  - OUTCOME_OK — the requested operation was **fully completed** and evidence exists. Discovery-only steps (tree listings, `/bin/id`, schema queries) do NOT count as completion. If the actual task (apply discount, process payment, answer question) was not executed — this is NOT OUTCOME_OK. Use OUTCOME_NONE_CLARIFICATION to signal more steps are needed. **If task states records exist ("confirmed", "known hit", "cite every") but `grounding_refs` is empty — this is NOT OUTCOME_OK. Use OUTCOME_NONE_CLARIFICATION.**
+  - OUTCOME_NONE_CLARIFICATION — task too vague to answer, OR records asserted to exist were not found, OR the task requires more execution steps before it can be answered.
+  - OUTCOME_NONE_UNSUPPORTED — the requested operation cannot be performed because no tool in BASE supports it. Not limited to database queries — applies to any operation without a matching tool (e.g., direct checkout when no checkout tool exists in BASE).
+  - OUTCOME_DENIED_SECURITY — the request violates a security policy found in BASE or policy documents. Use this when: (a) request asks to act on behalf of another user/customer, (b) request claims manager/authority approval without a verifiable policy reference, (c) policy docs explicitly prohibit the operation. **Even if your explanation is polite, the outcome MUST be OUTCOME_DENIED_SECURITY — not OUTCOME_OK.** `grounding_refs` MUST contain the path of the policy document that justifies the denial (e.g., `/docs/security.md`). If no policy doc was read yet, this cannot be OUTCOME_DENIED_SECURITY — instead return OUTCOME_NONE_CLARIFICATION and include the policy doc read as a pending action.
 - `grounding_refs` MUST list file paths for every matching record. Sources by execute type:
   - **SQL result**: if result contains a `path` column — use those values directly as grounding_refs. If `path` column is absent, use other path-like columns (e.g. `file`, `location`) if present. Do NOT fabricate paths.
   - **search: result** (format `path:line:line_text` per row): extract the `path` field from each row — those ARE the grounding_refs
