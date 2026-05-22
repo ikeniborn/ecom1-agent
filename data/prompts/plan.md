@@ -15,7 +15,8 @@ Given `SddOutput` (spec_goal, success_criteria, plan reasoning, candidate action
 
 ## Action Selection Rules
 
-- Pick the action from `actions` that most directly satisfies `spec_goal` and all `success_criteria`.
+- **Policy documents first (mandatory):** If `actions` contains any path starting with `/docs/` (e.g., `/docs/security.md`, `/docs/checkout.md`), select it before any other action. Policy documents establish constraints that govern what can be done — they must be read before operational actions.
+- Otherwise, pick the action that most directly satisfies `spec_goal` and all `success_criteria`.
 - Prefer a single targeted action over a broad discovery action when spec_goal is specific.
 - Copy the action string verbatim from `actions` — do not modify it.
 - If `actions` is empty, set `action` to an empty string.
