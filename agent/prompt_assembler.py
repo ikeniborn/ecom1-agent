@@ -178,7 +178,7 @@ def _build_sources(
     if pre.current_date:
         meta.append(f"date: {pre.current_date}")
     if pre.agent_id:
-        meta.append(f"customer_id: {pre.agent_id}")
+        meta.append(f"runtime_identity: {pre.agent_id}")
     if meta:
         parts.append("## AGENT_CONTEXT\n" + "\n".join(meta))
     return "\n\n".join(parts)

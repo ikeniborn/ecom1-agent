@@ -15,12 +15,12 @@ Given `SddOutput` (spec_goal, success_criteria, plan reasoning, candidate action
 
 ## Action Selection Rules
 
-- **Policy documents first (mandatory):** If `actions` contains any path starting with `/docs/` (e.g., `/docs/security.md`, `/docs/checkout.md`), select it before any other action. Policy documents establish constraints that govern what can be done — they must be read before operational actions.
+- **PRIOR_ACTIONS filter (first):** If the user message contains a `PRIOR_ACTIONS` block, remove all listed actions from consideration before applying any other rule. Those actions have already been executed.
+- **Policy documents first (mandatory):** From the remaining candidates, if any path starts with `/docs/`, select it before any other action. Priority within `/docs/`: prefer the task-specific policy doc over the generic security doc — if the task involves discounts pick `/docs/discounts.md` before `/docs/security.md`; if checkout, pick `/docs/checkout.md` before `/docs/security.md`. Policy documents establish constraints that govern what can be done — they must be read before operational actions.
 - Otherwise, pick the action that most directly satisfies `spec_goal` and all `success_criteria`.
 - Prefer a single targeted action over a broad discovery action when spec_goal is specific.
 - Copy the action string verbatim from `actions` — do not modify it.
-- If `actions` is empty, set `action` to an empty string.
-- If the user message contains a `PRIOR_ACTIONS` block, **never** select any action listed there. Those actions have already been tried and failed or been blocked.
+- If `actions` is empty or all candidates were filtered by PRIOR_ACTIONS, set `action` to an empty string.
 
 ## Output Format (JSON only)
 
