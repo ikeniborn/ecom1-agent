@@ -14,7 +14,7 @@ from .agents_md_parser import parse_agents_md
 from .llm import CLI_BLUE, CLI_CLR, CLI_GREEN, CLI_YELLOW
 
 _LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
-_SCHEMA_TABLES = ["products", "product_properties", "inventory", "kinds", "carts", "cart_items"]
+_SCHEMA_TABLES = ["products", "product_properties", "inventory", "kinds", "carts", "cart_items", "baskets", "basket_lines"]
 _COMPUTE_KEYWORDS = ("calculate", "compute", "sum of", "average of")
 
 
@@ -26,6 +26,7 @@ class PrephaseResult:
     agents_md_index: dict = field(default_factory=dict)
     schema_digest: dict = field(default_factory=dict)
     agent_id: str = ""
+    agent_store_id: str = ""
     current_date: str = ""
     task_type: str = "sql"
 
@@ -205,14 +206,32 @@ def run_prephase(
     except Exception as e:
         print(f"{CLI_YELLOW}[prephase] /bin/date failed: {e}{CLI_CLR}")
 
+
     # /bin/id — best-effort
     agent_id = ""
+    agent_store_id = ""
     try:
         id_result = vm.exec(ExecRequest(path="/bin/id"))
         agent_id = getattr(id_result, "stdout", "").strip()
         print(f"{CLI_BLUE}[prephase] /bin/id:{CLI_CLR} {CLI_GREEN}{agent_id!r}{CLI_CLR}")
     except Exception as e:
         print(f"{CLI_YELLOW}[prephase] /bin/id failed: {e}{CLI_CLR}")
+
+    # Read employee profile to get store assignment — best-effort
+    if agent_id:
+        import re as _re
+        _emp_m = _re.search(r'\bemp_\d+\b', agent_id)
+        if _emp_m:
+            _emp_id = _emp_m.group(0)
+            try:
+                _emp_r = vm.read(ReadRequest(path=f"/proc/employees/{_emp_id}.json"))
+                _emp_txt = getattr(_emp_r, "content", "") or ""
+                _store_m = _re.search(r'"store_id"\s*:\s*"(store_\w+)"', _emp_txt)
+                if _store_m:
+                    agent_store_id = _store_m.group(1)
+                    print(f"{CLI_BLUE}[prephase] agent store:{CLI_CLR} {CLI_GREEN}{agent_store_id!r}{CLI_CLR}")
+            except Exception as e:
+                print(f"{CLI_YELLOW}[prephase] employee profile failed: {e}{CLI_CLR}")
 
     db_schema = ""
     schema_digest: dict = {}
@@ -242,6 +261,7 @@ def run_prephase(
         agents_md_index=agents_md_index,
         schema_digest=schema_digest,
         agent_id=agent_id,
+        agent_store_id=agent_store_id,
         current_date=current_date,
         task_type=task_type,
     )

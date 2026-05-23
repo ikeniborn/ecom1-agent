@@ -60,10 +60,14 @@ def _exec_result_text(result) -> str:
     if isinstance(result, Message):
         try:
             d = MessageToDict(result)
-            return d.get("stdout", "") or d.get("output", "") or ""
+            stdout = d.get("stdout", "") or d.get("output", "") or ""
+            stderr = d.get("stderr", "") or ""
+            return stdout or stderr or ""
         except Exception:
             pass
-    return getattr(result, "stdout", "") or getattr(result, "output", "") or ""
+    stdout = getattr(result, "stdout", "") or getattr(result, "output", "") or ""
+    stderr = getattr(result, "stderr", "") or ""
+    return stdout or stderr or ""
 
 
 def _csv_has_data(result_txt: str) -> bool:
@@ -137,10 +141,13 @@ def _call_llm_phase(
 _format_schema_digest = _fmt_schema_digest
 
 
-def _build_sdd_user_msg(task_text: str, last_error: str) -> str:
+def _build_sdd_user_msg(task_text: str, last_error: str, prior_actions: list[str] | None = None) -> str:
     parts: list[str] = [f"TASK: {task_text}"]
     if last_error:
         parts.append(f"PREVIOUS ERROR: {last_error}")
+    if prior_actions:
+        parts.append("PRIOR_ACTIONS (already executed — apply persistence rules):\n" +
+                     "\n".join(f"  - {a}" for a in prior_actions))
     return "\n\n".join(parts)
 
 
@@ -183,8 +190,27 @@ def _build_learn_user_msg(
     return "\n\n".join(parts)
 
 
-def _build_answer_user_msg(task_text: str, execute_out) -> str:
-    return f"TASK: {task_text}\n\nEXECUTE_OUTPUT:\n{execute_out.model_dump_json(indent=2)}"
+def _build_answer_user_msg(
+    task_text: str,
+    execute_out,
+    prior_actions: list[str] | None = None,
+    prior_results: list[tuple[str, str]] | None = None,
+    runtime_identity: str | None = None,
+) -> str:
+    parts = [f"TASK: {task_text}", f"EXECUTE_OUTPUT:\n{execute_out.model_dump_json(indent=2)}"]
+    if prior_actions:
+        parts.append("PRIOR_EXECUTIONS (actions run in earlier cycles — use their file paths in grounding_refs if relevant):\n" +
+                     "\n".join(f"  - {a}" for a in prior_actions))
+    if prior_results:
+        pr_lines = []
+        for action, result in prior_results:
+            result_preview = result.strip()[:200] if result.strip() else "(empty)"
+            pr_lines.append(f"  action: {action[:120]}\n  result: {result_preview}")
+        parts.append("PRIOR_RESULTS (outputs from earlier cycles — extract file paths for grounding_refs):\n" +
+                     "\n\n".join(pr_lines))
+    if runtime_identity:
+        parts.append(f"## AGENT_CONTEXT\nruntime_identity: {runtime_identity}")
+    return "\n\n".join(parts)
 
 
 def _infer_action_type(action: str) -> str:
@@ -399,6 +425,7 @@ def run_pipeline(
     success = False
     cycles_used = 0
     prior_action_sets: list[frozenset] = []
+    prior_results: list[tuple[str, str]] = []  # (action, raw_output) per cycle
 
     outcome = "OUTCOME_NONE_CLARIFICATION"
     sdd_out: SddOutput | None = None
@@ -424,7 +451,8 @@ def run_pipeline(
 
             # ── SDD ───────────────────────────────────────────────────────────
             sdd_model = _resolve_model_for_phase("sdd", model)
-            sdd_user = _build_sdd_user_msg(task_text, last_error)
+            _prior_for_sdd = [a for s in prior_action_sets for a in s]
+            sdd_user = _build_sdd_user_msg(task_text, last_error, prior_actions=_prior_for_sdd)
             sdd_guide = load_prompt("sdd") or "# PHASE: sdd"
             sdd_system: list[dict] = [
                 {"type": "text", "text": unified_context},
@@ -549,6 +577,33 @@ def run_pipeline(
                 continue
             prior_action_sets.append(frozenset([plan_out.action]))
 
+            # Inject issuer_id into /bin/discount commands (positional: BASKET_ID PERCENT REASON ISSUER_ID)
+            if pre.agent_id and plan_out.action.startswith("/bin/discount "):
+                _emp_m = re.search(r'\bemp_\d+\b', pre.agent_id)
+                if _emp_m:
+                    _issuer = _emp_m.group(0)
+                    if _issuer not in plan_out.action:
+                        plan_out = plan_out.model_copy(update={"action": f"{plan_out.action} {_issuer}"})
+                        print(f"{CLI_BLUE}[pipeline] injected issuer_id {_issuer} into discount cmd{CLI_CLR}")
+
+            # Inject store_id filter into basket SQL queries when agent_store_id is known
+            if (pre.agent_store_id
+                    and _infer_action_type(plan_out.action) == "sql"
+                    and "FROM baskets" in plan_out.action
+                    and f"store_id = '{pre.agent_store_id}'" not in plan_out.action):
+                _store_filter = f"AND b.store_id = '{pre.agent_store_id}'"
+                _act = plan_out.action
+                # Insert before GROUP BY, ORDER BY, or LIMIT (in that priority order)
+                for _kw in ("GROUP BY", "ORDER BY", "LIMIT"):
+                    _ki = _act.upper().rfind(_kw)
+                    if _ki >= 0:
+                        _act = _act[:_ki].rstrip() + f" {_store_filter} " + _act[_ki:]
+                        break
+                else:
+                    _act = _act.rstrip() + f" {_store_filter}"
+                plan_out = plan_out.model_copy(update={"action": _act})
+                print(f"{CLI_BLUE}[pipeline] injected store filter {_store_filter} into SQL{CLI_CLR}")
+
             # ── EXECUTE ───────────────────────────────────────────────────────
             _t0 = time.monotonic()
             execute_out, execute_error = _run_execute(vm, plan_out, cycle + 1)
@@ -566,7 +621,10 @@ def run_pipeline(
                 continue
 
             raw_output = execute_out.results[0].get("output", "") if execute_out.results else ""
-            if not _csv_has_data(raw_output):
+            _action_type = _infer_action_type(plan_out.action)
+            # exec-type actions (/bin/ tools) may legitimately return empty output on success;
+            # only gate on empty result for data-returning operations (sql, read, search, list, find, tree)
+            if _action_type != "exec" and not _csv_has_data(raw_output):
                 last_error = f"Empty result: {raw_output.strip()[:120]}"
                 print(f"{CLI_YELLOW}[pipeline] EXECUTE: empty result{CLI_CLR}")
                 _run_learn(unified_context, model, cfg, task_text, last_error,
@@ -577,15 +635,21 @@ def run_pipeline(
                 continue
 
             if t := get_trace():
-                action_type = _infer_action_type(plan_out.action)
-                if action_type == "sql":
+                if _action_type == "sql":
                     t.log_sql_execute(cycle + 1, plan_out.action, raw_output, _csv_has_data(raw_output), _dur)
 
+            prior_results.append((plan_out.action, raw_output))
             print(f"{CLI_BLUE}[pipeline] EXECUTE ok: {raw_output[:80]}{CLI_CLR}")
 
             # ── ANSWER ────────────────────────────────────────────────────────
             executor_model = _resolve_model_for_phase("executor", model)
-            answer_user = _build_answer_user_msg(task_text, execute_out)
+            _prior_for_answer = [a for s in prior_action_sets for a in s]
+            answer_user = _build_answer_user_msg(
+                task_text, execute_out,
+                prior_actions=_prior_for_answer,
+                prior_results=prior_results,
+                runtime_identity=pre.agent_id or None,
+            )
             answer_guide = load_prompt("answer") or "# PHASE: answer"
             answer_system: list[dict] = [
                 {"type": "text", "text": answer_guide, "cache_control": {"type": "ephemeral"}},
@@ -612,11 +676,15 @@ def run_pipeline(
             if answer_out.outcome == "OUTCOME_NONE_CLARIFICATION" and cycle + 1 < _MAX_CYCLES:
                 last_error = f"ANSWER clarification: {answer_out.message[:200]}"
                 print(f"{CLI_YELLOW}[pipeline] ANSWER: OUTCOME_NONE_CLARIFICATION — retrying (cycle {cycle + 1}/{_MAX_CYCLES}){CLI_CLR}")
-                _run_learn(unified_context, model, cfg, task_text, last_error,
-                           sgr_trace, learn_ctx, pre.agents_md_index,
-                           error_type="semantic", cycle=cycle + 1, task_id=task_id,
-                           sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out)
-                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
+                # Only run LEARN if the execute returned empty/no-data — non-empty results
+                # indicate a correct intermediate step (e.g. reading a policy doc) that doesn't
+                # need a learning rule; firing LEARN on correct steps pollutes the rule store.
+                if not _csv_has_data(raw_output):
+                    _run_learn(unified_context, model, cfg, task_text, last_error,
+                               sgr_trace, learn_ctx, pre.agents_md_index,
+                               error_type="semantic", cycle=cycle + 1, task_id=task_id,
+                               sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out)
+                    _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
             # ── SUCCESS ───────────────────────────────────────────────────────

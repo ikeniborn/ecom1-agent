@@ -1,7 +1,110 @@
+entries:
+- content: 'HARD CONSTRAINT — SERVICE_RECOVERY STARTUP: Do NOT run tree:/docs/, tree:/proc/,
+    or /bin/id as explicit pipeline actions. Start C1 with /docs/discounts.md. Cycle
+    order: C1=/docs/discounts.md, C2=/docs/security.md, C3=/docs/checkout.md, C4=SQL
+    (r002), C5=/bin/discount. ISSUER_ID is already known from AGENT_CONTEXT runtime_identity
+    — do NOT run /bin/id explicitly.'
+  created: '2026-05-22'
+  deactivated_reason: null
+  id: r001
+  reasoning: SDD keeps running tree:/docs/ or /bin/id wasting cycles. Prephase already
+    runs /bin/id and makes result available as runtime_identity in AGENT_CONTEXT.
+  source: manual
+  status: active
+- content: 'HARD CONSTRAINT — BASKET LOOKUP WITH SUBTOTAL: C4 SQL must return basket_id,
+    path, and subtotal_cents. Use LEFT JOIN products (not INNER JOIN) to avoid excluding
+    baskets with SKUs missing from products table. CORRECT SQL: SELECT b.id, b.path,
+    b.customer_id, b.status, b.created_at, COALESCE(SUM(bl.quantity * COALESCE(p.price_cents,
+    0)), 0) AS subtotal_cents FROM baskets b JOIN customers c ON b.customer_id = c.id
+    JOIN basket_lines bl ON bl.basket_id = b.id LEFT JOIN products p ON p.sku = bl.sku
+    WHERE c.email LIKE ''%CUSTTAG%'' AND b.status = ''active'' AND b.discount_percent
+    IS NULL AND NOT EXISTS (SELECT 1 FROM basket_lines bl2 LEFT JOIN inventory i ON
+    bl2.sku = i.sku AND i.store_id = b.store_id WHERE bl2.basket_id = b.id AND (i.available_today
+    IS NULL OR bl2.quantity > i.available_today)) GROUP BY b.id ORDER BY b.created_at
+    DESC LIMIT 1 — replace CUSTTAG with the email tag. Pipeline auto-injects AND b.store_id
+    = ''store_XXX'' before GROUP BY. Returns basket_id, path, subtotal_cents.'
+  created: '2026-05-22'
+  deactivated_reason: null
+  id: r002
+  reasoning: LEFT JOIN products prevents excluding baskets with SKUs not in products
+    table. INNER JOIN was silently filtering correct baskets. Store filter is auto-injected
+    before GROUP BY by pipeline. discount_percent IS NULL filters already-discounted
+    baskets.
+  source: manual
+  status: active
+- content: "SERVICE_RECOVERY_CYCLE_ORDER: C1: /docs/discounts.md C2: /docs/security.md\
+    \ C3: /docs/checkout.md C4: SQL JOIN (see r002, returns basket_id + subtotal_cents).\n\
+    C5: /bin/discount BASKET_ID PERCENT service_recovery ISSUER_ID\n  - BASKET_ID:\
+    \ from id column of C4 result (e.g. basket_007)\n  - PERCENT: 10 if subtotal_cents\
+    \ >= 15000, else 5 (use integer, not decimal)\n  - ISSUER_ID: emp_XXX from runtime_identity\
+    \ in AGENT_CONTEXT (pipeline auto-injects if missing, LLM may omit)\n  - Example:\
+    \ /bin/discount basket_007 10 service_recovery emp_046\n  ANSWER returns OUTCOME_OK.\
+    \ grounding_refs MUST include /docs/discounts.md, /docs/security.md, /docs/checkout.md,\
+    \ and the basket path from C4.\nPLAN skips already-executed actions (check PRIOR_ACTIONS)."
+  created: '2026-05-22'
+  deactivated_reason: null
+  id: r003
+  reasoning: 5-cycle flow. Command format is positional (no flags). Pipeline injects
+    issuer_id automatically if omitted. PERCENT computed from subtotal_cents.
+  source: manual
+  status: active
+- content: Never hardcode a basket_id in spec_goal or in action '/bin/discount ...'
+    for a service_recovery discount task before executing the C4 SQL JOIN lookup defined
+    in r002; the basket_id must be obtained exclusively from the SQL query result
+    on customers.email.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r006
+  reasoning: The pipeline failed when basket_id was hardcoded without running the
+    SQL lookup first. basket_id changes per run.
+  source: learn
+  status: active
+- content: Always list /docs/discounts.md, /docs/security.md, and /docs/checkout.md
+    as three separate, individual success_criteria in any service_recovery discount
+    spec; never combine them or omit /docs/discounts.md.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r007
+  reasoning: Bundling policy docs into one criterion caused ANSWER parse failures
+    and missing policy checks.
+  source: learn
+  status: active
+- content: Never invoke `/bin/discount` with `--type`, `--max-allowed`, or other flags;
+    the tool requires exactly four positional arguments in order — basket_id percent
+    reason_code issuer_id. Never run `/bin/discount --help`. PERCENT is an integer
+    (10 if subtotal_cents >= 15000, else 5). Example correct command from r003.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Tool error: ''discount: expected basket id, percent, reason code, and
+    issuer id''. Flags like --type and --max-allowed are rejected. Positional format
+    is required.'
+  source: manual
+  status: active
+- content: Never request clarification for the maximum service_recovery discount percent;
+    compute PERCENT from subtotal_cents returned by C4 SQL — 10 if subtotal_cents
+    >= 15000 else 5. The reason code is always service_recovery.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r009
+  reasoning: LLM was requesting clarification for values derivable from the SQL result
+    and discounts.md policy.
+  source: manual
+  status: active
+- content: Never append flags such as `--issuer-id` to the `/bin/discount` plan action;
+    use exactly four positional arguments — basket_id percent reason_code issuer_id
+    — with no flags. The pipeline auto-injects issuer_id if not present.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r010
+  reasoning: Pipeline was appending --issuer-id flag causing tool rejection with usage
+    error. Positional format required.
+  source: manual
+  status: active
 last_run:
-  cycles_used: 1
-  date: '2026-05-21'
-  grounding_refs_count: 0
-  outcome: OUTCOME_NONE_CLARIFICATION
-  status: failure
+  cycles_used: 5
+  date: '2026-05-23'
+  grounding_refs_count: 4
+  outcome: OUTCOME_OK
+  status: success
 task_id: t26
