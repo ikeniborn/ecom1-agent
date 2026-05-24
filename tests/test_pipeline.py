@@ -1,6 +1,6 @@
 import json
 from unittest.mock import MagicMock, patch
-from agent.pipeline import run_pipeline, _run_learn, _build_plan_user_msg
+from agent.pipeline import run_pipeline, _run_learn, _build_plan_user_msg, _build_idd_user_msg
 from agent.prephase import PrephaseResult
 from agent.prompt_assembler import AssembledPrompt
 
@@ -277,9 +277,6 @@ def test_plan_user_msg_includes_prior_actions():
     assert "PRIOR_ACTIONS" in msg
     assert "search:x /proc/" in msg
     assert "list:/proc/payments/" in msg
-
-
-from agent.pipeline import _build_idd_user_msg
 
 
 def test_build_idd_user_msg_basic():
