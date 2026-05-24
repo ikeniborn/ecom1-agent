@@ -520,17 +520,44 @@ def run_pipeline(
             )
             unified_context = assembled.unified_context
 
+            # ── IDD ───────────────────────────────────────────────────────────
+            _prior_for_idd = [a for s in prior_action_sets for a in s]
+            idd_out, sgr_idd, tok = _run_idd(
+                unified_context, model, cfg, task_text,
+                last_error, _prior_for_idd, cycle + 1,
+            )
+            total_in_tok += tok.get("input", 0)
+            total_out_tok += tok.get("output", 0)
+            sgr_trace.append(sgr_idd)
+
+            if not idd_out:
+                last_error = "IDD phase: failed to parse LLM output"
+                print(f"{CLI_RED}[pipeline] IDD parse failed{CLI_CLR}")
+                _run_learn(unified_context, model, cfg, task_text, last_error,
+                           sgr_trace, learn_ctx, pre.agents_md_index,
+                           error_type="llm_fail", cycle=cycle + 1, task_id=task_id)
+                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
+                continue
+
+            if idd_out.decision == "hard_stop":
+                print(f"{CLI_YELLOW}[pipeline] IDD hard_stop: {idd_out.stop_code}{CLI_CLR}")
+                try:
+                    vm.answer(AnswerRequest(
+                        message=idd_out.stop_message,
+                        outcome=OUTCOME_BY_NAME[idd_out.stop_code],
+                        refs=idd_out.stop_refs,
+                    ))
+                except Exception as e:
+                    print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
+                success = True
+                break
+
+            print(f"{CLI_BLUE}[pipeline] IDD: {idd_out.intent_type} — {idd_out.reformulated_task[:60]!r}{CLI_CLR}")
+
             # ── SDD ───────────────────────────────────────────────────────────
             sdd_model = _resolve_model_for_phase("sdd", model)
             _prior_for_sdd = [a for s in prior_action_sets for a in s]
-            # Temporary placeholder — will be replaced by real IddOutput in Task 7
-            _placeholder_idd = IddOutput(
-                intent_objective=task_text,
-                reformulated_task=task_text,
-                success_criteria=[],
-                decision="proceed",
-            )
-            sdd_user = _build_sdd_user_msg(_placeholder_idd, last_error, prior_actions=_prior_for_sdd)
+            sdd_user = _build_sdd_user_msg(idd_out, last_error, prior_actions=_prior_for_sdd)
             sdd_guide = load_prompt("sdd") or "# PHASE: sdd"
             sdd_system: list[dict] = [
                 {"type": "text", "text": unified_context},
@@ -551,7 +578,8 @@ def run_pipeline(
                 print(f"{CLI_RED}[pipeline] SDD parse failed ({sdd_err_type}){CLI_CLR}")
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
-                           error_type=sdd_err_type, cycle=cycle + 1, task_id=task_id)
+                           error_type=sdd_err_type, cycle=cycle + 1, task_id=task_id,
+                           idd_out=idd_out)
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
@@ -626,7 +654,8 @@ def run_pipeline(
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="llm_fail" if not raw_plan else "semantic",
-                           cycle=cycle + 1, task_id=task_id, sdd_out=sdd_out)
+                           cycle=cycle + 1, task_id=task_id, sdd_out=sdd_out,
+                           idd_out=idd_out)
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
@@ -636,7 +665,7 @@ def run_pipeline(
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="semantic", cycle=cycle + 1, task_id=task_id,
-                           sdd_out=sdd_out, plan_out=plan_out)
+                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out)
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
@@ -650,7 +679,7 @@ def run_pipeline(
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="semantic", cycle=cycle + 1, task_id=task_id,
-                           sdd_out=sdd_out, plan_out=plan_out)
+                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out)
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
             prior_action_sets.append(frozenset([plan_out.action]))
@@ -694,7 +723,7 @@ def run_pipeline(
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="semantic", cycle=cycle + 1, task_id=task_id,
-                           sdd_out=sdd_out, plan_out=plan_out)
+                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out)
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
@@ -708,7 +737,7 @@ def run_pipeline(
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="empty", cycle=cycle + 1, task_id=task_id,
-                           sdd_out=sdd_out, plan_out=plan_out)
+                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out)
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
@@ -727,6 +756,7 @@ def run_pipeline(
                 prior_actions=_prior_for_answer,
                 prior_results=prior_results,
                 runtime_identity=pre.agent_id or None,
+                idd_out=idd_out,
             )
             answer_guide = load_prompt("answer") or "# PHASE: answer"
             answer_system: list[dict] = [
@@ -746,7 +776,7 @@ def run_pipeline(
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="semantic", cycle=cycle + 1, task_id=task_id,
-                           sdd_out=sdd_out, plan_out=plan_out)
+                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out)
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
@@ -761,7 +791,8 @@ def run_pipeline(
                     _run_learn(unified_context, model, cfg, task_text, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="semantic", cycle=cycle + 1, task_id=task_id,
-                               sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out)
+                               sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out,
+                               idd_out=idd_out)
                     _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
