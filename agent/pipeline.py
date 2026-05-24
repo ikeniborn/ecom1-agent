@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import time
@@ -143,7 +144,12 @@ def _call_llm_phase(
 _format_schema_digest = _fmt_schema_digest
 
 
-def _build_sdd_user_msg(idd_out: IddOutput, last_error: str, prior_actions: list[str] | None = None) -> str:
+def _build_sdd_user_msg(
+    idd_out: IddOutput,
+    last_error: str,
+    prior_actions: list[str] | None = None,
+    prior_results: list[tuple[str, str]] | None = None,
+) -> str:
     parts: list[str] = [
         f"INTENT: {idd_out.intent_objective}",
         f"TASK: {idd_out.reformulated_task}",
@@ -160,6 +166,20 @@ def _build_sdd_user_msg(idd_out: IddOutput, last_error: str, prior_actions: list
     if prior_actions:
         parts.append("PRIOR_ACTIONS (already executed — apply persistence rules):\n" +
                      "\n".join(f"  - {a}" for a in prior_actions))
+    if prior_results:
+        pr_lines = []
+        for action, result in prior_results:
+            # Tree and search results need larger limits to avoid hiding entries
+            if action.startswith("tree:"):
+                limit = 8000
+            elif action.startswith("search:"):
+                limit = 20000
+            else:
+                limit = 1500
+            result_preview = result.strip()[:limit] if result.strip() else "(empty)"
+            pr_lines.append(f"  action: {action[:120]}\n  result: {result_preview}")
+        parts.append("PRIOR_RESULTS (outputs from earlier executions — use these to derive specific file paths; do NOT re-run actions whose results appear here):\n" +
+                     "\n\n".join(pr_lines))
     return "\n\n".join(parts)
 
 
@@ -170,6 +190,17 @@ def _build_idd_user_msg(task_text: str, last_error: str, prior_actions: list[str
     if prior_actions:
         parts.append("PRIOR_ACTIONS:\n" + "\n".join(f"  - {a}" for a in prior_actions))
     return "\n\n".join(parts)
+
+
+def _with_json_schema(cfg: dict, schema: dict) -> dict:
+    """Return a copy of cfg with cc_json_schema injected into cc_options."""
+    cc_opts = dict(cfg.get("cc_options") or {})
+    cc_opts["cc_json_schema"] = schema
+    return {**cfg, "cc_options": cc_opts}
+
+
+_IDD_SCHEMA = IddOutput.model_json_schema()
+_SDD_SCHEMA = SddOutput.model_json_schema()
 
 
 def _run_idd(
@@ -189,7 +220,7 @@ def _run_idd(
     ]
     user_msg = _build_idd_user_msg(task_text, last_error, prior_actions)
     return _call_llm_phase(
-        system, user_msg, idd_model, cfg, IddOutput,
+        system, user_msg, idd_model, _with_json_schema(cfg, _IDD_SCHEMA), IddOutput,
         max_tokens=_PHASE_MAX_TOKENS["idd"],
         phase="idd", cycle=cycle,
     )
@@ -273,13 +304,26 @@ def _build_answer_user_msg(
     if prior_results:
         pr_lines = []
         for action, result in prior_results:
-            result_preview = result.strip()[:200] if result.strip() else "(empty)"
+            if action.startswith("tree:"):
+                limit = 8000
+            elif action.startswith("search:"):
+                limit = 20000
+            else:
+                limit = 1500
+            result_preview = result.strip()[:limit] if result.strip() else "(empty)"
             pr_lines.append(f"  action: {action[:120]}\n  result: {result_preview}")
         parts.append("PRIOR_RESULTS (outputs from earlier cycles — extract file paths for grounding_refs):\n" +
                      "\n\n".join(pr_lines))
     if runtime_identity:
         parts.append(f"## AGENT_CONTEXT\nruntime_identity: {runtime_identity}")
     return "\n\n".join(parts)
+
+
+def _extract_tree_files(tree_action: str, tree_output: str) -> list[str]:
+    """Extract sorted absolute file paths from a tree: action result."""
+    dir_path = tree_action[len("tree:"):].rstrip("/")
+    names = re.findall(r'name:\s*"([^"]+)"[^}]*?NODE_KIND_FILE', tree_output, re.DOTALL)
+    return sorted(f"{dir_path}/{n}" for n in names)
 
 
 def _infer_action_type(action: str) -> str:
@@ -557,14 +601,14 @@ def run_pipeline(
             # ── SDD ───────────────────────────────────────────────────────────
             sdd_model = _resolve_model_for_phase("sdd", model)
             _prior_for_sdd = [a for s in prior_action_sets for a in s]
-            sdd_user = _build_sdd_user_msg(idd_out, last_error, prior_actions=_prior_for_sdd)
+            sdd_user = _build_sdd_user_msg(idd_out, last_error, prior_actions=_prior_for_sdd, prior_results=prior_results or None)
             sdd_guide = load_prompt("sdd") or "# PHASE: sdd"
             sdd_system: list[dict] = [
                 {"type": "text", "text": unified_context},
                 {"type": "text", "text": sdd_guide, "cache_control": {"type": "ephemeral"}},
             ]
             sdd_out, sgr_entry, tok = _call_llm_phase(
-                sdd_system, sdd_user, sdd_model, cfg, SddOutput,
+                sdd_system, sdd_user, sdd_model, _with_json_schema(cfg, _SDD_SCHEMA), SddOutput,
                 max_tokens=_PHASE_MAX_TOKENS["sdd"], phase="sdd", cycle=cycle + 1,
             )
             total_in_tok += tok.get("input", 0)
@@ -748,6 +792,88 @@ def run_pipeline(
             prior_results.append((plan_out.action, raw_output))
             print(f"{CLI_BLUE}[pipeline] EXECUTE ok: {raw_output[:80]}{CLI_CLR}")
 
+            # ── BATCH EXECUTE (homogeneous file reads) ────────────────────────
+            # When SDD proposed additional file-read candidates (beyond the one
+            # PLAN selected), execute them in the same cycle so ANSWER can
+            # compare multiple records. Also runs when PLAN picked a tree/list
+            # discovery action — any remaining read candidates are still useful.
+            # Limited to 4 extras per cycle to cap context growth.
+            if sdd_out and _action_type in ("read", "tree", "list", "search", "find"):
+                _executed = {a2 for s2 in prior_action_sets for a2 in s2}
+                # SDD-proposed candidates
+                _sdd_extras = [
+                    a for a in sdd_out.actions
+                    if a != plan_out.action
+                    and _infer_action_type(a) == "read"
+                    and a not in _executed
+                ]
+                # Search-driven batch: if primary was search:, read ALL matching paths
+                _search_extras: list[str] = []
+                if _action_type == "search":
+                    _search_extras = [
+                        m for m in re.findall(r"^(/[^:\n]+):\d+:", raw_output, re.MULTILINE)
+                        if m not in _executed and m != plan_out.action
+                    ]
+                # Tree-driven batch: fires when primary is a read OR when primary IS
+                # the tree (same-cycle reads right after discovery).
+                _tree_extras: list[str] = []
+                if _action_type in ("read", "tree"):
+                    if _action_type == "read":
+                        _tree_dir = "/".join(plan_out.action.rstrip("/").split("/")[:-1])
+                        _tree_key = (f"tree:{_tree_dir}/", f"tree:{_tree_dir}")
+                    else:
+                        # Primary was tree: use its own output
+                        _tree_dir = plan_out.action[len("tree:"):].rstrip("/")
+                        _tree_key = (plan_out.action, plan_out.action)
+                    # Search prior_results for a matching tree result
+                    _tree_source: str | None = None
+                    for _ta, _tr in prior_results:
+                        if _ta in _tree_key:
+                            _tree_source = _tr
+                            break
+                    # Also check the just-executed output if primary was tree
+                    if _action_type == "tree" and _tree_source is None:
+                        _tree_source = raw_output
+                    if _tree_source:
+                        _raw_extras = [
+                            f for f in _extract_tree_files(
+                                f"tree:{_tree_dir}/", _tree_source
+                            )
+                            if f not in _executed and f != plan_out.action
+                        ]
+                        # Prioritise timestamp-named files (e.g. pay_20240413T…)
+                        # over sequential ones (pay_001…) so fraud records surface first.
+                        _tree_extras = sorted(
+                            _raw_extras,
+                            key=lambda p: (0 if re.search(r"\d{8}T\d{6}", p) else 1, p),
+                        )
+                # Merge: SDD first, then search-driven, then tree-driven fill.
+                # Adaptive batch cap: use IDD scope_estimate if available.
+                # Distributes remaining files evenly across remaining cycles.
+                _scope_files = (idd_out.scope_estimate or {}).get("files_to_read", 0) if idd_out else 0
+                _remaining_cycles = _MAX_CYCLES - cycle  # includes current cycle
+                if _scope_files > 0 and _remaining_cycles > 0:
+                    _batch_cap = min(80, max(24, math.ceil(_scope_files / _remaining_cycles) + 5))
+                else:
+                    _batch_cap = 24
+                _seen: set[str] = set(_sdd_extras)
+                _search_fill = [f for f in _search_extras if f not in _seen]
+                _seen |= set(_search_fill)
+                _tree_fill = [f for f in _tree_extras if f not in _seen]
+                _batch_extras = (_sdd_extras + _search_fill + _tree_fill)[:_batch_cap]
+                for _xact in _batch_extras:
+                    _xplan = plan_out.model_copy(update={"action": _xact})
+                    if check_retry_loop([_xact], prior_action_sets):
+                        continue
+                    _xout, _xerr = _run_execute(vm, _xplan, cycle + 1)
+                    if _xout and not _xerr:
+                        _xraw = _xout.results[0].get("output", "") if _xout.results else ""
+                        if _csv_has_data(_xraw):
+                            prior_results.append((_xact, _xraw))
+                            prior_action_sets[-1] = prior_action_sets[-1] | frozenset([_xact])
+                            _executed.add(_xact)
+                            print(f"{CLI_BLUE}[pipeline] BATCH ok: {_xraw[:60]}{CLI_CLR}")
+
             # ── ANSWER ────────────────────────────────────────────────────────
             executor_model = _resolve_model_for_phase("executor", model)
             _prior_for_answer = [a for s in prior_action_sets for a in s]
@@ -782,12 +908,16 @@ def run_pipeline(
 
             # ── ANSWER CLARIFICATION: retry if cycles remain ──────────────────
             if answer_out.outcome == "OUTCOME_NONE_CLARIFICATION" and cycle + 1 < _MAX_CYCLES:
-                last_error = f"ANSWER clarification: {answer_out.message[:200]}"
+                last_error = f"ANSWER clarification: {answer_out.message[:500]}"
                 print(f"{CLI_YELLOW}[pipeline] ANSWER: OUTCOME_NONE_CLARIFICATION — retrying (cycle {cycle + 1}/{_MAX_CYCLES}){CLI_CLR}")
-                # Only run LEARN if the execute returned empty/no-data — non-empty results
-                # indicate a correct intermediate step (e.g. reading a policy doc) that doesn't
-                # need a learning rule; firing LEARN on correct steps pollutes the rule store.
-                if not _csv_has_data(raw_output):
+                # Run LEARN if: no data, OR clarification signals incomplete file reading.
+                # Incomplete-read clarifications have valid intermediate data but the task
+                # is unfinished — LEARN must fire so the agent learns to batch more aggressively.
+                _clarification_incomplete_reads = any(
+                    k in answer_out.message.lower()
+                    for k in ("not yet read", "unread", "have not been read", "files remaining", "files ")
+                )
+                if not _csv_has_data(raw_output) or _clarification_incomplete_reads:
                     _run_learn(unified_context, model, cfg, task_text, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="semantic", cycle=cycle + 1, task_id=task_id,

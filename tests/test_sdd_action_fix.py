@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from agent.pipeline import run_pipeline
 from tests.test_pipeline import (
     _make_pre, _mock_assemble, _seq_llm,
-    _plan_json, _learn_json, _answer_json, _sdd_json,
+    _plan_json, _learn_json, _answer_json, _sdd_json, _idd_json,
     _make_exec_result,
 )
 
@@ -33,9 +33,11 @@ def test_pipeline_retries_on_exec_runtime_error():
     pre = _make_pre()
 
     with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm([
+             _idd_json(),               # IDD cycle 1
              _failing_exec_sdd_json(),  # SDD cycle 1: exec action that fails at runtime
              _plan_json(),              # PLAN cycle 1
              _learn_json(),             # LEARN cycle 1 (empty result)
+             _idd_json(),               # IDD cycle 2
              _sdd_json(),               # SDD cycle 2: valid SQL action
              _plan_json(),              # PLAN cycle 2
              _answer_json(),            # ANSWER cycle 2

@@ -130,9 +130,11 @@ def _spawn_once(
     cwd: str,
     env: dict[str, str],
     timeout_s: int,
+    stdin_data: str | None = None,
 ) -> tuple[list[str], int, str]:
     """Spawn iclaude once. Returns (stdout_lines, exit_code, fail_reason).
-    fail_reason: 'ok' | 'timeout' | 'error'."""
+    fail_reason: 'ok' | 'timeout' | 'error'.
+    stdin_data: if provided, written to proc stdin (avoids ARG_MAX / E2BIG)."""
     stdout_lines: list[str] = []
     fail_reason = "ok"
     exit_code = -1
@@ -140,6 +142,7 @@ def _spawn_once(
     try:
         proc = subprocess.Popen(
             cmd,
+            stdin=subprocess.PIPE if stdin_data is not None else subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -153,6 +156,12 @@ def _spawn_once(
             daemon=True,
         )
         t.start()
+        if stdin_data is not None and proc.stdin is not None:
+            try:
+                proc.stdin.write(stdin_data)
+                proc.stdin.close()
+            except OSError:
+                pass
         t.join(timeout=timeout_s)
         if proc.poll() is None:
             fail_reason = "timeout"
@@ -251,6 +260,15 @@ def cc_complete(
         "SlashCommand ExitPlanMode AskUserQuestion"
     )
 
+    # FIX-E2BIG: write system prompt to a file to avoid ARG_MAX / E2BIG when
+    # the assembled context is large. kernel enforces a per-execve limit on
+    # argv+envp tighter than the reported ARG_MAX (~2MB nominal).
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".txt", delete=False, prefix="cc_sys_"
+    ) as sf:
+        sf.write(sys_prompt)
+        sys_prompt_path = sf.name
+
     cmd = [
         *shlex.split(_ICLAUDE_CMD),
         "--no-save",
@@ -258,7 +276,7 @@ def cc_complete(
         "--strict-mcp-config",
         "--mcp-config", cfg_path,
         "--disallowed-tools", _CC_BUILTIN_TOOLS_BAN,
-        "--system-prompt", sys_prompt,
+        "--system-prompt-file", sys_prompt_path,
         "--output-format", "json",
     ]
     if cc_model:
@@ -298,13 +316,16 @@ def cc_complete(
         except (TypeError, ValueError) as _exc:
             print(f"[CC] cc_json_schema is not JSON-serializable ({_exc}) — ignored")
 
-    cmd.append(user_msg)
+    # FIX-E2BIG: user_msg passed via stdin, not as a positional CLI arg.
+    # Combined sys_prompt (~10-150 KB) + user_msg as CLI args triggered E2BIG
+    # even well under getconf ARG_MAX, because the kernel enforces a per-execve
+    # limit on the argv+envp region that is tighter than the reported ARG_MAX.
 
     env = _build_env()
 
     try:
         for attempt in range(_CC_MAX_RETRIES + 1):
-            stdout_lines, exit_code, fail_reason = _spawn_once(cmd, cwd, env, cc_timeout)
+            stdout_lines, exit_code, fail_reason = _spawn_once(cmd, cwd, env, cc_timeout, stdin_data=user_msg)
             text, in_tok, out_tok, cache_cr, cache_rd, stop_reason = _parse_envelope(stdout_lines)
             if text:
                 if token_out is not None:
@@ -373,6 +394,7 @@ def cc_complete(
                 )
     finally:
         Path(cfg_path).unlink(missing_ok=True)
+        Path(sys_prompt_path).unlink(missing_ok=True)
         try:
             Path(cwd).rmdir()
         except OSError:

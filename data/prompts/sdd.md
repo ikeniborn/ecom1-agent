@@ -41,58 +41,7 @@ Given a task and environment context, produce:
 
 **Selection rule:** `list:` returns only filenames — useless alone for content tasks. When the task requires finding records by content (fraud, status, keyword), use `search:` directly. `list:` → `read each file` requires multiple cycles; `search:keyword /dir/` does it in one.
 
-**3DS payment recovery:** When a task asks to recover a failed/stuck bank verification or 3DS checkout, use `/bin/payments recover-3ds PAY_ID`. Read `/docs/payments/3ds.md` first. CRITICAL sequence before running the tool: (1) find the payment ID, (2) do a direct file-read of `/proc/payments/PAY_ID.json` — this is mandatory so the file appears in grounding_refs, (3) THEN run `/bin/payments recover-3ds PAY_ID`. If the tool returns "not waiting for 3DS action", use OUTCOME_NONE_UNSUPPORTED. Do NOT say it is UNSUPPORTED before attempting the tool. grounding_refs MUST include `/proc/payments/PAY_ID.json` for both OUTCOME_OK and OUTCOME_NONE_UNSUPPORTED.
-
-**Catalogue count reports:** When a task asks "how many products are X" or "for the catalogue count report, how many X":
-1. Run `tree:/docs/` to discover the directory structure. Files may be in `/docs/catalogue-addenda/`, `/docs/policy-updates/`, `/docs/current-updates/`, or other subdirs.
-2. Identify and **read** (file-read action, not search) the file whose filename contains the product type keywords. Read at whatever path tree:/docs/ shows.
-3. The file gives **counting criteria** (not the count itself). Policy docs typically say: "count only SKUs with at least one inventory row in an open [Brand] store in [City] with available_today > 0."
-4. **CRITICAL**: Execute the SQL with ALL criteria from the policy doc — ALWAYS apply city filter, store brand filter, is_open=1, available_today>0 when specified. The full filtered count (e.g. 5, 68) is the correct answer, NOT the total products of that kind (e.g. 30, 264).
-   ```sql
-   SELECT COUNT(DISTINCT p.sku)
-   FROM products p
-   JOIN product_kinds pk ON p.kind_id = pk.id
-   JOIN inventory i ON p.sku = i.sku
-   JOIN stores s ON i.store_id = s.id
-   WHERE pk.name = '[TYPE FROM TASK]'
-     AND LOWER(s.city) = '[CITY FROM POLICY DOC]'
-     AND LOWER(s.name) LIKE '%[BRAND FROM POLICY DOC]%'
-     AND s.is_open = 1
-     AND i.available_today > 0
-   ```
-5. IMPORTANT: the correct table for kind names is **`product_kinds`** (NOT `kinds` — the `kinds` table does not exist).
-6. **COMPOUND TYPE NAMES**: NEVER split compound type names (e.g. "Tool Box and Bag", "Compressor and Dust Extractor", "Screwdriver and Hex Key Set") into separate IN() conditions. Use the EXACT full name: `pk.name = 'Tool Box and Bag'` NOT `pk.name IN ('Tool Box', 'Bag')`. Alternatively, if the policy doc gives a `kind_id` value, use `p.kind_id = '[KIND_ID FROM DOC]'` directly on the products table.
-7. **COUNT PRODUCTS, NOT KINDS**: `SELECT COUNT(DISTINCT p.sku)` counts PRODUCTS (SKUs). Do NOT count rows in product_kinds — that counts types, not products. Even if the policy doc says "one kind_id = X", you still need to count actual SKUs in the products table.
-8. **Policy doc kind_id**: When the policy doc gives an explicit `kind_id` value (e.g. `kind_id: screwdriver_hex_se`), use it directly: `SELECT COUNT(DISTINCT sku) FROM products WHERE kind_id = '[KIND_ID FROM DOC]'`. This is MORE RELIABLE than joining product_kinds by name.
-9. If no addenda/policy file exists for the requested product type, query `product_kinds` directly without location filter.
-10. Include the policy/addenda doc path in grounding_refs (use file-read action, not search, so it appears in FILES_READ_IN_PRIOR_CYCLES).
-11. Do NOT output OUTCOME_NONE_CLARIFICATION for count questions — always execute SQL to get the count.
-
-**Multi-product store availability count:** When task asks "how many of these [list of N products] have at least X items available in [store] today":
-- NEVER use `SELECT COUNT(DISTINCT p.sku)` as the final SQL — it returns no paths and `grounding_refs` will be empty.
-- Use `SELECT DISTINCT p.sku, p.path` with the inventory/store join. Count rows in the answer.
-- ALL returned `p.path` values MUST appear in `grounding_refs`.
-- Verify specific product properties using PIVOT GROUP BY with HAVING clauses.
-- Example final SQL:
-```sql
-SELECT DISTINCT p.sku, p.path FROM products p
-JOIN inventory i ON p.sku = i.sku
-JOIN stores s ON i.store_id = s.id
-WHERE s.city = 'Bratislava' AND s.name LIKE '%PowerTool%'
-  AND i.available_today >= 3
-  AND (p.brand = 'Ajax' AND p.model LIKE '%F4A-LNF%' OR ...)
-```
-
-**Multi-property product lookups:** When searching for a product by multiple properties (e.g., brand + series + mask_type + protection_class), use a PIVOT GROUP BY query rather than a flat JOIN that returns 100+ rows. Example:
-```sql
-SELECT p.sku, p.path,
-  MAX(CASE WHEN pp.key='mask_type' THEN pp.value_text END) AS mask_type,
-  MAX(CASE WHEN pp.key='protection_class' THEN pp.value_text END) AS protection_class
-FROM products p LEFT JOIN product_properties pp ON p.sku = pp.sku
-WHERE p.brand='Moldex' AND p.model LIKE '%1MC-E8U%'
-GROUP BY p.sku, p.path
-HAVING mask_type='dust mask' AND protection_class='basic'
-```
+**File-reading tasks:** When task requires reading multiple files, prefer `search:KEYWORD /dir/` to locate specific records in one action. Use `tree:/dir/` for enumeration when you need to read all files. The pipeline batches file reads automatically — propose the first file as primary action; remaining files are batched per cycle up to the adaptive cap derived from IDD `scope_estimate`.
 
 Never write a natural-language sentence as an action value.
 If you cannot express the required operation in one of the forms above, set `actions` to `[]`.

@@ -26,6 +26,9 @@ class IddOutput(BaseModel):
     stop_message: str = ""
     stop_refs: list[str] = []
     reasoning: str = ""
+    scope_estimate: dict = {}
+    # e.g. {"files_to_read": 180, "estimated_cycles": 8}
+    # Pipeline uses this to compute adaptive batch cap per cycle.
 
 
 class SddOutput(BaseModel):

@@ -30,6 +30,23 @@ def _collect_trace(tmp_path, task_id="t01"):
     return t, p
 
 
+def _idd_json():
+    return json.dumps({
+        "intent_objective": "count products",
+        "reformulated_task": "find X",
+        "intent_type": "read",
+        "extracted_params": {},
+        "success_criteria": ["result contains count"],
+        "stop_rules": [],
+        "health_metrics": [],
+        "decision": "proceed",
+        "stop_code": "",
+        "stop_message": "",
+        "stop_refs": [],
+        "reasoning": "",
+    })
+
+
 def _sdd_json():
     return json.dumps({
         "spec_goal": "count products by type",
@@ -65,7 +82,7 @@ def test_llm_call_records_written_on_success(tmp_path):
     vm = MagicMock()
     vm.exec.return_value = _exec_ok()
 
-    with patch("agent.pipeline.call_llm_raw", side_effect=[_sdd_json(), _plan_json(), _answer_json()]), \
+    with patch("agent.pipeline.call_llm_raw", side_effect=[_idd_json(), _sdd_json(), _plan_json(), _answer_json()]), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})
@@ -91,7 +108,7 @@ def test_sql_execute_record_written(tmp_path):
     vm = MagicMock()
     vm.exec.return_value = _exec_ok()
 
-    with patch("agent.pipeline.call_llm_raw", side_effect=[_sdd_json(), _plan_json(), _answer_json()]), \
+    with patch("agent.pipeline.call_llm_raw", side_effect=[_idd_json(), _sdd_json(), _plan_json(), _answer_json()]), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})
@@ -114,7 +131,7 @@ def test_plan_phase_llm_call_recorded(tmp_path):
     vm = MagicMock()
     vm.exec.return_value = _exec_ok()
 
-    with patch("agent.pipeline.call_llm_raw", side_effect=[_sdd_json(), _plan_json(), _answer_json()]), \
+    with patch("agent.pipeline.call_llm_raw", side_effect=[_idd_json(), _sdd_json(), _plan_json(), _answer_json()]), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})

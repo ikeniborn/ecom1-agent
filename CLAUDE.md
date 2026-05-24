@@ -84,3 +84,13 @@ Entry point: `main.py` → BitGN harness → `agent/orchestrator.py:run_agent()`
 - JSON extraction priority in `json_extract.py` is load-bearing: mutation tools (write/delete) take priority over reads to avoid spurious tool calls
 - `check_retry_loop` in `sql_security.py` is a standalone anti-infinite-loop guard
 - `agent/CLAUDE.md` covers agent-package internals and mirrors this file's architecture section
+
+## Prompt Engineering Rules
+
+**System prompts (`data/prompts/*.md`) contain only general structural rules.**
+
+- Allowed: action forms, output format, SQL constraints, generic decision patterns
+- Forbidden: task-specific domain rules, per-task-type heuristics, scenario-specific sequences
+
+All task-specific knowledge must flow through the LEARN mechanism into `data/learned/{task_id}.yaml`.
+Never patch `data/prompts/` to fix a task failure — fix the LEARN trigger or learned rule instead.

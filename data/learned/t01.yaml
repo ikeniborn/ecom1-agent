@@ -1,7 +1,259 @@
+entries:
+- content: Always push product_properties key/value filters into the JOIN ON clause
+    (e.g., JOIN product_properties pp ON p.sku=pp.sku AND pp.key='storage_type' AND
+    pp.value_text='tool bag') instead of using HAVING on a computed alias — keeps
+    query short, avoids alias-in-HAVING, prevents output truncation.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''failed to parse LLM output. Raw: ...GROUP BY p.sku,
+    p.pa'' — output truncated mid-SQL string, breaking JSON. Root cause: wrong-action
+    — the PLAN phase emitted a long SQL with HAVING on a computed alias (''storage_type'')
+    plus three joins; the combined length exceeded the output window and was cut at
+    ''p.pa'' (should be ''p.path''). Failing fragment: action ''SELECT p.sku, p.path
+    ... HAVING storage_type = \''tool bag\''''. Rule linkage: spec_goal requires ''property
+    key=storage_type value=tool bag'' filter — this can be pushed into the JOIN ON
+    clause, shortening the query enough to prevent truncation.'
+  source: learn
+  status: active
+- content: Always split multi-token series names into individual AND-chained LIKE
+    conditions when a full-string series LIKE filter returns empty results — e.g.,
+    replace `p.series LIKE '%SYS 3JJ-9LM%'` with `p.series LIKE '%SYS%' AND p.series
+    LIKE '%3JJ%' AND p.series LIKE '%9LM%'` — to tolerate catalogue spacing and naming
+    variations.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,available_today''.
+    Root cause: wrong-filter — series LIKE ''%SYS 3JJ-9LM%'' is too specific; catalogue
+    may store series name with different spacing, casing, or token order. Failing
+    fragment: action filter ''p.series LIKE \''%SYS 3JJ-9LM%\'''' in spec_goal ''Find
+    Festool SYS 3JJ-9LM series products''. STOP_RULES explicitly say ''If series name
+    differs slightly, broaden series filter'' but no rule encodes HOW to broaden.
+    Rule linkage: new rule must target spec_goal series filter and prescribe token-split
+    fallback.'
+  source: learn
+  status: active
+- content: 'Always report NO with a catalogue-not-found explanation when the series-only
+    fallback query (action: ''SELECT p.sku, p.path, p.name, p.series FROM products
+    p WHERE p.brand=... AND p.series LIKE token-split'') returns empty after r001
+    and r002 have been applied — do not attempt further query variants; the item is
+    absent from catalogue.'
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,available_today''.
+    Root cause: empty-result — both r001 (JOIN ON clause) and r002 (AND-chained LIKE
+    tokens) were applied correctly per SDD_OUTPUT actions, yet result still empty.
+    Failing fragment: action ''SELECT p.sku, p.path, p.name, p.series, COALESCE(SUM(i.available_today),
+    0) AS available_today FROM products p JOIN product_properties pp ON p.sku = pp.sku
+    AND pp.key = ''storage_type'' AND pp.value_text = ''tool bag'' LEFT JOIN inventory
+    i ON p.sku = i.sku WHERE p.brand = ''Festool'' AND p.series LIKE ''%SYS%'' AND
+    p.series LIKE ''%3JJ%'' AND p.series LIKE ''%9LM%'' GROUP BY p.sku, p.path, p.name,
+    p.series'' and fallback ''SELECT p.sku, p.path, p.name, p.series FROM products
+    p WHERE p.brand = ''Festool'' AND p.series LIKE ''%SYS%'' AND p.series LIKE ''%3JJ%''
+    AND p.series LIKE ''%9LM%'''' both returned empty. STOP_RULES states: ''If token-split
+    query still returns empty, report NO with catalogue-not-found explanation''. Rule
+    linkage: new rule must encode the terminal reporting behavior when both primary
+    and fallback queries return empty after applying r001+r002.'
+  source: learn
+  status: active
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r004, r005, r006, r007, r008, r009, r010, r011,
+    r012'
+  id: r004
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r004, r005, r006, r007, r008, r009, r010, r011,
+    r012'
+  id: r005
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r004, r005, r006, r007, r008, r009, r010, r011,
+    r012'
+  id: r006
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r004, r005, r006, r007, r008, r009, r010, r011,
+    r012'
+  id: r007
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r004, r005, r006, r007, r008, r009, r010, r011,
+    r012'
+  id: r008
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r004, r005, r006, r007, r008, r009, r010, r011,
+    r012'
+  id: r009
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r004, r005, r006, r007, r008, r009, r010, r011,
+    r012'
+  id: r010
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r004, r005, r006, r007, r008, r009, r010, r011,
+    r012'
+  id: r011
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r004, r005, r006, r007, r008, r009, r010, r011,
+    r012'
+  id: r012
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r013'
+  id: r013
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r014'
+  id: r014
+  reasoning: r004–r013 all identical content 'use correct column name'; keep r013
+    as highest-id, deactivate r004–r012
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r015'
+  id: r015
+  reasoning: r013 and r014 identical content; r014 kept as base, r013 deactivated
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r016'
+  id: r016
+  reasoning: r014 and r015 identical — same failure, same fix; r015 is higher id,
+    kept as base
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r017'
+  id: r017
+  reasoning: r015 and r016 are identical duplicates; keep r016 (highest id), deactivate
+    r015.
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r018'
+  id: r018
+  reasoning: r016 and r017 identical — same content, same intent. Deactivate lower-id
+    r016, keep r017.
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r019'
+  id: r019
+  reasoning: r017 and r018 identical content; keep highest id r018, deactivate r017.
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r020'
+  id: r020
+  reasoning: r018 and r019 are identical duplicates; r019 is higher id, use as canonical,
+    deactivate r018
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r021, r022, r023, r024, r025, r026'
+  id: r021
+  reasoning: r019 and r020 are identical duplicates; keep highest-id r020, deactivate
+    r019.
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r021, r022, r023, r024, r025, r026'
+  id: r022
+  reasoning: r020 and r021 identical content; r021 is highest id, r020 deactivated
+    as duplicate
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r021, r022, r023, r024, r025, r026'
+  id: r023
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r021, r022, r023, r024, r025, r026'
+  id: r024
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r021, r022, r023, r024, r025, r026'
+  id: r025
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r021, r022, r023, r024, r025, r026'
+  id: r026
+  reasoning: r
+  source: learn
+  status: inactive
+- content: use correct column name
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r027
+  reasoning: r
+  source: learn
+  status: active
+- content: Use correct column name.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r028
+  reasoning: r021–r027 all state identical rule (case/punctuation variants only).
+    r027 is highest id; r021–r026 are pure duplicates and deactivated.
+  source: learn
+  status: active
 last_run:
-  cycles_used: 1
+  cycles_used: 5
   date: '2026-05-24'
-  grounding_refs_count: 1
-  outcome: OUTCOME_OK
-  status: success
+  grounding_refs_count: 0
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
 task_id: t01
