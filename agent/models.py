@@ -3,6 +3,31 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, model_validator
 
 
+class IddOutput(BaseModel):
+    # Layer 1: Intent
+    intent_objective: str
+    reformulated_task: str
+    intent_type: Literal["read", "write", "security_check", "compute"] = "read"
+    extracted_params: dict = {}
+
+    # Layer 1: Expectation contract
+    success_criteria: list[str]
+    stop_rules: list[str] = []
+    health_metrics: list[str] = []
+
+    # Gate
+    decision: Literal["proceed", "hard_stop"]
+    stop_code: Literal[
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED",
+        "OUTCOME_NONE_CLARIFICATION",
+        "",
+    ] = ""
+    stop_message: str = ""
+    stop_refs: list[str] = []
+    reasoning: str = ""
+
+
 class SddOutput(BaseModel):
     spec_goal: str
     success_criteria: list[str]
