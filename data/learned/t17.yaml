@@ -1,6 +1,28 @@
+entries:
+- content: Always run a broad probe query (WHERE brand='Festool' only, no LIKE, no
+    HAVING) to confirm actual series and name values before executing the combined
+    product identification action in spec_goal 'Correct product identified by brand=Festool,
+    series LIKE %SYS 3JJ-9LM%, name LIKE %Tool Box and Bag%, storage_type=parts case';
+    use confirmed literal values in follow-up filters.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,storage_type''.
+    Root cause category: wrong-filter. Failing fragment: PLAN_OUTPUT action ''SELECT
+    p.sku, p.path, p.name, p.series, MAX(CASE WHEN pp.key=\''storage_type\'' THEN
+    pp.value_text END) AS storage_type ... WHERE p.brand = \''Festool\'' AND p.series
+    LIKE \''%SYS 3JJ-9LM%\'' AND p.name LIKE \''%Tool Box and Bag%\'' ... HAVING storage_type
+    = \''parts case\''''. Three simultaneous restrictive filters (series LIKE, name
+    LIKE, HAVING storage_type) are ANDed — any one mismatch in actual DB values (e.g.
+    series stored as ''SYS3JJ-9LM'' without space, or name stored differently) silently
+    kills all rows. Rule must target spec_goal ''Correct product identified by brand=Festool,
+    series LIKE \''%SYS 3JJ-9LM%\'', name LIKE \''%Tool Box and Bag%\'', storage_type=parts
+    case'' by requiring a broad probe before combining filters.'
+  source: learn
+  status: active
 last_run:
-  cycles_used: 2
-  date: '2026-05-23'
+  cycles_used: 3
+  date: '2026-05-24'
   grounding_refs_count: 3
   outcome: OUTCOME_OK
   status: success

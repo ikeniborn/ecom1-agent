@@ -27,7 +27,7 @@ entries:
     the identifier across model, series, and name alone, then verify brand and properties
     in separate follow-up queries.
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r002'
   id: r002
   reasoning: 'The verbatim error is ''Empty result: sku,path,name,brand,series,model,value_text''.
     The root cause category is wrong-action: the initial SKU lookup action simultaneously
@@ -43,7 +43,7 @@ entries:
     lookup: isolate the SKU with the identifier first, then verify brand and properties
     separately.'
   source: learn
-  status: active
+  status: inactive
 - content: Never conjoin an alphanumeric product identifier search for '1TO-KNA' across
     products.model, products.series, and products.name with a product_properties join
     filtering on properties (e.g., key='cleaner type' and value_text='screen wash')
@@ -63,10 +63,43 @@ entries:
     redundant guidance and consolidates the rule set.
   source: learn
   status: active
+- content: Never wrap the plan-phase JSON action object (containing 'function' and
+    'query' fields) in markdown code fences or any other formatting — always emit
+    the raw JSON object directly so the PCM harness can parse it.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''PLAN phase: failed to parse LLM output. Raw: ```json\n{\n  "function":
+    "sql",\n  "query": "SELECT sku..."\n}\n```''. Root cause: wrong-action — the PLAN
+    phase emitted a fenced JSON code block instead of the raw JSON object the PCM
+    harness expects; the harness could not parse the output because of the markdown
+    code fence wrapping. Failing fragment: the action ''SELECT sku, path, brand, series,
+    model, name FROM products WHERE model LIKE ...'' was correct in substance but
+    the LLM wrapped it in ```json ... ``` fences, making it unparseable. Rule linkage:
+    the new rule must target the output formatting of plan-phase actions — never wrap
+    the JSON action object in markdown fences.'
+  source: learn
+  status: active
+- content: Never conjoin an alphanumeric product identifier search across products.model,
+    products.series, and products.name with a product_properties join (e.g., key='cleaner
+    type', value_text='screen wash') or an exact brand filter (e.g., 'Sonax') in the
+    initial SKU lookup query — this produces empty results. Also never search an alphanumeric
+    product identifier exclusively in products.series and products.name; always include
+    products.model in the initial WHERE clause. Always first retrieve candidate SKUs
+    from the products table by the identifier across model, series, and name alone,
+    then verify brand and properties in separate follow-up queries.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: r002 is strict subset of r003. r003 covers all of r002's scope (no property/brand
+    joins in initial query) plus adds the rule about including products.model in the
+    initial search. r003 used as base, r002 deactivated.
+  source: learn
+  status: active
 last_run:
   cycles_used: 4
-  date: '2026-05-23'
+  date: '2026-05-24'
   grounding_refs_count: 3
   outcome: OUTCOME_OK
-  status: success
+  status: failure
 task_id: t20

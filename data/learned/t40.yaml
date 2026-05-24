@@ -277,7 +277,7 @@ entries:
     archive containers are discovered always emit a concrete file-reading or archive-extraction
     command as the PLAN action.
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r015, r016'
   id: r015
   reasoning: 'Verbatim error: ''PLAN phase: action is empty''. Root cause: wrong-action.
     The PLAN_OUTPUT action field is '''' even though the plan steps require an initial
@@ -288,7 +288,7 @@ entries:
     directory listing command ''tree:/proc/payments/'' rather than being empty at
     the start of the workflow.'
   source: learn
-  status: active
+  status: inactive
 - content: 'When the spec_goal is to identify every archived payment record under
     /proc/payments/ that belongs to the known fraud hit: never include ''search:fraud
     /proc/payments/'' in SDD actions; never use ''find:* /proc/payments/'' as the
@@ -300,7 +300,7 @@ entries:
     file-reading or archive-extraction command that opens each discovered archive
     container to inspect its payment contents.'
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r015, r016'
   id: r016
   reasoning: r013, r014, and r015 all address the same spec_goal. r015 (highest id)
     is the base because it prescribes the concrete initial PLAN command tree:/proc/payments/
@@ -308,7 +308,7 @@ entries:
     prohibitions from r014 (and r013) against search:fraud, find:*, and hardcoded
     archive subdirectory/file paths to cover the full scope of all three rules.
   source: learn
-  status: active
+  status: inactive
 - content: 'For fraud investigation tasks: after tree:/proc/payments/, read /docs/merchant-continuity-and-critical-incidents.md
     — this doc identifies which payments are part of confirmed fraud incidents. Use
     the incident details to filter which pay_XXX.json files to read and cite. The
@@ -317,16 +317,63 @@ entries:
     (3) read the specific payment files identified by the incident doc, (4) return
     OUTCOME_OK with those payment file paths in grounding_refs.'
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: r017 prescribes the correct 4-step sequence but omits the critical
+    constraint on SDD actions when PRIOR_ACTIONS already cover steps 1-2, allowing
+    SDD to loop back to prohibited actions; the new rule supersedes r017 with explicit
+    guidance for this mid-sequence state.
   id: r017
   reasoning: Agent tried many keyword searches for fraud which all failed. The /docs/merchant-continuity-and-critical-incidents.md
     doc likely identifies fraud payments by incident details without needing keyword
     search.
   source: manual
+  status: inactive
+- content: 'When spec_goal is to identify fraudulent payment records and PRIOR_ACTIONS
+    already contain both ''tree:/proc/payments/'' and ''read:/docs/merchant-continuity-and-critical-incidents.md'',
+    the SDD actions field must contain only concrete ''read:/proc/payments/<filename>''
+    actions for payment files identified or cross-referenced from the incident doc
+    — never ''search:fraud /proc/payments/'', never any action already present in
+    PRIOR_ACTIONS, never an empty list; if the incident doc yielded no explicit payment
+    IDs, parse it for merchant names, dates, or amounts and cross-reference against
+    the prior tree listing to produce candidate read: actions.'
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r018
+  reasoning: 'Verbatim error: ''PLAN phase: action is empty''. Root cause: wrong-action
+    — SDD emitted ''search:fraud /proc/payments/'' (violating r016), and PRIOR_ACTIONS
+    had already consumed tree:/proc/payments/ + incident doc read + search:fraud,
+    so PLAN filtered all candidates to nothing. Failing fragment: SDD actions=[''search:fraud
+    /proc/payments/''] despite r016 prohibiting it; r017 prescribes a 4-step sequence
+    but does not explicitly say what the SDD action must be when PRIOR_ACTIONS already
+    contain steps 1-2. Result: SDD looped back to a prohibited action instead of advancing
+    to step 3 (read specific payment files). Rule linkage: new rule must target the
+    SDD actions field when PRIOR_ACTIONS already contain tree:/proc/payments/ and
+    /docs/merchant-continuity-and-critical-incidents.md, forcing emission of concrete
+    read: actions only.'
+  source: learn
+  status: active
+- content: 'When spec_goal is to identify fraudulent/archived payment records under
+    /proc/payments/: (1) Initial PLAN action MUST be ''tree:/proc/payments/'' — never
+    empty, never ''find:* /proc/payments/'', never ''search:fraud /proc/payments/'',
+    never hardcoded paths like ''list:/proc/payments/archive/'' or ''/proc/payments/archive.zip''.
+    (2) After tree reveals archive containers, always emit concrete file-reading or
+    archive-extraction command as next PLAN action — never empty. (3) Once PRIOR_ACTIONS
+    contain both ''tree:/proc/payments/'' and ''read:/docs/merchant-continuity-and-critical-incidents.md'',
+    SDD actions must contain only concrete ''read:/proc/payments/<filename>'' actions
+    for files identified or cross-referenced from incident doc — never ''search:fraud'',
+    never repeat prior actions, never empty; if incident doc has no explicit payment
+    IDs, parse for merchant names/dates/amounts and cross-reference against tree listing
+    to produce candidate read: actions.'
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r019
+  reasoning: r015+r016+r018 all address same spec_goal (fraud payment record identification).
+    r015 is strict subset of r016. r018 covers later phase but same goal. Merged using
+    r018 as base, extended with r016's prohibitions and phase-1 guidance.
+  source: learn
   status: active
 last_run:
-  cycles_used: 15
-  date: '2026-05-23'
+  cycles_used: 5
+  date: '2026-05-24'
   grounding_refs_count: 0
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure

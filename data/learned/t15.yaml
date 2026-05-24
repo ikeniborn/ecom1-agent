@@ -32,11 +32,11 @@ entries:
     Fix: use SELECT DISTINCT sku,path to get paths for grounding_refs.'
   source: manual
   status: active
-- content: 'CRITICAL for multi-product availability count: The SQL action MUST be a
-    raw SELECT starting directly with SELECT — NEVER use WITH/CTE syntax, NEVER wrap
-    in /bin/sql. The executor rejects actions starting with WITH (invalid path) and
-    /bin/sql wrappers (syntax error). CORRECT pattern: SELECT DISTINCT p.sku, p.path
-    FROM products p JOIN inventory i ON p.sku = i.sku JOIN stores s ON i.store_id
+- content: 'CRITICAL for multi-product availability count: The SQL action MUST be
+    a raw SELECT starting directly with SELECT — NEVER use WITH/CTE syntax, NEVER
+    wrap in /bin/sql. The executor rejects actions starting with WITH (invalid path)
+    and /bin/sql wrappers (syntax error). CORRECT pattern: SELECT DISTINCT p.sku,
+    p.path FROM products p JOIN inventory i ON p.sku = i.sku JOIN stores s ON i.store_id
     = s.id WHERE LOWER(s.name) LIKE ''%storename%'' AND s.is_open=1 AND i.available_today
     >= N AND ((p.brand=''Brand1'' AND LOWER(p.model) LIKE ''%model1%'') OR (p.brand=''Brand2''
     AND LOWER(p.model) LIKE ''%model2%'') OR ...). Count returned rows for answer.
@@ -49,10 +49,69 @@ entries:
     no CTE, no wrapper.'
   source: manual
   status: active
+- content: Always run a store-discovery query (SELECT DISTINCT s.id, s.name, s.city
+    FROM stores WHERE LOWER(s.city) LIKE '%innsbruck%') before building the availability
+    SQL when the task references a store by prose description (e.g., 'central', 'main',
+    'downtown'). Use the actual s.name substring found in that result for the LIKE
+    filter — never map task prose directly to a LIKE pattern without verification.
+    If multiple stores match, prefer the one whose name most closely matches all prose
+    qualifiers (brand chain name + location qualifier).
+  created: '2026-05-24'
+  deactivated_reason: r004 prescribes a store-discovery query containing `s.id` which
+    does not exist in the stores table; this column reference caused the SQL logic
+    error that failed the pipeline. New rule replaces r004 with a corrected query
+    omitting s.id.
+  id: r004
+  reasoning: 'Verbatim error: ''Empty result: sku,path''. Root cause: wrong-filter.
+    Failing fragment: action contains `AND LOWER(s.name) LIKE ''%central%''` — the
+    Innsbruck PowerTool store name likely does not contain the literal substring ''central''
+    (could be ''zentrum'', ''mitte'', ''centrum'', or simply absent). The spec_goal
+    says ''central Innsbruck PowerTool shop'' but that is task description prose,
+    not a guaranteed SQL-matchable substring in s.name. The plan blindly mapped ''central''
+    → LIKE ''%central%'' without verifying actual store names. r002 and r003 are not
+    at fault — query structure is correct. The store discovery step was skipped. Rule
+    must require a store-name discovery query before filtering by store prose descriptors.'
+  source: learn
+  status: inactive
+- content: Always run store-discovery query `SELECT DISTINCT s.name, s.city FROM stores
+    WHERE LOWER(s.city) LIKE '%innsbruck%'` (NO s.id column — it does not exist in
+    stores table). Use actual s.name substring found for LIKE filter in the availability
+    SQL. Never reference s.id in any stores query.
+  created: '2026-05-24'
+  deactivated_reason: r005 contains the broken query `SELECT DISTINCT s.name, s.city
+    FROM stores WHERE ...` which uses alias prefix s without defining it — this is
+    the direct cause of the current failure.
+  id: r005
+  reasoning: 'Verbatim error: "SQL logic error: no such column: s.id (1)". Root cause:
+    wrong-column — existing rule r004 prescribes store-discovery query `SELECT DISTINCT
+    s.id, s.name, s.city FROM stores WHERE LOWER(s.city) LIKE ''%innsbruck%''` but
+    column `s.id` does not exist in the stores table (despite the schema digest FK
+    note claiming `stores.id`). The action in PLAN_OUTPUT `SELECT DISTINCT s.id, s.name,
+    s.city FROM stores WHERE LOWER(s.city) LIKE ''%innsbruck%''` was copied verbatim
+    from r004 and produced this exact error. Rule r004 is the direct cause of failure.'
+  source: learn
+  status: inactive
+- content: Always run store-discovery query `SELECT DISTINCT name, city FROM stores
+    WHERE LOWER(city) LIKE '%innsbruck%'` (no table alias prefix — stores not aliased
+    in FROM clause). Use actual name value found for LIKE filter in availability SQL.
+    Never write `s.name` or `s.city` in a single-table stores query without `FROM
+    stores s`.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verbatim error: "no such column: s.name (1)". Root cause: syntax — table
+    alias `s` used in SELECT (`s.name`, `s.city`) but `FROM stores` clause never assigns
+    alias `s`; without `FROM stores s` the prefix `s.` is unresolved. Failing fragment:
+    r005 rule_content contains `SELECT DISTINCT s.name, s.city FROM stores WHERE LOWER(s.city)
+    LIKE ''%innsbruck%''` — `stores` not aliased. PLAN_OUTPUT action is verbatim copy
+    of that broken query. Rule linkage: corrected rule must fix the query in r005
+    to either drop `s.` prefix or add `stores s` alias.'
+  source: learn
+  status: active
 last_run:
-  cycles_used: 15
-  date: '2026-05-23'
-  grounding_refs_count: 0
-  outcome: OUTCOME_NONE_CLARIFICATION
+  cycles_used: 5
+  date: '2026-05-24'
+  grounding_refs_count: 16
+  outcome: OUTCOME_OK
   status: failure
 task_id: t15

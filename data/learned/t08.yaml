@@ -17,9 +17,25 @@ entries:
     search terms across multiple product columns to locate the matching base product.'
   source: learn
   status: active
+- content: Always emit the `actions` array in SDD_OUTPUT as a complete, syntactically
+    valid SQL string inside a valid JSON field; never truncate mid-function-call (e.g.,
+    a dangling 'MAX' with no column, alias, or closing parenthesis is forbidden).
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''failed to parse LLM output. Raw: SQL query now:...
+    MAX''. Root cause: syntax — the action SQL was truncated mid-expression (''MAX''
+    with no closing paren/column/alias), causing the PLAN phase parser to reject the
+    output as unparseable JSON/SQL. Failing fragment: action string ending in ''MAX''
+    from SDD_OUTPUT actions[0] — the LLM generated a partial SQL snippet outside a
+    valid JSON structure instead of a clean JSON object with a complete SQL string.
+    Rule linkage: the action must always be emitted as a complete, syntactically valid
+    SQL string inside a valid JSON field — never truncated mid-function-call.'
+  source: learn
+  status: active
 last_run:
   cycles_used: 2
-  date: '2026-05-23'
+  date: '2026-05-24'
   grounding_refs_count: 1
   outcome: OUTCOME_OK
   status: success

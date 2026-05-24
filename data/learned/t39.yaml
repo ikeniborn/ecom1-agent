@@ -553,7 +553,7 @@ entries:
     execute those `read` or `grep` actions only after the outputs of the preceding
     enumeration or search steps have been obtained.
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r027'
   id: r027
   reasoning: r025 and r026 address the same spec_goal of identifying fraudulent payment
     records in /proc/payments/. r025 is a strict subset covering only search-based
@@ -561,7 +561,7 @@ entries:
     and search preliminary actions, fully subsuming r025. Retaining r026 eliminates
     redundancy.
   source: learn
-  status: active
+  status: inactive
 - content: Never allow the SDD `actions` list to terminate after only preliminary
     enumeration actions—whether `list:/proc/payments/` and `tree:/proc/payments/`,
     or `search:fraud /proc/payments/` and `search:fraudulent /proc/payments/`—when
@@ -572,14 +572,18 @@ entries:
     execute those `read` or `grep` actions only after the outputs of the preceding
     enumeration or search steps have been obtained.
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: r028 is a verbatim duplicate of r027 and adds no new constraint.
+    r029 is superseded because it explicitly conditions its workflow on 'After tree:/proc/payments/'
+    — a step the new rule prohibits — making r029 self-contradictory with the corrected
+    approach; the new rule absorbs r029's valid intent (use continuity doc) while
+    removing the timed-out tree prerequisite.
   id: r028
   reasoning: r026 and r027 are semantically identical duplicates addressing the same
     spec_goal (identify fraudulent payment record(s) in the /proc/payments/ archive);
     r027 has the highest id, so it is retained as the base and r026 is deactivated
     as redundant.
   source: learn
-  status: active
+  status: inactive
 - content: 'CRITICAL for fraud investigation tasks: do NOT spend cycles on keyword
     searches. After tree:/proc/payments/, immediately read /docs/merchant-continuity-and-critical-incidents.md
     — this doc identifies which payments are part of confirmed fraud incidents. Use
@@ -588,15 +592,112 @@ entries:
     OUTCOME_NONE_CLARIFICATION — the task says "fraud review says one hit is present"
     which means the data IS there.'
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: r028 is a verbatim duplicate of r027 and adds no new constraint.
+    r029 is superseded because it explicitly conditions its workflow on 'After tree:/proc/payments/'
+    — a step the new rule prohibits — making r029 self-contradictory with the corrected
+    approach; the new rule absorbs r029's valid intent (use continuity doc) while
+    removing the timed-out tree prerequisite.
   id: r029
   reasoning: 15 cycles of keyword searches failed to find fraud records. The /docs/merchant-continuity-and-critical-incidents.md
     should identify them directly. Do not keep looping on failed keyword searches.
   source: manual
+  status: inactive
+- content: Never use `tree:/proc/payments/` as an enumeration action when spec_goal
+    is to identify fraudulent payment records in /proc/payments/ — the tree operation
+    on this archive causes read timeout; replace it with `list:/proc/payments/` (shallow,
+    non-recursive) to obtain file names without timeout, then immediately cross-reference
+    against `/docs/merchant-continuity-and-critical-incidents.md` to map incident
+    payment IDs to specific files, then read those files directly.
+  created: '2026-05-24'
+  deactivated_reason: r030 only prohibits `tree:/proc/payments/` but not `search:fraud
+    /proc/payments/`; the new rule is a strict superset that covers both prohibited
+    actions under the same spec_goal, making r030 redundant.
+  id: r030
+  reasoning: 'Verbatim error: ''The read operation timed out'' on action ''tree:/proc/payments/''.
+    Root cause: wrong-action — `tree` on a large archive directory exceeds the PCM
+    read timeout ceiling; non-recursive listing must replace it. Failing fragment:
+    PLAN_OUTPUT action=''tree:/proc/payments/'' and SDD_OUTPUT actions=[''tree:/proc/payments/'',
+    ''search:fraud /proc/payments/'']. Rule linkage: the new rule must forbid `tree:/proc/payments/`
+    and mandate `list:/proc/payments/` (non-recursive) as the enumeration action.
+    Additionally, r029 explicitly references ''After tree:/proc/payments/'' as a prerequisite
+    step, so it directly contributed to the failing action being retained in the plan;
+    r029 must be deactivated and superseded. r027 and r028 are textually identical
+    — r028 is a duplicate and should be deactivated.'
+  source: learn
+  status: inactive
+- content: Never use `search:fraud /proc/payments/`, `search:fraudulent /proc/payments/`,
+    or `tree:/proc/payments/` as the initial action when spec_goal is to identify
+    fraudulent payment records in /proc/payments/ — payment files contain no literal
+    fraud keyword and tree causes read timeout; always use `list:/proc/payments/`
+    (shallow, non-recursive) to obtain file names, then immediately cross-reference
+    `/docs/merchant-continuity-and-critical-incidents.md` to map incident payment
+    IDs to specific files, then read those files directly.
+  created: '2026-05-24'
+  deactivated_reason: r031 and r032 both prohibit wrong initial actions and require
+    list:/proc/payments/ first, but neither explicitly requires list:/proc/payments/
+    to appear in the SDD actions list when the doc was already read in a prior cycle
+    — the gap that caused this failure. New rule supersedes both with a stronger,
+    self-contained-SDD requirement.
+  id: r031
+  reasoning: 'Verbatim error: ''Empty result: ''. Root cause: wrong-action — `search:fraud
+    /proc/payments/` returned zero results because payment archive files contain no
+    literal ''fraud'' keyword; fraud incident membership is recorded only in `/docs/merchant-continuity-and-critical-incidents.md`,
+    not embedded in payment file content. Failing fragment: SDD action `search:fraud
+    /proc/payments/` and PLAN action `search:fraud /proc/payments/`. r030 already
+    prohibits `tree:/proc/payments/` and prescribes `list:` + doc cross-reference,
+    but does NOT cover `search:fraud /proc/payments/` — so r030 is incomplete; a broader
+    rule superseding r030 must prohibit both `tree:` and `search:fraud` approaches
+    and mandate the `list:` → doc-cross-reference → `read` pipeline.'
+  source: learn
+  status: inactive
+- content: Never use `search:fraud /proc/payments/`, `search:fraudulent /proc/payments/`,
+    or `tree:/proc/payments/` as initial action when spec_goal is to identify fraudulent
+    payment records in /proc/payments/ — payment files contain no literal fraud keyword
+    and tree causes read timeout. Always use `list:/proc/payments/` (shallow, non-recursive)
+    to obtain file names, then immediately cross-reference `/docs/merchant-continuity-and-critical-incidents.md`
+    to map incident payment IDs to specific files, then read those files directly.
+    The SDD `actions` list must never terminate after this enumeration phase alone
+    — subsequent `read` or `grep` actions targeting the identified payment files are
+    mandatory and must be executed only after the enumeration outputs have been obtained.
+  created: '2026-05-24'
+  deactivated_reason: r031 and r032 both prohibit wrong initial actions and require
+    list:/proc/payments/ first, but neither explicitly requires list:/proc/payments/
+    to appear in the SDD actions list when the doc was already read in a prior cycle
+    — the gap that caused this failure. New rule supersedes both with a stronger,
+    self-contained-SDD requirement.
+  id: r032
+  reasoning: r027 and r031 share the same spec_goal (identify fraudulent payments
+    in /proc/payments/). r031 (higher id) covers the correct initial action sequence;
+    r027 adds the constraint that SDD must not terminate after enumeration and must
+    sequence read/grep after outputs. Merged into r031 as base, extended with r027's
+    SDD-termination and sequencing constraints.
+  source: learn
+  status: inactive
+- content: Always include `list:/proc/payments/` as the first entry in the SDD `actions`
+    list when spec_goal is to identify fraudulent payment records in /proc/payments/
+    — do not assume prior cycle enumeration output persists; every SDD must be self-contained.
+    The actions list must then contain the doc read (`/docs/merchant-continuity-and-critical-incidents.md`)
+    and, after those two resolve, explicit `read` actions for each matched payment
+    file path — the SDD must never contain only one action for this spec_goal.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r033
+  reasoning: 'Verbatim error: ''PLAN phase: action is empty''. Root cause: wrong-spec.
+    Failing fragment: SDD `actions` list contained only `["/docs/merchant-continuity-and-critical-incidents.md"]`;
+    PLAN_OUTPUT reports that doc was already in PRIOR_ACTIONS so filtered out, leaving
+    zero unexecuted actions and forcing `action: ""`. The spec_goal required identifying
+    fraudulent payment records in /proc/payments/, but the SDD never included `list:/proc/payments/`
+    as an action at all — it assumed the prior cycle''s listing was still available,
+    which the orchestrator does not carry forward. Rule linkage: r032 says ''Always
+    use list:/proc/payments/ to obtain file names'' but does not explicitly prohibit
+    omitting that action from SDD when prior cycle ran it; the new rule must close
+    this gap by requiring list:/proc/payments/ to appear in every SDD actions list
+    for this spec_goal, regardless of PRIOR_ACTIONS state.'
+  source: learn
   status: active
 last_run:
-  cycles_used: 15
-  date: '2026-05-23'
+  cycles_used: 5
+  date: '2026-05-24'
   grounding_refs_count: 0
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure

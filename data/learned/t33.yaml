@@ -33,7 +33,7 @@ entries:
     'The exact product SKU is identified by matching brand Uvex, series/model containing
     2KV-937 and Industrial, size L, and color family Green.'
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r002'
   id: r002
   reasoning: 'Verbatim error: ''Empty result: sku,path,brand,series,model,name,size,color_family''.
     Root cause category: wrong-filter. The standalone SKU identification action executed
@@ -47,7 +47,7 @@ entries:
     for the brand filter and property value filters in that exact standalone SKU identification
     action.'
   source: learn
-  status: active
+  status: inactive
 - content: Always identify the exact product SKU with a standalone query on the products
     and product_properties tables before executing any inventory-aggregation action
     that joins stores, products, and product_properties. In that standalone query,
@@ -56,7 +56,9 @@ entries:
     by matching brand Uvex, series/model containing 2KV-937 and Industrial, size L,
     and color family Green.'
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: r003 and r005 contain Uvex brand success criteria mismatched
+    to the current Bahco task and provide no valid guidance here; both are stale residue
+    from a prior task cycle as flagged by the WARNING in the LEARNED section.
   id: r003
   reasoning: r001 and r002 share the same spec_goal (exact SKU identification for
     Uvex/2KV-937/Industrial/L/Green). r001 mandates a standalone pre-aggregation query;
@@ -64,11 +66,73 @@ entries:
     into a single rule to eliminate redundancy and capture both the sequencing requirement
     and the case-insensitivity implementation detail.
   source: learn
+  status: inactive
+- content: Always emit SQL actions as structured JSON action list entries in the PLAN
+    output — never narrate or present queries as prose or markdown code blocks, even
+    when the SQL tool appears unavailable; the PCM harness dispatches the JSON action
+    field, not inline text, as required by spec_goal 'Sum available_today units across
+    all open Vienna PowerTool stores for the Bahco Comfort Grip BE 1ZR-PGS side cutter
+    125mm pliers product'.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''PLAN phase: failed to parse LLM output. Raw: SQL tool
+    not in available toolset. Presenting queries for PCM harness execution.'' Root
+    cause: wrong-action — the PLAN phase LLM tried to output SQL queries directly
+    in natural language / markdown instead of returning a parseable JSON action list,
+    because it believed the SQL tool was unavailable and broke out of the structured
+    output format. Failing fragment: the SDD action ''SELECT p.sku, p.path, p.name,
+    p.series, MAX(CASE WHEN pp.key=...'' was never emitted as a JSON action; the LLM
+    instead narrated it as prose, causing the PCM harness JSON parser to fail. Rule
+    linkage: the new rule must target the PLAN output format — the LLM must always
+    emit SQL actions as structured JSON action fields regardless of perceived tool
+    availability, never as prose or markdown blocks.'
+  source: learn
+  status: active
+- content: Always identify the exact product SKU with a standalone query on the products
+    and product_properties tables before executing any inventory-aggregation action
+    that joins stores, products, and product_properties. In that standalone query,
+    apply COLLATE NOCASE or LOWER() to the brand equality filter and to product_properties.value_text
+    comparisons, satisfying the success criterion 'The exact product SKU is identified
+    by matching brand Uvex, series/model containing 2KV-937 and Industrial, size L,
+    and color family Green.'
+  created: '2026-05-24'
+  deactivated_reason: r003 and r005 contain Uvex brand success criteria mismatched
+    to the current Bahco task and provide no valid guidance here; both are stale residue
+    from a prior task cycle as flagged by the WARNING in the LEARNED section.
+  id: r005
+  reasoning: 'r002 is a strict subset of r003: r002 only prescribes COLLATE NOCASE/LOWER()
+    in the standalone SKU query, while r003 prescribes the same PLUS the requirement
+    to run that standalone query before any inventory-aggregation join. r003 (higher
+    id) fully subsumes r002 — deactivate r002, keep r003 unchanged.'
+  source: learn
+  status: inactive
+- content: Always search product line identifier tokens (e.g. '1ZR-PGS') across p.series,
+    p.model, AND p.name using OR conditions in the standalone SKU identification query
+    required by spec_goal 'Sum available_today units of Bahco Comfort Grip BE 1ZR-PGS
+    side cutter 125 mm pliers across all open Vienna PowerTool stores' — never filter
+    on p.series alone, because the token may reside in p.model or p.name instead.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,tool_type,length_mm''.
+    Root cause category: wrong-filter. Failing fragment: SDD_OUTPUT action[0] clause
+    ''LOWER(p.series) LIKE \''%1zr-pgs%\'''' — the string ''BE 1ZR-PGS'' from the
+    product name appears in the products.name or products.model column, not necessarily
+    in products.series (schema separates series/model/name fields). Filtering only
+    p.series produced zero rows. Success criterion ''Exact SKU identified via standalone
+    pivot query on products + product_properties matching brand=Bahco, series containing
+    1ZR-PGS, tool_type=side cutter, length_mm=125'' failed because the identifier
+    token was sought only in the wrong column. Rule must require OR-spanning p.series,
+    p.model, and p.name when searching for product line identifiers in the standalone
+    SKU query. Additionally, r003 and r005 reference Uvex brand success criteria and
+    are mismatched residue from a prior task cycle — both should be deactivated.'
+  source: learn
   status: active
 last_run:
-  cycles_used: 6
-  date: '2026-05-23'
-  grounding_refs_count: 1
+  cycles_used: 4
+  date: '2026-05-24'
+  grounding_refs_count: 3
   outcome: OUTCOME_OK
   status: success
 task_id: t33

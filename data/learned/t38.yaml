@@ -4,7 +4,7 @@ entries:
     policy in `/docs` to determine how fraud incident records are identified before
     searching.
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r001'
   id: r001
   reasoning: The verbatim error is 'Empty result'. The root cause category is wrong-action
     because the action 'search:fraud /proc/payments/' assumed the literal string 'fraud'
@@ -14,7 +14,7 @@ entries:
     structural inspection of the payments directory and review of the relevant security
     policy.
   source: learn
-  status: active
+  status: inactive
 - content: 'For fraud investigation tasks ("confirmed fraud incident in archived payment
     history, find payment records"): this is a READ-ONLY task. Use tree:/proc/payments/
     to explore, then search or list payments to identify suspicious/fraud records.
@@ -62,9 +62,86 @@ entries:
     doc likely identifies the fraud payments by incident details.
   source: manual
   status: active
+- content: Always follow the r004 sequence for fraud investigation; when /docs/merchant-continuity-and-critical-incidents.md
+    does not list explicit payment filenames, use tree:/proc/payments/ to enumerate
+    all payment files, then read candidate files whose names or metadata match the
+    merchant ID, date range, or transaction identifiers stated in the incident doc
+    — never fall back to search:fraud or search:incident as a substitute for this
+    cross-reference step.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''Empty result:'' from action ''search:fraud /proc/payments/''.
+    Root cause: wrong-action — plan fell back to blind keyword search despite r001/r004
+    prohibiting it. Failing fragment: PLAN_OUTPUT action=''search:fraud /proc/payments/''
+    and SDD actions=[''search:fraud /proc/payments/'', ''search:incident /proc/payments/''].
+    SDD itself states ''Incident doc already read... specific payment file paths from
+    that doc not yet extracted'' — meaning r004''s step (3) ''read the specific payment
+    files identified by the incident doc'' failed to terminate the pipeline because
+    the incident doc did not directly name payment filenames; the pipeline then regressed
+    to keyword search. r004 is incomplete: it covers the happy path (doc names files
+    directly) but provides no fallback when the incident doc identifies fraud by merchant
+    ID, date range, or transaction details rather than explicit filenames. Rule linkage:
+    new rule must cite spec_goal ''identify and cite all payment records'' and action
+    sequence from r004, extending it with a cross-reference step using tree:/proc/payments/
+    output when filenames are not directly stated in the incident doc.'
+  source: learn
+  status: active
+- content: Never execute blind keyword searches such as `search:fraud /proc/payments/`
+    or `search:fraud /docs/` (or any similar blind search in either path); always
+    run `tree /proc/payments/` and `tree /docs/` to discover files, then read the
+    relevant policy/incident docs directly to determine how fraud records are identified.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: r001 and r003 express identical anti-pattern (no blind keyword search)
+    for two different paths — merged into r003 as base, extended to cover both /proc/payments/
+    and /docs/ paths.
+  source: learn
+  status: active
+- content: Never allow PLAN action to be empty mid-sequence for fraud investigation
+    tasks; after /docs/merchant-continuity-and-critical-incidents.md is read (appears
+    in PRIOR_ACTIONS), PLAN must immediately derive and emit a concrete read action
+    for a specific payment file path — using tree:/proc/payments/ output cross-referenced
+    against merchant ID, date range, or transaction identifiers from the incident
+    doc — without awaiting external harness input or claiming all actions are exhausted.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Verbatim error: ''PLAN phase: action is empty''. Root cause category:
+    wrong-action. Failing fragment: PLAN_OUTPUT steps[2] ''Await PCM harness to supply
+    specific payment file paths extracted from incident doc content for direct read''
+    — plan exhausted SDD actions[] via PRIOR_ACTIONS filter and then stalled instead
+    of deriving the next concrete action from incident doc content already in context.
+    Rule r004/r005 mandate reading the incident doc then reading matching payment
+    files, but neither rule prevents the plan phase from emitting an empty action
+    when SDD actions[] is exhausted mid-sequence. Rule linkage: new rule must mandate
+    that PLAN always emits a concrete payment-file read action once incident doc content
+    is available, without waiting for external harness input.'
+  source: learn
+  status: active
+- content: 'Never use find:*.md or any find: glob action to enumerate payment files;
+    always use tree:/proc/payments/ (with sufficient depth) to list all payment record
+    files, then derive read targets by cross-referencing filenames against merchant
+    ID, date range, or transaction identifiers from /docs/merchant-continuity-and-critical-incidents.md.'
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Verbatim error: ''Empty result: '' with ERROR_TYPE: empty. Root cause
+    category: wrong-action. Failing fragment: SDD_OUTPUT action ''find:*.md /proc/payments/''
+    — this action produced an empty result, meaning the PCM harness does not support
+    a find:*.md glob action. The plan (PLAN_OUTPUT) and spec both depend on this action
+    to enumerate payment files, but the harness only supports tree:, read:, and search:
+    style actions. The correct substitute is tree:/proc/payments/ (depth-unlimited
+    or with explicit depth) to get all filenames including nested .md/.json files.
+    Rule r005 says to use tree:/proc/payments/ to enumerate all payment files but
+    the SDD chose find:*.md instead — violating the spirit of r005. Rule linkage:
+    rule_content must forbid find:*.md and mandate tree: for file enumeration.'
+  source: learn
+  status: active
 last_run:
-  cycles_used: 15
-  date: '2026-05-23'
+  cycles_used: 5
+  date: '2026-05-24'
   grounding_refs_count: 0
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure

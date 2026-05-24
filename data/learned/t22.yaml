@@ -5,15 +5,160 @@ entries:
     Do NOT return OUTCOME_NONE_UNSUPPORTED — the checkout tool exists, but the basket
     ID is required to proceed.
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r001, r002'
   id: r001
   reasoning: Agent said UNSUPPORTED but correct is CLARIFICATION — the basket ID was
     not specified so agent should ask for it.
   source: manual
+  status: inactive
+- content: 'Always emit a valid structured SDD spec (fields: spec_goal, success_criteria,
+    plan, actions) in the SDD phase even when the resolution is OUTCOME_NONE_CLARIFICATION;
+    encode the clarification intent as spec_goal=''clarify_basket_id'', list candidate
+    basket IDs (e.g. basket_063, basket_016, basket_027) in success_criteria, and
+    set actions to a single clarify action — never emit free-form conversational text
+    as SDD output.'
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r001, r002'
+  id: r002
+  reasoning: 'Verbatim error: ''SDD phase: failed to parse LLM output. Raw: 3 active
+    baskets found. Which to check out? 1. `basket_063`...''. Root cause: wrong-spec
+    — SDD phase emitted free-form conversational text instead of a structured spec
+    document (spec_goal/success_criteria/plan/actions). Failing fragment: the SDD
+    LLM acted on r001''s ''return OUTCOME_NONE_CLARIFICATION'' instruction directly,
+    producing the clarification message as raw output rather than encoding the clarification
+    intent inside a valid SDD schema. Rule linkage: new rule must constrain SDD phase
+    output format when intent is OUTCOME_NONE_CLARIFICATION, complementing r001 which
+    targets only ANSWER phase behavior.'
+  source: learn
+  status: inactive
+- content: 'Always set spec_goal to the exact literal string ''clarify_basket_id''
+    with no appended text, punctuation, or prose (e.g. never ''clarify_basket_id —
+    ...'' or ''clarify_basket_id: ...''); any clarification context belongs in success_criteria
+    or plan fields only.'
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r003, r004'
+  id: r003
+  reasoning: 'Verbatim error: ''failed to parse LLM output. Raw: ```json\n{\n  "spec_goal":
+    "clarify_basket_id — customer has 3 open baskets; need to know which to check
+    out"''. Root cause: wrong-value-type — spec_goal field contains prose annotation
+    appended after the required literal value ''clarify_basket_id'', making it unparseable
+    as a clean enum/literal. Failing fragment: spec_goal=''clarify_basket_id — customer
+    has 3 open baskets; need to know which to check out'' — the em-dash and trailing
+    prose corrupt the field value. Rule r002 says set spec_goal=''clarify_basket_id''
+    but does not explicitly forbid appending prose to that field value. New rule must
+    close that gap by requiring spec_goal be EXACTLY the literal string ''clarify_basket_id''
+    with no appended text.'
+  source: learn
+  status: inactive
+- content: 'Always set spec_goal to exact literal ''clarify_basket_id'' (no appended
+    text, punctuation, or prose — context goes in success_criteria/plan only). When
+    customer says "my basket" or "check it out" without basket ID: return OUTCOME_NONE_CLARIFICATION
+    (never OUTCOME_NONE_UNSUPPORTED — checkout tool exists, basket ID required). Always
+    emit valid structured SDD spec (fields: spec_goal, success_criteria, plan, actions)
+    even for OUTCOME_NONE_CLARIFICATION: set spec_goal=''clarify_basket_id'', list
+    candidate basket IDs in success_criteria, set actions to single clarify action.
+    Never emit free-form conversational text as SDD output.'
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r003, r004'
+  id: r004
+  reasoning: 'r001+r002+r003 all address same scenario (ambiguous basket, clarification
+    flow). r003 is highest id and adds precision constraint on spec_goal format. Merged
+    to cover full scope: clarification trigger (r001), SDD structure requirement (r002),
+    and spec_goal literal format enforcement (r003).'
+  source: learn
+  status: inactive
+- content: Always emit a structured plan object (with approach, steps, and action
+    fields) in the PLAN phase — never free-form prose — even when spec_goal is 'clarify_basket_id';
+    for clarification goals, set action to a single clarify step listing candidate
+    basket IDs, not a conversational question.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r005, r007'
+  id: r005
+  reasoning: 'Verbatim error: ''PLAN phase: failed to parse LLM output. Raw: 3 open
+    baskets found for your account. Which to check out?\n\nNeed basket ID to proceed
+    — which is yours?\n\n(If you see basket IDs in a previous message, share it; otherwise
+    say "show my baskets" and I''ll list them with store/date details.)''. Root cause:
+    wrong-action — the PLAN phase emitted free-form conversational text instead of
+    a structured plan object. The SDD_OUTPUT looks correct (spec_goal=''clarify_basket_id'',
+    valid fields), but the PLAN phase output was raw prose rather than a parseable
+    plan structure. The failing fragment is the PLAN phase LLM output itself: free-form
+    text ''Need basket ID to proceed — which is yours?'' instead of a JSON/structured
+    plan. Existing rules r003 and r004 both target SDD output format but neither addresses
+    PLAN phase output format. The PLAN phase must also emit a structured object (approach,
+    steps, action fields), not conversational prose — even when spec_goal is clarify_basket_id.
+    Rule linkage: new rule must cite PLAN phase and clarify_basket_id to prevent prose
+    output at plan stage.'
+  source: learn
+  status: inactive
+- content: 'Always set spec_goal to exact literal ''clarify_basket_id'' (no appended
+    text, punctuation, or prose — context goes in success_criteria/plan only). When
+    customer says "my basket" or "check it out" without basket ID: return OUTCOME_NONE_CLARIFICATION
+    (never OUTCOME_NONE_UNSUPPORTED — checkout tool exists, basket ID required). Always
+    emit valid structured SDD spec (fields: spec_goal, success_criteria, plan, actions)
+    even for OUTCOME_NONE_CLARIFICATION: set spec_goal=''clarify_basket_id'', list
+    candidate basket IDs in success_criteria, set actions to single clarify action.
+    Always emit a structured plan object (with approach, steps, and action fields)
+    in the PLAN phase — never free-form prose — even when spec_goal is ''clarify_basket_id'';
+    for clarification goals, set action to a single clarify step listing candidate
+    basket IDs, not a conversational question. Never emit free-form conversational
+    text as SDD output.'
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: r003+r004+r005 all address spec_goal='clarify_basket_id' behavior. r003
+    is strict subset of r004. r005 adds structured plan object requirement not covered
+    by r004. Merged into single rule using r005 (highest id) extended with full scope
+    of r003+r004.
+  source: learn
+  status: active
+- content: Always emit complete, well-formed JSON for SDD output — never truncate
+    mid-string or mid-object; for spec_goal='clarify_basket_id', keep plan.steps entries
+    short (≤ 20 words each) and actions to a single clarify action so total output
+    stays within token limits and all braces/brackets/strings are closed before the
+    response ends.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r005, r007'
+  id: r007
+  reasoning: 'Verbatim error: ''failed to parse LLM output'' — the raw SDD JSON was
+    truncated mid-string (''belonging to cu...''). Root cause category: syntax — the
+    LLM output was cut off before the JSON object was closed, producing invalid/unparseable
+    JSON. Failing fragment: the ''plan.steps'' array string was truncated: ''"Query
+    baskets table for all open baskets belonging to cu'' — no closing quote, bracket,
+    or brace. Rule linkage: r006 mandates ''Always emit valid structured SDD spec''
+    but does not address output length/truncation causing malformed JSON. The new
+    rule must require that the SDD JSON be complete and well-formed (all braces/brackets/strings
+    closed) before emission, specifically for the clarify_basket_id spec_goal path
+    where plan.steps content can grow long.'
+  source: learn
+  status: inactive
+- content: 'Always set spec_goal to exact literal ''clarify_basket_id'' (no appended
+    text, punctuation, or prose — context goes in success_criteria/plan only). When
+    customer says "my basket" or "check it out" without basket ID: return OUTCOME_NONE_CLARIFICATION
+    (never OUTCOME_NONE_UNSUPPORTED — checkout tool exists, basket ID required). Always
+    emit valid structured SDD spec (fields: spec_goal, success_criteria, plan, actions)
+    even for OUTCOME_NONE_CLARIFICATION: set spec_goal=''clarify_basket_id'', list
+    candidate basket IDs in success_criteria, set actions to single clarify action.
+    Always emit a structured plan object (with approach, steps, and action fields)
+    in the PLAN phase — never free-form prose — even when spec_goal is ''clarify_basket_id'';
+    for clarification goals, set action to a single clarify step listing candidate
+    basket IDs, not a conversational question. Never emit free-form conversational
+    text as SDD output. Always emit complete, well-formed JSON — never truncate mid-string
+    or mid-object; keep plan.steps entries short (≤ 20 words each) and actions to
+    a single clarify action so total output stays within token limits and all braces/brackets/strings
+    are closed before the response ends.'
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r008
+  reasoning: r005 and r007 are strict subsets of r006 (r005 covers structured plan
+    requirement, r007 adds JSON completeness/token-limit guidance). r006 is highest-id
+    base covering r005 scope; extended with r007's JSON-completeness and token-limit
+    constraints. r005 deactivated as fully subsumed by r006. r007 deactivated as additive
+    constraint now merged into r006.
+  source: learn
   status: active
 last_run:
-  cycles_used: 15
-  date: '2026-05-23'
+  cycles_used: 5
+  date: '2026-05-24'
   grounding_refs_count: 0
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure

@@ -4,7 +4,7 @@ entries:
     and never replace that step with guessed s.name LIKE filters in the subsequent
     inventory action.
   created: '2026-05-23'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r001'
   id: r001
   reasoning: '1. Verbatim error: Empty result: sku,path,name,series,brand,available_today.
     2. Root cause category: wrong-filter. 3. Failing fragment: The action ''SELECT
@@ -17,7 +17,7 @@ entries:
     retrieve the exact id for the store referenced in the spec_goal before any inventory
     join, directly preventing the guessed filter that produced the empty result.'
   source: learn
-  status: active
+  status: inactive
 - content: Always wrap the PLAN_OUTPUT action SQL in `/bin/sql '<query>'` when the
     action contains a database query, rather than emitting raw SQL strings that the
     executor misinterprets as file paths.
@@ -96,10 +96,10 @@ entries:
     for inventory checks.'
   source: learn
   status: active
-- content: 'CRITICAL for multi-product availability count: The SQL action MUST be a
-    raw SELECT starting directly with SELECT — NEVER use WITH/CTE syntax, NEVER wrap
-    in /bin/sql. CORRECT pattern: SELECT DISTINCT p.sku, p.path FROM products p JOIN
-    inventory i ON p.sku = i.sku JOIN stores s ON i.store_id = s.id WHERE LOWER(s.name)
+- content: 'CRITICAL for multi-product availability count: The SQL action MUST be
+    a raw SELECT starting directly with SELECT — NEVER use WITH/CTE syntax, NEVER
+    wrap in /bin/sql. CORRECT pattern: SELECT DISTINCT p.sku, p.path FROM products
+    p JOIN inventory i ON p.sku = i.sku JOIN stores s ON i.store_id = s.id WHERE LOWER(s.name)
     LIKE ''%hauptplatz%'' AND s.is_open=1 AND i.available_today >= 1 AND ((p.brand=''Heco''
     AND LOWER(p.model) LIKE ''%3dw-64b%'') OR (p.brand=''Festool'' AND LOWER(p.model)
     LIKE ''%model2%'') OR ...). Count returned rows for answer. ALL p.path values
@@ -112,10 +112,79 @@ entries:
     SQL that failed with invalid path or syntax error.'
   source: manual
   status: active
+- content: Always resolve the target store id in a SEPARATE prior SQL action (SELECT
+    id, name FROM stores WHERE LOWER(name) LIKE '%downtown%' OR LOWER(name) LIKE '%ljubljana%')
+    before the main inventory query — never embed the store resolution as an inline
+    subquery in the spec_goal inventory action, because a NULL result from the inline
+    subquery silently eliminates all rows with no error. Use the confirmed id literal
+    in the main SELECT DISTINCT p.sku, p.path query.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r007'
+  id: r007
+  reasoning: 'Verbatim error: ''Empty result: sku,path''. Root cause: wrong-filter.
+    Failing fragment: action inline subquery `(SELECT id FROM stores WHERE LOWER(name)
+    LIKE ''%downtown%'' AND LOWER(name) LIKE ''%ljubljana%'' LIMIT 1)` returned NULL
+    — both LIKE conditions with AND too restrictive, store name likely doesn''t contain
+    both tokens. NULL store id → JOIN with s.id = NULL → zero rows. Rule linkage:
+    r001 says ''Always query the stores table to retrieve the exact store id... before
+    joining inventory'' but action embedded inline subquery instead of pre-querying,
+    violating r001''s intent. r003/r006 correct SELECT DISTINCT pattern was used but
+    pointless when store subquery returns NULL.'
+  source: learn
+  status: inactive
+- content: Always resolve the target store id in a SEPARATE prior SQL action (SELECT
+    id, name FROM stores WHERE LOWER(name) LIKE '%downtown%' OR LOWER(name) LIKE '%ljubljana%'
+    OR LOWER(name) LIKE '%stare_mesto%' etc.) before the main inventory query — never
+    embed the store resolution as an inline subquery in the spec_goal inventory action,
+    because a NULL result from the inline subquery silently eliminates all rows with
+    no error. Use the confirmed id literal in the main SELECT DISTINCT p.sku, p.path
+    query.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r008
+  reasoning: r001 and r007 both mandate a separate prior store-id lookup before the
+    inventory query. r007 (higher id) is more detailed and explicit about the inline-subquery
+    failure mode; r001 is a strict subset. Deactivate r001, extend r007 to mention
+    additional store name patterns.
+  source: learn
+  status: active
+- content: Never filter product line codes (alphanumeric codes like GTU-YPJ, SYS 3JJ-9LM,
+    25C-DXE) using p.series — always use LOWER(p.model) LIKE '%<code_lowercase>%'
+    in the spec_goal inventory action, because model codes from task product line
+    names are stored in the model column, not series.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Verbatim error: ''Empty result: sku,path''. Root cause: wrong-column.
+    Failing fragment: actions uses ''p.series LIKE \''%GTU-YPJ%\'''' and ''p.series
+    LIKE \''%SYS 3JJ-9LM%\'''' and ''p.series LIKE \''%25C-DXE%\''''. Model codes
+    (GTU-YPJ, SYS 3JJ-9LM, 25C-DXE) embedded in the task''s product line names are
+    stored in p.model, not p.series — confirmed by r006 which explicitly uses LOWER(p.model)
+    LIKE pattern. Filtering on p.series for these codes eliminates all candidate rows,
+    producing empty result even with correct store_id literal. Rule r006 is consistent
+    with the fix but does not explicitly forbid p.series usage, so a prohibiting rule
+    is needed. r007/r008 were followed (literal store_id used), not causal.'
+  source: learn
+  status: active
+- content: Always resolve the target store id in a SEPARATE prior SQL action (SELECT
+    id, name FROM stores WHERE LOWER(name) LIKE '%downtown%' OR LOWER(name) LIKE '%ljubljana%'
+    OR LOWER(name) LIKE '%stare_mesto%' etc.) before the main inventory query — never
+    embed the store resolution as an inline subquery in the spec_goal inventory action,
+    because a NULL result from the inline subquery silently eliminates all rows with
+    no error. Use the confirmed id literal in the main SELECT DISTINCT p.sku, p.path
+    query.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r010
+  reasoning: r007 and r008 address identical spec_goal (store id resolution). r008
+    is highest-id and strictly extends r007 with additional store name examples. r007
+    deactivated as subset.
+  source: learn
+  status: active
 last_run:
-  cycles_used: 15
-  date: '2026-05-23'
-  grounding_refs_count: 0
-  outcome: OUTCOME_NONE_CLARIFICATION
+  cycles_used: 4
+  date: '2026-05-24'
+  grounding_refs_count: 2
+  outcome: OUTCOME_OK
   status: failure
 task_id: t13

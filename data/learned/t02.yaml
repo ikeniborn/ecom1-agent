@@ -1,7 +1,64 @@
+entries:
+- content: Always, when a query matching spec_goal 'series matching <X>' returns empty,
+    run a diagnostic fallback SELECT DISTINCT series FROM products WHERE brand='<brand>'
+    before concluding absence — confirm whether the series token exists in any form,
+    then adjust the LIKE pattern or conclude NO with evidence.
+  created: '2026-05-24'
+  deactivated_reason: 'Consolidated: r001'
+  id: r001
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,model,disc_diameter''.
+    Root cause: wrong-filter — series field value in DB may not match literal ''PKS
+    375-EOK''; LIKE ''%PKS 375-EOK%'' is the sole series filter in action ''SELECT
+    ... WHERE p.brand=\''Bosch\'' AND p.series LIKE \''%PKS 375-EOK%\'' ... HAVING
+    disc_diameter = 150''. Failing fragment: spec_goal ''series matching PKS 375-EOK''
+    assumes series column stores that exact token; if stored as ''Compact PKS 375-EOK'',
+    ''PKS375-EOK'', or similar, LIKE still matches, but if stored entirely differently
+    (e.g. ''PKS 375 EOK'' with spaces instead of hyphens, or absent entirely) the
+    filter silently eliminates all rows. No fallback query was attempted to verify
+    series values actually present for brand=Bosch. Rule linkage: rule must require
+    a diagnostic fallback when series LIKE filter in spec_goal ''series matching PKS
+    375-EOK'' returns empty, before concluding absence.'
+  source: learn
+  status: inactive
+- content: Always, when executing the r001 diagnostic fallback for spec_goal 'series
+    matching <X>', query SELECT DISTINCT series FROM products WHERE brand='<brand>'
+    with NO additional category_id or kind_id filter — adding category constraints
+    defeats the diagnostic purpose and produces empty results even when the brand
+    has matching products.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''Empty result: series,path''. Root cause category:
+    wrong-filter. Failing fragment: action ''SELECT DISTINCT p.series, p.path FROM
+    products p WHERE p.brand=\''Bosch\'' AND LOWER(p.category_id) LIKE \''%grinder%\''''
+    — the category_id LIKE ''%grinder%'' filter returned empty, meaning Bosch grinder
+    products are not stored under a category_id containing the token ''grinder''.
+    The LEARNED rule r001 mandates a diagnostic fallback SELECT DISTINCT series FROM
+    products WHERE brand=''<brand>'' (no category filter), but the plan applied an
+    additional LOWER(p.category_id) LIKE ''%grinder%'' constraint that silently eliminated
+    all rows before the series check could occur. The rule_content must prohibit adding
+    category filters in the r001 diagnostic fallback query.'
+  source: learn
+  status: active
+- content: Always, when a query matching spec_goal 'series matching <X>' returns empty,
+    run a diagnostic fallback SELECT DISTINCT series FROM products WHERE brand='<brand>'
+    — with NO additional category_id or kind_id filter, as adding category constraints
+    defeats the diagnostic purpose and produces empty results even when the brand
+    has matching products — before concluding absence. Confirm whether the series
+    token exists in any form, then adjust the LIKE pattern or conclude NO with evidence.
+  created: '2026-05-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: r001 and r002 share identical spec_goal and diagnostic action. r002 (higher
+    id) adds a critical constraint (no category/kind filters) that extends r001 without
+    contradiction. Merged into r002 as base, absorbing r001's full scope. r001 deactivated
+    as subset.
+  source: learn
+  status: active
 last_run:
-  cycles_used: 1
-  date: '2026-05-23'
-  grounding_refs_count: 1
+  cycles_used: 3
+  date: '2026-05-24'
+  grounding_refs_count: 6
   outcome: OUTCOME_OK
-  status: success
+  status: failure
 task_id: t02
