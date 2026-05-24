@@ -211,12 +211,15 @@ def _build_learn_user_msg(
     sdd_out=None,
     plan_out=None,
     answer_out=None,
+    idd_out: IddOutput | None = None,
 ) -> str:
     parts = [
         f"TASK: {task_text}",
         f"ERROR: {error}",
         f"ERROR_TYPE: {error_type}",
     ]
+    if idd_out and idd_out.stop_rules:
+        parts.append("STOP_RULES:\n" + "\n".join(f"  - {r}" for r in idd_out.stop_rules))
     if sdd_out is not None:
         parts.append(f"SDD_OUTPUT:\n{sdd_out.model_dump_json(indent=2)}")
     if plan_out is not None:
@@ -252,8 +255,11 @@ def _build_answer_user_msg(
     prior_actions: list[str] | None = None,
     prior_results: list[tuple[str, str]] | None = None,
     runtime_identity: str | None = None,
+    idd_out: IddOutput | None = None,
 ) -> str:
     parts = [f"TASK: {task_text}", f"EXECUTE_OUTPUT:\n{execute_out.model_dump_json(indent=2)}"]
+    if idd_out and idd_out.success_criteria:
+        parts.append("EXPECTATIONS:\n" + "\n".join(f"  - {c}" for c in idd_out.success_criteria))
     if prior_actions:
         parts.append("PRIOR_EXECUTIONS (actions run in earlier cycles — use their file paths in grounding_refs if relevant):\n" +
                      "\n".join(f"  - {a}" for a in prior_actions))
@@ -369,6 +375,7 @@ def _run_learn(
     sdd_out=None,
     plan_out=None,
     answer_out=None,
+    idd_out: IddOutput | None = None,
 ) -> None:
     learn_model = _resolve_model_for_phase("learn", model)
     learn_guide = load_prompt("learn") or "# PHASE: learn"
@@ -378,7 +385,8 @@ def _run_learn(
     ]
     existing_entries = load_learned_entries(task_id) if task_id else []
     learn_user = _build_learn_user_msg(task_text, error, error_type, existing_entries,
-                                       sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out)
+                                       sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out,
+                                       idd_out=idd_out)
     learn_out, sgr_learn, _ = _call_llm_phase(
         learn_system, learn_user, learn_model, cfg, LearnOutput,
         max_tokens=_PHASE_MAX_TOKENS["learn"], phase="learn", cycle=cycle,
