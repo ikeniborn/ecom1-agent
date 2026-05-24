@@ -1,6 +1,7 @@
 """ASSEMBLE → SDD → PLAN → EXECUTE → ANSWER pipeline."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import time
@@ -142,10 +143,20 @@ def _call_llm_phase(
 _format_schema_digest = _fmt_schema_digest
 
 
-def _build_sdd_user_msg(task_text: str, last_error: str, prior_actions: list[str] | None = None) -> str:
-    parts: list[str] = [f"TASK: {task_text}"]
+def _build_sdd_user_msg(idd_out: IddOutput, last_error: str, prior_actions: list[str] | None = None) -> str:
+    parts: list[str] = [
+        f"INTENT: {idd_out.intent_objective}",
+        f"TASK: {idd_out.reformulated_task}",
+        f"INTENT_TYPE: {idd_out.intent_type}",
+    ]
+    if idd_out.extracted_params:
+        parts.append(f"EXTRACTED_PARAMS: {json.dumps(idd_out.extracted_params)}")
+    if idd_out.success_criteria:
+        parts.append("EXPECTATIONS:\n" + "\n".join(f"  - {c}" for c in idd_out.success_criteria))
+    if idd_out.health_metrics:
+        parts.append("CONSTRAINTS:\n" + "\n".join(f"  - {m}" for m in idd_out.health_metrics))
     if last_error:
-        parts.append(f"PREVIOUS ERROR: {last_error}")
+        parts.append(f"PREVIOUS_ERROR: {last_error}")
     if prior_actions:
         parts.append("PRIOR_ACTIONS (already executed — apply persistence rules):\n" +
                      "\n".join(f"  - {a}" for a in prior_actions))
@@ -504,7 +515,14 @@ def run_pipeline(
             # ── SDD ───────────────────────────────────────────────────────────
             sdd_model = _resolve_model_for_phase("sdd", model)
             _prior_for_sdd = [a for s in prior_action_sets for a in s]
-            sdd_user = _build_sdd_user_msg(task_text, last_error, prior_actions=_prior_for_sdd)
+            # Temporary placeholder — will be replaced by real IddOutput in Task 7
+            _placeholder_idd = IddOutput(
+                intent_objective=task_text,
+                reformulated_task=task_text,
+                success_criteria=[],
+                decision="proceed",
+            )
+            sdd_user = _build_sdd_user_msg(_placeholder_idd, last_error, prior_actions=_prior_for_sdd)
             sdd_guide = load_prompt("sdd") or "# PHASE: sdd"
             sdd_system: list[dict] = [
                 {"type": "text", "text": unified_context},

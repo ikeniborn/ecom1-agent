@@ -296,3 +296,40 @@ def test_build_idd_user_msg_with_error_and_actions():
     assert "PREVIOUS_ERROR: table not found" in msg
     assert "PRIOR_ACTIONS" in msg
     assert "SELECT * FROM orders" in msg
+
+
+from agent.models import IddOutput as _IddOutput
+
+
+def _make_idd_out(reformulated_task="Return count of products", decision="proceed"):
+    return _IddOutput(
+        intent_objective="Count products",
+        reformulated_task=reformulated_task,
+        success_criteria=["result is a positive integer"],
+        decision=decision,
+    )
+
+
+def test_build_sdd_user_msg_uses_idd_reformulated_task():
+    from agent.pipeline import _build_sdd_user_msg
+    idd = _make_idd_out(reformulated_task="Return count of active products in store_42")
+    msg = _build_sdd_user_msg(idd, "", [])
+    assert "Return count of active products in store_42" in msg
+    assert "INTENT:" in msg
+    assert "TASK:" in msg
+
+
+def test_build_sdd_user_msg_includes_expectations():
+    from agent.pipeline import _build_sdd_user_msg
+    idd = _IddOutput(
+        intent_objective="Check discount eligibility",
+        reformulated_task="Check if basket_007 qualifies for discount",
+        success_criteria=["result states eligibility", "refs include basket file"],
+        health_metrics=["basket state must not change"],
+        decision="proceed",
+    )
+    msg = _build_sdd_user_msg(idd, "", [])
+    assert "EXPECTATIONS:" in msg
+    assert "result states eligibility" in msg
+    assert "CONSTRAINTS:" in msg
+    assert "basket state must not change" in msg
