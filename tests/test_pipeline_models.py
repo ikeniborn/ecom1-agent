@@ -4,6 +4,7 @@ from agent.models import (
     SddOutput, PlanOutput, ExecuteOutput,
     LearnOutput, AnswerOutput,
     ResolveCandidate, ResolveOutput,
+    IddOutput,
 )
 
 
@@ -121,9 +122,6 @@ def test_resolve_candidate_minimal():
         discovery_query="SELECT DISTINCT brand FROM products WHERE brand ILIKE '%Heco%' LIMIT 10",
     )
     assert c.confirmed_value is None
-
-
-from agent.models import IddOutput
 
 
 def test_idd_output_proceed():
