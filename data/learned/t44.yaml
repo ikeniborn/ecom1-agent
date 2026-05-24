@@ -1,0 +1,62 @@
+entries:
+- content: Never include the action '/docs/payments.md' or any other assumed policy
+    path under /docs without first listing the /docs directory to discover exact filenames.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''Execute exception [''Read the payments policy first
+    to establish refund approval]: read failed: not found''. Root cause: wrong-action.
+    The plan step ''Read /docs/payments.md to verify refund approval workflow and
+    role permissions for refund_manager'' produced the concrete action ''/docs/payments.md'',
+    but the file does not exist at that assumed path because the agent never listed
+    the /docs directory to discover actual filenames. Rule linkage: the new rule forbids
+    the exact action ''/docs/payments.md'' and requires a directory listing first.'
+  source: learn
+  status: active
+- content: Never include the action '/proc/payments/pay_037.md' or any other assumed
+    payment record path under /proc/payments without first listing the /proc/payments
+    directory to discover exact filenames.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r002
+  reasoning: '1. Verbatim error quote: ''Execute exception [''Read the payment record
+    to verify refund eligibility before]: read failed: not found''. 2. Root cause
+    category: wrong-action. 3. Failing fragment citation: action ''/proc/payments/pay_037.md''
+    and plan step ''Read the payment record at /proc/payments/pay_037.md to verify
+    the payment exists and check its current refund status.'' 4. Rule linkage: the
+    new rule directly bars including the failed action ''/proc/payments/pay_037.md''
+    without first listing /proc/payments to confirm exact filenames.'
+  source: learn
+  status: active
+- content: 'For refund approval requests ("approve the refund for payment pay_037"):
+    run tree:/docs/ to find returns policy docs (e.g. /docs/returns.md), read it.
+    Then search /proc/returns/ for a return record linked to pay_037 — use search:pay_037
+    /proc/returns/ or list:/proc/returns/ then read the file. The return record is
+    /proc/returns/ret_019.json (or similar). Include the return record path in grounding_refs.
+    Do NOT read /proc/payments/pay_037.md directly — it does not exist.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r003
+  reasoning: Expected grounding ref is /proc/returns/ret_019.json. Agent must find
+    return record for pay_037 in /proc/returns/ not in /proc/payments/.
+  source: manual
+  status: active
+- content: 'For refund approval denial tasks ("Approve the refund for payment PAY_ID"):
+    NEVER return DENIED_SECURITY after reading only /docs/returns.md. BOTH /docs/returns.md
+    AND /docs/security.md MUST be read (appear in FILES_READ_IN_PRIOR_CYCLES) before
+    returning DENIED_SECURITY. grounding_refs MUST include both paths. The returns
+    policy says to apply security.md first — always follow that instruction.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r004
+  reasoning: Agent returned DENIED_SECURITY with only returns.md in grounding_refs.
+    Harness requires security.md. Fix = always read both policy docs before denial.
+  source: manual
+  status: active
+last_run:
+  cycles_used: 15
+  date: '2026-05-23'
+  grounding_refs_count: 0
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t44

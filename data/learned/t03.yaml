@@ -1,52 +1,7 @@
-entries:
-- content: Always validate property keys used in SQL queries by checking against the
-    product_properties table or the known top property keys list before constructing
-    filters; do not assume keys from user task without verification. (Cite spec_goal
-    reference to 'viscosity 5W-40'.)
-  created: '2026-05-21'
-  deactivated_reason: null
-  id: r001
-  reasoning: 'Verbatim error quote: ''Empty result: sku''. Root cause category: wrong-key.
-    Failing fragment citation: spec_goal: ''Determine whether the catalogue contains
-    a product matching brand Castrol, series ''Castrol All Season GTX 3PP-ZPA Engine
-    Oil'', volume 250ml, and viscosity 5W-40.'' and action query: ''SELECT sku FROM
-    products p WHERE brand=''Castrol'' AND series=''Castrol All Season GTX 3PP-ZPA
-    Engine Oil'' AND EXISTS (SELECT 1 FROM product_properties pp WHERE pp.sku=p.sku
-    AND pp.key=''volume_ml'' AND pp.value_number=250) AND EXISTS (SELECT 1 FROM product_properties
-    pp WHERE pp.sku=p.sku AND pp.key=''viscosity'' AND pp.value_text=''5W-40'');''.
-    The query uses property key ''viscosity'' which is not among the known top property
-    keys (color_family, material, volume_ml, length_mm, diameter_mm, voltage_v, size,
-    power_source, use_area, pack_count). The spec_goal includes ''viscosity 5W-40''
-    but the actual property key in the catalogue is likely different (e.g., ''viscosity_grade''
-    or not stored as a property). Rule linkage: new rule must ensure property keys
-    are validated against schema before use.'
-  source: learn
-  status: active
-- content: Always ensure the actions list in the spec includes all SQL queries required
-    to satisfy the success criteria, including both the property key validation step
-    and the final product search query that joins products with product_properties.
-    (Cite spec_goal 'by first validating property key names' and success_criterion
-    'Query returns at least one product'.)
-  created: '2026-05-21'
-  deactivated_reason: null
-  id: r002
-  reasoning: 'Verbatim error: ''I cannot determine if the specific product exists
-    because only property keys were retrieved; no query was run to match the given
-    specifications.'' Root cause category: wrong-spec — the spec''s actions list contained
-    only the property key validation query and omitted the final product search query
-    required to satisfy the success_criterion ''Query returns at least one product''.
-    Failing fragment citation: SDD_OUTPUT actions = ["SELECT DISTINCT key FROM product_properties
-    WHERE key LIKE ''%lens%'' OR key LIKE ''%color%'' OR key IN (''size'',''coating'',''color_family'')
-    LIMIT 50"] — only one action, missing the product join query. Rule linkage: new
-    rule references spec_goal phrase ''by first validating property key names'' and
-    success_criterion ''Query returns at least one product'' to ensure both validation
-    and final search are included as actions.'
-  source: learn
-  status: active
 last_run:
   cycles_used: 2
-  date: '2026-05-21'
-  grounding_refs_count: 0
+  date: '2026-05-23'
+  grounding_refs_count: 1
   outcome: OUTCOME_OK
-  status: failure
+  status: success
 task_id: t03

@@ -1,135 +1,27 @@
 entries:
-- content: Always quote multi-word search patterns (e.g., 'Luisa Scholz') in action
-    specifications using double quotes to ensure the full pattern is passed as a single
-    argument and the path is correctly identified.
-  created: '2026-05-21'
+- content: Never replace the planned actions search:Veveri /proc/stores/ and /proc/baskets/basket_026.json
+    with an OUTCOME_NONE_CLARIFICATION requesting user-provided access; read internal
+    /proc paths directly as enumerated in the plan actions.
+  created: '2026-05-22'
   deactivated_reason: null
   id: r001
-  reasoning: 'Verbatim error: ''Search employee files for "Luisa Scholz" to retrieve
-    manage]: search failed: invalid path: path must be absolute: "Scholz /proc/employees/"''.
-    Root cause: syntax error in action specification. The action ''search:Luisa Scholz
-    /proc/employees/'' was parsed by the search tool as pattern ''Luisa'' and path
-    ''Scholz /proc/employees/'', causing an invalid path error because ''Scholz /proc/employees/''
-    is not an absolute path. Failing fragment: action from SDD_OUTPUT actions and
-    PLAN_OUTPUT action. Rule linkage: rule_content will specify that search patterns
-    with spaces must be quoted to prevent parsing errors.'
+  reasoning: 'Verbatim error: ''ANSWER clarification: I cannot apply the discount
+    yet. I need to verify the store record for PowerTool Brno Veveri and read basket_026
+    to confirm manager assignment, basket status, and eligibility. Please provide
+    or allow''. Root cause category: wrong-action. Failing fragment citation: the
+    SDD_OUTPUT actions list included ''search:Veveri /proc/stores/'' and ''/proc/baskets/basket_026.json'',
+    and the PLAN_OUTPUT step 2 was ''Search for the Brno Veveri store file and verify
+    Patrick Fuchs''s manager status'' and step 3 was ''Read basket_026.json to validate
+    the claimed line items and EUR 224.00 subtotal''; instead of executing these reads,
+    the ANSWER_OUTPUT emitted OUTCOME_NONE_CLARIFICATION and asked the user to provide
+    or allow access. Rule linkage: the rule prohibits substituting those concrete
+    planned actions with a clarification request.'
   source: learn
   status: active
-- content: Always use a pattern that includes underscores and wildcards for both first
-    and last name (e.g., 'Luisa_Scholz*' or 'l*luisa*scholz*') when searching for
-    employee profiles in /proc/employees/ via the `find` action, to account for common
-    naming conventions.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r002, r004'
-  id: r002
-  reasoning: 'Verbatim error: ''Empty result:''. Root cause: wrong-filter. The action
-    `find:Luisa* /proc/employees/` returned no files, likely because employee profile
-    filenames follow a different convention (e.g., underscores, lowercase) that does
-    not match ''Luisa*''. The plan relied on a pattern that was too narrow for the
-    actual filename structure. The failing fragment is the action `find:Luisa* /proc/employees/`
-    which is the first step in the plan. Existing rule r001 (quoting multi-word patterns)
-    does not apply because the pattern is single-word and unquoted, but the empty
-    result is due to pattern mismatch, not quoting. A new rule is needed to specify
-    robust pattern construction for employee lookups.'
-  source: learn
-  status: inactive
-- content: Always include a read action for the employee profile file when the spec_goal
-    explicitly requires verifying a specific employee's role and approval. For example,
-    for spec_goal 'Verify that Luisa Scholz is a manager at PowerTool Vienna Meidling
-    and that she approved a 5% service_recovery discount for basket_032', the actions
-    must include reading the employee profile (e.g., '/proc/employees/Luisa_Scholz.json')
-    in addition to reading the basket file, not just listing the directory.
-  created: '2026-05-21'
-  deactivated_reason: null
-  id: r003
-  reasoning: 'Verbatim error: ''Unable to verify that Luisa Scholz is a manager at
-    PowerTool Vienna Meidling or that a 5% service_recovery discount was approved
-    for basket_032. The basket file (basket_032.json) does not contain manager, discount,
-    or subtotal fields.'' Root cause category: wrong-action. The action list in SDD_OUTPUT
-    contained only ''list:/proc/employees/'' and ''/proc/baskets/basket_032.json'',
-    which omitted any read action for Luisa Scholz''s employee profile, making it
-    impossible to verify her role and approval. The spec_goal explicitly required
-    verifying both the employee''s manager role at PowerTool Vienna Meidling and the
-    discount approval. The plan included reading the profile, but the action list
-    did not. This omission directly caused the clarification failure.'
-  source: learn
-  status: active
-- content: Always use a case-insensitive pattern that includes wildcards on both sides
-    of lowercase name components (e.g., '*luisa*scholz*' or '*scholz*luisa*') when
-    searching for employee profiles in /proc/employees/ via the `find` action, to
-    account for potential differences in case or name ordering.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r002, r004'
-  id: r004
-  reasoning: 'Verbatim error: ''Empty result:''. Root cause: empty-result. Failing
-    fragment: action ''find:Luisa_Scholz* /proc/employees/''. Rule linkage: the new
-    rule must ensure the find pattern matches the actual employee file despite case
-    or name ordering differences. Existing rules r001 (quoting) and r002 (underscores/wildcards)
-    were applied but still returned empty, suggesting case-sensitivity or name ordering
-    as unaddressed factor.'
-  source: learn
-  status: inactive
-- content: Always use a pattern that accounts for common naming conventions (e.g.,
-    underscores) and includes case-insensitive wildcards on both sides of lowercase
-    name components (e.g., '*luisa*scholz*', '*scholz*luisa*', or 'Luisa_Scholz*')
-    when searching for employee profiles in /proc/employees/ via the `find` action,
-    to handle differences in case, ordering, and filename conventions.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r005, r006'
-  id: r005
-  reasoning: r002 and r004 both specify how to construct search patterns for employee
-    profiles via find. r002 emphasizes underscores and wildcards; r004 emphasizes
-    case-insensitivity and wildcards on both sides. They overlap without contradiction.
-    Merged to cover both concerns, using r004 (higher id) as base.
-  source: learn
-  status: inactive
-- content: Never use character class syntax (e.g., [Ll], [Ss]) in find patterns for
-    employee names in /proc/employees/; instead, always use the lowercase wildcard
-    patterns recommended by r005 such as '*luisa*scholz*', '*scholz*luisa*', or 'Luisa_Scholz*'.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r005, r006'
-  id: r006
-  reasoning: 'Verbatim error: ''Empty result''. Root cause category: wrong-filter.
-    Failing fragment: action ''find:*[Ll]uisa*[Ss]cholz* /proc/employees/'' in SDD
-    and PLAN. The pattern uses character class syntax ([Ll], [Ss]) which may not be
-    supported by the tool or does not match the actual filename ''Luisa_Scholz.json''
-    due to glob parsing differences. Existing rule r005 recommends patterns like ''*luisa*scholz*''
-    that are known to work, but this SDD deviated from that rule. New rule prohibits
-    character classes to ensure consistent matching.'
-  source: learn
-  status: inactive
-- content: When searching for employee profiles in /proc/employees/ via the `find`
-    action, always use case-insensitive wildcard patterns that account for common
-    naming conventions (e.g., underscores). Use patterns like '*luisa*scholz*', '*scholz*luisa*',
-    or 'Luisa_Scholz*' (with quotes to ensure proper argument passing if the pattern
-    contains spaces; note these patterns do not have spaces). Never use character
-    class syntax (e.g., [Ll], [Ss]) in find patterns.
-  created: '2026-05-21'
-  deactivated_reason: null
-  id: r007
-  reasoning: 'Merged r005 and r006: r005 provided the pattern recommendations for
-    case-insensitive wildcard searches; r006 restricted against character class syntax
-    and pointed back to r005. The merged rule combines both: it enforces the use of
-    the recommended patterns and prohibits character classes, covering the full scope
-    of both rules.'
-  source: learn
-  status: active
-- content: Never include an action in the plan that duplicates an action already present
-    in the SDD_OUTPUT actions; always include the employee profile read action (e.g.,
-    '/proc/employees/Luisa_Scholz.json') first when the spec_goal explicitly requires
-    verifying a specific employee's role and approval, as in spec_goal 'Verify that
-    Luisa Scholz is a manager at PowerTool Vienna Meidling and that she approved a
-    5% service_recovery discount for basket_032'.
-  created: '2026-05-21'
-  deactivated_reason: null
-  id: r008
-  reasoning: 'Error: ''Repeated action detected — must use a different query or approach.
-    Action was: /proc/baskets/basket_032.json''. Root cause category: wrong-action.
-    Failing fragment: the PLAN_OUTPUT action ''/proc/baskets/basket_032.json'' duplicates
-    an action already present in SDD_OUTPUT actions, which was likely already executed.
-    The plan omitted the required employee profile read (violating existing rule r003).
-    Rule linkage: the new rule must prevent repeating an already-performed action
-    and enforce sequencing the employee profile read first.'
-  source: learn
-  status: active
+last_run:
+  cycles_used: 4
+  date: '2026-05-23'
+  grounding_refs_count: 5
+  outcome: OUTCOME_DENIED_SECURITY
+  status: success
 task_id: t28

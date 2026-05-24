@@ -1,388 +1,72 @@
 entries:
-- content: Always include all necessary queries from the spec's actions list in the
-    plan. For spec_goal 'Determine the total available_today across all Vienna stores',
-    the plan must include at least the stores query (e.g., 'select * from stores where
-    city = "Vienna";') and an inventory join with the product SKU to compute the total.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r001, r002, r003, r004'
+- content: Never search for an alphanumeric product identifier such as '1TO-KNA' exclusively
+    in the series and name columns; always include the products.model column in the
+    WHERE clause, as the action SELECT p.sku, p.path, p.name, p.brand, p.series, prop.value_text
+    FROM products... produced an empty result because the identifier was likely stored
+    in model.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r001'
   id: r001
-  reasoning: 'Verbatim error: ''Found the product SKU CLN-5IZV3OGJ (Vileda Workshop
-    UltraMax 3R0-GQ8 Cleaning Machine, floor cleaner, 3000W), but no branch inventory
-    data is available.'' Root cause: wrong-action — the plan action only executed
-    the products query, omitting the required stores and inventory queries. Failing
-    fragment: PLAN_OUTPUT action ''select sku, brand, series, model, name, properties
-    from products where brand = "Vileda";'' — this solitary action did not fetch store
-    or inventory data. Rule linkage: new rule must cite spec_goal ''Determine the
-    total available_today across all Vienna stores'' and action identifier ''select
-    * from stores where city = "Vienna";'' from SDD_OUTPUT.'
+  reasoning: '1. Verbatim error: ''Empty result: sku,path,name,brand,series,value_text''.
+    2. Root cause category: wrong-filter. 3. Failing fragment citation: The action
+    query ''SELECT p.sku, p.path, p.name, p.brand, p.series, prop.value_text FROM
+    products p LEFT JOIN product_properties prop ON p.sku = prop.sku WHERE p.brand
+    = ''Sonax'' AND prop.key = ''cleaner type'' AND prop.value_text = ''screen wash''
+    AND (p.series LIKE ''%1TO-KNA%'' OR p.name LIKE ''%1TO-KNA%'');'' restricted the
+    search for the alphanumeric code ''1TO-KNA'' exclusively to the series and name
+    columns. 4. Rule linkage: The new rule mandates including the model column when
+    filtering by such product identifiers because the schema provides a dedicated
+    model field and omitting it caused the empty result set.'
   source: learn
   status: inactive
-- content: When the spec_goal or success_criteria includes 'Cite all store records
-    and the product record', the plan must include actions that capture and include
-    the file paths of those records (e.g., by recording the execution output file
-    paths or querying a metadata table) before computing the final answer.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r001, r002, r003, r004'
-  id: r002
-  reasoning: 'Error: ''ANSWER clarification: count : 9 <COUNT:9>. File paths for the
-    records were not provided in execution results.'' Root cause category: wrong-spec
-    (the spec''s action list did not include any step to capture file paths, despite
-    success_criteria requiring citations). Failing spec fragment: success_criteria:
-    ''Cite all store records and the product record in the answer.'' The plan actions
-    only included SQL data queries, not any operation to retrieve file paths. Rule
-    linkage: new rule must enforce that when citation is required, the plan includes
-    explicit steps to capture file paths.'
-  source: learn
-  status: inactive
-- content: Always validate product existence by first querying the products table
-    with the brand and series alone (e.g., WHERE brand='Vileda' AND series='Vileda
-    Workshop UltraMax 3R0-GQ8') before applying property joins; if the initial query
-    returns empty, escalate or apply fuzzy matching (LIKE, alternative keys) before
-    finalizing the plan. This rule is triggered when spec_goal contains specific brand
-    and series identifiers like 'Vileda' and 'Vileda Workshop UltraMax 3R0-GQ8'.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r001, r002, r003, r004'
-  id: r003
-  reasoning: 'Verbatim error: ''Empty result: sku,path''. Root cause category: empty-result.
-    Failing fragment: The action ''SELECT p.sku, p.path FROM products p JOIN product_properties
-    pp1 ON p.sku=pp1.sku AND pp1.key=''machine_type'' AND pp1.value_text=''floor cleaner''
-    JOIN product_properties pp2 ON p.sku=pp2.sku AND pp2.key=''power'' AND (pp2.value_text=''3000
-    W'' OR pp2.value_number=3000) WHERE p.brand=''Vileda'' AND p.series=''Vileda Workshop
-    UltraMax 3R0-GQ8'';'' returned zero rows. Rule linkage: The spec_goal assumed
-    exact brand=''Vileda'' and series=''Vileda Workshop UltraMax 3R0-GQ8'' without
-    first verifying data existence; the new rule must require a preliminary existence
-    check to avoid assuming exact matches.'
-  source: learn
-  status: inactive
-- content: 'Always include in the SDD ''actions'' array every SQL query and step required
-    to compute the final answer directly. For spec_goal ''Determine the total available_today
-    across all Vienna stores for the specific Vileda Cleaning Machine product'' with
-    success_criteria ''Cite all store records and the product record'', the actions
-    must include at minimum: stores query, product query(s), inventory join with SUM(available_today)
-    and COALESCE, and a final action that formats the count with citations.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r001, r002, r003, r004'
-  id: r004
-  reasoning: 'Verbatim error: "product record and per‑store availability data are
-    missing". Root cause category: wrong-spec: the SDD actions list omitted the inventory
-    join and final answer step, causing the executor to only run the stores query
-    and stop prematurely. Failing fragment: actions array in SDD_OUTPUT contains only
-    three queries (stores, products exact, products fuzzy) but no inventory join or
-    formatting action. Rule linkage: new rule will enforce that the actions list must
-    include every step needed to produce the final answer directly.'
-  source: learn
-  status: inactive
-- content: 'Always include in the SDD ''actions'' array every SQL query and step required
-    to compute the final answer directly. For spec_goal ''Determine the total available_today
-    across all Vienna stores for the specific Vileda Cleaning Machine product'' with
-    success_criteria ''Cite all store records and the product record'', the actions
-    must include at minimum: stores query, product validation query (first query the
-    products table with brand and series alone; if empty, escalate or apply fuzzy
-    matching before finalizing), product query(s) for the specific product, inventory
-    join with SUM(available_today) and COALESCE, and a final action that formats the
-    count with citations. When citing records, include their full file paths (e.g.,
-    by recording the execution output file paths or querying a metadata table) before
-    computing the final answer.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r005, r006'
-  id: r005
-  reasoning: Merged r001, r002, r003, and r004. r001 and r004 overlapped on the stores/inventory
-    queries; r002 added citation requirements; r003 added explicit product-existence
-    validation. r004 (the highest-id rule) was extended with the validation step from
-    r003 and the file‑path citation method from r002 to create a single rule covering
-    the full scenario.
-  source: learn
-  status: inactive
-- content: Always execute every action listed in the SDD 'actions' array sequentially
-    without interruption; for spec_goal 'Determine the total available_today across
-    all Vienna PowerTool branches for the specific Vileda Cleaning Machine' and its
-    actions (stores query, product query, inventory join), all actions must be completed
-    before producing the final answer, never stopping to ask for clarification midway.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r005, r006'
-  id: r006
-  reasoning: 'Verbatim error: ''I found the store records for PowerTool branches in
-    Vienna (store_vienna_praterstern, store_vienna_meidling) but need additional queries
-    to locate the product'' reveals the agent executed only the first action from
-    the SDD actions array (stores query) and stopped, instead of executing the remaining
-    actions (product query and inventory join). Root cause category: wrong-action
-    — the action set was present but only partially executed. Failing fragment: the
-    ''actions'' array in SDD_OUTPUT defined three actions, but only the first was
-    completed. Rule linkage: new rule must enforce that every action in the array
-    is executed sequentially.'
-  source: learn
-  status: inactive
-- content: 'Always include in the SDD ''actions'' array every SQL query and step required
-    to compute the final answer directly, and execute every action listed sequentially
-    without interruption. For spec_goal ''Determine the total available_today across
-    all stores for a specific product'' with success_criteria ''Cite all store records
-    and the product record'', the actions must include at minimum: stores query, product
-    validation query (first query the products table with brand and series alone;
-    if empty, escalate or apply fuzzy matching before finalizing), product query(s)
-    for the specific product, inventory join with SUM(available_today) and COALESCE,
-    and a final action that formats the count with citations. When citing records,
-    include their full file paths (e.g., by recording the execution output file paths
-    or querying a metadata table) before computing the final answer. Never stop to
-    ask for clarification midway; all actions must be completed before producing the
-    final answer.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r007, r008'
-  id: r007
-  reasoning: 'r005 (id 5) specifies the required actions in the SDD for availability
-    questions, including product validation, fuzzy matching, COALESCE, and file path
-    citations. r006 (id 6) mandates sequential execution of all actions without interruption.
-    These overlap: r006''s action set (stores query, product query, inventory join)
-    is a subset of r005''s more detailed set, and r006''s execution rule is complementary.
-    Merged into a single rule that covers both content and execution, using r006 as
-    base (higher id) and extending with r005''s specifics.'
-  source: learn
-  status: inactive
-- content: Always use LIKE matching on series (e.g., series LIKE '%Vileda Workshop
-    UltraMax 3R0-GQ8%') when exact match returns empty, and when filtering on numeric
-    properties (e.g., power, voltage) query both value_text and value_number with
-    OR (e.g., (pp.value_text = '3000 W' OR pp.value_number = 3000)). For spec_goal
-    'Determine the total available_today units of the specified Cleaning Machine product
-    across all PowerTool branches in Vienna', ensure the product is identified with
-    fuzzy series matching and dual-format property filter.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r007, r008'
-  id: r008
-  reasoning: 'Verbatim error: ''ERROR: Empty result: sku,path''. Root cause category:
-    wrong-filter. The SDD''s product query uses exact series=''Vileda Workshop UltraMax
-    3R0-GQ8'' (missing ''Cleaning Machine line'') and compares power as value_text=''3000
-    W'' when power may be stored as numeric value_number. Failing action: "SELECT
-    p.sku, p.path FROM products p JOIN product_properties pp1 ON p.sku=pp1.sku AND
-    pp1.key=''machine_type'' AND pp1.value_text=''floor cleaner'' JOIN product_properties
-    pp2 ON p.sku=pp2.sku AND pp2.key=''power'' AND pp2.value_text=''3000 W'' WHERE
-    p.brand=''Vileda'' AND p.series=''Vileda Workshop UltraMax 3R0-GQ8'';". Rule r007
-    already requires fuzzy matching on empty brand+series results, but the SDD actions
-    did not implement any fallback. The new rule must enforce LIKE matching on series
-    and dual-format property filters to avoid empty results.'
-  source: learn
-  status: inactive
-- content: 'Always include in the SDD ''actions'' array every SQL query and step required
-    to compute the final answer directly, and execute every action listed sequentially
-    without interruption. For spec_goals like ''Determine the total available_today
-    across all stores for a specific product'' with success_criteria ''Cite all store
-    records and the product record'', the actions must include at minimum: stores
-    query, product validation query (first query the products table with brand and
-    series alone; if empty, apply LIKE matching on series (e.g., series LIKE ''%...%'')
-    or escalate or apply further fuzzy matching before finalizing), product query(s)
-    for the specific product, inventory join with SUM(available_today) and COALESCE,
-    and a final action that formats the count with citations. When citing records,
-    include their full file paths (e.g., by recording the execution output file paths
-    or querying a metadata table) before computing the final answer. When filtering
-    on numeric properties (e.g., power, voltage), query both value_text and value_number
-    with OR (e.g., (pp.value_text = ''3000 W'' OR pp.value_number = 3000)). Never
-    stop to ask for clarification midway; all actions must be completed before producing
-    the final answer.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r009, r010'
-  id: r009
-  reasoning: 'r007 (general SDD structure for available_today queries) and r008 (specific
-    fuzzy matching and property filter techniques) overlap: r007''s ''apply fuzzy
-    matching'' is generic, and r008 specifies LIKE matching on series and dual-format
-    property queries. Merged rule takes r007''s procedural framework and extends it
-    with r008''s concrete techniques, ensuring consistency and avoiding redundant
-    separate rules.'
-  source: learn
-  status: inactive
-- content: Always execute the product validation query as a separate action and verify
-    that it returns at least one row before using it in any subsequent inventory join.
-    If the product validation action returns zero rows, immediately apply broader
-    or fuzzy matching (e.g., remove property filters, use less restrictive LIKE on
-    series/name) or escalate to clarify the exact product specification. Never embed
-    the product identification subquery inside the final inventory join SQL because
-    that will cause an empty result if the product query fails. This applies to spec_goals
-    like 'Determine the total available_today across all Vienna PowerTool branches
-    for the specific Vileda Cleaning Machine' where product identification is critical.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r009, r010'
-  id: r010
-  reasoning: 'Verbatim error: ''Empty result: ''count : '' || CAST(COALESCE(SUM(inv.available_today),
-    0) AS TEXT) || '' Product: '' || p.path || '' Stores: '' || GROUP_CON''. Error
-    type: empty. Root cause: The final action''s CROSS JOIN with a product subquery
-    returned zero rows because the product subquery likely returned no matching product.
-    The agent failed to execute the product validation query separately and check
-    for emptiness before proceeding to the inventory join, as required by existing
-    rule r009. The spec_goal included product identification, and the plan included
-    a separate product query step, but the actions merged it into a subquery, which
-    caused empty result when product not found. The failing fragment is the last action:
-    ''SELECT ... FROM stores s CROSS JOIN (SELECT ...) p LEFT JOIN inventory ...''.
-    Rule linkage: new rule must mandate that product validation is executed as a separate
-    action and its result non-empty before reuse, and prohibit embedding the product
-    subquery in the final join.'
-  source: learn
-  status: inactive
-- content: 'Always include in the SDD ''actions'' array every SQL query and step required
-    to compute the final answer directly, and execute every action listed sequentially
-    without interruption. For spec_goals like ''Determine the total available_today
-    across all stores for a specific product'' with success_criteria ''Cite all store
-    records and the product record'', the actions must include at minimum: stores
-    query, product validation query (first query the products table with brand and
-    series alone; if empty, apply broader or fuzzy matching such as LIKE on series/name
-    or remove property filters, then escalate if still empty), product query(s) for
-    the specific product, inventory join with SUM(available_today) and COALESCE, and
-    a final action that formats the count with citations. When citing records, include
-    their full file paths (e.g., by recording the execution output file paths or querying
-    a metadata table) before computing the final answer. When filtering on numeric
-    properties (e.g., power, voltage), query both value_text and value_number with
-    OR (e.g., (pp.value_text = ''3000 W'' OR pp.value_number = 3000)). Never stop
-    to ask for clarification midway; all actions must be completed before producing
-    the final answer. Additionally, always execute the product validation query as
-    a separate action and verify that it returns at least one row before using it
-    in any subsequent inventory join. Never embed the product identification subquery
-    inside the final inventory join SQL because that will cause an empty result if
-    the product query fails.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r011, r012'
-  id: r011
-  reasoning: Merged r009 (basic SDD actions structure, citations, numeric property
-    filtering) with r010 (explicit separate product validation, fallback steps, forbidding
-    embedded subqueries). r010 adds detail on execution separation and fallback that
-    is compatible with and extends r009. Highest numeric id (r010) used as base, extended
-    with r009's requirements for stores query, citations with full file paths, numeric
-    property OR filtering, and the sequential uninterruptible execution instruction.
-  source: learn
-  status: inactive
-- content: Always, for spec_goals that require citing all store records even if zero
-    stores match (e.g., 'Across every Vienna PowerTool branch, including branches
-    with 0 availability'), include in the SDD 'actions' array a final action that
-    constructs the answer string by explicitly listing the product path and all store
-    paths retrieved from preceding queries, and ensure the final output includes both
-    the count and the full file paths of all cited records, even if the list of stores
-    is empty. Do not rely on a single SQL query that may return zero rows; instead,
-    capture the store paths via a separate stores query and the product path via a
-    separate product query, then format the answer string in a final step.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r011, r012'
-  id: r012
-  reasoning: 'Verbatim error: ''Empty result: '' (blank after colon). Root cause:
-    empty-result — the final combined SQL query returned zero rows because either
-    no stores matched the filter ''s.city = "Vienna" AND s.name LIKE "%PowerTool%"''
-    or the embedded product subquery returned NULL causing an unexpected empty set.
-    Failing fragment: the third action in SDD_OUTPUT (the combined stores/inventory/format
-    query) and the plan action that embeds the product identification subquery inside
-    the final inventory join. Existing rule r011 prohibits embedding the product subquery
-    and requires separate product validation, but does not enforce handling the case
-    where the stores query returns zero rows, leading to an empty answer when no stores
-    match. Rule linkage: new rule must cite spec_goal ''Across every Vienna PowerTool
-    branch, including branches with 0 availability'' to ensure the final action always
-    produces a non-empty output even if no stores exist.'
-  source: learn
-  status: inactive
-- content: 'Always, for spec_goals requiring citation of store records and product
-    records (e.g., ''Determine the total available_today across all stores for a specific
-    product'', or ''Across every Vienna PowerTool branch, including branches with
-    0 availability''), ensure the SDD ''actions'' array includes at minimum: a stores
-    query that captures all store paths even if the inventory join returns zero rows;
-    a product validation query (first query the products table with brand and series
-    alone; if empty, apply broader or fuzzy matching such as LIKE on series/name or
-    remove property filters, then escalate if still empty); one or more product queries
-    for the specific product; an inventory join with SUM(available_today) and COALESCE;
-    and a final action that constructs the answer string by explicitly listing the
-    product path and all store paths retrieved from the preceding stores query, ensuring
-    the final output includes both the count and the full file paths of all cited
-    records, even if the list of stores is empty. Do not rely on a single SQL query
-    that may return zero rows; instead, capture the store paths via a separate stores
-    query and the product path via a separate product query, then format the answer
-    string in a final step. When filtering on numeric properties (e.g., power, voltage),
-    query both value_text and value_number with OR (e.g., (pp.value_text = ''3000
-    W'' OR pp.value_number = 3000)). Never stop to ask for clarification midway; all
-    actions must be completed before producing the final answer. Additionally, always
-    execute the product validation query as a separate action and verify that it returns
-    at least one row before using it in any subsequent inventory join. Never embed
-    the product identification subquery inside the final inventory join SQL because
-    that will cause an empty result if the product query fails.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r013, r014'
-  id: r013
-  reasoning: r011 and r012 both address spec_goals that require citing all store records
-    and product records for inventory availability queries under a 'cite all records'
-    success criterion. r011 provides comprehensive technical instructions (product
-    validation, fuzzy matching, numeric property OR, separate product query, never
-    embed subquery). r012 specifically emphasizes the case where zero stores match
-    and the need to capture store paths via a separate stores query. Since r012's
-    requirement is a subset of r011's broader instructions but adds explicit handling
-    of zero-store scenarios, merging eliminates redundancy and ensures all edge cases
-    are covered.
-  source: learn
-  status: inactive
-- content: 'Always, for spec_goals requiring product identification with brand, series,
-    and properties before inventory computation (e.g., ''Across every Vienna PowerTool
-    branch ... how many units of product ... are available today?''), include in the
-    SDD ''actions'' array at least two distinct product query actions executed sequentially:
-    (1) a product query with brand=''X'' AND series LIKE ''%Y%'' (exact or LIKE);
-    (2) a broader product query executed unconditionally (e.g., using LIKE on name
-    or series with less specificity, or removing property filters) to locate the product
-    even if the first query returns zero rows. The inventory join action must be placed
-    after both product queries. The plan steps must explicitly list both queries.
-    Never rely on a single product query to succeed.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r013, r014'
-  id: r014
-  reasoning: 'Verbatim error: ''Unable to determine the total available units because
-    the product record and availability data for the Cleaning Machine (Vileda Workshop
-    UltraMax 3R0-GQ8, floor cleaner, 3000W) were not found.'' Root cause: wrong-spec
-    — the SDD actions array contained only a single product query (action #2) and
-    did not include a fallback broader query, despite the requirement in existing
-    rule r013 to ''if empty, apply broader or fuzzy matching''. The failing fragment
-    is SDD action #2 (SELECT sku, path FROM products WHERE brand=''Vileda'' AND series
-    LIKE ''%Vileda Workshop UltraMax 3R0-GQ8%'') which returned zero rows, and the
-    plan step #2 that only mentions a single query. The agent consequently stopped
-    asking clarification instead of executing broader search. Rule linkage: new rule
-    must enforce that the SDD actions list includes at least two separate product
-    queries (exact then broader) executed unconditionally, so that the inventory join
-    (action #3) only runs after product is confirmed found via either query.'
-  source: learn
-  status: inactive
-- content: 'Always, for spec_goals requiring citation of store records and product
-    records (e.g., ''Determine the total available_today across all stores for a specific
-    product'' or ''Across every Vienna PowerTool branch, including branches with 0
-    availability''), ensure the SDD ''actions'' array includes at minimum: a stores
-    query that captures all store paths even if the inventory join returns zero rows;
-    a product validation query (first query the products table with brand and series
-    alone; if empty, apply broader or fuzzy matching such as LIKE on series/name or
-    remove property filters, then escalate if still empty); a second broader product
-    query executed unconditionally as a separate action (e.g., using LIKE on name
-    or series with less specificity, or removing property filters) to locate the product
-    even if the first query returns zero rows; one or more product queries for the
-    specific product; an inventory join with SUM(available_today) and COALESCE, placed
-    after both product queries; and a final action that constructs the answer string
-    by explicitly listing the product path and all store paths retrieved from the
-    preceding stores query, ensuring the final output includes both the count and
-    the full file paths of all cited records, even if the list of stores is empty.
-    Do not rely on a single SQL query that may return zero rows; instead, capture
-    the store paths via a separate stores query and the product path via a separate
-    product query, then format the answer string in a final step. When filtering on
-    numeric properties (e.g., power, voltage), query both value_text and value_number
-    with OR (e.g., (pp.value_text = ''3000 W'' OR pp.value_number = 3000)). Never
-    stop to ask for clarification midway; all actions must be completed before producing
-    the final answer. Additionally, always execute the product validation query as
-    a separate action and verify that it returns at least one row before using it
-    in any subsequent inventory join. Never embed the product identification subquery
-    inside the final inventory join SQL because that will cause an empty result if
-    the product query fails. The plan steps must explicitly list both the initial
-    product query and the broader follow-up query as distinct actions.'
-  created: '2026-05-21'
+- content: Never conjoin an alphanumeric product identifier search for '1TO-KNA' across
+    products.model, products.series, and products.name with a product_properties join
+    filtering on key='cleaner type' and value_text='screen wash' and an exact brand
+    filter 'Sonax' in the initial SKU lookup query, because this action produced an
+    empty result; always first retrieve candidate SKUs from the products table by
+    the identifier across model, series, and name alone, then verify brand and properties
+    in separate follow-up queries.
+  created: '2026-05-23'
   deactivated_reason: null
-  id: r015
-  reasoning: 'Merged r013 and r014. r014 (highest id) provided the base requirement
-    for two distinct product query actions (exact then broader) and explicit inventory
-    join placement. r013 added comprehensive requirements: stores query, final answer
-    construction listing paths, numeric property handling, unconditional inclusion
-    of broader query, separate product validation, no embedded subqueries, and never
-    asking for clarification. The merged rule extends r014 by incorporating all these
-    points, resolving the apparent contradiction (r013''s conditional broader query
-    vs r014''s unconditional broader query) by requiring the broader query as an unconditional
-    separate action while still recommending conditional use of its results if the
-    first query succeeds.'
+  id: r002
+  reasoning: 'The verbatim error is ''Empty result: sku,path,name,brand,series,model,value_text''.
+    The root cause category is wrong-action: the initial SKU lookup action simultaneously
+    joined product_properties, filtered by exact brand ''Sonax'', and required property
+    key=''cleaner type'' with value_text=''screen wash'' while also matching the identifier
+    ''1TO-KNA'' across model/series/name, causing the entire query to collapse to
+    zero rows when any single constraint mismatched. The failing fragment is the action
+    ''SELECT p.sku, p.path, p.name, p.brand, p.series, p.model, prop.value_text FROM
+    products p LEFT JOIN product_properties prop ON p.sku = prop.sku WHERE p.brand
+    = ''Sonax'' AND prop.key = ''cleaner type'' AND prop.value_text = ''screen wash''
+    AND (p.series LIKE ''%1TO-KNA%'' OR p.name LIKE ''%1TO-KNA%'' OR p.model LIKE
+    ''%1TO-KNA%'')''. The rule directly targets this action by mandating a decoupled
+    lookup: isolate the SKU with the identifier first, then verify brand and properties
+    separately.'
+  source: learn
+  status: active
+- content: Never conjoin an alphanumeric product identifier search for '1TO-KNA' across
+    products.model, products.series, and products.name with a product_properties join
+    filtering on properties (e.g., key='cleaner type' and value_text='screen wash')
+    or an exact brand filter (e.g., 'Sonax') in the initial SKU lookup query. More
+    generally, never search for an alphanumeric product identifier exclusively in
+    the products.series and products.name columns; always include the products.model
+    column in the initial WHERE clause. Always first retrieve candidate SKUs from
+    the products table by the identifier across model, series, and name alone, then
+    verify brand and properties in separate follow-up queries.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r003
+  reasoning: r001 and r002 share the same spec_goal (look up a product by an alphanumeric
+    identifier like '1TO-KNA') but prescribe different/complementary actions. r002
+    (highest id) subsumes the core lesson of r001 by searching across model, series,
+    and name, while also adding the broader two-step strategy. Merging them eliminates
+    redundant guidance and consolidates the rule set.
   source: learn
   status: active
 last_run:
-  cycles_used: 1
-  date: '2026-05-21'
+  cycles_used: 4
+  date: '2026-05-23'
   grounding_refs_count: 3
   outcome: OUTCOME_OK
-  status: failure
+  status: success
 task_id: t20

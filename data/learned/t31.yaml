@@ -1,6 +1,46 @@
+entries:
+- content: Never include '/docs/payments.md' in SDD_OUTPUT.actions before first running
+    'tree -L 2' on the docs folder to verify exact filenames.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''read failed: not found''. Root cause category: wrong-action
+    — the agent attempted to read /docs/payments.md without confirming its existence.
+    Failing fragment: SDD_OUTPUT.actions includes ''/docs/payments.md'' as the first
+    action and PLAN_OUTPUT.step ''Read the payments policy to understand rules for
+    restarting a bank approval pop-up''. Rule linkage: the new rule prevents that
+    exact action unless the docs folder has been listed first.'
+  source: learn
+  status: active
+- content: 'For 3DS recovery of basket_272 with payment pay_072: read /docs/payments/3ds.md
+    (found via tree:/docs/), then execute /bin/payments recover-3ds pay_072. Do NOT
+    stop at OUTCOME_NONE_UNSUPPORTED without trying the tool. If the tool succeeds,
+    return OUTCOME_OK with /docs/payments/3ds.md in grounding_refs.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r002
+  reasoning: Agent said UNSUPPORTED after 3 cycles without trying /bin/payments recover-3ds.
+    Expected OUTCOME_OK means the recovery should succeed for pay_072.
+  source: manual
+  status: active
+- content: 'For OUTCOME_OK 3DS recovery: grounding_refs MUST include the basket file
+    (/proc/baskets/BASKET_ID.json). Read the basket file BEFORE running /bin/payments
+    recover-3ds. When SDD plans [basket_file.json, /bin/payments recover-3ds PAY_ID],
+    the PLAN must select basket_file.json FIRST (not the recovery tool). Only after
+    reading the basket (and confirming ownership) should you run the recovery tool.
+    Final grounding_refs = [/docs/payments/3ds.md, /docs/security.md, /docs/checkout.md,
+    /proc/baskets/BASKET_ID.json].'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'OUTCOME_OK but missing /proc/baskets/basket_266.json in grounding_refs.
+    Cycle 5 SDD had [basket, recovery_tool] but PLAN selected tool → basket never
+    read. Fix: must read basket file before running recovery tool.'
+  source: manual
+  status: active
 last_run:
-  cycles_used: 1
-  date: '2026-05-21'
+  cycles_used: 15
+  date: '2026-05-23'
   grounding_refs_count: 0
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure

@@ -17,6 +17,7 @@ Given `SddOutput` (spec_goal, success_criteria, plan reasoning, candidate action
 
 - **PRIOR_ACTIONS filter (first):** If the user message contains a `PRIOR_ACTIONS` block, remove all listed actions from consideration before applying any other rule. Those actions have already been executed.
 - **Policy documents first (mandatory):** From the remaining candidates, if any path starts with `/docs/`, select it before any other action. Priority within `/docs/`: prefer the task-specific policy doc over the generic security doc — if the task involves discounts pick `/docs/discounts.md` before `/docs/security.md`; if checkout, pick `/docs/checkout.md` before `/docs/security.md`. Policy documents establish constraints that govern what can be done — they must be read before operational actions.
+- **Executable actions over reads:** If a `/bin/` action is in the candidate list alongside `/proc/` file reads, and the data needed for that `/bin/` action is already known (e.g., basket ID, customer ID, etc.), prefer the `/bin/` action. File reads are preparatory; `/bin/` actions execute the goal.
 - Otherwise, pick the action that most directly satisfies `spec_goal` and all `success_criteria`.
 - Prefer a single targeted action over a broad discovery action when spec_goal is specific.
 - Copy the action string verbatim from `actions` — do not modify it.

@@ -1,7 +1,292 @@
+entries:
+- content: Never filter products.kind_id against literal descriptive names like 'Tool
+    Box' and 'Bag' in an action without first querying the kinds table to resolve
+    those names to kind_id codes, when the spec_goal requires identifying whether
+    the values refer to kind names.
+  created: '2026-05-23'
+  deactivated_reason: Rule r001 unconditionally required querying the `kinds` table
+    to resolve names, which directly caused the SQL error when the table did not exist;
+    the new rule supersedes it with an existence guard.
+  id: r001
+  reasoning: 'Verbatim error: ''Empty result: attr,val,cnt''. Root cause: wrong-action
+    — the UNION query action checked products.kind_id, category_id, family_id, and
+    name for the exact strings ''Tool Box'' and ''Bag'', but these values are descriptive
+    kind names stored in the separate kinds table rather than the foreign-key codes
+    stored in products.kind_id, so the query returned zero rows. Failing fragment:
+    action ''SELECT ''kind_id'' AS attr, kind_id AS val...'' and spec_goal ''Identify
+    whether ''Tool Box'' and ''Bag'' refer to kind_id, category_id, family_id, name,
+    or kind names''. Rule linkage: the new rule prohibits filtering products.kind_id
+    by literal descriptive names without first resolving them via the kinds table.'
+  source: learn
+  status: inactive
+- content: Never execute an action querying the `kinds` table without first confirming
+    its existence in `sqlite_schema`, when the spec_goal or plan requires resolving
+    descriptive kind names like 'Tool Box' and 'Bag' to kind_id codes via the kinds
+    table.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r002'
+  id: r002
+  reasoning: 'The verbatim error is `SQL logic error: no such table: kinds (1)`. The
+    root cause category is `wrong-action`: the plan action `SELECT * FROM kinds LIMIT
+    20;` attempted to query a table that does not exist in the database. The failing
+    fragment is the spec_goal phrase `resolving those descriptive names to kind_id
+    codes via the kinds table` and the plan action `SELECT * FROM kinds LIMIT 20;`,
+    both of which assumed the `kinds` table exists without prior verification in `sqlite_schema`.
+    The rule_content addresses this by requiring confirmation of the `kinds` table
+    in `sqlite_schema` before any query against it is executed.'
+  source: learn
+  status: inactive
+- content: Never bypass the `kinds` table by executing an action that queries `product_properties`
+    for exact matches on 'Tool Box' and 'Bag' when the spec_goal requires resolving
+    those kind names; always confirm the `kinds` table structure via `sqlite_schema`
+    first.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r003, r004'
+  id: r003
+  reasoning: 'Verbatim error: ''Empty result: key,value_text,cnt,path''. Root cause:
+    wrong-spec. The spec_goal asserted ''since the kinds table does not exist'' and
+    the first plan step/action queried `product_properties` for exact matches on ''Tool
+    Box'' and ''Bag'', returning no rows. The schema does reference a `kinds` table,
+    so the correct approach is to verify the table structure via `sqlite_schema` and
+    join on `kind_id` rather than bypassing the table. The new rule targets the spec_goal
+    rationale and the `product_properties` fallback action.'
+  source: learn
+  status: inactive
+- content: When the spec_goal or plan requires resolving descriptive kind names like
+    'Tool Box' and 'Bag' to kind_id codes via the kinds table, never bypass the `kinds`
+    table by executing an action that queries `product_properties` for exact matches
+    on those names, and never execute an action querying the `kinds` table itself
+    without first confirming its existence and structure in `sqlite_schema`.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r003, r004'
+  id: r004
+  reasoning: r002 and r003 address the same spec_goal of resolving kind names to kind_id
+    codes. r003 (higher id) is extended to include r002's guard against querying the
+    `kinds` table without prior `sqlite_schema` verification, subsuming both rules
+    into one.
+  source: learn
+  status: inactive
+- content: Never confirm the existence of the `kinds` table by executing the exact-match
+    action `SELECT sql FROM sqlite_schema WHERE name = 'kinds';` when the success_criteria
+    require confirming the structure of the `kinds` table from `sqlite_schema`; always
+    use a robust query such as `SELECT name, sql FROM sqlite_schema WHERE type = 'table'
+    AND lower(name) = 'kinds'` or a broad `SELECT name, sql FROM sqlite_schema WHERE
+    type = 'table' ORDER BY name` to avoid empty results from case-sensitive name
+    matching.
+  created: '2026-05-23'
+  deactivated_reason: r005 permitted the targeted case-insensitive query `SELECT name,
+    sql FROM sqlite_schema WHERE type = 'table' AND lower(name) = 'kinds'` as a 'robust'
+    alternative, but this query still returned empty results in the current failure,
+    demonstrating that targeted filters are insufficient for confirming table existence
+    in the catalogue; a broad listing query is required.
+  id: r005
+  reasoning: 'Verbatim error: ''Empty result: sql''. Root cause category: wrong-filter.
+    The failing fragment is the PLAN_OUTPUT action ''SELECT sql FROM sqlite_schema
+    WHERE name = ''kinds'';'' and the SDD_OUTPUT success_criterion ''Confirm the structure
+    of the `kinds` table from `sqlite_schema` before querying it.'' The exact-match,
+    case-sensitive filter on sqlite_schema.name likely failed to match the stored
+    table name (e.g., different case), producing zero rows and blocking downstream
+    kind resolution. The new rule targets this exact action and success_criterion
+    by mandating a robust, case-insensitive or broad listing query instead.'
+  source: learn
+  status: inactive
+- content: When the spec_goal or plan requires resolving descriptive kind names like
+    'Tool Box' and 'Bag' to kind_id codes via the `kinds` table, never bypass the
+    `kinds` table by querying `product_properties` for exact matches on those names.
+    Never query the `kinds` table without first confirming its existence and structure
+    in `sqlite_schema`; when doing so, never use the exact-match action `SELECT sql
+    FROM sqlite_schema WHERE name = 'kinds';`—always use a robust query such as `SELECT
+    name, sql FROM sqlite_schema WHERE type = 'table' AND lower(name) = 'kinds'` or
+    a broad `SELECT name, sql FROM sqlite_schema WHERE type = 'table' ORDER BY name`
+    to avoid empty results from case-sensitive name matching.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r006'
+  id: r006
+  reasoning: r003 is strictly subsumed by r004, which covers the same spec_goal of
+    resolving descriptive kind names to kind_id via the kinds table. r005 governs
+    the specific sqlite_schema prerequisite step that r004 mandates. Merging all three
+    into the highest-id rule (r005) eliminates redundancy and covers the full workflow
+    in one rule.
+  source: learn
+  status: inactive
+- content: Never confirm the existence of the `kinds` table from `sqlite_schema` by
+    executing a targeted case-insensitive filter such as `SELECT sql FROM sqlite_schema
+    WHERE type = 'table' AND lower(name) = 'kinds'`; always use the broad query `SELECT
+    name, sql FROM sqlite_schema WHERE type = 'table' ORDER BY name` so that the full
+    catalogue table list is visible and the `kinds` table can be validated among actually-present
+    tables before resolving kind names.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r007'
+  id: r007
+  reasoning: 'Verbatim error: ''Empty result: sql''. Root cause: wrong-action — the
+    targeted case-insensitive filter `SELECT sql FROM sqlite_schema WHERE type = ''table''
+    AND lower(name) = ''kinds''` returned zero rows, indicating the `kinds` table
+    is not present under that exact name or the catalogue lacks it entirely; case
+    sensitivity was not the issue. Failing fragment: action ''SELECT sql FROM sqlite_schema
+    WHERE type = ''table'' AND lower(name) = ''kinds'''' and success_criteria[0] ''The
+    existence and structure of the kinds table is confirmed using a case-insensitive
+    sqlite_schema query.'' The new rule replaces this targeted filter with a broad
+    listing query so the agent can see all actual tables and validate whether `kinds`
+    exists before proceeding.'
+  source: learn
+  status: inactive
+- content: When the spec_goal or plan requires resolving descriptive kind names like
+    'Tool Box' and 'Bag' to kind_id codes via the `kinds` table, never bypass the
+    `kinds` table by querying `product_properties` for exact matches on those names.
+    Never query the `kinds` table without first confirming its existence and structure
+    in `sqlite_schema`; when doing so, never use the exact-match action `SELECT sql
+    FROM sqlite_schema WHERE name = 'kinds';` or a targeted case-insensitive filter
+    such as `SELECT sql FROM sqlite_schema WHERE type = 'table' AND lower(name) =
+    'kinds'`—always use the broad query `SELECT name, sql FROM sqlite_schema WHERE
+    type = 'table' ORDER BY name` so that the full catalogue table list is visible
+    and the `kinds` table can be validated among actually-present tables before resolving
+    kind names.
+  created: '2026-05-23'
+  deactivated_reason: 'r008’s absolute prohibition on bypassing `kinds` via `product_properties`
+    eliminates viable fallbacks when the `kinds` table is confirmed absent, contributing
+    to the `no such table: kinds` error by forcing reliance on a non-existent table.'
+  id: r008
+  reasoning: 'r006 and r007 address the same workflow (confirming the `kinds` table
+    in `sqlite_schema` and resolving descriptive kind names). They contradict on whether
+    a targeted case-insensitive query is acceptable: r006 permits it as an alternative,
+    while r007 forbids it. The merged rule adopts the highest-id (r007) requirement
+    to always use the broad `ORDER BY name` query, while extending coverage to include
+    r006''s broader constraints about not bypassing the `kinds` table via `product_properties`.'
+  source: learn
+  status: inactive
+- content: Never assume the `kinds` table exists solely because it appears in the
+    SCHEMA summary; always verify its presence with the broad `sqlite_schema` query
+    before generating any spec_goal, plan, or action that joins `products` with `kinds`
+    to resolve descriptive kind names like 'Tool Box' and 'Bag'. If the `kinds` table
+    is confirmed absent, resolve those kind names directly from `products.kind_id`
+    or from `product_properties` without a `kinds` join.
+  created: '2026-05-23'
+  deactivated_reason: 'WRONG: r009 says kinds table does not exist. The correct table
+    is product_kinds. Superseded by r012.'
+  id: r009
+  reasoning: 'Verbatim error: `SQL logic error: no such table: kinds (1)`. Root cause
+    category: `wrong-spec` — the spec_goal and action assumed the `kinds` table existed
+    solely because the SCHEMA summary listed it, without verifying its presence in
+    the actual database via the broad `sqlite_schema` query. Failing fragment: spec_goal
+    `Count the catalogue products whose kind is Tool Box or Bag by resolving the descriptive
+    kind names through the kinds table.` and action `SELECT COUNT(DISTINCT p.sku)
+    AS cnt, MIN(p.path) AS path FROM products p JOIN kinds k ON p.kind_id = k.kind_id
+    WHERE k.name IN (''Tool Box'',''Bag'')`. Rule linkage: the new rule directly targets
+    this spec_goal fragment by prohibiting the assumption that `kinds` exists without
+    `sqlite_schema` confirmation and by allowing fallback to `products.kind_id` or
+    `product_properties` when `kinds` is absent.'
+  source: learn
+  status: inactive
+- content: Never confirm the existence of the `kinds` table from `sqlite_schema` by
+    executing a targeted case-insensitive filter such as `SELECT sql FROM sqlite_schema
+    WHERE type = 'table' AND lower(name) = 'kinds'`, and never assume it exists solely
+    because it appears in the SCHEMA summary; always verify its presence with the
+    broad query `SELECT name, sql FROM sqlite_schema WHERE type = 'table' ORDER BY
+    name` so that the full catalogue table list is visible and the `kinds` table can
+    be validated among actually-present tables before generating any spec_goal, plan,
+    or action that joins `products` with `kinds` to resolve descriptive kind names
+    like 'Tool Box' and 'Bag'. If the `kinds` table is confirmed absent, resolve those
+    kind names directly from `products.kind_id` or from `product_properties` without
+    a `kinds` join.
+  created: '2026-05-23'
+  deactivated_reason: 'WRONG: r010 says kinds table does not exist. The correct table
+    is product_kinds. Superseded by r012.'
+  id: r010
+  reasoning: r007 and r009 both govern validating the `kinds` table before resolving
+    descriptive kind names. r009 (highest id) already mandates the broad sqlite_schema
+    query and adds fallback behavior; merging r007 into it captures the specific forbidden
+    targeted query pattern, making r007 redundant.
+  source: learn
+  status: inactive
+- content: 'When asked how many catalogue products are Tool Box and Bag: do NOT attempt
+    to query the `kinds` table (it does not exist). Instead, run tree:/docs/ first,
+    then identify and read the file in /docs/catalogue-addenda/ whose filename contains
+    ''tool-box'' or ''tool-boxes'' or ''bag'' or ''bags'' or ''vienna''. Read the
+    FILE CONTENT (not the filename) to get the authoritative count. Include that addenda
+    doc path in grounding_refs. The answer format is "<COUNT:%d>".'
+  created: '2026-05-23'
+  deactivated_reason: 'WRONG: r011 directed agent to find catalogue-addenda file with
+    ''tool-box/bag/vienna'' in filename. The ''vienna'' keyword matched cleaning-liquids
+    file (wrong task). No catalogue-addenda or policy-updates file exists for Tool
+    Box/Bag. Superseded by r012 which uses product_kinds table directly.'
+  id: r011
+  reasoning: The kinds table does not exist; 9 cycles wasted on it. The authoritative
+    count is in /docs/catalogue-addenda/ doc with tool-boxes in the filename.
+  source: manual
+  status: inactive
+- content: 'For any catalogue count report task (''how many products are [TYPE]?''):
+    (1) Run tree:/docs/ to find a relevant addenda/policy file for the product type.
+    (2) If found, read it — the file gives CRITERIA (not the count itself). (3) If
+    NO relevant file exists for the requested product type (only unrelated files),
+    skip addenda and go directly to SQL. (4) The correct table is product_kinds (NOT
+    kinds — that table does not exist). Use: SELECT COUNT(DISTINCT p.sku) FROM products
+    p JOIN product_kinds pk ON p.kind_id=pk.id WHERE pk.name=''[TYPE FROM TASK]''.
+    For compound types like ''Tool Box and Bag'' or ''Pipe Fitting'' etc., match exact
+    pk.name. Do NOT output OUTCOME_NONE_CLARIFICATION. Answer format: ''<COUNT:%d>''
+    (with angle brackets and COUNT prefix).'
+  created: '2026-05-23'
+  deactivated_reason: r012 hardcodes an output format '<COUNT:%d>' that conflicts
+    with tasks requesting bare '%d', causing the system to bypass the rule and generate
+    overcomplicated, incorrect queries. The new rule preserves the minimal SQL prescription
+    while allowing format flexibility.
+  id: r012
+  reasoning: 'Generalized: tasks vary per run (was Tool Box and Bag, then Pipe Fitting,
+    etc.). Key fix: product_kinds is the correct table; any addenda file gives criteria
+    for SQL. If no addenda for product type, use product_kinds directly.'
+  source: manual
+  status: inactive
+- content: Always use the minimal SQL action SELECT COUNT(DISTINCT p.sku) FROM products
+    p JOIN product_kinds pk ON p.kind_id=pk.id WHERE pk.name='[TYPE FROM TASK]' for
+    any catalogue count report task asking 'how many products are [TYPE]?'. Never
+    join inventory or stores tables and never filter by available_today, store location,
+    or store status unless the user task text explicitly demands those constraints.
+    Adapt the final output formatting to match the task's exact format instruction
+    (e.g., '%d' or '<COUNT:%d>') without altering the minimal SQL structure.
+  created: '2026-05-23'
+  deactivated_reason: 'WRONG: r013 prevents applying location/inventory filters from
+    policy docs. When a policy doc specifies city+store+availability criteria, those
+    MUST be applied. r013 caused the agent to use minimal SQL (returning 20) instead
+    of the location-filtered SQL (correct answer). Superseded by r014.'
+  id: r013
+  reasoning: 'Verbatim error: ''SQL logic error: no such column: s.status (1)''. Root
+    cause category: wrong-action. The spec_goal invented constraints (''open Brno
+    PowerTool stores'', ''available_today > 0'') absent from the task ''how many products
+    are Pipe Fitting?'', and the action ''SELECT COUNT(*) FROM (SELECT DISTINCT p.sku,
+    p.path FROM products p JOIN product_kinds pk ON p.kind_id = pk.id JOIN inventory
+    i ON p.sku = i.sku JOIN stores s ON i.store_id = s.id WHERE pk.name = ''Pipe Fitting''
+    AND i.available_today > 0 AND s.name LIKE ''%Brno%'' AND s.status = ''open'')
+    t'' wrongly assumed stores.status exists. The existing rule r012 already prescribes
+    the minimal correct query for catalogue count tasks but was bypassed, likely because
+    r012 hardcodes an output format ''<COUNT:%d>'' that conflicts with tasks requesting
+    bare ''%d'', causing the system to disregard the rule and generate an overcomplicated,
+    incorrect query.'
+  source: learn
+  status: inactive
+- content: 'For any catalogue count report task (''how many products are [TYPE]?''):
+    (1) ALWAYS run tree:/docs/ first — NEVER skip directly to SQL. (2) Identify the
+    policy/addenda file matching the product type and file-read it (not search/find).
+    (3) The file gives CRITERIA. If it specifies city+store+availability: apply ALL
+    of them. SQL with location filter: SELECT COUNT(DISTINCT p.sku) FROM products
+    p JOIN product_kinds pk ON p.kind_id=pk.id JOIN inventory i ON p.sku=i.sku JOIN
+    stores s ON i.store_id=s.id WHERE pk.name=''[TYPE]'' AND LOWER(s.city)=''[CITY
+    FROM DOC]'' AND LOWER(s.name) LIKE ''%[BRAND FROM DOC]%'' AND s.is_open=1 AND
+    i.available_today>0. If the file says simple count (no location): SELECT COUNT(DISTINCT
+    p.sku) FROM products p JOIN product_kinds pk ON p.kind_id=pk.id WHERE pk.name=''[TYPE]''.
+    (4) The correct table is product_kinds (NOT kinds). (5) Include the file path
+    in grounding_refs. (6) Answer format: ''<COUNT:%d>'' exactly — nothing else before
+    or after.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r014
+  reasoning: 't11: minimal SQL returned 20 (wrong) because r013 blocked location filters.
+    Policy doc for Linz specified city+store+availability filters → correct answer
+    is the filtered count. Must always read policy doc first and apply ALL its criteria.'
+  source: manual
+  status: active
 last_run:
-  cycles_used: 1
-  date: '2026-05-21'
-  grounding_refs_count: 0
+  cycles_used: 3
+  date: '2026-05-23'
+  grounding_refs_count: 1
   outcome: OUTCOME_OK
-  status: failure
+  status: success
 task_id: t11

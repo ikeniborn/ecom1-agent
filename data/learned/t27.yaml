@@ -1,21 +1,52 @@
 entries:
-- content: Always use absolute paths when executing filesystem commands like tree;
-    for example, use 'tree:/full/path/to/docs/' instead of relative paths like 'tree:docs/'
-    in the action.
-  created: '2026-05-21'
-  deactivated_reason: null
+- content: 'For 3DS recovery of basket_266: read /docs/payments/3ds.md, search for
+    the payment ID in /proc/payments/ or via SQL on payments table, then execute /bin/payments
+    recover-3ds PAY_ID. Do NOT say OUTCOME_NONE_UNSUPPORTED without first attempting
+    the /bin/payments recover-3ds tool. If the tool succeeds, return OUTCOME_OK. Include
+    /docs/payments/3ds.md and /docs/security.md in grounding_refs.'
+  created: '2026-05-23'
+  deactivated_reason: r001 instructs to search /proc/payments/ for the payment ID,
+    but this approach produced an empty result in this cycle despite pay_074.json
+    existing; recovery must instead list and read payment JSON files directly.
   id: r001
-  reasoning: 'Verbatim error: ''tree failed: invalid path: path must be absolute:
-    "docs/"''. Root cause: wrong-value-type: the action ''tree:docs/'' used a relative
-    path instead of an absolute path required by the tree tool. Failing fragment:
-    action ''tree:docs/'' from PLAN_OUTPUT. Rule linkage: the new rule will require
-    absolute paths for filesystem commands, preventing this error.'
+  reasoning: Agent said no tool exists for 3DS recovery but /bin/payments recover-3ds
+    IS the tool. Expected OUTCOME_OK means the recovery should succeed.
+  source: manual
+  status: inactive
+- content: Never use action search:basket_274 /proc/payments/ to locate payment files
+    for basket_274. Instead, list /proc/payments/ and read individual JSON files to
+    find the payment ID whose basket_id matches basket_274, then execute /bin/payments
+    recover-3ds PAY_ID. Do NOT say OUTCOME_NONE_UNSUPPORTED without first attempting
+    the /bin/payments recover-3ds tool. If the tool succeeds, return OUTCOME_OK. Include
+    /docs/payments/3ds.md and /docs/security.md in grounding_refs.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r002
+  reasoning: '1. Verbatim error: ''Empty result: /proc/payments/pay_074.json:1:{"id":"pay_074","basket_id":"basket_274","basket_archived":false,"customer_id":"cust_089",''.
+    2. Root cause category: wrong-action — the tool invocation returned empty even
+    though the payment file pay_074.json exists and contains the basket_id. 3. Failing
+    fragment citation: action ''search:basket_274 /proc/payments/'' from PLAN_OUTPUT.
+    4. Rule linkage: the new rule explicitly prohibits the failing search action and
+    mandates directory listing plus direct JSON file reading to locate the payment
+    ID before recovery.'
   source: learn
   status: active
+- content: 'CRITICAL for 3DS recovery: after finding the payment ID (pay_XXX), ALWAYS
+    do a direct file-read of /proc/payments/PAY_ID.json BEFORE running /bin/payments
+    recover-3ds. This adds it to FILES_READ_IN_PRIOR_CYCLES so ANSWER can include
+    it in grounding_refs. For OUTCOME_OK, grounding_refs MUST include /proc/payments/PAY_ID.json.
+    Without the payment file in grounding_refs, harness will fail even on OUTCOME_OK.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'OUTCOME_OK but harness failed: missing /proc/payments/pay_074.json in
+    grounding_refs. Fix: read the payment file directly before running the tool.'
+  source: manual
+  status: active
 last_run:
-  cycles_used: 1
-  date: '2026-05-21'
-  grounding_refs_count: 1
-  outcome: OUTCOME_OK
+  cycles_used: 15
+  date: '2026-05-23'
+  grounding_refs_count: 0
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t27

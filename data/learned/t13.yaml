@@ -1,87 +1,121 @@
 entries:
-- content: Always include in the plan actions for each product description a specific
-    SQL query that joins products with product_properties using brand, series, and
-    property keys to find the SKU, before checking inventory.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r001, r002, r003'
-  id: r001
-  reasoning: 'Error: ''Empty result: '' with type empty. Root cause: wrong-spec —
-    the plan''s only action was the schema query ''/bin/sql ''select name, sql from
-    sqlite_schema where sql is not null order by type, name;'''', which does not perform
-    the product identification needed to count availability. The spec_goal ''Count
-    how many of the 6 specified products have at least 1 item available today at the
-    Graz Jakomini hardware store'' lacks explicit steps to map each product description
-    to a SKU using the schema. Without those queries, no SKUs were found, resulting
-    in an empty answer.'
-  source: learn
-  status: inactive
-- content: Always include a step to retrieve distinct series values for each brand
-    using LIKE with the product description keywords (e.g., '%SYS 3JJ-9LM%') to confirm
-    the exact series string, and query store names using LIKE (e.g., '%Wilten PowerTool%')
-    with single wildcard only, before building the inventory count query. Reference
-    the action 'SELECT COUNT(DISTINCT sku) FROM ...' as the stage that must be preceded
-    by exploration.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r001, r002, r003'
-  id: r002
-  reasoning: 'Verbatim error: ''Empty result: ''. Root cause category: empty-result
-    — the SQL query returned zero rows. Failing fragment: the action SQL query (SELECT
-    COUNT(DISTINCT sku) FROM ...) that uses exact equality for series names (e.g.,
-    ''Festool Stackable SYS 3JJ-9LM Tool Box and Bag'') and store name LIKE with both
-    substrings. This likely fails because the series string in the database does not
-    match verbatim or the store name lacks one of the substrings. Rule linkage: new
-    rule will require verifying series and store name via partial matching or exploration
-    before the final query.'
-  source: learn
-  status: inactive
-- content: Always ensure the actions field in the SDD output contains, for each distinct
-    product description referenced in the plan, an action that specifies an SQL query
-    joining products with product_properties using brand, series, and the property
-    keys and values from the product description to find its SKU, and a final action
-    querying inventory for those SKUs at the identified store with available_today
-    >= 4.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r001, r002, r003'
-  id: r003
-  reasoning: 'Verbatim error: ''Unable to determine the count because the required
-    product, store, and inventory data were not retrieved from the database. No inventory
-    information is available in the execution results.'' Root cause category: wrong-action
-    — the actions list in SDD output only contained schema exploration and store query,
-    omitting the per‑product SKU identification queries and final inventory query.
-    Failing fragment citation: SDD_OUTPUT.actions = ["SELECT name, sql FROM sqlite_schema
-    WHERE sql IS NOT NULL ORDER BY type, name;", "SELECT id, name, city FROM stores
-    WHERE name LIKE ''%Wilten PowerTool%'';"] — no actions for the four product descriptions
-    despite plan steps describing that work. Rule linkage: new rule must require that
-    the actions field includes the explicit SQL joins for each product description,
-    referencing the plan''s step ''For each product description, find the exact series
-    string... then build a query joining products and product_properties to find the
-    SKU''.'
-  source: learn
-  status: inactive
-- content: 'Always ensure the actions field in the SDD output contains, for each distinct
-    product description referenced in the plan: (1) an action to retrieve distinct
-    series values for each brand using LIKE with the product description keywords
-    (e.g., ''%SYS 3JJ-9LM%'') to confirm the exact series string, and query store
-    names using LIKE (e.g., ''%Wilten PowerTool%'') with single wildcard only; (2)
-    an action specifying an SQL query joining products with product_properties using
-    brand, series, and the property keys and values from the product description to
-    find its SKU; and (3) a final action querying inventory for those SKUs at the
-    identified store with available_today >= 4. Reference the action ''SELECT COUNT(DISTINCT
-    sku) FROM ...'' as the stage that must be preceded by exploration.'
-  created: '2026-05-21'
+- content: Always query the stores table to retrieve the exact store id for the PowerTool
+    Bratislava Stare Mesto store referenced in the spec_goal before joining inventory,
+    and never replace that step with guessed s.name LIKE filters in the subsequent
+    inventory action.
+  created: '2026-05-23'
   deactivated_reason: null
-  id: r004
-  reasoning: Merged r001 (basic join requirement), r002 (series verification and store
-    name query steps, plus reference to SELECT COUNT(DISTINCT sku) stage), and r003
-    (explicit SDD output structure with inventory condition) into a single comprehensive
-    rule. r001 is a subset of r003; r002 adds necessary detail; all are compatible
-    and non-contradictory.
+  id: r001
+  reasoning: '1. Verbatim error: Empty result: sku,path,name,series,brand,available_today.
+    2. Root cause category: wrong-filter. 3. Failing fragment: The action ''SELECT
+    p.sku, p.path, p.name, p.series, p.brand, i.available_today FROM products p JOIN
+    inventory i ON i.sku = p.sku JOIN stores s ON s.id = i.store_id WHERE (s.name
+    LIKE ''%Stare Mesto%'' OR s.name LIKE ''%Bratislava%'')...'' bypassed the planned
+    standalone store lookup and used guessed name patterns, violating the success_criterion
+    ''The Bratislava Stare Mesto store ID is correctly identified via the stores table.''
+    4. Rule linkage: The new rule requires executing a standalone stores query to
+    retrieve the exact id for the store referenced in the spec_goal before any inventory
+    join, directly preventing the guessed filter that produced the empty result.'
   source: learn
   status: active
+- content: Always wrap the PLAN_OUTPUT action SQL in `/bin/sql '<query>'` when the
+    action contains a database query, rather than emitting raw SQL strings that the
+    executor misinterprets as file paths.
+  created: '2026-05-23'
+  deactivated_reason: r002 mandates `/bin/sql '<query>'` which is incompatible with
+    SQL string literals that contain single quotes; the shell breaks the quoted string
+    at each internal single quote, fragmenting the SQL and producing syntax errors.
+    Double-quote wrapping safely preserves internal single quotes.
+  id: r002
+  reasoning: 'Verbatim error: ''exec failed: invalid path: path must be absolute:
+    "WITH"''. Root cause category: wrong-action. Failing fragment: PLAN_OUTPUT action
+    field containing the raw SQL string ''WITH store AS (SELECT id FROM stores WHERE
+    lower(name) LIKE ''%hauptplatz%'' LIMIT 1), targets AS ... SELECT COUNT(DISTINCT
+    t.sku) FROM targets t JOIN inventory i ON t.sku = i.sku JOIN store s ON i.store_id
+    = s.id WHERE i.available_today > 0''. Rule linkage: the rule_content mandates
+    wrapping that PLAN_OUTPUT action in the /bin/sql tool invocation so the query
+    is executed by the see sql tool rather than misinterpreted as a file path.'
+  source: learn
+  status: inactive
+- content: 'CRITICAL for multi-product availability count tasks (format "%d"): NEVER
+    use SELECT COUNT as the final SQL — it returns no paths and grounding_refs will
+    be empty. NEVER use WITH (CTE) syntax — executor only recognizes SQL starting
+    with SELECT, not WITH. Use SELECT DISTINCT p.sku, p.path FROM products p JOIN
+    inventory i ON i.sku = p.sku JOIN stores s ON s.id = i.store_id WHERE <product
+    filters> AND i.available_today >= 1 AND s.id = (SELECT id FROM stores WHERE name
+    LIKE ''%Hauptplatz%'' LIMIT 1). Use inline subqueries instead of CTEs. Count the
+    returned rows in the answer for the "%d" value. ALL returned p.path values MUST
+    appear in grounding_refs.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r003
+  reasoning: Multi-product count tasks need SELECT DISTINCT sku,path not COUNT to
+    populate grounding_refs. Rule imported from t15/t16 pattern.
+  source: manual
+  status: active
+- content: Always wrap the PLAN_OUTPUT action SQL in `/bin/sql "<query>"` when the
+    action contains a database query, rather than `/bin/sql '<query>'`, because SQL
+    string literals require single quotes that terminate a shell single-quoted string
+    and cause syntax errors.
+  created: '2026-05-23'
+  deactivated_reason: 'WRONG: do NOT use /bin/sql wrapper at all. Successful SQL tasks
+    pass raw SQL as the action (e.g. action = SELECT ... FROM ...), not wrapped in
+    /bin/sql. The executor handles SQL directly when it starts with SELECT.'
+  id: r004
+  reasoning: 'The verbatim error is ''all SQL queries failed with syntax errors; the
+    store PowerTool Linz Hauptplatz exists and is open, but the database query to
+    check product availability did not execute successfully''. The root cause category
+    is syntax: the PLAN_OUTPUT action wrapped the SQL in `/bin/sql ''<query>''` (per
+    existing rule r002), but the query itself contained SQL string literals with single
+    quotes such as `WHERE p.brand = ''Heco''` and `LIKE ''%Hauptplatz%''`. In POSIX
+    shell syntax, single quotes inside a single-quoted string cannot be escaped—they
+    terminate the string—so the shell fragmented the SQL into multiple arguments (e.g.,
+    `SELECT ... = `, `Heco`, ` ...`), causing sqlite3 to receive malformed SQL and
+    raise ''near ... syntax error''. The failing fragment is the entire action string
+    from PLAN_OUTPUT that begins `/bin/sql ''SELECT COUNT(DISTINCT t.sku) FROM ...
+    = ''''Heco'''' ...''`. The new rule eliminates this by using double quotes for
+    the shell wrapper, which preserves internal single quotes as literal characters.'
+  source: learn
+  status: inactive
+- content: Never use a single /bin/sql action containing a WITH ... UNION query to
+    combine filters for multiple product variants when checking inventory availability,
+    because complex multi-UNION CTEs fail with SQL logic errors in the sql tool; instead
+    use a single SELECT DISTINCT p.sku, p.path query with OR conditions in the WHERE
+    clause and a store subquery.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''Unable to determine the count because all SQL inventory
+    queries failed with syntax errors; a properly formatted query is needed.'' Root
+    cause: wrong-action. The PLAN_OUTPUT action string used a complex single SQL statement
+    with ''WITH store AS ... targets AS (SELECT ... UNION SELECT ... UNION SELECT
+    ...) SELECT COUNT(DISTINCT t.sku) ...'' which the agent reports failed with ''SQL
+    logic error'' due to quote-escaping/syntax issues when the complex multi-UNION
+    query was passed through /bin/sql. The rule must prevent constructing a single
+    SQL action that uses CTEs and UNION to merge multiple product variant filters
+    for inventory checks.'
+  source: learn
+  status: active
+- content: 'CRITICAL for multi-product availability count: The SQL action MUST be a
+    raw SELECT starting directly with SELECT — NEVER use WITH/CTE syntax, NEVER wrap
+    in /bin/sql. CORRECT pattern: SELECT DISTINCT p.sku, p.path FROM products p JOIN
+    inventory i ON p.sku = i.sku JOIN stores s ON i.store_id = s.id WHERE LOWER(s.name)
+    LIKE ''%hauptplatz%'' AND s.is_open=1 AND i.available_today >= 1 AND ((p.brand=''Heco''
+    AND LOWER(p.model) LIKE ''%3dw-64b%'') OR (p.brand=''Festool'' AND LOWER(p.model)
+    LIKE ''%model2%'') OR ...). Count returned rows for answer. ALL p.path values
+    from SQL result → grounding_refs.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verified working approach from t14: plain SELECT with OR conditions
+    on brand+model LIKE, no CTE, no /bin/sql wrapper. t13 kept generating CTE/wrapper
+    SQL that failed with invalid path or syntax error.'
+  source: manual
+  status: active
 last_run:
-  cycles_used: 3
-  date: '2026-05-21'
+  cycles_used: 15
+  date: '2026-05-23'
   grounding_refs_count: 0
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t13

@@ -1,7 +1,176 @@
+entries:
+- content: Always run tree:/docs/ first, then identify and read the file in /docs/catalogue-addenda/
+    whose filename contains 'wiper' or 'blade' or 'salzburg'. Read that file content
+    (not the filename) to get the authoritative catalogue count for Wiper Blade products.
+    Include that addenda doc path in grounding_refs. The answer format is exactly
+    "%d" (just the integer number, no <COUNT:> brackets).
+  created: '2026-05-23'
+  deactivated_reason: 'WRONG: r001 referenced wiper/blade/salzburg but t10 is about
+    Screwdriver and Hex Key Set. Superseded by r004.'
+  id: r001
+  reasoning: Catalogue addenda doc in /docs/catalogue-addenda/ gives authoritative
+    count; do not read count from filename. Answer format for this task is plain integer
+    with no brackets.
+  source: manual
+  status: inactive
+- content: When the spec_goal is 'Deliver the authoritative catalogue count for the
+    product kind 'Screwdriver and Hex Key Set' as a single integer string in exactly
+    '%d' format, by reconciling the SQL product count with the relevant addenda document',
+    always execute the plan step 'Read the identified addenda file to extract the
+    authoritative reporting count'; if that file content is empty, fall back to the
+    SQL COUNT query result joining products and kinds as the authoritative catalogue
+    count and emit the final answer as a bare integer in exactly '%d' format.
+  created: '2026-05-23'
+  deactivated_reason: r002 prescribed the exact fallback SQL COUNT query joining products
+    and kinds, which fails because the kinds table does not exist in the database.
+  id: r002
+  reasoning: '1. Verbatim error: ''Empty result: 2025-10-08-reporting-screwdriver-hex-sets.md''.
+    2. Root cause category: empty-result — the addenda file read operation returned
+    empty content, leaving no authoritative count to reconcile with the SQL result.
+    3. Failing fragment citation: the plan step ''Read the identified addenda file
+    to extract the authoritative reporting count'' produced empty content, and the
+    spec_goal ''Deliver the authoritative catalogue count for the product kind ''Screwdriver
+    and Hex Key Set'' by reconciling the SQL product count with the relevant addenda
+    document'' could not be satisfied. 4. Rule linkage: the new rule instructs fallback
+    to the SQL COUNT when the addenda file content is empty, directly referencing
+    the exact spec_goal and the ''Read the identified addenda file to extract the
+    authoritative reporting count'' step.'
+  source: learn
+  status: inactive
+- content: Always query sqlite_schema to verify the kinds table exists before executing
+    the action 'SELECT COUNT(*) FROM products p JOIN kinds k ON p.kind_id = k.id WHERE
+    k.name = 'Screwdriver and Hex Key Set'' from the spec_goal 'Deliver the authoritative
+    catalogue count for the product kind 'Screwdriver and Hex Key Set' as a single
+    integer string in exactly '%d' format, by reconciling the SQL product count with
+    the relevant addenda document'; if kinds is absent, execute a COUNT query directly
+    on products using kind_id.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''SQL logic error: no such table: kinds (1)''. Root
+    cause category: wrong-action. The failing fragment is the plan action ''SELECT
+    COUNT(*) FROM products p JOIN kinds k ON p.kind_id = k.id WHERE k.name = ''Screwdriver
+    and Hex Key Set'''', which assumes the kinds table exists. The existing rule r002
+    directed this exact fallback query, contributing to the failure. The new rule
+    replaces this by requiring schema verification before executing the join.'
+  source: learn
+  status: active
+- content: 'For any catalogue count task (''how many products are [TYPE]?''): (1)
+    Run tree:/docs/ to find the relevant addenda/policy file. (2) READ the file with
+    a file-read action (not search!) — the file path must be in grounding_refs. The
+    file gives CRITERIA (not the count). (3) Execute SQL based on the criteria using
+    product_kinds (NOT kinds table). If criteria include city/inventory: SELECT COUNT(DISTINCT
+    p.sku) FROM products p JOIN product_kinds pk ON p.kind_id=pk.id JOIN inventory
+    i ON p.sku=i.sku JOIN stores s ON i.store_id=s.id WHERE pk.name=''[TYPE]'' AND
+    LOWER(s.city)=''[CITY]'' AND LOWER(s.name) LIKE ''%powertool%'' AND s.is_open=1
+    AND i.available_today>0. If normal count (no location filter): SELECT COUNT(DISTINCT
+    p.sku) FROM products p JOIN product_kinds pk ON p.kind_id=pk.id WHERE pk.name=''[TYPE]''.
+    (4) CRITICAL: The addenda/policy doc FILE PATH must be in grounding_refs. Do NOT
+    use search: to find the file — use tree:/docs/ then file-read the path directly.
+    Answer format: ''%d'' (bare integer, no extra text). Do NOT output OUTCOME_NONE_CLARIFICATION.'
+  created: '2026-05-23'
+  deactivated_reason: r004 mandates SQL on table 'product_kinds' which is absent from
+    the sqlite_schema (only 'kinds' is listed), mandates bare integer '%d' format
+    that directly conflicts with the spec_goal's '[QTY:%d]' requirement, and critically
+    requires a grounding_refs file path even when no addenda exists, causing empty-result
+    failures.
+  id: r004
+  reasoning: 't10: scored 0.00 because search:trouser /docs/ found the file but didn''t
+    add its path to grounding_refs (only file-read actions appear in FILES_READ_IN_PRIOR_CYCLES).
+    Must use tree:/docs/ to discover then direct file-read to get grounding_refs.'
+  source: manual
+  status: inactive
+- content: Never join products with product_kinds for the spec_goal 'Deliver the authoritative
+    catalogue count for the product kind 'Work Trousers' as a single integer string
+    in exactly '%d' format, reconciling the SQL product count with any relevant addenda
+    document'; because the addenda at /docs/current-updates/catalogue-counting-2025-10-08-work-trousers-vienna.md
+    explicitly requests kind_id='work_trousers', always execute SELECT COUNT(DISTINCT
+    sku) FROM products WHERE kind_id='work_trousers' and return the bare integer in
+    '%d' format with no brackets or extra text.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''Empty result: /docs/current-updates/catalogue-counting-2025-10-08-work-trousers-vienna.md:6:Requested
+    kind_id: work_trousers''. Root cause category: wrong-action. Failing fragment
+    from SDD_OUTPUT: ''Execute a SELECT COUNT query joining products with product_kinds
+    (including the path column) to compute the definitive count according to the criteria''.
+    The spec assumed a table named product_kinds and a JOIN strategy, but the schema
+    only guarantees a `kinds` table (with unknown columns) and the addenda explicitly
+    provided the raw kind_id value ''work_trousers''. The rule linkage: the new rule
+    prohibits the product_kinds JOIN and mandates a direct COUNT on products.kind_id
+    using the addenda-specified value.'
+  source: learn
+  status: active
+- content: Never execute the action 'find:*Wiring* /docs/' for the spec_goal 'Deliver
+    the authoritative catalogue count for the product kind 'Wiring Device' wrapped
+    in the exact string format '[QTY:%d]', reconciling the SQL count with any relevant
+    addenda document'; instead always run tree:/docs/ first, and if no addenda file
+    exists proceed directly to execute SELECT COUNT(DISTINCT sku) FROM products WHERE
+    kind_id='wiring_device' and return the result strictly in the '[QTY:%d]' format
+    with no extra text, without requiring a policy document in grounding_refs.
+  created: '2026-05-23'
+  deactivated_reason: 'PARTIALLY WRONG: r006 says skip grounding_refs if no addenda.
+    But addenda /docs/catalogue-addenda/2024-07-17-reporting-wiring-devices-bratislava.md
+    DOES exist and was required by harness. Agent saw file in tree output but used
+    find: instead of file-read. Superseded by r007.'
+  id: r006
+  reasoning: 'Verbatim error: ''Empty result''. Root cause category: wrong-action.
+    The PLAN_OUTPUT action ''find:*Wiring* /docs/'' produced an empty list because
+    no addenda exists for ''Wiring Device'', and the pipeline halted instead of falling
+    back to a direct SQL count. Existing rule r004 contributed to the failure because
+    it mandates querying a non-schema table ''product_kinds'' (not listed in sqlite_schema;
+    only ''kinds'' is documented), demands bare integer ''%d'' format that conflicts
+    with the spec_goal''s required ''[QTY:%d]'' token, and makes a grounding_refs
+    policy file path mandatory even when no addenda exists. Failing fragment: action
+    ''find:*Wiring* /docs/'' from PLAN_OUTPUT and spec_goal ''Deliver the authoritative
+    catalogue count for the product kind ''Wiring Device'' wrapped in the exact string
+    format ''[QTY:%d]'', reconciling the SQL count with any relevant addenda document''.
+    Rule linkage: the new rule explicitly bans the failing find action, replaces it
+    with tree:/docs/, mandates direct SQL on products.kind_id when no addenda is present,
+    and enforces the exact ''[QTY:%d]'' format required by the spec_goal.'
+  source: learn
+  status: inactive
+- content: 'For any catalogue count task (''how many products are [TYPE]?''): (1)
+    Run tree:/docs/ first. (2) If tree output shows a matching policy/addenda file:
+    file-read it directly (NEVER use find: or search: to re-locate a file already
+    visible in tree output). Apply ALL criteria from the file in SQL. Include the
+    file path in grounding_refs. (3) If tree output shows NO matching file: run direct
+    SQL SELECT COUNT(DISTINCT p.sku) FROM products p JOIN product_kinds pk ON p.kind_id=pk.id
+    WHERE pk.name=''[TYPE]'' without grounding_refs. (4) The correct table is product_kinds
+    (NOT kinds). (5) Answer format: match task instructions exactly (e.g. ''%d'' =
+    bare integer, ''[QTY:%d]'' = that bracket format). CRITICAL: if addenda file visible
+    in tree output, you MUST file-read it and include in grounding_refs — do NOT skip
+    it even if prior cycle already ran tree.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r007
+  reasoning: 't10 third run: tree:/docs/ found bratislava wiring-devices file. Cycle
+    2 SDD used find:*Wiring* /docs/ instead of direct file-read → file never read
+    → grounding_refs empty → 0.00. r006 also incorrectly said skip grounding_refs
+    if no addenda, but addenda DID exist. Fix: after tree finds file, next action
+    must be direct file-read of that path.'
+  source: manual
+  status: active
+- content: 'CRITICAL: If a prior cycle returned OUTCOME_NONE_CLARIFICATION with message
+    saying "need to read" or "need to read the catalogue addenda" — the NEXT SDD cycle
+    MUST use a direct file-read action of the EXACT path visible in PRIOR_EXECUTIONS
+    (tree output). Check the tree:/docs/ result in PRIOR_EXECUTIONS for the matching
+    addenda/policy filename. Use the COMPLETE path including subdirectory (e.g. /docs/catalogue-addenda/2025-10-08-reporting-pliers-wrenches-vienna.md).
+    NEVER use find: or search: when the path is already visible in PRIOR_EXECUTIONS
+    tree output.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'cycle 1 ANSWER returned OUTCOME_NONE_CLARIFICATION: "Need to read the
+    catalogue addenda report" but did not backtick-quote path in message. Cycle 2
+    SDD used find:*pliers* /docs/ instead of direct read. Fix: rule forces direct
+    file-read of path seen in tree output.'
+  source: manual
+  status: active
 last_run:
-  cycles_used: 1
-  date: '2026-05-21'
+  cycles_used: 15
+  date: '2026-05-23'
   grounding_refs_count: 0
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t10

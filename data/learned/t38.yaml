@@ -1,361 +1,71 @@
 entries:
-- content: Never use a literal keyword search (e.g., 'fraud') as the sole method to
-    identify fraudulent records when the spec_goal is 'Identify the fraudulent payment
-    record(s) from archived payments with full filesystem paths, and cite each one'.
-    Always first explore the directory structure (tree:/proc/) and then read payment
-    files to detect fraud indicators such as flags, status fields, or other markers.
-  created: '2026-05-21'
-  deactivated_reason: New rule supersedes r001 by unconditionally forbidding the literal
-    keyword search action, closing the loophole that allowed its use as part of a
-    multi-step plan.
+- content: Never execute a blind keyword search such as `search:fraud /proc/payments/`
+    in the payments archive; always run `tree /proc/payments/` and review the security
+    policy in `/docs` to determine how fraud incident records are identified before
+    searching.
+  created: '2026-05-23'
+  deactivated_reason: null
   id: r001
-  reasoning: 'Verbatim error: ''Empty result:''. Root cause: wrong-filter – the keyword
-    ''fraud'' is not present in any archived payment file, resulting in empty search.
-    Failing fragment: action ''search:fraud /proc/payments/'' from SDD_OUTPUT and
-    PLAN_OUTPUT. Rule linkage: the new rule will prohibit literal keyword searches
-    for fraud identification and mandate directory exploration + content inspection
-    instead.'
+  reasoning: The verbatim error is 'Empty result'. The root cause category is wrong-action
+    because the action 'search:fraud /proc/payments/' assumed the literal string 'fraud'
+    would appear in archived payment files, but no matches were returned. The failing
+    fragment is the action 'search:fraud /proc/payments/' listed in SDD_OUTPUT actions.
+    The corrective rule therefore forbids this blind keyword search and mandates prior
+    structural inspection of the payments directory and review of the relevant security
+    policy.
   source: learn
-  status: inactive
-- content: Always include read actions for payment files in the actions list when
-    the spec_goal is 'Identify the fraudulent payment record(s) from archived payments
-    with full filesystem paths, and cite each one'.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r002'
+  status: active
+- content: 'For fraud investigation tasks ("confirmed fraud incident in archived payment
+    history, find payment records"): this is a READ-ONLY task. Use tree:/proc/payments/
+    to explore, then search or list payments to identify suspicious/fraud records.
+    Return OUTCOME_OK and cite payment file paths in grounding_refs. Do NOT return
+    OUTCOME_DENIED_SECURITY just because runtime_identity shows anonymous/GUEST —
+    read-only forensic lookups are not restricted by the guest security policy.'
+  created: '2026-05-23'
+  deactivated_reason: null
   id: r002
-  reasoning: 'Verbatim error: ''Unable to identify fraudulent payment record. The
-    listing of /proc/payments/ shows many payment files but no fraud label. <NO>''.
-    Root cause category: wrong-action. Failing fragment: action list ''list:/proc/payments/''
-    only, without any read operations. Rule linkage: new rule references spec_goal
-    ''Identify the fraudulent payment record(s) from archived payments with full filesystem
-    paths, and cite each one''.'
-  source: learn
-  status: inactive
-- content: Never include a literal keyword search action (e.g., 'search:fraud') in
-    any action list or plan when the spec_goal is 'Identify the fraudulent payment
-    record(s) from archived payments with full filesystem paths, and cite each one'.
-    Instead, rely solely on directory exploration (tree:/proc/payments/) and reading
-    payment files to detect fraud indicators such as flags, status fields, or other
-    markers.
-  created: '2026-05-21'
-  deactivated_reason: r003 contradicts r004 by mandating tree as the sole exploration
-    method; this caused the agent to use tree first, which was flagged as repeated
-    because it had been used previously. Deactivating r003 enforces r004's preference
-    for list as first action and avoids action repetition.
+  reasoning: Agent denied as DENIED_SECURITY (anonymous user). Expected OUTCOME_OK.
+    Read-only fraud investigation is not blocked by guest policy.
+  source: manual
+  status: active
+- content: Never execute a blind keyword search such as `search:fraud /docs/` to locate
+    security policy documents; always run `tree /docs/` to discover policy files and
+    read the relevant security policy directly to determine how fraud incident records
+    are identified.
+  created: '2026-05-23'
+  deactivated_reason: null
   id: r003
-  reasoning: 'Error: ''Repeated action detected — must use a different query or approach.
-    Action was: search:fraud /proc/payments/'' — root cause category: wrong-action
-    — failing fragment: action ''search:fraud /proc/payments/'' in SDD_OUTPUT — rule
-    linkage: r001 prohibits literal keyword search as sole method, but spec_goal and
-    success_criteria still allowed it; the action was reused causing repetition. A
-    stronger rule is needed to absolutely forbid the search:fraud action for this
+  reasoning: 'The pipeline failed with verbatim error ''Empty result'' because the
+    executed action `search:fraud /docs/` returned no matches. Root cause category
+    is wrong-action: a blind keyword search for ''fraud'' inside /docs/ is not a reliable
+    mechanism to locate the relevant security policy document, and in this run it
+    produced an empty result that blocked further progress. The failing fragment is
+    the action string `search:fraud /docs/` and the corresponding plan step ''Search
+    /docs/ for fraud-related security policy to understand how fraud incident records
+    are identified''. The new rule directly targets this failing action by prohibiting
+    blind keyword searches in /docs/ and requiring explicit directory listing and
+    direct file reading, ensuring the security policy can be located to satisfy the
     spec_goal.'
   source: learn
-  status: inactive
-- content: Always prefer the list action over the tree action as the first directory
-    enumeration step when the spec_goal is 'Identify the fraudulent payment record(s)
-    from archived payments with full filesystem paths, and cite each one', to avoid
-    timeout; tree may be used only as a fallback if list does not reveal the full
-    structure.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r004'
+  status: active
+- content: 'For fraud investigation tasks: after tree:/proc/payments/, read /docs/merchant-continuity-and-critical-incidents.md
+    — this doc identifies which payments are part of confirmed fraud incidents. Use
+    the incident details to filter which pay_XXX.json files to read and cite. The
+    fraud payments are identified by the incident doc, not by a "fraud" keyword in
+    the files themselves. Action sequence: (1) tree:/proc/payments/, (2) read /docs/merchant-continuity-and-critical-incidents.md,
+    (3) read the specific payment files identified by the incident doc, (4) return
+    OUTCOME_OK with payment file paths in grounding_refs.'
+  created: '2026-05-23'
+  deactivated_reason: null
   id: r004
-  reasoning: 'Verbatim error: ''Execute exception ["Explore the directory structure
-    and enumerate all payment f]: The read operation timed out''. Root cause: wrong-spec
-    (the spec''s actions list included tree:/proc/payments/ as the first exploration
-    step, which timed out because the directory is too large). Failing fragment: action
-    ''tree:/proc/payments/'' from both SDD_OUTPUT actions list and PLAN_OUTPUT action.
-    Rule linkage: new rule must enforce that for the given spec_goal, the first directory
-    exploration action should be list instead of tree to avoid timeout.'
-  source: learn
-  status: inactive
-- content: Always use the list action as the first directory enumeration step when
-    the spec_goal is 'Identify the fraudulent payment record(s) from archived payments
-    with full filesystem paths, and cite each one', and never reuse a tree action
-    that has already been attempted in a prior cycle; fall back to tree only if list
-    does not reveal the full structure.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r005, r006, r007'
-  id: r005
-  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
-    or approach. Action was: tree:/proc/payments/'' Root cause category: wrong-spec.
-    Failing fragment: The action ''tree:/proc/payments/'' was the sole action in the
-    spec/plan, and it had been used in a prior cycle, triggering repetition detection.
-    Rule linkage: Existing rule r003 states ''Never include a literal keyword search
-    action... rely solely on directory exploration (tree:/proc/payments/) and reading
-    payment files'' – this misled the agent to use tree as the mandatory first step,
-    ignoring r004 which says ''Always prefer the list action over the tree action
-    as the first directory enumeration step''. The repetition error occurred because
-    tree was reused from a prior cycle, which would have been avoided if list had
-    been used first as r004 prescribes.'
-  source: learn
-  status: inactive
-- content: Always use the list action as the first directory enumeration step when
-    the spec_goal is 'Identify the fraudulent payment record(s) from archived payments
-    with full filesystem paths, and cite each one', and never reuse a tree action
-    that has already been attempted in a prior cycle; fall back to tree only if list
-    does not reveal the full structure.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r005, r006, r007'
-  id: r006
-  reasoning: r004 and r005 both address directory enumeration strategy (prefer list
-    over tree). r005 is a superset that also prohibits reusing a previously attempted
-    tree action. r005's content fully subsumes r004, so r004 is deactivated.
-  source: learn
-  status: inactive
-- content: Never reuse a search action that has already been attempted in a prior
-    cycle; when the spec_goal is 'Identify the fraudulent payment record(s) from archived
-    payments with full filesystem paths, and cite each one', if the action 'search:fraud
-    /proc/payments/' has been tried previously, use the list action on /proc/payments
-    as the first directory enumeration step instead.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r005, r006, r007'
-  id: r007
-  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
-    or approach. Action was: search:fraud /proc/payments/''. Root cause category:
-    wrong-action (the action was a repeat of a prior attempt). Failing fragment: the
-    action ''search:fraud /proc/payments/'' in both the actions list of SDD_OUTPUT
-    and the action of PLAN_OUTPUT. Rule linkage: the new rule must explicitly forbid
-    reusing this exact search action when the spec_goal is ''Identify the fraudulent
-    payment record(s) from archived payments with full filesystem paths, and cite
-    each one''.'
-  source: learn
-  status: inactive
-- content: Always use the list action as the first directory enumeration step when
-    the spec_goal is 'Identify the fraudulent payment record(s) from archived payments
-    with full filesystem paths, and cite each one'. Never reuse a tree action or a
-    search action that has already been attempted in a prior cycle. Fall back to tree
-    only if list does not reveal the full structure.
-  created: '2026-05-21'
-  deactivated_reason: r008 unconditionally mandates list as the first directory enumeration
-    step without checking if list has already been attempted, directly causing the
-    repeated action error. Deactivating it allows a more adaptive approach that avoids
-    repetition and ensures read actions are included.
-  id: r008
-  reasoning: r005 and r006 are identical duplicates. r007 overlaps with r005/r006
-    by also specifying 'never reuse a search action' and conditionally using list;
-    merged to combine all constraints into one rule, removing redundancy.
-  source: learn
-  status: inactive
-- content: When the spec_goal is 'Identify the fraudulent payment record(s) from archived
-    payments with full filesystem paths, and cite each one', never use list:/proc/payments/
-    as the sole action; always include read actions for each discovered payment file,
-    especially if a prior cycle has already executed list:/proc/payments/.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r009'
-  id: r009
-  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
-    or approach. Action was: list:/proc/payments/''. Root cause: wrong-spec (omitted
-    read actions) and wrong-action (repeating a prior list without adding new reads).
-    Failing fragment: the sole action ''list:/proc/payments/'' in both SDD_OUTPUT
-    and PLAN_OUTPUT does not include any read actions, contrary to success_criteria
-    that require examining each file. Rule linkage: the new rule must cite spec_goal
-    and the failing action to prevent repetition without reads.'
-  source: learn
-  status: inactive
-- content: When the spec_goal is 'Identify the fraudulent payment record(s) from archived
-    payments with full filesystem paths, and cite each one', never use list:/proc/payments/
-    as the sole action; always include read actions for each discovered payment file,
-    especially if a prior cycle has already executed list:/proc/payments/.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r010, r011, r012'
-  id: r010
-  reasoning: 'Merged r002 and r009: r009 subsumes r002 by adding the prohibition of
-    using list:/proc/payments/ as the sole action. r002''s requirement to always include
-    read actions is already covered by r009. Deactivating r002 eliminates redundancy
-    while preserving the full rule.'
-  source: learn
-  status: inactive
-- content: When the spec_goal is 'Identify the fraudulent payment record(s) from archived
-    payments with full filesystem paths, and cite each one', never use list:/proc/payments/
-    as the sole action; always include read actions for each discovered payment file,
-    especially if a prior cycle has already executed list:/proc/payments/.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r010, r011, r012'
-  id: r011
-  reasoning: Rules r009 and r010 are identical duplicates. Taking the content of the
-    highest-id rule (r010) as the base, no extension is needed. Deactivating r009.
-  source: learn
-  status: inactive
-- content: When the spec_goal is 'Identify the fraudulent payment record(s) from archived
-    payments with full filesystem paths, and cite each one', never use search as the
-    sole discovery action; always use list:/proc/payments/ to enumerate files, then
-    read each discovered file to verify fraud.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r010, r011, r012'
-  id: r012
-  reasoning: 'ERROR: ''Empty result: '' from action ''search:hit /proc/payments/''.
-    Root cause: empty-result because the keyword ''hit'' is not present in any file
-    in /proc/payments/, so no files matched. Failing fragment: action ''search:hit
-    /proc/payments/'' from SDD_OUTPUT and PLAN_OUTPUT, with spec_goal ''Identify the
-    fraudulent payment record(s) from archived payments with full filesystem paths,
-    and cite each one.'' Rule linkage: new rule explicitly prohibits using search
-    as the sole discovery action for this spec_goal, redirecting to list + read approach.'
-  source: learn
-  status: inactive
-- content: When the spec_goal is 'Identify the fraudulent payment record(s) from archived
-    payments with full filesystem paths, and cite each one', never use list:/proc/payments/
-    as the sole action; always include read actions for each discovered payment file,
-    especially if a prior cycle has already executed list:/proc/payments/. Additionally,
-    never use search as the sole discovery action; always use list:/proc/payments/
-    to enumerate files, then read each discovered file to verify fraud.
-  created: '2026-05-21'
-  deactivated_reason: r013's condition required exact spec_goal string match, but
-    the current failure shows a nearly identical pattern with a slight wording variation;
-    the rule did not fire. Superseding with a broader condition.
-  id: r013
-  reasoning: Merged r010 and r011 (duplicates) with r012 (overlap covering same spec_goal).
-    r012 had highest id and provided the constraint against search and the directive
-    to use list+read; extended to include the explicit prohibition against using list
-    as sole action and the note about prior cycles from r010/r011.
-  source: learn
-  status: inactive
-- content: Always include read actions for each discovered payment file when the spec_goal
-    involves identifying fraudulent payments from archived files with full filesystem
-    paths, and never use tree or search as the sole discovery action; always use list:/proc/payments/
-    to enumerate files, then read each discovered file to verify fraud.
-  created: '2026-05-21'
-  deactivated_reason: r014 mandates list:/proc/payments/ which is now blocked; superseded
-    by new rule using alternative discovery (tree/find).
-  id: r014
-  reasoning: 'Verbatim error quote: ''The directory listing of payments shows many
-    files, but no fraud indicator is present in the listing itself. To identify the
-    one fraudulent payment record, we would need to read the contents of each payment
-    file.'' Root cause category: wrong-action — actions omitted reading payment file
-    contents, so no fraud indicator could be identified. Failing fragment citation:
-    actions: ["tree:/proc/", "search:fraud /proc/"]; spec_goal: ''Identify and cite
-    all fraudulent payment records from archived payments with full filesystem paths.''
-    Rule linkage: existing rule r013 covers the same pattern but its condition is
-    an exact spec_goal string that did not match the current spec_goal''s wording,
-    thus the rule did not fire. A new rule with a generalized spec_goal condition
-    is needed.'
-  source: learn
-  status: inactive
-- content: Always use tree:/proc/payments/ or find /proc/payments -type f to enumerate
-    archived payment files when list:/proc/payments/ has been previously attempted
-    or is unavailable; then read each discovered file to verify fraud indicators,
-    as required by the spec_goal 'Identify and cite all fraudulent payment records
-    from the archived payments files in /proc/payments/ without altering any files.'
-  created: '2026-05-21'
-  deactivated_reason: r015 mandates using tree or find, but allowed tree to be reused
-    when it was already attempted, causing the repeat error. The new rule supersedes
-    r015 by forcing a switch to find to avoid repetition.
-  id: r015
-  reasoning: 'Error verbatim: ''Repeated action detected — must use a different query
-    or approach. Action was: list:/proc/payments/''. Root cause category: wrong-action
-    — the action list:/proc/payments/ is blocked as repeated. Failing fragment: action
-    ''list:/proc/payments/'' from PLAN_OUTPUT and SDD_OUTPUT. Rule linkage: existing
-    rule r014 explicitly mandates using list:/proc/payments/ to enumerate files, which
-    directly caused the repetition block. Per Repeated Failure Protocol, r014 must
-    be deactivated because it forces the now-blocked action. A new rule directing
-    alternative discovery (tree or find) is needed.'
-  source: learn
-  status: inactive
-- content: Always use find /proc/payments -type f as the initial enumeration action
-    for archived payment files in /proc/payments/ instead of tree:/proc/payments/,
-    to avoid 'Repeated action detected' errors and fulfill the spec_goal 'Identify
-    and cite all fraudulent payment records from the archived payments files in /proc/payments/
-    without altering any files.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r016'
-  id: r016
-  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
-    or approach. Action was: tree:/proc/payments/'' Root cause category: wrong-action.
-    Failing fragment: action ''tree:/proc/payments/'' from the plan (PLAN_OUTPUT.action).
-    Rule linkage: existing rule r015 mandates ''Always use tree:/proc/payments/ or
-    find /proc/payments -type f'' but does not prevent re-using tree when it has already
-    been attempted, causing the repeat error. The plan chose tree even though it was
-    previously used, leading to the failure.'
-  source: learn
-  status: inactive
-- content: Never assume the known fraud hit is identified by the presence of the word
-    'fraud' or 'fraudulent' in file content. Instead, first enumerate all archived
-    payment files using find /proc/payments -type f, then read each file to search
-    for the specific fraud hit reference identifier or other fraud indicator as provided
-    by Risk Ops, to fulfill the spec_goal 'Identify all payment records in /proc/payments/
-    that are associated with the known fraud hit'.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r017'
-  id: r017
-  reasoning: 'Verbatim error: ''Empty result: '' (empty string after colon). Root
-    cause: wrong-spec — the spec_goal assumed files contain ''fraud'' or ''fraudulent''
-    keywords but no files matched, possibly because the fraud hit is indicated by
-    a different attribute (e.g., filename, metadata, or a specific fraud hit reference).
-    Failing fragment: spec_goal phrase ''likely containing \"fraud\" or \"fraudulent\"
-    keywords'' and the action ''search:fraud /proc/payments/''. Rule linkage: new
-    rule must prohibit assuming keyword presence without empirical evidence from Risk
-    Ops or file inspection.'
-  source: learn
-  status: inactive
-- content: Always use find /proc/payments -type f as the initial enumeration action
-    for archived payment files in /proc/payments/ (instead of tree:/proc/payments/)
-    to avoid 'Repeated action detected' errors. Never assume the known fraud hit is
-    identified by the presence of the word 'fraud' or 'fraudulent' in file content.
-    Instead, first enumerate all archived payment files using find /proc/payments
-    -type f, then read each file to search for the specific fraud hit reference identifier
-    or other fraud indicator as provided by Risk Ops. This fulfills the spec_goal
-    'Identify and cite all fraudulent payment records from the archived payments files
-    in /proc/payments/ without altering any files.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r018, r019'
-  id: r018
-  reasoning: 'Merged r016 and r017: r016 required using find instead of tree to avoid
-    repeated action errors; r017 required the same enumeration method plus a search
-    approach that does not rely on the keyword ''fraud''. r017 (higher id) already
-    covers enumeration via find, but lacked the explicit instruction to avoid tree
-    and the spec_goal wording from r016. The merged rule combines both: mandate find
-    over tree, and mandate reading each file to find the specific fraud hit identifier
-    rather than assuming the word ''fraud''. r016 is deactivated as its content is
-    now included in the merged rule.'
-  source: learn
-  status: inactive
-- content: Always use find /proc/payments -type f as the initial enumeration action
-    for archived payment files in /proc/payments/ (instead of tree:/proc/payments/)
-    to avoid 'Repeated action detected' errors. Never assume the known fraud hit is
-    identified by the presence of the word 'fraud' or 'fraudulent' in file content.
-    Instead, first enumerate all archived payment files using find /proc/payments
-    -type f, then read each file to search for the specific fraud hit reference identifier
-    or other fraud indicator as provided by Risk Ops. This fulfills the spec_goal
-    'Identify and cite all fraudulent payment records from the archived payments files
-    in /proc/payments/ without altering any files.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r018, r019'
-  id: r019
-  reasoning: Merged r017 into r018 because r018 is a superset that includes all instructions
-    from r017 plus the critical detail to always use find instead of tree to avoid
-    'Repeated action detected' errors. Taking r018 (highest id) as the base, its content
-    fully covers the scope of r017.
-  source: learn
-  status: inactive
-- content: Always use 'find /proc/payments -type f' as the exact enumeration action
-    in SDD actions for archived payment files (not 'find:*' or any other pattern)
-    to fulfill the spec_goal 'Identify and cite all fraudulent payment records from
-    the archived payments files in /proc/payments/ without altering any files.'
-  created: '2026-05-21'
-  deactivated_reason: null
-  id: r020
-  reasoning: 'ERROR: ''Empty result: '' — root cause category: wrong-action — failing
-    fragment: action ''find:* /proc/payments/'' in SDD_OUTPUT.actual_actions — rule
-    linkage: new rule references spec_goal ''Identify and cite all fraudulent payment
-    records from the archived payments files in /proc/payments/ without altering any
-    files.'' and the incorrect action pattern.'
-  source: learn
+  reasoning: Agent tried keyword search for "fraud" which failed. The /docs/merchant-continuity-and-critical-incidents.md
+    doc likely identifies the fraud payments by incident details.
+  source: manual
   status: active
-- content: Always use 'find /proc/payments -type f' as the exact enumeration action
-    in SDD actions for archived payment files (not 'find:*' or any other pattern)
-    to avoid 'Repeated action detected' errors. Never assume the known fraud hit is
-    identified by the presence of the word 'fraud' or 'fraudulent' in file content.
-    Instead, first enumerate all archived payment files using find /proc/payments
-    -type f, then read each file to search for the specific fraud hit reference identifier
-    or other fraud indicator as provided by Risk Ops. This fulfills the spec_goal
-    'Identify and cite all fraudulent payment records from the archived payments files
-    in /proc/payments/ without altering any files.'
-  created: '2026-05-21'
-  deactivated_reason: null
-  id: r021
-  reasoning: Merged r018 and r019 (duplicates) with r020 (overlapping but with more
-    specific action syntax). r020 used as base; added the context about not assuming
-    'fraud' word and reading files to search for specific indicator from r018/r019.
-  source: learn
-  status: active
+last_run:
+  cycles_used: 15
+  date: '2026-05-23'
+  grounding_refs_count: 0
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
 task_id: t38

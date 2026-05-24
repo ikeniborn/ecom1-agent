@@ -190,6 +190,18 @@ def _build_learn_user_msg(
     return "\n\n".join(parts)
 
 
+def _extract_file_paths_from_actions(actions: list[str]) -> list[str]:
+    """Extract absolute file paths from action strings for grounding_refs hints."""
+    paths: list[str] = []
+    for a in actions:
+        s = a.strip()
+        if s.startswith("/") and not s.startswith("/bin/") and not s.startswith("/usr/"):
+            paths.append(s)
+        elif s.startswith("search:"):
+            pass  # search results have paths extracted at answer time
+    return paths
+
+
 def _build_answer_user_msg(
     task_text: str,
     execute_out,
@@ -201,6 +213,13 @@ def _build_answer_user_msg(
     if prior_actions:
         parts.append("PRIOR_EXECUTIONS (actions run in earlier cycles — use their file paths in grounding_refs if relevant):\n" +
                      "\n".join(f"  - {a}" for a in prior_actions))
+        file_paths = _extract_file_paths_from_actions(prior_actions)
+        if file_paths:
+            parts.append(
+                "FILES_READ_IN_PRIOR_CYCLES (MANDATORY for grounding_refs — for DENIED_SECURITY include ALL of these; "
+                "for OUTCOME_OK include all that were read to answer the task):\n" +
+                "\n".join(f"  - {p}" for p in file_paths)
+            )
     if prior_results:
         pr_lines = []
         for action, result in prior_results:

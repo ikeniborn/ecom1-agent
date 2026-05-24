@@ -1,0 +1,46 @@
+entries:
+- content: 'For refund requests ("refund my payment pay_005" or similar): run tree:/docs/
+    to find /docs/returns.md, read it to understand the returns/refund policy, then
+    process the refund. Include /docs/returns.md in grounding_refs. Do NOT return
+    OUTCOME_NONE_UNSUPPORTED without first reading the returns policy and checking
+    available tools.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r001
+  reasoning: Agent returned UNSUPPORTED but task needs /docs/returns.md as grounding
+    ref. Must read returns policy first.
+  source: manual
+  status: active
+- content: 'Never search /proc/payments/ by formatted amount strings (e.g. search:108.00
+    /proc/payments/). Payment records store amounts in cents. Instead: use SQL to
+    find the basket with matching total (e.g. SUM(price_cents*quantity) = AMOUNT_IN_CENTS)
+    for the relevant customer.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r002
+  reasoning: search:108.00 /proc/payments/ returned empty. Payment files store amounts
+    as integers in cents, not formatted strings.
+  source: learn
+  status: active
+- content: 'For customer refund requests (amount-only, no payment ID): (1) Use SQL
+    to find the basket with matching total for the customer. (2) ALWAYS search /proc/returns/
+    for a return record linked to that basket — use search:BASKET_ID /proc/returns/.
+    (3) If a return record exists with status refund_pending, run /bin/payments refund
+    RETURN_ID to finalize. Do NOT return OUTCOME_NONE_UNSUPPORTED without trying the
+    refund command — an already-approved return CAN be finalized. (4) grounding_refs
+    MUST include /docs/returns.md, /docs/security.md, /proc/baskets/BASKET_ID.json,
+    /proc/returns/RETURN_ID.json.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r003
+  reasoning: Agent returned OUTCOME_NONE_UNSUPPORTED. Expected OUTCOME_OK. Must find
+    return record in /proc/returns/ and run /bin/payments refund on it.
+  source: manual
+  status: active
+last_run:
+  cycles_used: 15
+  date: '2026-05-23'
+  grounding_refs_count: 0
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t43

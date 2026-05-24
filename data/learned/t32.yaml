@@ -1,46 +1,7 @@
-entries:
-- content: Always construct the series LIKE pattern by starting with the exact series
-    name from the task description (including brand prefix and all words like 'Wavin',
-    'Press Fit', 'Tigris', 'ZXK-C4H', 'Pipe Fitting') and convert it to a LIKE '%...%'
-    pattern. Do not drop any words unless they are duplicated in the brand filter.
-  created: '2026-05-21'
-  deactivated_reason: r001 allowed but did not require dropping the brand prefix when
-    duplicated, leading to an overly strict filter; the new rule explicitly mandates
-    it.
-  id: r001
-  reasoning: 'Error: ''Empty result: sku,name,series,model,properties'' from query
-    ''SELECT sku, name, series, model, properties FROM products WHERE brand = ''Wavin''
-    AND series LIKE ''%Press Fit Tigris ZXK-C4H%''''. Root cause: wrong-filter — the
-    LIKE pattern omitted both ''Wavin'' (brand already separate but also part of series)
-    and ''Pipe Fitting'' from the series name, causing zero matches. The spec_goal
-    stated series containing ''Press Fit Tigris ZXK-C4H Pipe Fitting'' but the task
-    origin series is ''Wavin Press Fit Tigris ZXK-C4H Pipe Fitting''. The action used
-    an incomplete substring. This led to empty result. Rule linkage: the action must
-    use the full series string from the task.'
-  source: learn
-  status: inactive
-- content: Always remove the brand prefix from the series LIKE pattern when the brand
-    is also specified as a filter, to match the actual series name in the database
-    without redundancy.
-  created: '2026-05-21'
-  deactivated_reason: null
-  id: r002
-  reasoning: 'Verbatim error: ''ERROR: Empty result: sku,name,series,model,brand,properties''.
-    Root cause category: wrong-filter — the series LIKE pattern included the brand
-    prefix ''Wavin'' which is redundant with the brand=''Wavin'' filter, and the database
-    series column likely does not contain the brand prefix, causing no match. Failing
-    fragment: the action in SDD_OUTPUT.actions[0] and PLAN_OUTPUT.action: ''SELECT
-    sku, name, series, model, brand, properties FROM products WHERE brand=''Wavin''
-    AND series LIKE ''%Wavin Press Fit Tigris ZXK-C4H Pipe Fitting%'' LIMIT 10;''.
-    Rule linkage: the new rule directly addresses this by mandating the removal of
-    the brand prefix from the series pattern when a brand filter is present, overriding
-    the permissive nature of existing rule r001.'
-  source: learn
-  status: active
 last_run:
   cycles_used: 1
-  date: '2026-05-21'
-  grounding_refs_count: 0
+  date: '2026-05-23'
+  grounding_refs_count: 1
   outcome: OUTCOME_OK
-  status: failure
+  status: success
 task_id: t32

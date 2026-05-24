@@ -1,20 +1,105 @@
 entries:
-- content: Never use space-separated command syntax in actions; always use colon-separated
-    format (e.g., replace 'read /proc/baskets/basket_133.json' with 'read:/proc/baskets/basket_133.json').
+- content: Never use find:basket_189* /proc/baskets/ to locate basket_189; always
+    use tree:/proc/baskets/ to enumerate directory contents before attempting to read
+    the specific basket file.
   created: '2026-05-21'
   deactivated_reason: null
   id: r001
-  reasoning: 'Verbatim error: ''exec failed: invalid path: path must be absolute:
-    "read"''. Root cause: wrong-action (action string format invalid). Failing fragment:
-    action ''read /proc/baskets/basket_133.json'' from PLAN_OUTPUT. Rule linkage:
-    new rule enforces colon-separated format for all actions, directly referencing
-    the malformed action.'
+  reasoning: 'Verbatim error: ''Empty result:''. Root cause category: wrong-action.
+    The action ''find:basket_189* /proc/baskets/'' specified in both SDD_OUTPUT and
+    PLAN_OUTPUT returned no matches, failing to locate basket_189 and halting the
+    checkout workflow. Using a wildcard find search against /proc/baskets/ is fragile
+    because basket file naming conventions are unknown and the tool produces a hard
+    empty-result error rather than usable directory state. Rule linkage: the new rule
+    replaces the failing find action with a tree-based directory enumeration.'
   source: learn
   status: active
+- content: Never return an OUTCOME_NONE_CLARIFICATION stating the checkout for basket_134
+    was not submitted when the spec_goal is 'Submit checkout for basket_134 following
+    the documented checkout policy and current basket state.'; always include actions
+    to read basket_134, read /docs/checkout.md, and perform the checkout submission
+    before generating a final answer.
+  created: '2026-05-22'
+  deactivated_reason: 'Consolidated: r002, r003'
+  id: r002
+  reasoning: 'Verbatim error: ''I haven''t submitted the checkout for basket_134 yet.
+    I only listed the /docs directory and found documentation files such as /docs/checkout.md;
+    the actual checkout operation still needs to be performed.'' Root cause: wrong-action.
+    The SDD_OUTPUT actions [''tree:/docs'', ''tree:/proc/baskets/'', ''/bin/id'',
+    ''/bin/date''] are purely discovery commands and omit the required steps to read
+    basket_134, read /docs/checkout.md, and execute the checkout submission mandated
+    by the spec_goal ''Submit checkout for basket_134 following the documented checkout
+    policy and current basket state.'' Consequently, ANSWER_OUTPUT terminated with
+    OUTCOME_NONE_CLARIFICATION instead of performing the checkout. The new rule mandates
+    that the action list must include the actual checkout execution steps for this
+    spec_goal.'
+  source: learn
+  status: inactive
+- content: Never emit the action 'read:/proc/baskets/basket_134.md'; always pass the
+    bare absolute path '/proc/baskets/basket_134.md' without the 'read:' prefix.
+  created: '2026-05-22'
+  deactivated_reason: 'Consolidated: r002, r003'
+  id: r003
+  reasoning: 'The executor failed with the exact error: ''exec failed: invalid path:
+    path must be absolute: "read:/proc/baskets/basket_134.md"''. Root cause category:
+    wrong-action. The failing fragment is the action string ''read:/proc/baskets/basket_134.md''
+    listed in both SDD_OUTPUT actions and PLAN_OUTPUT action. This action incorrectly
+    concatenated the ''read:'' prefix with the absolute path, causing the path validator
+    to reject the entire string as non-absolute. The new rule must prevent this by
+    referencing the exact action and specifying the correct bare path.'
+  source: learn
+  status: inactive
+- content: When the spec_goal is 'Submit checkout for basket_134 following the documented
+    checkout policy and current basket state.', never emit the action '/proc/baskets/basket_134.md'
+    without first executing tree:/proc/baskets/ to enumerate directory contents; always
+    use tree:/proc/baskets/ to confirm basket_134's presence and exact filename before
+    attempting to read the specific basket file.
+  created: '2026-05-22'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''Execute exception [''Read the basket_134 file directly
+    to establish its current ]: read failed: not found''. Root cause category: wrong-action
+    — the PLAN_OUTPUT produced action ''/proc/baskets/basket_134.md'' and approach
+    text ''Read the basket_134 file directly to establish its current items...'' without
+    first executing the tree enumeration step that the SDD specified, causing a direct
+    read against a not-found path. Failing fragment: PLAN_OUTPUT action ''/proc/baskets/basket_134.md''
+    and the skipped tree:/proc/baskets/ step from the spec plan. The rule_content
+    therefore mandates tree enumeration before the basket read for this spec_goal,
+    closing the plan quality gap.'
+  source: learn
+  status: active
+- content: When the spec_goal is 'Submit checkout for basket_134 following the documented
+    checkout policy and current basket state.', first execute tree:/proc/baskets/
+    to confirm basket_134's presence and exact filename; then read the basket by passing
+    the bare absolute path '/proc/baskets/basket_134.md' (never prefix with 'read:');
+    also read /docs/checkout.md; perform the checkout submission; and only then generate
+    the final answer. Never return an OUTCOME_NONE_CLARIFICATION stating the checkout
+    for basket_134 was not submitted.
+  created: '2026-05-22'
+  deactivated_reason: null
+  id: r005
+  reasoning: r002, r003, and r004 all address the basket_134 checkout spec_goal. r004
+    (highest id) provides the base workflow (tree enumeration before read); merged
+    with r003's bare-path syntax constraint and r002's required checkout.md read plus
+    prohibition against premature OUTCOME_NONE_CLARIFICATION.
+  source: learn
+  status: active
+- content: 'For checkout of basket_137: read /docs/checkout.md, read /proc/baskets/basket_137.json,
+    compare basket lines to inventory via SQL, then execute /bin/checkout basket_137.
+    Include /proc/baskets/basket_137.json and /docs/checkout.md in grounding_refs.
+    Return OUTCOME_OK on success. Do NOT return OUTCOME_NONE_UNSUPPORTED — the /bin/checkout
+    tool exists. This is the customer''s own basket (no cross-customer issue).'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r006
+  reasoning: Agent returned NONE_UNSUPPORTED but expected OUTCOME_OK. Checkout tool
+    exists, this is an own-basket checkout.
+  source: manual
+  status: active
 last_run:
-  cycles_used: 2
-  date: '2026-05-21'
-  grounding_refs_count: 1
-  outcome: OUTCOME_OK
-  status: failure
+  cycles_used: 3
+  date: '2026-05-23'
+  grounding_refs_count: 3
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: success
 task_id: t21

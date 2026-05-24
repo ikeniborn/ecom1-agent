@@ -1,60 +1,58 @@
 entries:
-- content: Always avoid using WITH (Common Table Expression) in SQL queries when executing
-    actions; rewrite CTEs as nested subqueries or join patterns for the /bin/sql tool.
-  created: '2026-05-21'
-  deactivated_reason: null
+- content: Use the sql tool with the PLAN_OUTPUT unified candidate-matching CTE query
+    passed as stdin, never as a path argument.
+  created: '2026-05-23'
+  deactivated_reason: 'WRONG: never use CTE (WITH syntax) or sql tool wrapper. The
+    executor recognizes raw SQL starting with SELECT directly as the action. r003
+    supersedes this.'
   id: r001
-  reasoning: 'Verbatim error: ''Execute exception [''Identify the store ID, match
-    each product by brand/name/pro]: exec failed: invalid path: path must be absolute:
-    "WITH"''. Root cause category: wrong-action — the SQL tool /bin/sql interprets
-    the query starting with ''WITH'' as an absolute file path. Failing fragment: the
-    action in both SDD_OUTPUT and PLAN_OUTPUT begins with ''WITH store AS (SELECT
-    id FROM stores ...)''. Rule linkage: the new rule must forbid use of WITH clauses
-    in actions for this tool, and cite the plan action or spec_goal as the target.'
+  reasoning: '1. Verbatim error: "exec failed: invalid path: path must be absolute:
+    \"WITH\"". 2. Root cause: wrong-action — the unified candidate-matching SQL query
+    was passed to a tool parameter that expects an absolute filesystem path, so the
+    executor rejected the query body starting with "WITH" as an invalid path. 3. Failing
+    fragment: PLAN_OUTPUT action "WITH candidates AS (SELECT p.sku, p.path, ''pattex''
+    as item FROM products p LEFT JOIN product_properties pp ON p.sku = pp.sku WHERE
+    p.brand = ''Pattex''...". 4. Rule linkage: the rule explicitly requires the sql
+    tool with stdin for this exact candidate-matching CTE action instead of a path-based
+    execution.'
   source: learn
-  status: active
-- content: Always verify that any table referenced in support of a spec_goal concerning
-    a specific store location (e.g., 'Jakomini PowerTool store in Graz') actually
-    exists in the schema before constructing queries on it; if the table does not
-    exist, examine the inventory or other tables that contain store_id to derive store
-    identity.
-  created: '2026-05-21'
+  status: inactive
+- content: 'When counting products available in a store (multi-product availability
+    check task), NEVER use SELECT COUNT(...) as the final SQL — it returns no paths
+    and grounding_refs will be empty. Instead: SELECT DISTINCT p.sku, p.path FROM
+    candidates c JOIN inventory i ON c.sku=i.sku JOIN stores s ON i.store_id=s.id
+    WHERE <store_filter> AND i.available_today>0. Count the returned rows yourself.
+    ALL returned p.path values MUST appear in grounding_refs. The harness checks that
+    grounding_refs contains the actual product file paths.'
+  created: '2026-05-23'
   deactivated_reason: null
   id: r002
-  reasoning: 'Error: "Empty result: ". Root cause category: wrong-spec. Failing fragment:
-    the action "SELECT id, name, location FROM stores WHERE name LIKE ''%Jakomini%''
-    AND location LIKE ''%Graz%'';" from PLAN_OUTPUT and the spec_goal phrase "Jakomini
-    PowerTool store in Graz" both assume a stores table exists. However, the SCHEMA
-    digest lists no stores table — only products, product_properties, inventory, kinds,
-    carts, cart_items. The inventory table has store_id, but no separate stores table
-    exists. Thus the query returned empty because the table does not exist. Rule linkage:
-    the new rule will instruct to verify table existence when store references appear
-    in spec_goal.'
-  source: learn
+  reasoning: 'grounding_refs was empty because SQL returned only COUNT=1 with no path
+    column. Harness required /proc/catalog/workwear/work_trousers/WRK-2C1DPQAV.json.
+    Fix: use SELECT DISTINCT sku,path to get paths for grounding_refs.'
+  source: manual
   status: active
-- content: Always execute product resolution and inventory queries for each SKU after
-    identifying the target store when the spec_goal requires counting products with
-    sufficient availability at a specific store; never declare inventory data missing
-    without querying the inventory table with the SKU and store_id.
-  created: '2026-05-21'
+- content: 'CRITICAL for multi-product availability count: The SQL action MUST be a
+    raw SELECT starting directly with SELECT — NEVER use WITH/CTE syntax, NEVER wrap
+    in /bin/sql. The executor rejects actions starting with WITH (invalid path) and
+    /bin/sql wrappers (syntax error). CORRECT pattern: SELECT DISTINCT p.sku, p.path
+    FROM products p JOIN inventory i ON p.sku = i.sku JOIN stores s ON i.store_id
+    = s.id WHERE LOWER(s.name) LIKE ''%storename%'' AND s.is_open=1 AND i.available_today
+    >= N AND ((p.brand=''Brand1'' AND LOWER(p.model) LIKE ''%model1%'') OR (p.brand=''Brand2''
+    AND LOWER(p.model) LIKE ''%model2%'') OR ...). Count returned rows for answer.
+    ALL p.path values from SQL result → grounding_refs.'
+  created: '2026-05-23'
   deactivated_reason: null
   id: r003
-  reasoning: 'Verbatim error: ''The store PowerTool Graz Jakomini exists, but inventory
-    data for the specified products is missing. Unable to compute the count of items
-    with at least 4 available. Please provide inventory information''. Root cause:
-    wrong-action: agent stopped after store lookup and concluded inventory data missing
-    without querying the inventory table for any product SKU. Failing fragment: action
-    ''SELECT id, name, city FROM stores WHERE name LIKE ''%Jakomini%'' OR name LIKE
-    ''%PowerTool%'' OR city = ''Graz'';'' was executed in isolation; plan steps 3-5
-    (product resolution and inventory queries) were never attempted. Rule linkage:
-    new rule will mandate completing the full plan when spec_goal requires counting
-    availability of specific products at a specific store.'
-  source: learn
+  reasoning: 'Multi-product SQL kept failing with CTE/wrapper. Correct approach verified
+    in t14 (passing): plain SELECT with OR conditions on brand+model LIKE patterns,
+    no CTE, no wrapper.'
+  source: manual
   status: active
 last_run:
-  cycles_used: 3
-  date: '2026-05-21'
+  cycles_used: 15
+  date: '2026-05-23'
   grounding_refs_count: 0
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t15

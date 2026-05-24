@@ -1,312 +1,332 @@
 entries:
-- content: Never search in /proc/ for archived payment records or historical data;
-    instead, use /bin/sql to query the database or search in a designated file system
-    directory (e.g., /data/payments/).
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r001, r010'
+- content: Never use search:fraud /proc/payments/ as the sole action to locate a known
+    fraud hit in archived payment history; always list the contents of /proc/payments/
+    first to identify relevant archive files and naming conventions before applying
+    any keyword search.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r001'
   id: r001
-  reasoning: 'Verbatim error: ''ERROR: Empty result: ''. Root cause: wrong-spec -
-    the spec_goal ''Identify and cite every payment record that belongs to the confirmed
-    fraud hit in the older archived payment history.'' and action ''search:fraud /proc/''
-    incorrectly assumed payment records are stored in /proc/, which is a virtual filesystem
-    for processes, not archived data. This led to an empty result. Rule linkage: new
-    rule will cite the action identifier ''search:fraud /proc/'' and spec_goal phrase
-    ''older archived payment history''.'
+  reasoning: '1. Verbatim error: ''Empty result''. 2. Root cause: wrong-action. 3.
+    Failing fragment citation: action ''search:fraud /proc/payments/'' and plan step
+    ''Search /proc/payments/ for files containing ''fraud'' to locate the known fraud
+    hit record''. 4. The rule_content explicitly prohibits ''search:fraud /proc/payments/''
+    as the sole discovery mechanism and mandates prior directory listing.'
   source: learn
   status: inactive
-- content: Never assume that fraud records are literally tagged with the keyword 'fraud'
-    in the payment files under /data/payments/; instead, for the spec_goal 'Identify
-    and cite all payment records under /data/payments/ that belong to the known fraud
-    hit', first query /bin/sql for fraud-related fields (e.g., a 'fraud_flag' column
-    or specific transaction IDs) and use the resulting identifiers to locate and cite
-    the corresponding files.
-  created: '2026-05-21'
+- content: Always map the PLAN step 'select and read specific payment archive files
+    that are likely to contain the fraud hit' to a concrete, non-empty `action` targeting
+    the exact paths discovered in the prior listing when the spec_goal is to identify
+    every archived payment record in /proc/payments/ that belongs to the known fraud
+    hit; never leave the PLAN action empty while targeted inspection steps remain.
+  created: '2026-05-23'
   deactivated_reason: 'Consolidated: r002, r003'
   id: r002
-  reasoning: 'Verbatim error: ''search failed: not found''. Root cause category: wrong-filter
-    — the filter ''fraud'' was assumed to appear literally in payment files under
-    /data/payments/, but no files matched. Failing fragment: spec_goal phrase ''Identify
-    and cite all payment records under /data/payments/ that belong to the known fraud
-    hit'' and action ''search:fraud /data/payments/''. Rule linkage: new rule must
-    forbid assuming keyword presence and instead require obtaining specific identifiers
-    from Risk Ops or querying the database.'
+  reasoning: 'Verbatim error: ''PLAN phase: action is empty''. Root cause category:
+    wrong-action. The PLAN phase produced an approach and steps that required targeted
+    file inspection but emitted an empty string for the mandatory `action` field,
+    stalling execution. Failing fragment: PLAN_OUTPUT `"action": ""` alongside the
+    step ''select and read specific payment archive files that are likely to contain
+    the fraud hit''. Rule linkage: the new rule mandates that the PLAN `action` must
+    be populated with a concrete read command whenever the spec_goal requires identifying
+    specific archived payment records and the plan steps call for reading those files.'
   source: learn
   status: inactive
-- content: Always first query sqlite_master to discover all tables and their schemas
-    before executing any query against a specific table; for the spec_goal 'Identify
-    and cite all payment records under the payments directory that belong to the known
-    fraud hit', if no fraud_flag column is found in any payment-adjacent table, explore
-    other tables (e.g., fraud_hits) and alternative columns (e.g., is_fraud, fraud_status)
-    to locate fraud-associated identifiers.
-  created: '2026-05-21'
+- content: Always map the PLAN step 'select and read specific payment archive files
+    that are likely to contain the fraud hit' to a concrete, non-empty `action` targeting
+    the exact paths discovered in the prior listing when the spec_goal is to identify
+    every archived payment record in /proc/payments/ that belongs to the known fraud
+    hit; never leave the PLAN action empty while targeted inspection steps remain.
+    Before planning those steps, always list the contents of /proc/payments/ first
+    to identify relevant archive files and naming conventions, and never use search:fraud
+    /proc/payments/ as the sole action to locate the fraud hit without prior listing.
+  created: '2026-05-23'
   deactivated_reason: 'Consolidated: r002, r003'
   id: r003
-  reasoning: 'Verbatim error: ''Empty result:'' from action ''SELECT t.id, t.file_name,
-    t.transaction_id, t.fraud_flag FROM payments t WHERE t.fraud_flag IS NOT NULL
-    AND t.fraud_flag != '''';''. Root cause category: wrong-spec (spec assumed existence
-    of table ''payments'' and column ''fraud_flag'' without verification). Failing
-    fragment: action in PLAN_OUTPUT that directly queried assumed table/column without
-    schema discovery. Rule linkage: new rule must enforce schema discovery before
-    assuming any table/column for the spec_goal ''Identify and cite all payment records
-    under the payments directory that belong to the known fraud hit''.'
+  reasoning: r001 and r002 both address the same spec_goal of locating and identifying
+    known fraud hits in /proc/payments/ archived history. r001 governs the initial
+    discovery step (mandatory listing before search), while r002 governs the subsequent
+    planning step (concrete paths in PLAN). Merged into a single end-to-end rule using
+    highest-id r002 as base and extending it to cover r001's listing requirement.
   source: learn
   status: inactive
-- content: Never assume that fraud records are literally tagged with the keyword 'fraud'
-    in the payment files under /data/payments/. Instead, for the spec_goal 'Identify
-    and cite all payment records under /data/payments/ that belong to the known fraud
-    hit', first query /bin/sql against sqlite_master to discover all tables and their
-    schemas. Then query payment-adjacent tables for fraud-related fields (e.g., fraud_flag,
-    is_fraud, fraud_status, or specific transaction IDs). If no fraud_flag column
-    is found in any payment-adjacent table, explore other tables (e.g., fraud_hits)
-    and alternative columns to locate fraud-associated identifiers. Use the resulting
-    identifiers (e.g., transaction_id, path, file_name) to locate and cite the corresponding
-    files under /data/payments/. Do not ask for clarification if such a column exists;
-    only request clarification if no fraud-related column is found in any table.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r004, r005'
+- content: Never use the action find:*.md /proc/payments/ or assume payment archives
+    are markdown files when the spec_goal is to identify every archived payment record
+    in /proc/payments/ that belongs to the known fraud hit; always perform an unfiltered
+    directory listing of /proc/payments/ first to discover actual file names and extensions
+    before selecting specific archive files to read.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r004'
   id: r004
-  reasoning: 'Merged r002 (about not assuming keyword ''fraud'' and using /bin/sql
-    for fraud fields) with r003 (about first querying sqlite_master and exploring
-    alternative tables/columns). The merged rule combines the full workflow: discover
-    schema, identify fraud columns by various names, fall back to other tables if
-    needed, and use the identifiers to locate files. r001 is distinct and not included.'
+  reasoning: 'The pipeline returned ''Empty result'' after executing the action ''find:*.md
+    /proc/payments/''. Root cause is wrong-filter: the plan step ''find all .md payment
+    archive files in /proc/payments/'' and the SDD action ''find:*.md /proc/payments/''
+    incorrectly assumed all archived payment files use the .md extension, so the filtered
+    search returned nothing and the fraud hit could not be located. Existing rule
+    r003 mandates listing /proc/payments/ first but does not explicitly prohibit an
+    extension-filtered listing or the .md assumption, leaving a gap that allowed this
+    failure. The new rule directly prohibits the failing action and mandates an unfiltered
+    listing to discover actual naming conventions.'
   source: learn
   status: inactive
-- content: Always, after querying sqlite_master for table names, obtain the column
-    names of each candidate table using 'PRAGMA table_info' or 'SELECT sql FROM sqlite_master
-    WHERE name=...' and use only those column names when constructing queries. For
-    the spec_goal 'Identify and cite all payment records under /data/payments/ that
-    belong to the known fraud hit', do not hardcode column names like 'fraud_flag'
-    or 'status' until you have verified they exist in the table's schema.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r004, r005'
+- content: 'When the spec_goal is to identify every archived payment record in /proc/payments/
+    that belongs to the known fraud hit: always perform an unfiltered directory listing
+    of /proc/payments/ first to discover actual file names, extensions, and naming
+    conventions before selecting specific archive files to read; never use find:*.md
+    /proc/payments/ or assume payment archives are markdown files; never use search:fraud
+    /proc/payments/ as the sole action to locate the fraud hit without prior listing.
+    Then, map the PLAN step ''select and read specific payment archive files that
+    are likely to contain the fraud hit'' to a concrete, non-empty `action` targeting
+    the exact paths discovered in the prior listing, and never leave the PLAN action
+    empty while targeted inspection steps remain.'
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r005'
   id: r005
-  reasoning: 'Verbatim error: ''Empty result: ''. Root cause category: wrong-column.
-    Failing fragment: action ''SELECT * FROM fraud_hits WHERE fraud_flag = 1 OR status
-    LIKE ''%confirm%'' LIMIT 5'' from SDD_OUTPUT actions. The spec_goal ''Identify
-    and cite all payment records under /data/payments/ that belong to the known fraud
-    hit'' assumes existence of an entity and columns that may not match reality. The
-    agent did not verify the table''s schema before using column names ''fraud_flag''
-    and ''status'', causing an empty result. New rule prevents hardcoding column names
-    without schema confirmation.'
+  reasoning: r002 is fully subsumed by r003. r003 and r004 address the same spec_goal
+    with different, non-contradictory actions; r004 is the highest id. The merged
+    rule extends r004 with r003's additional constraints on mapping PLAN steps to
+    concrete non-empty actions targeting exact discovered paths and prohibiting search:fraud
+    as the sole action, eliminating overlap and redundancy.
   source: learn
   status: inactive
-- content: Never assume that fraud records are literally tagged with the keyword 'fraud'
-    in the payment files under /data/payments/. For the spec_goal 'Identify and cite
-    all payment records under /data/payments/ that belong to the known fraud hit',
-    always first query /bin/sql against sqlite_master to discover all table names,
-    and then obtain the column names of each candidate table using 'PRAGMA table_info'
-    or 'SELECT sql FROM sqlite_master WHERE name=...'. Use only those verified column
-    names when constructing queries; do not hardcode column names like 'fraud_flag'
-    or 'status' until you have verified they exist in the table's schema. Then query
-    payment-adjacent tables for fraud-related fields (e.g., fraud_flag, is_fraud,
-    fraud_status, or specific transaction IDs). If no fraud_flag column is found in
-    any payment-adjacent table, explore other tables (e.g., fraud_hits) and alternative
-    columns to locate fraud-associated identifiers. Use the resulting identifiers
-    (e.g., transaction_id, path, file_name) to locate and cite the corresponding files
-    under /data/payments/. Do not ask for clarification if such a column exists; only
-    request clarification if no fraud-related column is found in any table.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r006, r007'
+- content: 'When the spec_goal is to identify every archived payment record in /proc/payments/
+    that belongs to the known fraud hit: always perform an unfiltered directory listing
+    of /proc/payments/ first to discover actual file names, extensions, and naming
+    conventions before selecting specific archive files to read; never use find:*.md
+    /proc/payments/ or assume payment archives are markdown files; never use search:fraud
+    /proc/payments/ as the sole action to locate the fraud hit without prior listing.
+    Then, map the PLAN step ''select and read specific payment archive files that
+    are likely to contain the fraud hit'' to a concrete, non-empty `action` targeting
+    the exact paths discovered in the prior listing, and never leave the PLAN action
+    empty while targeted inspection steps remain.'
+  created: '2026-05-23'
+  deactivated_reason: Rules r006 and r007 instruct targeting 'exact paths discovered
+    in the prior listing', which caused the planner to leave the action empty when
+    search:fraud returned no matches after filtering; the new rule supersedes them
+    by mandating inspection of every discovered archive file regardless of search
+    results.
   id: r006
-  reasoning: r004 and r005 both target the same spec_goal ('Identify and cite all
-    payment records under /data/payments/ that belong to the known fraud hit'). r005
-    extends r004 by mandating the use of PRAGMA table_info to verify column names
-    and prohibiting hardcoded column names. r004 adds the initial principle (never
-    assume 'fraud' keyword) and the fallback exploration of other tables. Merging
-    them into one comprehensive rule eliminates redundancy and ensures all steps are
-    captured as a single directive.
+  reasoning: r004 and r005 share the same spec_goal; r005 is a strict superset of
+    r004, containing all of r004's guidance plus additional prohibitions (against
+    search:fraud) and PLAN-action requirements. Keeping r005 as the base fully covers
+    the scope of both rules.
   source: learn
   status: inactive
-- content: Never request clarification when the spec_goal mentions a 'known fraud
-    hit' without explicit identifier; instead, always query the database for a table
-    named 'fraud_hits' or any table containing fraud case identifiers (e.g., hit_id,
-    fraud_case_id, transaction_id) and retrieve those identifiers to join with payment
-    records; only request clarification after fully exploring all tables and finding
-    no fraud-related data.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r006, r007'
+- content: 'When the spec_goal is to identify every archived payment record in /proc/payments/
+    that belongs to the known fraud hit: always perform an unfiltered directory listing
+    of /proc/payments/ first to discover actual file names, extensions, and naming
+    conventions before selecting specific archive files to read; never use find:*.md
+    /proc/payments/ or assume payment archives are markdown files; never use search:fraud
+    /proc/payments/ as the sole action to locate the fraud hit without prior listing.
+    Then, map the PLAN step ''select and read specific payment archive files that
+    are likely to contain the fraud hit'' to a concrete, non-empty `action` targeting
+    the exact paths discovered in the prior listing, and never leave the PLAN action
+    empty while targeted inspection steps remain.'
+  created: '2026-05-23'
+  deactivated_reason: Rules r006 and r007 instruct targeting 'exact paths discovered
+    in the prior listing', which caused the planner to leave the action empty when
+    search:fraud returned no matches after filtering; the new rule supersedes them
+    by mandating inspection of every discovered archive file regardless of search
+    results.
   id: r007
-  reasoning: 'Verbatim error: ''ANSWER clarification: The task indicates a confirmed
-    fraud hit in archived payment history, but no specific fraud hit identifier or
-    criteria were provided.'' Root cause category: wrong-action – the system requested
-    clarification instead of performing the necessary database queries to discover
-    the fraud hit identifier. Failing fragments: action ''SELECT name, sql FROM sqlite_schema
-    WHERE sql IS NOT NULL ORDER BY type, name;'' and spec_goal phrase ''known fraud
-    hit''. The agent only retrieved the schema and then stopped, never querying for
-    a fraud_hits table or similar to obtain the hit identifier. Rule linkage: new
-    rule will reference the spec_goal ''Identify all payment files (full paths) associated
-    with the known fraud hit'' to enforce explicit exploration before clarification.'
+  reasoning: r005 and r006 are semantically identical duplicates with the same spec_goal
+    and identical action prescriptions; r006 (highest id) is kept as the base and
+    fully covers r005.
   source: learn
   status: inactive
-- content: Never assume that fraud records are literally tagged with the keyword 'fraud'
-    in the payment files under /data/payments/. For the spec_goal 'Identify and cite
-    all payment records under /data/payments/ that belong to the known fraud hit',
-    always first query /bin/sql against sqlite_master to discover all table names,
-    and then obtain the column names of each candidate table using 'PRAGMA table_info'
-    or 'SELECT sql FROM sqlite_master WHERE name=...'. Use only those verified column
-    names when constructing queries; do not hardcode column names like 'fraud_flag'
-    or 'status' until you have verified they exist in the table's schema. Then query
-    payment-adjacent tables for fraud-related fields (e.g., fraud_flag, is_fraud,
-    fraud_status, or specific transaction IDs). If no fraud_flag column is found in
-    any payment-adjacent table, explore other tables (e.g., fraud_hits) and alternative
-    columns to locate fraud-associated identifiers. Use the resulting identifiers
-    (e.g., transaction_id, path, file_name) to locate and cite the corresponding files
-    under /data/payments/. Never request clarification when the spec_goal mentions
-    a 'known fraud hit' without explicit identifier; instead, always query the database
-    for a table named 'fraud_hits' or any table containing fraud case identifiers
-    (e.g., hit_id, fraud_case_id, transaction_id) and retrieve those identifiers to
-    join with payment records; only request clarification after fully exploring all
-    tables and finding no fraud-related data.
-  created: '2026-05-21'
-  deactivated_reason: These rules reference /data/payments/ which is not the payment
-    directory in this task; the task uses /proc/payments/. The new rule corrects the
-    path and consolidates the behavior, making these obsolete.
+- content: Never rely on search:fraud /proc/payments/ to eliminate archive files from
+    inspection when the spec_goal is to identify every archived payment record in
+    /proc/payments/ that belongs to the known fraud hit; always perform an unfiltered
+    directory listing of /proc/payments/ first, and then always map the PLAN step
+    to a concrete, non-empty action that opens every discovered archive file to inspect
+    its contents, and never leave the PLAN action empty while archive files remain.
+  created: '2026-05-23'
+  deactivated_reason: r008 allowed a discovery-only command ('find:* /proc/payments/')
+    to satisfy its 'concrete, non-empty action' requirement and did not clearly mandate
+    an archive-opening action in the PLAN step, which contributed to the repeated
+    failure to inspect archive contents.
   id: r008
-  reasoning: r006 and r007 both address the same spec_goal about identifying payment
-    records belonging to a known fraud hit. r006 provides a detailed procedural flow
-    for querying the database and locating files; r007 explicitly forbids premature
-    clarification and emphasizes exploring all tables before asking. These rules overlap
-    completely in scope and are consistent. r007 (higher id) is used as the base and
-    extended with the step-by-step guidance from r006. r001 is unrelated (search location)
-    and is not part of this consolidation.
+  reasoning: 'Verbatim error: "PLAN phase: action is empty". Root cause category:
+    wrong-filter — the PLAN_OUTPUT approach states "no targeted file-read candidates
+    remain after filtering" because it relied on search:fraud /proc/payments/ to eliminate
+    archives, which left zero files to inspect and produced an empty action. Failing
+    fragment: PLAN_OUTPUT `"action": ""` and approach text "no targeted file-read
+    candidates remain after filtering". Existing rules r006 and r007 contributed to
+    this failure by instructing the planner to target only "exact paths discovered
+    in the prior listing", so when the search returned no matches the planner left
+    the action empty; the new rule supersedes them by prohibiting reliance on search:fraud
+    to filter out archives and mandating a non-empty action that inspects every discovered
+    file.'
   source: learn
   status: inactive
-- content: Always, for the spec_goal 'Identify and cite every payment record under
-    /data/payments/ that belongs to the known fraud hit discovered from the database',
-    after retrieving the fraud hit identifier from the database, query all tables
-    that potentially contain file paths (e.g., payments, payment_files, transactions)
-    using PRAGMA table_info to find columns like path, file_path, or filename. Join
-    the fraud hit identifier with rows in such tables to obtain concrete file paths.
-    Only if no mapping table exists should you fall back to searching file contents
-    or filenames with the identifier.
-  created: '2026-05-21'
-  deactivated_reason: These rules reference /data/payments/ which is not the payment
-    directory in this task; the task uses /proc/payments/. The new rule corrects the
-    path and consolidates the behavior, making these obsolete.
+- content: Never include 'search:fraud /proc/payments/' in SDD actions and never use
+    'find:* /proc/payments/' as the PLAN action when the spec_goal is to identify
+    every archived payment record in /proc/payments/ that belongs to the known fraud
+    hit; after an unfiltered directory listing discovers archive files, the PLAN action
+    must be a concrete file-reading or archive-extraction command that opens each
+    discovered archive to inspect its payment contents.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r009, r010'
   id: r009
-  reasoning: 'Verbatim error: ''Empty result''. Root cause category: empty-result.
-    The SDD_OUTPUT plan assumed existence of a ''fraud_hits'' table and that the identifier
-    could be directly used to search /data/payments/ via grep (action ''search:${FRAUD_HIT_ID}
-    /data/payments/''). This resulted in no matches because the connection between
-    the fraud hit identifier and actual payment file paths was missing. The spec_goal
-    specified ''Identify and cite every payment record under /data/payments/ that
-    belongs to the known fraud hit discovered from the database'', but the plan did
-    not include a step to query the database for a table that maps fraud identifiers
-    to file paths (e.g., payments, payment_files, transactions). The existing rule
-    r008 correctly guides schema exploration but does not mandate joining fraud identifiers
-    with a file-path table before resorting to filesystem search. This gap caused
-    the empty result.'
+  reasoning: '1. Verbatim error: ''Empty result''. 2. Root cause category: wrong-action
+    — the PLAN action was ''find:* /proc/payments/'', which only enumerates file paths
+    and never opens or inspects archive contents, while the SDD actions still included
+    ''search:fraud /proc/payments/'' as a substitute for actually reading archives.
+    3. Failing fragment citation: PLAN action ''find:* /proc/payments/'' and SDD action
+    ''search:fraud /proc/payments/''. 4. Rule linkage: the new rule directly prohibits
+    both the discovery-only PLAN action and the reliance on search:fraud in SDD actions
+    when the spec_goal is ''Identify every archived payment record in /proc/payments/
+    that belongs to the known fraud hit and cite the full path of each record.'''
   source: learn
   status: inactive
-- content: Never request clarification for the spec_goal 'Identify and cite every
-    payment record under /proc/payments/ that belongs to the known fraud hit discovered
-    from the database'; instead, always query /bin/sql against sqlite_master to discover
-    all table names, then obtain column names using PRAGMA table_info, and explore
-    all tables for fraud-related fields (e.g., fraud_hits table, fraud_flag, is_fraud,
-    hit_id, transaction_id). Only after fully exploring all tables and finding no
-    fraud-related data should you request clarification. For any spec_goal targeting
-    /proc/payments/, treat the identical logic as previously applied to /data/payments/.
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r001, r010'
+- content: Never include 'list:/proc/payments/archive/' or any other hardcoded archive
+    subdirectory path in SDD actions or PLAN actions when the spec_goal is to identify
+    every archived payment record in /proc/payments/ that belongs to the known fraud
+    hit; instead, rely on the unfiltered listing of /proc/payments/ to reveal actual
+    archive containers, then apply concrete file-reading or archive-extraction commands
+    to each discovered container.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r009, r010'
   id: r010
-  reasoning: 'Verbatim error: ''ANSWER clarification: The task references a known
-    fraud hit in older payment history, but no identifier or criteria for that hit
-    were provided. I need clarification on what constitutes the fraud hit (e.g., transaction
-    ID,''. Root cause category: ''wrong-action'' – agent requested clarification instead
-    of continuing to explore database tables. Failing fragment: spec_goal ''Identify
-    and cite every payment record under /proc/payments/ that belongs to the known
-    fraud hit discovered from the database'' and the action ''SELECT name FROM sqlite_master
-    ...'' which was not followed by further table exploration. Rule linkage: existing
-    rule r008 explicitly forbids requesting clarification for this spec_goal and mandates
-    full table exploration before asking, but the agent violated it, likely because
-    r008 references /data/payments/ while the spec uses /proc/payments/, causing the
-    agent to treat the rule as inapplicable.'
+  reasoning: 'Verbatim error: ''Execute exception [''List the archive subdirectory
+    under /proc/payments/ to enum]: list failed: not found''. Root cause category:
+    wrong-action. Failing fragment citation: the SDD action ''list:/proc/payments/archive/''
+    and the PLAN action ''list:/proc/payments/archive/''. Rule linkage: the new rule
+    prohibits hardcoding ''list:/proc/payments/archive/'' and instead requires deriving
+    archive containers from an unfiltered /proc/payments/ listing before using concrete
+    file-reading or archive-extraction commands.'
   source: learn
   status: inactive
-- content: Never search in /proc/ for payment records or historical data, except when
-    the spec_goal explicitly requires identifying records under /proc/payments/ (e.g.,
-    'Identify and cite every payment record under /proc/payments/ that belongs to
-    the known fraud hit discovered from the database'). In such cases, always query
-    /bin/sql against sqlite_master to discover all table names, obtain column names
-    using PRAGMA table_info, and explore all tables for fraud-related fields (e.g.,
-    fraud_hits table, fraud_flag, is_fraud, hit_id, transaction_id). Only after fully
-    exploring all tables and finding no fraud-related data should you request clarification.
-    For any spec_goal targeting /proc/payments/, treat the identical logic as previously
-    applied to /data/payments/.
-  created: '2026-05-21'
-  deactivated_reason: r011 mandated the exact action that led to the repeated query
-    error; the new rule supersedes it by restricting repetition and guiding to the
-    next step.
+- content: Never allow the PLAN action to be empty when the spec_goal is to identify
+    every archived payment record under /proc/payments/ that belongs to the known
+    fraud hit and an unfiltered directory listing of /proc/payments/ has already been
+    performed; always emit a concrete file-reading or archive-extraction command that
+    opens each discovered archive container to inspect its payment contents.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r011, r012'
   id: r011
-  reasoning: 'Merged r001 (general prohibition on searching /proc/ for payments) with
-    r010 (specific process for spec_goal targeting /proc/payments/). The two rules
-    contradict: r001 says never search in /proc/, r010 says to do so for a specific
-    goal. The merged rule resolves the conflict by adding an exception for the spec_goal
-    while retaining the general prohibition. r010''s process logic is incorporated
-    verbatim as the highest-id rule.'
+  reasoning: 'Verbatim error: "PLAN phase: action is empty". Root cause category:
+    wrong-action. The PLAN phase halted instead of progressing to inspection: PLAN_OUTPUT
+    action was "" and its approach stated "All candidate discovery actions were previously
+    attempted, leaving no remaining executable action to locate archived fraud payment
+    records." This directly contradicts the required next step from the SDD plan step
+    2 ("Use concrete file-reading commands to open each discovered container and inspect
+    its archived payment contents"). The new rule plugs this exact gap by explicitly
+    mandating that the PLAN action must not be empty after the directory listing and
+    must instead be a concrete file-reading or archive-extraction command.'
   source: learn
   status: inactive
-- content: Never repeat the query 'SELECT name FROM sqlite_master WHERE type='table'
-    ORDER BY name' in consecutive actions; after the first successful execution, proceed
-    to examine the columns of the discovered tables using PRAGMA table_info without
-    re-querying sqlite_master. This applies to spec_goal 'Identify and cite every
-    payment record under /proc/payments/ that belongs to the known fraud hit discovered
-    from the database.'
-  created: '2026-05-21'
-  deactivated_reason: 'Consolidated: r012'
+- content: 'When the spec_goal is to identify every archived payment record under
+    /proc/payments/ that belongs to the known fraud hit: never include ''search:fraud
+    /proc/payments/'' in SDD actions; never use ''find:* /proc/payments/'' as the
+    PLAN action; never include any hardcoded archive subdirectory path (e.g., ''list:/proc/payments/archive/'')
+    in SDD or PLAN actions; instead rely on an unfiltered directory listing of /proc/payments/
+    to reveal actual archive containers; and after such a listing discovers archive
+    files, never allow the PLAN action to be empty—always emit a concrete file-reading
+    or archive-extraction command that opens each discovered archive container to
+    inspect its payment contents.'
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r011, r012'
   id: r012
-  reasoning: 'Verbatim error: ''Repeated action detected — must use a different query
-    or approach. Action was: SELECT name FROM sqlite_master WHERE type=''table'' ORDER
-    BY name''. Root cause: wrong-action because the same schema discovery query was
-    executed again instead of progressing to column inspection. Failing fragment:
-    the action string ''SELECT name FROM sqlite_master WHERE type=''table'' ORDER
-    BY name'' from SDD_OUTPUT/PLAN_OUTPUT. Rule linkage: new rule must prevent repeating
-    this action and mandate a different next step.'
+  reasoning: r009, r010, and r011 all address the same spec_goal and prescribe compatible
+    but overlapping constraints; r011 (highest id) forms the base and is extended
+    with the prohibitions against search/find and hardcoded archive paths from r009
+    and r010.
   source: learn
   status: inactive
-- content: Always query the database (sqlite_master and PRAGMA table_info on all tables)
-    to discover any fraud-related tables or columns (e.g., fraud_hits, fraud_flag,
-    is_fraud) before requesting clarification on a known fraud hit. Only after fully
-    examining all tables and finding no fraud-related identifiers should clarification
-    be requested. This applies to spec_goal 'Identify and cite all payment record
-    files under /data/payments/ that belong to the known fraud hit discovered from
-    the database.'
-  created: '2026-05-21'
-  deactivated_reason: null
+- content: Never include a hardcoded archive file path such as '/proc/payments/archive.zip'
+    in SDD actions or as the PLAN action when the spec_goal is to identify every archived
+    payment record under /proc/payments/ that belongs to the known fraud hit; always
+    perform an unfiltered directory listing of /proc/payments/ first to discover actual
+    archive containers, then emit a concrete file-reading or archive-extraction command
+    for each discovered archive.
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r013, r014'
   id: r013
-  reasoning: 'Verbatim error: ''The task references a known fraud hit but does not
-    specify which hit. Please provide an identifier (e.g., payment ID, customer ID,
-    date range, or the fraud case reference) so the specific payment records can be
-    located.'' Root cause: wrong-spec — the spec_goal intended the fraud hit to be
-    discovered from the database, but the assistant prematurely requested a human-provided
-    identifier instead of querying the database. Failing fragment: spec_goal ''Identify
-    and cite all payment record files under /data/payments/ that belong to the known
-    fraud hit discovered from the database.'' Rule linkage: the new rule must enforce
-    that the database is queried first per the spec_goal''s assumption that the hit
-    is discoverable there.'
+  reasoning: 'Verbatim error: Execute exception [''Read the discovered archive container
+    to inspect its paymen]: read failed: not found. Root cause category: wrong-action.
+    Failing fragment citation: SDD action ''/proc/payments/archive.zip'' and PLAN
+    action ''/proc/payments/archive.zip''. Rule linkage: The new rule explicitly bans
+    hardcoding an archive file path such as ''/proc/payments/archive.zip'' in SDD
+    actions or as the PLAN action and mandates an unfiltered directory listing of
+    /proc/payments/ before any file-reading command is emitted, directly addressing
+    the failed fragment.'
+  source: learn
+  status: inactive
+- content: 'When the spec_goal is to identify every archived payment record under
+    /proc/payments/ that belongs to the known fraud hit: never include ''search:fraud
+    /proc/payments/'' in SDD actions; never use ''find:* /proc/payments/'' as the
+    PLAN action; never include any hardcoded archive subdirectory path (e.g., ''list:/proc/payments/archive/'')
+    or hardcoded archive file path such as ''/proc/payments/archive.zip'' in SDD or
+    PLAN actions; instead rely on an unfiltered directory listing of /proc/payments/
+    to reveal actual archive containers; and after such a listing discovers archive
+    files, never allow the PLAN action to be empty—always emit a concrete file-reading
+    or archive-extraction command that opens each discovered archive container to
+    inspect its payment contents.'
+  created: '2026-05-23'
+  deactivated_reason: 'Consolidated: r013, r014'
+  id: r014
+  reasoning: r011, r012, and r013 all address the same spec_goal; r013 (highest id)
+    is extended to incorporate the prohibitions against search:fraud, find:*, hardcoded
+    subdirectory paths, and the explicit non-empty PLAN requirement from r011 and
+    r012.
+  source: learn
+  status: inactive
+- content: When the spec_goal is to identify every archived payment record under /proc/payments/
+    that belongs to the known fraud hit, never allow the PLAN action to be empty;
+    always emit 'tree:/proc/payments/' as the initial concrete PLAN action, and after
+    archive containers are discovered always emit a concrete file-reading or archive-extraction
+    command as the PLAN action.
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r015
+  reasoning: 'Verbatim error: ''PLAN phase: action is empty''. Root cause: wrong-action.
+    The PLAN_OUTPUT action field is '''' even though the plan steps require an initial
+    unfiltered directory listing of /proc/payments/ and the SDD actions already specify
+    ''tree:/proc/payments/''. Failing fragment: PLAN_OUTPUT action is '''' instead
+    of containing the concrete unfiltered directory listing command. Rule linkage:
+    the new rule explicitly requires the PLAN action to be populated with the concrete
+    directory listing command ''tree:/proc/payments/'' rather than being empty at
+    the start of the workflow.'
   source: learn
   status: active
-- content: Always query the database (sqlite_master and PRAGMA table_info on all tables)
-    to discover any fraud-related tables or columns (e.g., fraud_hits, fraud_flag,
-    is_fraud) before requesting clarification on a known fraud hit. Only after fully
-    examining all tables and finding no fraud-related identifiers should clarification
-    be requested. Never repeat the sqlite_master query in consecutive actions; after
-    the first successful execution, proceed to examine the columns of the discovered
-    tables using PRAGMA table_info without re-querying sqlite_master. This applies
-    to spec_goals that require identifying and citing payment records belonging to
-    a known fraud hit discovered from the database.
-  created: '2026-05-21'
+- content: 'When the spec_goal is to identify every archived payment record under
+    /proc/payments/ that belongs to the known fraud hit: never include ''search:fraud
+    /proc/payments/'' in SDD actions; never use ''find:* /proc/payments/'' as the
+    PLAN action; never include any hardcoded archive subdirectory path (e.g., ''list:/proc/payments/archive/'')
+    or hardcoded archive file path such as ''/proc/payments/archive.zip'' in SDD or
+    PLAN actions; instead always emit ''tree:/proc/payments/'' as the initial concrete
+    PLAN action to reveal actual archive containers; and after such a listing discovers
+    archive files, never allow the PLAN action to be empty—always emit a concrete
+    file-reading or archive-extraction command that opens each discovered archive
+    container to inspect its payment contents.'
+  created: '2026-05-23'
   deactivated_reason: null
-  id: r014
-  reasoning: Merged r013 (higher id, broader rule) with r012 (specific constraint
-    on not repeating sqlite_master query). r012's additional restriction is compatible
-    and fills a gap; deactivating r012 reduces redundancy while preserving all guidance.
+  id: r016
+  reasoning: r013, r014, and r015 all address the same spec_goal. r015 (highest id)
+    is the base because it prescribes the concrete initial PLAN command tree:/proc/payments/
+    and mandates non-empty follow-up PLAN actions. It is extended with the explicit
+    prohibitions from r014 (and r013) against search:fraud, find:*, and hardcoded
+    archive subdirectory/file paths to cover the full scope of all three rules.
   source: learn
+  status: active
+- content: 'For fraud investigation tasks: after tree:/proc/payments/, read /docs/merchant-continuity-and-critical-incidents.md
+    — this doc identifies which payments are part of confirmed fraud incidents. Use
+    the incident details to filter which pay_XXX.json files to read and cite. The
+    fraud payments are identified by the incident doc, not by a keyword search. Action
+    sequence: (1) tree:/proc/payments/, (2) read /docs/merchant-continuity-and-critical-incidents.md,
+    (3) read the specific payment files identified by the incident doc, (4) return
+    OUTCOME_OK with those payment file paths in grounding_refs.'
+  created: '2026-05-23'
+  deactivated_reason: null
+  id: r017
+  reasoning: Agent tried many keyword searches for fraud which all failed. The /docs/merchant-continuity-and-critical-incidents.md
+    doc likely identifies fraud payments by incident details without needing keyword
+    search.
+  source: manual
   status: active
 last_run:
   cycles_used: 15
-  date: '2026-05-21'
+  date: '2026-05-23'
   grounding_refs_count: 0
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure

@@ -12,7 +12,7 @@ You receive:
 - LEARNED — in-session rules from prior failure cycles (highest priority under normal conditions)
 - VAULT — rules from AGENTS.MD (domain authority)
 - SCHEMA_DIGEST and DB_SCHEMA — database structure
-- AGENT_CONTEXT — metadata (date, customer_id)
+- AGENT_CONTEXT — metadata (date, runtime_identity including user and roles)
 
 ## Output
 
@@ -27,6 +27,9 @@ Return a single markdown document with exactly these sections in order:
 
 # SCHEMA
 <schema digest and db schema>
+
+## AGENT_CONTEXT
+<date and runtime_identity from AGENT_CONTEXT — copy verbatim, do NOT summarize or omit>
 ```
 
 ## LAST_RUN handling
