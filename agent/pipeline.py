@@ -21,7 +21,7 @@ from .llm import (
     CLI_BLUE, CLI_CLR, CLI_GREEN, CLI_RED, CLI_YELLOW,
 )
 from .json_extract import _extract_json_from_text
-from .models import SddOutput, PlanOutput, ExecuteOutput, LearnOutput, AnswerOutput, ConsolidateOutput
+from .models import IddOutput, SddOutput, PlanOutput, ExecuteOutput, LearnOutput, AnswerOutput, ConsolidateOutput
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest
 from .prompt import load_prompt
 from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff, save_last_run
@@ -33,6 +33,7 @@ _MAX_CYCLES = int(os.environ.get("MAX_STEPS", "3"))
 _SDD_ENABLED = os.environ.get("SDD_ENABLED", "1") == "1"
 
 _PHASE_MAX_TOKENS: dict[str, int] = {
+    "idd":       int(os.environ.get("MAX_TOKENS_IDD",       "2048")),
     "sdd":       int(os.environ.get("MAX_TOKENS_SDD",       "8192")),
     "plan":      int(os.environ.get("MAX_TOKENS_PLAN",      "4096")),
     "learn":     int(os.environ.get("MAX_TOKENS_LEARN",     "2048")),
