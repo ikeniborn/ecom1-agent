@@ -152,6 +152,38 @@ def _build_sdd_user_msg(task_text: str, last_error: str, prior_actions: list[str
     return "\n\n".join(parts)
 
 
+def _build_idd_user_msg(task_text: str, last_error: str, prior_actions: list[str]) -> str:
+    parts: list[str] = [f"TASK: {task_text}"]
+    if last_error:
+        parts.append(f"PREVIOUS_ERROR: {last_error}")
+    if prior_actions:
+        parts.append("PRIOR_ACTIONS:\n" + "\n".join(f"  - {a}" for a in prior_actions))
+    return "\n\n".join(parts)
+
+
+def _run_idd(
+    unified_context: str,
+    model: str,
+    cfg: dict,
+    task_text: str,
+    last_error: str,
+    prior_actions: list[str],
+    cycle: int,
+) -> tuple[IddOutput | None, dict, dict]:
+    idd_model = _resolve_model_for_phase("idd", model)
+    idd_guide = load_prompt("idd") or "# PHASE: idd"
+    system: list[dict] = [
+        {"type": "text", "text": unified_context},
+        {"type": "text", "text": idd_guide, "cache_control": {"type": "ephemeral"}},
+    ]
+    user_msg = _build_idd_user_msg(task_text, last_error, prior_actions)
+    return _call_llm_phase(
+        system, user_msg, idd_model, cfg, IddOutput,
+        max_tokens=_PHASE_MAX_TOKENS["idd"],
+        phase="idd", cycle=cycle,
+    )
+
+
 def _build_plan_user_msg(sdd_json: str, prior_actions: list[str] | None = None) -> str:
     parts = [sdd_json]
     if prior_actions:

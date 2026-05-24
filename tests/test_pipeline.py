@@ -277,3 +277,25 @@ def test_plan_user_msg_includes_prior_actions():
     assert "PRIOR_ACTIONS" in msg
     assert "search:x /proc/" in msg
     assert "list:/proc/payments/" in msg
+
+
+from agent.pipeline import _build_idd_user_msg
+
+
+def test_build_idd_user_msg_basic():
+    msg = _build_idd_user_msg("show me orders", "", [])
+    assert "TASK: show me orders" in msg
+    assert "PREVIOUS_ERROR" not in msg
+    assert "PRIOR_ACTIONS" not in msg
+
+
+def test_build_idd_user_msg_with_error_and_actions():
+    msg = _build_idd_user_msg(
+        "show me orders",
+        "table not found",
+        ["SELECT * FROM orders", "/bin/sql SELECT 1"],
+    )
+    assert "TASK: show me orders" in msg
+    assert "PREVIOUS_ERROR: table not found" in msg
+    assert "PRIOR_ACTIONS" in msg
+    assert "SELECT * FROM orders" in msg
