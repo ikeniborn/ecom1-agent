@@ -1,8 +1,10 @@
 import json
+from typing import Literal
 from unittest.mock import MagicMock, patch
-from agent.pipeline import run_pipeline, _run_learn, _build_plan_user_msg, _build_idd_user_msg
+from agent.pipeline import run_pipeline, _run_learn, _build_plan_user_msg, _build_idd_user_msg, _build_sdd_user_msg
 from agent.prephase import PrephaseResult
 from agent.prompt_assembler import AssembledPrompt
+from agent.models import IddOutput as _IddOutput
 
 
 def _mock_assemble(*_a, **_kw):
@@ -298,10 +300,7 @@ def test_build_idd_user_msg_with_error_and_actions():
     assert "SELECT * FROM orders" in msg
 
 
-from agent.models import IddOutput as _IddOutput
-
-
-def _make_idd_out(reformulated_task="Return count of products", decision="proceed"):
+def _make_idd_out(reformulated_task: str = "Return count of products", decision: Literal["proceed", "hard_stop"] = "proceed") -> _IddOutput:
     return _IddOutput(
         intent_objective="Count products",
         reformulated_task=reformulated_task,
@@ -311,7 +310,6 @@ def _make_idd_out(reformulated_task="Return count of products", decision="procee
 
 
 def test_build_sdd_user_msg_uses_idd_reformulated_task():
-    from agent.pipeline import _build_sdd_user_msg
     idd = _make_idd_out(reformulated_task="Return count of active products in store_42")
     msg = _build_sdd_user_msg(idd, "", [])
     assert "Return count of active products in store_42" in msg
@@ -320,7 +318,6 @@ def test_build_sdd_user_msg_uses_idd_reformulated_task():
 
 
 def test_build_sdd_user_msg_includes_expectations():
-    from agent.pipeline import _build_sdd_user_msg
     idd = _IddOutput(
         intent_objective="Check discount eligibility",
         reformulated_task="Check if basket_007 qualifies for discount",
