@@ -1,7 +1,120 @@
-last_run:
-  cycles_used: 5
-  date: '2026-05-24'
-  grounding_refs_count: 0
-  outcome: OUTCOME_NONE_CLARIFICATION
-  status: failure
+entries:
+- content: Never rely on a single content keyword search across /proc/payments/ as
+    the only discovery step for the fraudulent payment record specified in the spec_goal;
+    always list the directory and inspect individual files to locate and confirm the
+    target record.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r001'
+  id: r001
+  reasoning: 'Verbatim error: ''Empty result''. Root cause: wrong-filter. The failing
+    fragment is the plan step ''Search /proc/payments/ for files containing fraud-related
+    keywords to quickly locate the fraudulent record'' and the executed action ''search:fraud
+    /proc/payments/''. The literal keyword ''fraud'' produced no matches in the archived
+    payment files despite the task asserting one fraudulent hit exists. The rule therefore
+    targets the spec_goal and action to ensure directory-level enumeration and file
+    inspection are used rather than halting on a single empty keyword search.'
+  source: learn
+  status: inactive
+- content: Never produce a plan whose sole action is `list:/proc/payments/` when the
+    spec_goal requires identifying fraudulent payment records by inspecting file contents;
+    always include explicit follow-on read actions for each enumerated payment record
+    file after the directory listing.
+  created: '2026-05-25'
+  deactivated_reason: r002 and r003 targeted the abstract 'plan' rather than the concrete
+    `actions` array, permitting a multi-step plan while the executable `actions` remained
+    a single `list:/proc/payments/` entry. The new rule supersedes them by precisely
+    governing the `actions` sequence.
+  id: r002
+  reasoning: 'The ANSWER states: ''Need the result of `search:fraud /proc/payments/`
+    or direct reads of individual payment files under `/proc/payments/` to locate
+    the confirmed fraud hit and cite the specific record path.'' Root cause: wrong-action.
+    The SDD and PLAN produced only `list:/proc/payments/` as the action, omitting
+    the follow-on file reads required by the spec_goal to ''individually inspecting
+    each file''s contents for fraud indicators.'' Consequently the ANSWER phase lacked
+    file contents and requested clarification instead of citing the fraudulent record
+    paths. The new rule prevents stopping at a bare directory listing by requiring
+    explicit read actions for the enumerated files.'
+  source: learn
+  status: inactive
+- content: Never rely on a single content keyword search across /proc/payments/ as
+    the only discovery step for the fraudulent payment record specified in the spec_goal,
+    and never produce a plan whose sole action is `list:/proc/payments/` when the
+    spec_goal requires identifying fraudulent payment records by inspecting file contents;
+    always list the directory and include explicit follow-on read actions for each
+    enumerated payment record file after the directory listing to locate and confirm
+    the target record.
+  created: '2026-05-25'
+  deactivated_reason: r002 and r003 targeted the abstract 'plan' rather than the concrete
+    `actions` array, permitting a multi-step plan while the executable `actions` remained
+    a single `list:/proc/payments/` entry. The new rule supersedes them by precisely
+    governing the `actions` sequence.
+  id: r003
+  reasoning: r001 and r002 address the same spec_goal of locating fraudulent payment
+    records in /proc/payments/; r001 prohibits keyword-search-only discovery while
+    r002 prohibits list-only plans. They overlap in requiring directory listing followed
+    by per-file inspection, so they are merged into a single comprehensive rule using
+    r002 (highest id) as the base.
+  source: learn
+  status: inactive
+- content: Never emit an `actions` sequence whose only element is `list:/proc/payments/`
+    when the spec_goal requires identifying fraudulent payment records by inspecting
+    file contents; always include explicit follow-on read actions for each enumerated
+    payment record file after the directory listing.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r004'
+  id: r004
+  reasoning: '1. Verbatim error: ''ANSWER clarification: Need to read `/proc/payments/README.md`
+    and inspect the archived payment record files under `/proc/payments/` for fraud
+    indicators to identify the specific records involved in the confirmed incident.
+    The directory listing alone does not contain fraud classification data.'' 2. Root
+    cause: wrong-action — the SDD_OUTPUT `actions` array contained only `[''list:/proc/payments/'']`
+    despite the `plan` correctly describing file reads, so no payment files were actually
+    inspected. 3. Failing fragment: `actions: [''list:/proc/payments/'']` in SDD_OUTPUT
+    and the sole action in PLAN_OUTPUT `action: ''list:/proc/payments/''`. 4. Rule
+    linkage: existing rules r002 and r003 targeted the ''plan'' abstraction rather
+    than the concrete `actions` array, allowing a compliant multi-step `plan` to coexist
+    with a non-compliant single-entry `actions` array; the new rule closes this loophole
+    by explicitly governing the `actions` sequence.'
+  source: learn
+  status: inactive
+- content: Never emit an `actions` sequence that reads only a subset of discovered
+    payment record files under `/proc/payments/` when the `spec_goal` requires inspecting
+    every archived payment record for fraud indicators; always include explicit read
+    actions for each remaining uninspected payment record file, or use a `search:`
+    action scoped to `/proc/payments/` to retrieve all candidate records without per-file
+    enumeration.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: '1. Verbatim error: ''Need to read the remaining payment files under
+    `/proc/payments/` such as `/proc/payments/pay_003.json` and the archived timestamped
+    files to locate the confirmed fraud records.'' 2. Root cause: wrong-action. 3.
+    Failing fragment: The SDD_OUTPUT `actions` sequence `["/proc/payments/README.md",
+    "/proc/payments/pay_001.json", "/proc/payments/pay_002.json"]` included only two
+    payment record files, leaving 80+ other files uninspected, while the `spec_goal`
+    requires identifying ''every archived payment record under /proc/payments/ that
+    exhibits the fraud indicators'' and `success_criteria[1]` mandates that ''Every
+    payment record file under /proc/payments/ is inspected for fraud markers via direct
+    read or targeted content search''. 4. Rule linkage: The new rule directly addresses
+    this partial-coverage action set by requiring that, when the spec_goal demands
+    inspecting every payment record, the actions must either read every remaining
+    uninspected file or use a scoped search action to cover the directory.'
+  source: learn
+  status: active
+- content: Never emit an `actions` sequence whose only element is `list:/proc/payments/`
+    or that reads only a subset of discovered payment record files under `/proc/payments/`
+    when the `spec_goal` requires inspecting archived payment records for fraud indicators;
+    always include explicit read actions for each remaining uninspected payment record
+    file, or use a `search:` action scoped to `/proc/payments/` to retrieve all candidate
+    records without per-file enumeration.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: r004 and r005 address the same spec_goal of inspecting /proc/payments/
+    for fraud. r004’s prohibition against a list-only action is a specific instance
+    of the broader subset-read coverage in r005. The merged rule retains r005 as the
+    base and extends it to explicitly include r004’s list-only case, ensuring all
+    records are inspected either by reading every file or by using a scoped search.
+  source: learn
+  status: active
 task_id: t38
