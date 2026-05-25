@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-import pytest
 
 _MODELS = json.loads((Path(__file__).parent.parent / "models.json").read_text())
 
