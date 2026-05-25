@@ -26,6 +26,7 @@ Given the inputs, diagnose what went wrong and either:
 - Rules must reference `spec_goal`, `success_criteria`, or `action` from the inputs — not raw SQL patterns.
 - All string fields must be non-empty and reference concrete identifiers — no generic phrases.
 - `rule_content` MUST NOT assert conclusions about data existence (e.g., "item is absent from catalogue", "report NO"). Rules govern technique — how to construct actions — not outcomes. Outcome conclusions belong in ANSWER, not in learned rules.
+- `rule_content` MUST be task-agnostic: do NOT embed specific product names, brand names, series identifiers, SKUs, property values, or any literal string drawn from the current task's parameters. Rules must describe the general technique so they apply across different tasks with different products. Instead of naming the specific value, describe the pattern (e.g., "Never use exact equality on products.name or products.series for a multi-word product line name; use LIKE with the series identifier tokens instead" — NOT "never use exact equality for 'Heco Zinc Plated TopFix GTU-YPJ'").
 
 ## Strategy Escalation
 
