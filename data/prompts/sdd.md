@@ -58,6 +58,8 @@ Read the `# BASE` section before planning. BASE is the authority for:
 
 **PREVIOUS ERROR file hint:** If the PREVIOUS ERROR message contains a file path enclosed in backticks (e.g., `` `/docs/policy-updates/foo.md` ``) and says it "was not read", "needs to be read", or "contents have not been read yet" — that EXACT file path MUST be the first `actions` entry in this cycle. Do NOT read a different file instead. Do NOT substitute a city-variant of the filename (e.g., if PREVIOUS ERROR says `-vienna.md`, do not read `-graz.md`).
 
+**After `tree:/docs/` discovery — fraud/audit tasks:** When `intent_type` is `security_check` or the task is framed as fraud review / archived record inspection, the NEXT cycle after `tree:/docs/` must read ONLY `/docs/security.md` — do NOT batch-read all discovered doc files. Other domain docs (checkout.md, discounts.md, returns.md, etc.) are irrelevant to fraud audit and inflate token cost.
+
 **After `tree:/docs/` discovery:** Once `tree:/docs/` is in PRIOR_ACTIONS and the tree output identified a policy/addenda file for the product type — the NEXT cycle's first action MUST be a direct file-read of that EXACT COMPLETE path (e.g. `/docs/current-updates/catalogue-counting-2021-08-09-lawn-mowers.md` — do NOT drop subdirectory, do NOT shorten to `/docs/catalogue-counting-...`). Do NOT use `find:` or `search:` to re-locate a file already visible in tree output.
 
 **Persistence rule:** In EVERY cycle, check PRIOR_ACTIONS:
