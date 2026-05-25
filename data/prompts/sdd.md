@@ -44,7 +44,8 @@ Given a task and environment context, produce:
 **File-reading tasks:** When task requires reading multiple files, prefer `search:KEYWORD /dir/` to locate specific records in one action. Use `tree:/dir/` for enumeration when you need to read all files. The pipeline batches file reads automatically — propose the first file as primary action; remaining files are batched per cycle up to the adaptive cap derived from IDD `scope_estimate`.
 
 Never write a natural-language sentence as an action value.
-If you cannot express the required operation in one of the forms above, set `actions` to `[]`.
+If you cannot express the required operation in one of the forms above, set `actions` to `[]` AND set `error_code` to the appropriate code.
+`actions=[]` with `error_code=""` is INVALID — if there is no error, there must be at least one action.
 
 ## Applying BASE Directives (MANDATORY)
 

@@ -19,6 +19,8 @@ Find groups of rules that:
 For each group: produce one merged_rule. Take the content of the rule with the highest numeric id
 as the base; extend it to cover the full scope of all rules in the group.
 
+**Pre-check before semantic analysis:** If any two active rules have identical `content` (case-insensitive, whitespace-normalized) — output `skip: false` and merge them immediately without further analysis. Do not re-evaluate semantics for string-identical rules.
+
 Skip (output skip: true) when all active rules are distinct and non-contradictory.
 
 ## Output (JSON only, first character must be {)

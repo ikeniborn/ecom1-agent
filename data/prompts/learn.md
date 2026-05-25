@@ -25,6 +25,14 @@ Given the inputs, diagnose what went wrong and either:
 - Output PURE JSON only. First character must be `{`.
 - Rules must reference `spec_goal`, `success_criteria`, or `action` from the inputs — not raw SQL patterns.
 - All string fields must be non-empty and reference concrete identifiers — no generic phrases.
+- `rule_content` MUST NOT assert conclusions about data existence (e.g., "item is absent from catalogue", "report NO"). Rules govern technique — how to construct actions — not outcomes. Outcome conclusions belong in ANSWER, not in learned rules.
+
+## Strategy Escalation
+
+If `ERROR_TYPE=empty` and `EXISTING_RULES` already contain SQL-refinement rules for this task:
+- Do NOT generate another SQL-refinement rule.
+- Instead generate a rule prescribing a different action form: `search:TERM /proc/catalog/`, `find:*KEYWORD* /proc/catalog/`, or `tree:/proc/catalog/` to locate the record via filesystem when SQL returns empty repeatedly.
+- This applies when 2 or more prior rules already address the same empty-result failure with SQL adjustments.
 
 ## Output Format (JSON only)
 

@@ -22,7 +22,7 @@ entries:
     LIKE '%3JJ%' AND p.series LIKE '%9LM%'` — to tolerate catalogue spacing and naming
     variations.
   created: '2026-05-24'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r002'
   id: r002
   reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,available_today''.
     Root cause: wrong-filter — series LIKE ''%SYS 3JJ-9LM%'' is too specific; catalogue
@@ -33,14 +33,14 @@ entries:
     Rule linkage: new rule must target spec_goal series filter and prescribe token-split
     fallback.'
   source: learn
-  status: active
+  status: inactive
 - content: 'Always report NO with a catalogue-not-found explanation when the series-only
     fallback query (action: ''SELECT p.sku, p.path, p.name, p.series FROM products
     p WHERE p.brand=... AND p.series LIKE token-split'') returns empty after r001
     and r002 have been applied — do not attempt further query variants; the item is
     absent from catalogue.'
   created: '2026-05-24'
-  deactivated_reason: null
+  deactivated_reason: 'Removed: encodes outcome conclusion (NO) as rule — violates learn.md rule_content constraint. SQL returned empty due to wrong value in r001 example (tool bag vs parts case), not genuine absence.'
   id: r003
   reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,available_today''.
     Root cause: empty-result — both r001 (JOIN ON clause) and r002 (AND-chained LIKE
@@ -237,23 +237,207 @@ entries:
   status: inactive
 - content: use correct column name
   created: '2026-05-24'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r027'
   id: r027
   reasoning: r
   source: learn
-  status: active
+  status: inactive
 - content: Use correct column name.
   created: '2026-05-24'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r028'
   id: r028
   reasoning: r021–r027 all state identical rule (case/punctuation variants only).
     r027 is highest id; r021–r026 are pure duplicates and deactivated.
   source: learn
+  status: inactive
+- content: Always exclude descriptive product name tokens such as 'Tool', 'Box', and
+    'Bag' from the token-split AND-chained LIKE filters on `p.series` in the action;
+    restrict those filters to the series identifier tokens (e.g., '%SYS%', '%3JJ%',
+    '%9LM%') and match descriptive tokens against `p.name` instead, to avoid empty
+    results when the series column does not contain product descriptions.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r029, r031'
+  id: r029
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name''. Root cause: wrong-filter
+    — the action applied token-split LIKE conditions to the `series` column using
+    descriptive product name tokens (''Tool'', ''Box'', ''Bag'') that are not stored
+    in the `series` field, causing both the primary query and the intended fallback
+    to return empty. Failing fragment: action ''SELECT p.sku, p.path, p.name FROM
+    products p ... WHERE p.brand = ''Festool'' AND p.series LIKE ''%SYS%'' ... AND
+    p.series LIKE ''%Tool%'' AND p.series LIKE ''%Box%'' AND p.series LIKE ''%Bag%''''.
+    The new rule corrects this by restricting series filters to identifier tokens
+    only.'
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r030'
+  id: r030
+  reasoning: r027 and r028 are semantically identical duplicates; r028 (highest id)
+    is kept as the canonical form.
+  source: learn
+  status: inactive
+- content: When a full-string `p.series` LIKE filter returns empty results, split
+    multi-token series names into individual AND-chained LIKE conditions, but exclude
+    descriptive product name tokens such as 'Tool', 'Box', and 'Bag' from the `p.series`
+    filters; restrict those filters to series identifier tokens (e.g., '%SYS%', '%3JJ%',
+    '%9LM%') and match descriptive tokens against `p.name` instead, to tolerate catalogue
+    spacing and naming variations while avoiding empty results.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r029, r031'
+  id: r031
+  reasoning: r002 and r029 address the same spec_goal (handling multi-token series
+    names in LIKE filters). r029 (highest id) refines the token-split approach by
+    excluding descriptive tokens from `p.series`; the merged rule extends r029 with
+    r002's trigger condition so the full scope is covered in one rule.
+  source: learn
+  status: inactive
+- content: Never AND-chain multiple descriptive product name tokens in `p.name` LIKE
+    filters in the primary catalogue query action when `p.series` already contains
+    the unique identifier tokens for the product line, because requiring every descriptive
+    token in `p.name` over-constrains the query and causes empty results before the
+    series-only fallback is reached.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r032'
+  id: r032
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name''. Root cause: wrong-filter.
+    The action ''SELECT p.sku, p.path, p.name FROM products p JOIN product_properties
+    pp ON p.sku = pp.sku AND pp.key = ''storage_type'' AND pp.value_text = ''parts
+    case'' WHERE p.brand = ''Festool'' AND p.series LIKE ''%SYS%'' AND p.series LIKE
+    ''%3JJ%'' AND p.series LIKE ''%9LM%'' AND p.name LIKE ''%Tool%'' AND p.name LIKE
+    ''%Box%'' AND p.name LIKE ''%Bag%'''' AND-chained multiple descriptive tokens
+    (''Tool'', ''Box'', ''Bag'') in `p.name`, which over-constrained the primary catalogue
+    query and excluded valid products before the series-only fallback could be evaluated.
+    The new rule prohibits applying redundant, restrictive `p.name` descriptive filters
+    when `p.series` already contains the unique identifier tokens.'
+  source: learn
+  status: inactive
+- content: Use correct column name.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r033'
+  id: r033
+  reasoning: r028 and r030 are semantically identical duplicates; keeping r030 as
+    the active rule.
+  source: learn
+  status: inactive
+- content: Never AND-chain multiple descriptive product name tokens in `p.name` LIKE
+    filters in the primary catalogue query action when `p.series` already contains
+    the unique identifier tokens for the product line, because requiring every descriptive
+    token in `p.name` over-constrains the query and causes empty results before the
+    series-only fallback is reached. When a full-string `p.series` LIKE filter returns
+    empty, split multi-token series names into individual AND-chained LIKE conditions,
+    but always exclude descriptive product name tokens such as 'Tool', 'Box', and
+    'Bag' from `p.series` filters; restrict those filters to series identifier tokens
+    (e.g., '%SYS%', '%3JJ%', '%9LM%') and match descriptive tokens against `p.name`
+    instead, to tolerate catalogue spacing and naming variations while avoiding empty
+    results.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r034'
+  id: r034
+  reasoning: r029, r031, and r032 all address the same spec_goal of constructing catalogue
+    queries for products described by mixed identifier/descriptive tokens. r032 (highest
+    id) forms the base; extended to incorporate the token-split fallback instructions
+    from r031 and the general series-filter exclusion from r029.
+  source: learn
+  status: inactive
+- content: Always include the series-only fallback query as a second discrete action
+    in the `actions` array when a success_criterion states 'If primary is empty, series-only
+    fallback is executed', rather than describing the fallback only in plan steps.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r035
+  reasoning: 'The ERROR is ''Empty result: sku,path,name,series''. The primary catalogue
+    query action returned zero rows. The success_criteria explicitly state ''If primary
+    is empty, series-only fallback is executed; if fallback is empty, response contains
+    <NO>...''. However, the SDD_OUTPUT `actions` array and the PLAN_OUTPUT `action`
+    field each contain only the primary query; the series-only fallback is described
+    in plan text but is not emitted as a discrete executable action. Because the executor
+    had no fallback action to run, the pipeline halted with an empty-result error
+    instead of confirming series absence and answering <NO>. Root cause category:
+    wrong-action. Failing fragment: SDD_OUTPUT actions = [primary query only] and
+    PLAN_OUTPUT action = primary query, which omit the fallback despite the success_criterion
+    requiring it.'
+  source: learn
+  status: active
+- content: Use correct column name.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r036
+  reasoning: r030 and r033 are identical duplicates; r033 is the highest-id rule and
+    covers the full scope.
+  source: learn
+  status: active
+- content: Never AND-chain multiple descriptive product name tokens in `p.name` LIKE
+    filters in the primary catalogue query action when `p.series` already contains
+    the unique identifier tokens for the product line, because requiring every descriptive
+    token in `p.name` over-constrains the query and causes empty results before the
+    series-only fallback is reached. When a full-string `p.series` LIKE filter returns
+    empty, split multi-token series names into individual AND-chained LIKE conditions,
+    but always exclude descriptive product name tokens such as 'Tool', 'Box', and
+    'Bag' from `p.series` filters; restrict those filters to series identifier tokens
+    (e.g., '%SYS%', '%3JJ%', '%9LM%') and match descriptive tokens against `p.name`
+    instead, to tolerate catalogue spacing and naming variations while avoiding empty
+    results.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r037
+  reasoning: r032 and r034 address the same spec_goal of avoiding over-constrained
+    `p.name` filters. r034 is a strict superset of r032, adding guidance on splitting
+    multi-token series names and excluding descriptive tokens from `p.series` filters.
+    r034 subsumes r032 completely.
+  source: learn
+  status: active
+- content: Always provide a non-empty terminal action in the PLAN action field when
+    the spec_goal is to report a final <NO> answer based on prior empty catalogue
+    results — an empty action string causes a PLAN phase semantic error even when
+    success criteria state that no further SQL queries or catalogue actions are executed.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r038
+  reasoning: 'The verbatim error is ''PLAN phase: action is empty''. Root cause category:
+    wrong-action. The failing fragment is the PLAN_OUTPUT action string '''' and the
+    SDD_OUTPUT actions array [] for the spec_goal ''Report that the Festool Stackable
+    SYS 3JJ-9LM Tool Box and Bag with storage type parts case is not found in the
+    product catalogue, citing the empty series-only fallback result.'' The planner
+    omitted an action because the success criterion stated ''No further SQL queries
+    or catalogue actions are executed'', but the pipeline still requires a non-empty
+    terminal action to advance to the answer phase. The new rule ensures the PLAN
+    action field is always populated with a terminal identifier when the spec_goal
+    is to deliver a final NO response.'
+  source: learn
+  status: active
+- content: Use correct column name.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r039
+  reasoning: r033 and r036 are semantically identical duplicates addressing the same
+    failure and fix; r036 (highest id) is kept as the base and already covers the
+    full scope.
+  source: learn
+  status: active
+- content: Never AND-chain multiple descriptive product name tokens in `p.name` LIKE
+    filters in the primary catalogue query action when `p.series` already contains
+    the unique identifier tokens for the product line, because requiring every descriptive
+    token in `p.name` over-constrains the query and causes empty results before the
+    series-only fallback is reached. When a full-string `p.series` LIKE filter returns
+    empty, split multi-token series names into individual AND-chained LIKE conditions,
+    but always exclude descriptive product name tokens such as 'Tool', 'Box', and
+    'Bag' from `p.series` filters; restrict those filters to series identifier tokens
+    (e.g., '%SYS%', '%3JJ%', '%9LM%') and match descriptive tokens against `p.name`
+    instead, to tolerate catalogue spacing and naming variations while avoiding empty
+    results.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r040
+  reasoning: r034 and r037 are semantically identical duplicates addressing the same
+    failure and fix; r037 (highest id) is kept as the base and already covers the
+    full scope.
+  source: learn
   status: active
 last_run:
   cycles_used: 5
-  date: '2026-05-24'
+  date: '2026-05-25'
   grounding_refs_count: 0
-  outcome: OUTCOME_NONE_CLARIFICATION
+  outcome: OUTCOME_OK
   status: failure
 task_id: t01

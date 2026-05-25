@@ -48,7 +48,7 @@ For `stop_refs`: include policy doc paths from BASE relevant to the stop reason:
 Set `decision = "proceed"` and fill all fields:
 
 - `intent_objective`: one sentence, WHAT the task asks + WHY it matters (e.g., "Find payment status for pay_001 to determine if refund is warranted")
-- `reformulated_task`: make every identifier explicit — no pronouns, no "it", no "this". All IDs named. (e.g., "Return the current status and amount of payment pay_001 for customer_007")
+- `reformulated_task`: make every identifier explicit — no pronouns, no "it", no "this". All IDs named. (e.g., "Return the current status and amount of payment pay_001 for customer_007"). MUST describe the domain objective (what data to find, what operation to perform). NEVER describe pipeline mechanics (e.g., "emit a non-empty action", "advance to answer phase", "execute terminal action") — those are executor concerns, not intent.
 - `intent_type`:
   - `read`: data retrieval, lookup, report
   - `write`: mutation — discount, checkout, payment recovery, any tool that changes state
