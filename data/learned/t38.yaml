@@ -84,7 +84,7 @@ entries:
     action scoped to `/proc/payments/` to retrieve all candidate records without per-file
     enumeration.
   created: '2026-05-25'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r005'
   id: r005
   reasoning: '1. Verbatim error: ''Need to read the remaining payment files under
     `/proc/payments/` such as `/proc/payments/pay_003.json` and the archived timestamped
@@ -100,7 +100,7 @@ entries:
     inspecting every payment record, the actions must either read every remaining
     uninspected file or use a scoped search action to cover the directory.'
   source: learn
-  status: active
+  status: inactive
 - content: Never emit an `actions` sequence whose only element is `list:/proc/payments/`
     or that reads only a subset of discovered payment record files under `/proc/payments/`
     when the `spec_goal` requires inspecting archived payment records for fraud indicators;
@@ -108,13 +108,139 @@ entries:
     file, or use a `search:` action scoped to `/proc/payments/` to retrieve all candidate
     records without per-file enumeration.
   created: '2026-05-25'
-  deactivated_reason: null
+  deactivated_reason: r006 and r007 incorrectly permit a `search:` action scoped to
+    `/proc/payments/` as an alternative to explicit reads when inspecting archived
+    payment records; the current failure demonstrates that this search does not reliably
+    retrieve all timestamped archived files, so those rules must be replaced by one
+    requiring `tree:` discovery followed by explicit reads.
   id: r006
   reasoning: r004 and r005 address the same spec_goal of inspecting /proc/payments/
     for fraud. r004’s prohibition against a list-only action is a specific instance
     of the broader subset-read coverage in r005. The merged rule retains r005 as the
     base and extends it to explicitly include r004’s list-only case, ensuring all
     records are inspected either by reading every file or by using a scoped search.
+  source: learn
+  status: inactive
+- content: Never emit an `actions` sequence whose only element is `list:/proc/payments/`
+    or that reads only a subset of discovered payment record files under `/proc/payments/`
+    when the `spec_goal` requires inspecting every archived payment record for fraud
+    indicators; always include explicit read actions for each remaining uninspected
+    payment record file, or use a `search:` action scoped to `/proc/payments/` to
+    retrieve all candidate records without per-file enumeration.
+  created: '2026-05-25'
+  deactivated_reason: r006 and r007 incorrectly permit a `search:` action scoped to
+    `/proc/payments/` as an alternative to explicit reads when inspecting archived
+    payment records; the current failure demonstrates that this search does not reliably
+    retrieve all timestamped archived files, so those rules must be replaced by one
+    requiring `tree:` discovery followed by explicit reads.
+  id: r007
+  reasoning: r005 and r006 address the same spec_goal of inspecting archived payment
+    records for fraud indicators. r006 (highest id) expands the prohibition to include
+    list-only actions but drops the word 'every'. Merged rule takes r006 as base and
+    restores 'every archived payment record' from r005 to cover the full scope of
+    both rules.
+  source: learn
+  status: inactive
+- content: Never use a content-keyword `search:` action as the sole retrieval mechanism
+    for `/proc/payments/` when the `spec_goal` requires inspecting every archived
+    timestamped payment record; always use `tree:/proc/payments/` to discover all
+    filenames first, then include explicit read actions for each remaining uninspected
+    payment record file.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r008'
+  id: r008
+  reasoning: 'Verbatim error: ''Need to read the remaining current payment files `/proc/payments/pay_021.json`
+    through `/proc/payments/pay_080.json` and the archived timestamped payment records
+    (e.g., `/proc/payments/pay_20250627T075617Z_DofnCeeMMg.json`) to complete the
+    fraud review and classify every f''. Root cause category: wrong-action. The SDD_OUTPUT
+    actions sequence was [`search:pay_ /proc/payments/`], and the spec_goal required
+    ''Inspect every remaining archived and current payment record under /proc/payments/''.
+    Using a single content-keyword `search:` action as the sole retrieval mechanism
+    did not discover the archived timestamped records or the remaining current files,
+    so the agent could only report on the 20 previously inspected files. The rule
+    must replace this insufficient search-only approach with a discovery step that
+    guarantees every file is found.'
+  source: learn
+  status: inactive
+- content: Never include a `search:` action on a path outside `/proc/payments/` in
+    the `actions` array when the `spec_goal` requires inspecting every archived timestamped
+    payment record under `/proc/payments/`; always use `tree:/proc/payments/` to discover
+    all filenames first, then include explicit read actions for each remaining uninspected
+    payment record file.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r009, r010'
+  id: r009
+  reasoning: 'Verbatim error: ''ANSWER phase: failed to parse LLM output''. Root cause
+    category: wrong-action. The failing fragment is the SDD_OUTPUT `actions` array:
+    ["search:store /proc/stores/", "/proc/payments/pay_023.json"]. This injected an
+    irrelevant content-keyword search on an unrelated path and omitted the required
+    `tree:/proc/payments/` discovery step and explicit reads for the remaining payment
+    files, starving the ANSWER phase of proper payment context. Existing rule r008
+    only blocks using `search:` as the sole retrieval mechanism for `/proc/payments/`;
+    it does not block extraneous searches on other paths, which is the loophole exploited
+    here. The new rule directly targets the `actions` array and the `spec_goal` by
+    prohibiting off-target searches and mandating tree-based discovery inside `/proc/payments/`.'
+  source: learn
+  status: inactive
+- content: When the `spec_goal` requires inspecting every archived timestamped payment
+    record under `/proc/payments/`, never use a content-keyword `search:` action as
+    the sole retrieval mechanism for `/proc/payments/`, and never include a `search:`
+    action on a path outside `/proc/payments/` in the `actions` array; always use
+    `tree:/proc/payments/` to discover all filenames first, then include explicit
+    read actions for each remaining uninspected payment record file.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r009, r010'
+  id: r010
+  reasoning: 'r008 and r009 share the same spec_goal (inspecting every archived timestamped
+    payment record under `/proc/payments/`). r008 prohibits search: as the sole mechanism
+    on `/proc/payments/` while r009 prohibits search: outside `/proc/payments/` in
+    the actions array. These are different action prescriptions; merged under highest-id
+    r009 to encompass both constraints.'
+  source: learn
+  status: inactive
+- content: Always include explicit read actions in the `actions` array for every remaining
+    uninspected payment record file under `/proc/payments/` when the `spec_goal` requires
+    inspecting every archived timestamped payment record and the success criterion
+    demands that every payment record file under `/proc/payments/` is explicitly read
+    and inspected; never truncate the `actions` array to only a subset of the discovered
+    files.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r011
+  reasoning: '1. Verbatim error: ''ANSWER clarification: Need to read the remaining
+    uninspected payment files under `/proc/payments/`, including `/proc/payments/pay_027.json`
+    through `/proc/payments/pay_077.json` and any additional files beyond `pay_077.json`,
+    before all payment records in the fraud incident can be cited.'' 2. Root cause:
+    wrong-action. The SDD_OUTPUT `actions` array contained only `/proc/payments/pay_024.json`,
+    `/proc/payments/pay_025.json`, and `/proc/payments/pay_026.json`, omitting the
+    majority of remaining uninspected payment record files that the `spec_goal` and
+    success criteria required to be explicitly read. 3. Failing fragment: The SDD_OUTPUT
+    `actions` array listed only three files when the success criterion ''Every payment
+    record file under /proc/payments/ is explicitly read and inspected'' demanded
+    explicit reads for all remaining files discovered by `tree:/proc/payments/`. 4.
+    Rule linkage: The new rule mandates that the `actions` array must contain explicit
+    read actions for every remaining uninspected payment record file, directly addressing
+    the truncation gap in the SDD actions.'
+  source: learn
+  status: active
+- content: When the `spec_goal` requires inspecting every archived timestamped payment
+    record under `/proc/payments/`, never use a content-keyword `search:` action as
+    the sole retrieval mechanism for `/proc/payments/`, and never include a `search:`
+    action on a path outside `/proc/payments/` in the `actions` array; always use
+    `tree:/proc/payments/` to discover all filenames first, then include explicit
+    read actions in the `actions` array for every remaining uninspected payment record
+    file, ensuring that every payment record file under `/proc/payments/` is explicitly
+    read and inspected; never truncate the `actions` array to only a subset of the
+    discovered files.
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r012
+  reasoning: r009 and r010 overlap on the same spec_goal, with r010 being a strict
+    superset of r009 (adding the prohibition against content-keyword search as the
+    sole retrieval mechanism). r011 addresses the identical spec_goal with complementary
+    constraints about full coverage and no truncation of read actions. Taking the
+    highest-id rule (r011) as the base and extending it with the retrieval restrictions
+    from r009/r010 produces a single comprehensive rule.
   source: learn
   status: active
 task_id: t38

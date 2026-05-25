@@ -841,6 +841,11 @@ def run_pipeline(
                             )
                             if f not in _executed and f != plan_out.action
                         ]
+                        # Never auto-batch /docs/ tree extras. The SDD explicitly selects
+                        # which policy doc to read via its actions array. Auto-batching all
+                        # discovered docs wastes 50-80K context on irrelevant policy files.
+                        if _tree_dir.rstrip("/") in ("/docs", "docs"):
+                            _raw_extras = []
                         # Prioritise timestamp-named files (e.g. pay_20240413T…)
                         # over sequential ones (pay_001…) so fraud records surface first.
                         _tree_extras = sorted(
