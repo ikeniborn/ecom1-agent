@@ -110,12 +110,7 @@ PARALLEL_TASKS = max(1, int(os.getenv("PARALLEL_TASKS", "1")))
 
 _MODELS_JSON = Path(__file__).parent / "models.json"
 _raw = json.loads(_MODELS_JSON.read_text())
-_profiles: dict[str, dict] = _raw.get("_profiles", {})
 MODEL_CONFIGS: dict[str, dict] = {k: v for k, v in _raw.items() if not k.startswith("_")}
-for _cfg in MODEL_CONFIGS.values():
-    for _fname in ("ollama_options", "ollama_options_classifier", "ollama_options_evaluator"):
-        if isinstance(_cfg.get(_fname), str):
-            _cfg[_fname] = _profiles.get(_cfg[_fname], {})
 
 def _require_env(name: str) -> str:
     v = os.getenv(name)
