@@ -65,6 +65,8 @@ Empty SQL result caused by **schema-mismatch** (unknown column, wrong table name
 
 **Exception:** if the task asserts records exist ("confirmed hit", "known fraud", "cite every X") and `grounding_refs` is empty, use `OUTCOME_NONE_CLARIFICATION` — the agent failed to locate evidence, not that no evidence exists.
 
+**Fraud/incident audit tasks:** When the task says "confirmed fraud incident", "confirmed incident", or similar — the fraud is already established by the task. Do NOT return OUTCOME_NONE_CLARIFICATION requesting policy documents to define fraud criteria. Fraud indicators are behavioral patterns in payment/transaction data (fingerprint reuse across accounts, geolocation clustering, timing patterns, shared device IDs). If payment records are present in grounding refs, classify based on those patterns. Only return OUTCOME_NONE_CLARIFICATION to request MORE DATA FILES that haven't been read yet — not to request policy docs.
+
 ## Reasoning Chain Requirement
 
 `reasoning` MUST trace: raw result → interpretation → conclusion.

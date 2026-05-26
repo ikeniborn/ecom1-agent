@@ -309,7 +309,9 @@ def _build_answer_user_msg(
             elif action.startswith("search:"):
                 limit = 20000
             else:
-                limit = 1500
+                # 400 chars captures full payment JSON fields (fingerprints, IDs, amounts, status)
+                # to enable precise fraud pattern detection; num_ctx=32768 accommodates accumulation.
+                limit = 400
             result_preview = result.strip()[:limit] if result.strip() else "(empty)"
             pr_lines.append(f"  action: {action[:120]}\n  result: {result_preview}")
         parts.append("PRIOR_RESULTS (outputs from earlier cycles — extract file paths for grounding_refs):\n" +
@@ -858,9 +860,9 @@ def run_pipeline(
                 _scope_files = (idd_out.scope_estimate or {}).get("files_to_read", 0) if idd_out else 0
                 _remaining_cycles = _MAX_CYCLES - cycle  # includes current cycle
                 if _scope_files > 0 and _remaining_cycles > 0:
-                    _batch_cap = min(80, max(24, math.ceil(_scope_files / _remaining_cycles) + 5))
+                    _batch_cap = min(40, max(6, math.ceil(_scope_files / _remaining_cycles) + 2))
                 else:
-                    _batch_cap = 24
+                    _batch_cap = 6
                 _seen: set[str] = set(_sdd_extras)
                 _search_fill = [f for f in _search_extras if f not in _seen]
                 _seen |= set(_search_fill)
@@ -915,14 +917,14 @@ def run_pipeline(
             if answer_out.outcome == "OUTCOME_NONE_CLARIFICATION" and cycle + 1 < _MAX_CYCLES:
                 last_error = f"ANSWER clarification: {answer_out.message[:500]}"
                 print(f"{CLI_YELLOW}[pipeline] ANSWER: OUTCOME_NONE_CLARIFICATION — retrying (cycle {cycle + 1}/{_MAX_CYCLES}){CLI_CLR}")
-                # Run LEARN if: no data, OR clarification signals incomplete file reading.
-                # Incomplete-read clarifications have valid intermediate data but the task
-                # is unfinished — LEARN must fire so the agent learns to batch more aggressively.
-                _clarification_incomplete_reads = any(
-                    k in answer_out.message.lower()
-                    for k in ("not yet read", "unread", "have not been read", "files remaining", "files ")
-                )
-                if not _csv_has_data(raw_output) or _clarification_incomplete_reads:
+                # LEARN fires only when there is no execute data at all (genuine failure).
+                # File-enumeration clarifications are intentional progress: the backtick path
+                # in last_error already propagates to SDD via PREVIOUS_ERROR; running LEARN
+                # here generates rules that break the backtick→SDD mechanism (e.g. r034).
+                _is_file_enum_clarification = bool(re.search(
+                    r"`/proc/", answer_out.message
+                ))
+                if not _csv_has_data(raw_output) and not _is_file_enum_clarification:
                     _run_learn(unified_context, model, cfg, task_text, last_error,
                                sgr_trace, learn_ctx, pre.agents_md_index,
                                error_type="semantic", cycle=cycle + 1, task_id=task_id,

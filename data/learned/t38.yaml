@@ -205,7 +205,7 @@ entries:
     and inspected; never truncate the `actions` array to only a subset of the discovered
     files.
   created: '2026-05-25'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r011'
   id: r011
   reasoning: '1. Verbatim error: ''ANSWER clarification: Need to read the remaining
     uninspected payment files under `/proc/payments/`, including `/proc/payments/pay_027.json`
@@ -222,7 +222,7 @@ entries:
     read actions for every remaining uninspected payment record file, directly addressing
     the truncation gap in the SDD actions.'
   source: learn
-  status: active
+  status: inactive
 - content: When the `spec_goal` requires inspecting every archived timestamped payment
     record under `/proc/payments/`, never use a content-keyword `search:` action as
     the sole retrieval mechanism for `/proc/payments/`, and never include a `search:`
@@ -233,7 +233,7 @@ entries:
     read and inspected; never truncate the `actions` array to only a subset of the
     discovered files.
   created: '2026-05-25'
-  deactivated_reason: null
+  deactivated_reason: 'Consolidated: r012'
   id: r012
   reasoning: r009 and r010 overlap on the same spec_goal, with r010 being a strict
     superset of r009 (adding the prohibition against content-keyword search as the
@@ -242,5 +242,471 @@ entries:
     highest-id rule (r011) as the base and extending it with the retrieval restrictions
     from r009/r010 produces a single comprehensive rule.
   source: learn
+  status: inactive
+- content: Never anchor the `spec_goal` or `success_criteria` to `/proc/payments/README.md`
+    as the source of incident-classification criteria without first verifying its
+    contents; when the task involves a confirmed fraud or critical incident, always
+    search the `docs/` policy directory for incident definitions and matching rules
+    before finalizing the spec.
+  created: '2026-05-25'
+  deactivated_reason: r013 is superseded by this more general rule; it only prohibited
+    anchoring to `/proc/payments/README.md`, but the same failure mode can occur with
+    any policy document path whose contents have not been verified to contain the
+    required incident criteria.
+  id: r013
+  reasoning: 'The verbatim ANSWER clarification states: ''Need to read `/docs/merchant-continuity-and-critical-incidents.md`
+    to obtain the confirmed fraud incident criteria and matching rules. Also need
+    to read all remaining `/proc/payments/pay_*.json` files that were not yet inspected
+    (e.g., `pay_001.json` through `pay_077.json` and any others shown in the directory
+    listing), because the README does not define fraud indicators and those files
+    have not been examined.'' Root cause category: wrong-spec. The failing SDD_OUTPUT
+    `spec_goal` fragment reads: ''Identify every payment record file under /proc/payments/
+    that matches the fraud incident criteria documented in the README,'' and the `success_criteria`
+    includes: ''/proc/payments/README.md has been read and its fraud criteria understood.''
+    By anchoring the criteria source to the README before verifying its contents,
+    the spec became unfulfillable and halted progress. Existing rules r011 and r012
+    address explicit file reads under `/proc/payments/` but do not prevent incorrectly
+    anchoring the `spec_goal` or `success_criteria` to a local README for incident
+    criteria.'
+  source: learn
+  status: inactive
+- content: When the `spec_goal` requires inspecting every archived timestamped payment
+    record under `/proc/payments/` and/or the success criterion demands that every
+    payment record file under `/proc/payments/` is explicitly read and inspected,
+    never use a content-keyword `search:` action as the sole retrieval mechanism for
+    `/proc/payments/`, and never include a `search:` action on a path outside `/proc/payments/`
+    in the `actions` array; always use `tree:/proc/payments/` to discover all filenames
+    first, then include explicit read actions in the `actions` array for every remaining
+    uninspected payment record file, ensuring that every payment record file under
+    `/proc/payments/` is explicitly read and inspected; never truncate the `actions`
+    array to only a subset of the discovered files.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r014'
+  id: r014
+  reasoning: 'r011 and r012 address the same spec_goal (inspecting every archived
+    timestamped payment record under `/proc/payments/`). r011 is a strict subset of
+    r012: it only mandates explicit reads and no truncation. r012 (highest id) subsumes
+    those requirements and adds discovery-protocol constraints (use `tree:`, prohibit
+    `search:` as sole mechanism). The merged rule takes r012 as the base and extends
+    its trigger condition to explicitly include r011’s success-criterion clause, fully
+    replacing r011 without contradicting it.'
+  source: learn
+  status: inactive
+- content: Never anchor the `spec_goal` or `success_criteria` to a policy document
+    path as the source of fraud or incident-classification criteria without first
+    reading the document to verify it contains matching rules for the incident type;
+    when the task involves a confirmed fraud or critical incident, always search the
+    `docs/` policy directory for relevant incident definitions and matching rules
+    and confirm the selected document actually contains the required criteria before
+    including it in the spec.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r015'
+  id: r015
+  reasoning: 'The verbatim error states: "The specified policy document `/docs/merchant-continuity-and-critical-incidents.md`
+    contains no fraud criteria or matching rules—it explicitly disclaims being a policy
+    for risk review." Root cause category: wrong-spec. The failing fragment is the
+    `spec_goal` phrase "that satisfy the confirmed fraud incident criteria documented
+    in /docs/merchant-continuity-and-critical-incidents.md" and `success_criteria`
+    entry 0 which predicates success on "The policy document /docs/merchant-continuity-and-critical-incidents.md
+    is read and its confirmed fraud incident criteria and matching rules are extracted
+    and applied to every payment record." Rule linkage: The new rule prohibits anchoring
+    the `spec_goal` or `success_criteria` to an unverified policy document path and
+    mandates broad searching of the `docs/` policy directory and verification of contents
+    before finalizing the spec.'
+  source: learn
+  status: inactive
+- content: When the `spec_goal` requires inspecting every archived timestamped payment
+    record under `/proc/payments/` and/or the success criterion demands that every
+    payment record file under `/proc/payments/` is explicitly read and inspected,
+    never use a content-keyword `search:` action as the sole retrieval mechanism for
+    `/proc/payments/`, and never include a `search:` action on a path outside `/proc/payments/`
+    in the `actions` array; always use `tree:/proc/payments/` to discover all filenames
+    first, then include explicit read actions in the `actions` array for every remaining
+    uninspected payment record file, ensuring that every payment record file under
+    `/proc/payments/` is explicitly read and inspected; never truncate the `actions`
+    array to only a subset of the discovered files.
+  created: '2026-05-25'
+  deactivated_reason: Superseded by r020. Rule prescribed enumerating all remaining
+    files in actions array, causing SDD to generate 75+ actions and LLM timeout. Pipeline
+    tree-batch handles multi-file reads automatically from cached tree output; SDD
+    only needs to provide first unread file as primary action.
+  id: r016
+  reasoning: r012 is a strict subset of r014. Both prescribe identical actions for
+    the overlapping scenario (spec_goal requiring inspection of every archived timestamped
+    payment record), but r014 adds the additional trigger of a success criterion demanding
+    that every payment record file be explicitly read and inspected. Keeping r014
+    alone covers the full scope of both rules.
+  source: learn
+  status: inactive
+- content: Never include a direct read action for a presumed single policy file path
+    in the `actions` array when the `spec_goal` requires locating fraud or incident-classification
+    criteria in `/docs/`; always include a filesystem discovery action for `/docs/`
+    such as `tree:/docs/` or `find:*fraud* /docs/` in the `actions` array before reading
+    any specific document, then verify the selected document contains the required
+    matching rules.
+  created: '2026-05-25'
+  deactivated_reason: Counterproductive when tree:/docs/ already in PRIOR_ACTIONS.
+    Forcing tree:/docs/ every cycle wastes an action slot and displaces payment file
+    reads. answer.md now handles the fraud-criteria-from-docs issue directly.
+  id: r017
+  reasoning: 'Verbatim error: ''ANSWER clarification: Need to read the remaining payment
+    record files under `/proc/payments/` (including `pay_003.json` through `pay_077.json`
+    and any files beyond the truncated tree listing) and locate a policy document
+    in `/docs/` containing explicit fraud classification criteria and matching rules
+    before any classification can be performed.'' Root cause: wrong-action. Failing
+    fragment: `actions: ["/docs/security.md", "tree:/proc/payments/"]`. Rule linkage:
+    the new rule prohibits guessing a single policy file path in the `actions` array
+    and instead mandates a filesystem discovery action for `/docs/` before any specific
+    document is read.'
+  source: learn
+  status: inactive
+- content: When the `spec_goal` requires inspecting every archived timestamped payment
+    record under `/proc/payments/` and/or the success criterion demands that every
+    payment record file under `/proc/payments/` is explicitly read and inspected,
+    never use a content-keyword `search:` action as the sole retrieval mechanism for
+    `/proc/payments/`, and never include a `search:` action on a path outside `/proc/payments/`
+    in the `actions` array; always use `tree:/proc/payments/` to discover all filenames
+    first, then include explicit read actions in the `actions` array for every remaining
+    uninspected payment record file, ensuring that every payment record file under
+    `/proc/payments/` is explicitly read and inspected; never truncate the `actions`
+    array to only a subset of the discovered files.
+  created: '2026-05-25'
+  deactivated_reason: Superseded by r020. Same truncation-prohibition error as r016.
+  id: r018
+  reasoning: r014 and r016 are string-identical duplicates; kept r016 as base and
+    deactivated r014.
+  source: learn
+  status: inactive
+- content: When the `spec_goal` requires locating fraud or incident-classification
+    criteria in `/docs/` or when the task involves a confirmed fraud or critical incident,
+    never anchor the `spec_goal` or `success_criteria` to a policy document path as
+    the source of such criteria without first reading the document to verify it contains
+    matching rules for the incident type, and never include a direct read action for
+    a presumed single policy file path in the `actions` array; always include a filesystem
+    discovery action for `/docs/` such as `tree:/docs/` or `find:*fraud* /docs/` in
+    the `actions` array before reading any specific document, then verify the selected
+    document actually contains the required matching rules before including it in
+    the spec.
+  created: '2026-05-25'
+  deactivated_reason: Counterproductive when tree:/docs/ already in PRIOR_ACTIONS.
+    Deactivated for same reasons as r017.
+  id: r019
+  reasoning: r015 and r017 share the same spec_goal of locating fraud or incident-classification
+    criteria in `/docs/` but prescribe different actions; r017 (higher id) is the
+    base, extended to cover r015's constraint against anchoring spec_goal/success_criteria
+    to an unverified policy path.
+  source: learn
+  status: inactive
+- content: When `tree:/proc/payments/` has been executed and appears in PRIOR_ACTIONS,
+    do NOT enumerate all remaining unread payment file paths in the `actions` array;
+    output only 1–3 unread payment file paths as actions. The pipeline automatically
+    batches additional unread files from the cached tree listing up to batch_cap per
+    cycle. Enumerating all 50–100 file paths in a single actions array causes LLM
+    timeout and conflicts with the 1–3 action limit in sdd.md.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r020'
+  id: r020
+  reasoning: Rules r016 and r018 required enumerating ALL remaining unread files in
+    the actions array (never truncate). With 75+ unread files, SDD generated a 75-path
+    actions array causing the LLM to take 20+ minutes and timeout repeatedly. The
+    pipeline tree-batch mechanism in pipeline.py reads files from prior_results tree
+    cache automatically when primary action is from the same directory. SDD only needs
+    to provide the first unread file as primary; pipeline fills rest up to batch_cap.
+  source: manual
+  status: inactive
+- content: 'For fraud review tasks — where the task text contains any of: ''confirmed
+    fraud hit'', ''confirmed a known fraud hit'', ''confirmed fraud incident'', ''fraud
+    hit in archived payment history'', ''fraud review says'', ''one hit is present
+    in the archived payments'', ''cite every payment record you are marking'', or
+    any phrase asking to identify fraudulent payment records from history: set `decision
+    = ''proceed''`. Do NOT hard_stop for a missing fraud case ID, Risk Ops ticket
+    number, or other external reference. The fraud incident is discoverable by inspecting
+    all archived payment files in /proc/payments/ for behavioral patterns (e.g., payment_method_fingerprint
+    reuse across multiple customer accounts, timing clustering, shared device identifiers).
+    Requesting clarification on ''which hit'' is incorrect — the agent''s job is to
+    find it from the data.'
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r021
+  reasoning: In run 3, IDD hard_stopped with OUTCOME_NONE_CLARIFICATION claiming 'that
+    hit' is ambiguous without a case ID. This is wrong — the task expects the agent
+    to identify fraud by behavioral pattern analysis of payment files. There is no
+    external case ID to provide; the hit is in the data itself. Extended patterns
+    in run 10 to cover new task text variant "Fraud review says one hit is present
+    in the archived payments. Identify the fraudulent payment records from history.
+    Leave files unchanged and cite every payment record you are marking."
+  source: manual
   status: active
+- content: For fraud review tasks ('cite every payment record you mark as fraud',
+    'confirmed fraud hit'), ANSWER must return OUTCOME_NONE_CLARIFICATION if the tree
+    listing in EXECUTE_OUTPUT shows more files in /proc/payments/ than the file reads
+    in FILES_READ_IN_PRIOR_CYCLES + current cycle reads. Do NOT return OUTCOME_OK
+    based on a subset of payment files — 'cite every' means all files must be inspected
+    before a final classification can be made. Include in the clarification message
+    the EXACT path of the next unread payment file enclosed in backticks (e.g. `\/proc\/payments\/pay_003.json`)
+    so SDD can use it as primary action in the next cycle.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r022'
+  id: r022
+  reasoning: In run 4, cycle 1 read only 24 of ~100 payment files (sorted oldest-first
+    by timestamp) and found 5 fraud records. ANSWER immediately returned OUTCOME_OK
+    with score 0.59. This is wrong because 76 files remained unread and could contain
+    more fraud records. The task says 'cite every payment record you mark as fraud'
+    which requires reading all files before claiming completeness. ANSWER must continue
+    until all files are read.
+  source: manual
+  status: inactive
+- content: Never select tree:/docs/ as the current action over tree:/proc/payments/
+    when the spec_goal requires inspecting every file in /proc/payments/ for behavioral
+    anomalies; the target data directory must be enumerated first so the ANSWER phase
+    has the file inventory required and does not return a premature OUTCOME_NONE_CLARIFICATION.
+    This applies to any fraud review task, including tasks phrased as "Fraud review
+    says one hit is present" or "cite every payment record you are marking".
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r023
+  reasoning: 'The ANSWER returned OUTCOME_NONE_CLARIFICATION with the exact message:
+    ''Need to list and read archived payment files in `/proc/payments/` to identify
+    and cite the records involved in the confirmed fraud incident.'' Root cause category:
+    wrong-action. Extended to cover new task text variant in run 10.'
+  source: learn
+  status: active
+- content: 'For fraud review tasks — task text contains any of: ''confirmed fraud
+    hit'', ''fraud hit in archived payment history'', ''cite every payment record
+    you mark as fraud'', ''fraud review says'', ''one hit is present in the archived
+    payments'', ''cite every payment record you are marking'', or any phrase asking
+    to identify fraudulent payment records from history: do NOT include any `/docs/`
+    file paths in the SDD `actions` array when `tree:/docs/` already appears in PRIOR_ACTIONS.
+    Specifically: do NOT add `/docs/security.md`, `/docs/merchant-continuity-and-critical-incidents.md`,
+    or any other `/docs/` path as a candidate action. Including them causes the PLAN
+    to pick them first (policy-docs-first rule in plan.md) and wastes a cycle reading
+    an irrelevant doc instead of payment files. For fraud review, the only relevant
+    actions are: `tree:/proc/payments/` (if not yet in PRIOR_ACTIONS), or a specific
+    unread payment file path from /proc/payments/ (if tree already done).'
+  created: '2026-05-25'
+  deactivated_reason: null
+  id: r024
+  reasoning: In run 5 cycles 1 and 2, SDD included /docs/security.md in actions despite
+    tree:/docs/ being in PRIOR_ACTIONS. Extended patterns in run 10 to cover new task
+    text variant "Fraud review says one hit is present in the archived payments."
+  source: manual
+  status: active
+- content: Never include `/proc/payments/README.md` in the SDD `actions` array for
+    fraud review tasks where `spec_goal` requires inspecting every archived payment
+    JSON file under `/proc/payments/` for behavioral anomalies, and never allow an
+    ANSWER phase `OUTCOME_NONE_CLARIFICATION` message to substitute `/proc/payments/README.md`
+    or generic references to remaining files for the concrete next step; the clarification
+    message must always specify the exact filesystem path of the next unread payment
+    JSON file from `/proc/payments/` enclosed in backticks so the subsequent `actions`
+    array can target that file directly.
+  created: '2026-05-25'
+  deactivated_reason: 'Consolidated: r025'
+  id: r025
+  reasoning: '1. Verbatim error: ''ANSWER phase: failed to parse LLM output''. 2.
+    Root cause: wrong-action — The SDD `actions` array included `/proc/payments/README.md`,
+    a non-payment documentation file, and the ANSWER phase `OUTCOME_NONE_CLARIFICATION`
+    message either substituted `/proc/payments/README.md` or used generic references
+    to ''remaining files'' instead of a concrete next unread payment JSON path, preventing
+    the downstream parser from extracting a valid target for the next cycle. 3. Failing
+    fragment: SDD_OUTPUT.actions contained `/proc/payments/README.md` alongside actual
+    payment JSON files, diverting the inspection away from the required payment record
+    targets. 4. Rule linkage: The new rule explicitly bans `/proc/payments/README.md`
+    from the actions array and mandates that any ANSWER clarification specify the
+    exact backtick-enclosed path of the next unread payment JSON file so the parser
+    can construct the subsequent actions array.'
+  source: learn
+  status: inactive
+- content: Never include `/proc/payments/README.md` in the SDD `actions` array for
+    fraud review tasks where `spec_goal` requires inspecting every archived payment
+    JSON file under `/proc/payments/` for behavioral anomalies. ANSWER must return
+    `OUTCOME_NONE_CLARIFICATION` if the tree listing in EXECUTE_OUTPUT shows more
+    files in `/proc/payments/` than the file reads in FILES_READ_IN_PRIOR_CYCLES +
+    current cycle reads — do NOT return OUTCOME_OK on a subset ('cite every' means
+    all files inspected). The clarification message must always specify the exact
+    filesystem path of the next unread payment JSON file from `/proc/payments/` enclosed
+    in backticks (e.g. `/proc/payments/pay_003.json`) — never substitute README.md
+    or generic references — so the subsequent `actions` array can target that file
+    directly.
+  created: '2026-05-26'
+  deactivated_reason: 'Consolidated: r026'
+  id: r026
+  reasoning: 'r022 and r025 both govern OUTCOME_NONE_CLARIFICATION content: r022 defines
+    the trigger condition (more files in tree than read) and requires exact path in
+    backticks; r025 extends this by forbidding README.md in actions and clarification.
+    r025 (higher id) is base; extended with r022''s trigger condition.'
+  source: learn
+  status: inactive
+- content: Never include `/proc/payments/README.md` in the SDD `actions` array for
+    fraud review tasks where `spec_goal` requires inspecting every archived payment
+    JSON file under `/proc/payments/` for behavioral anomalies. ANSWER must return
+    `OUTCOME_NONE_CLARIFICATION` if the tree listing in EXECUTE_OUTPUT shows more
+    files in `/proc/payments/` than the file reads in FILES_READ_IN_PRIOR_CYCLES +
+    current cycle reads — do NOT return OUTCOME_OK on a subset ('cite every' means
+    all files inspected). The clarification message must always specify the exact
+    filesystem path of the next unread payment JSON file from `/proc/payments/` enclosed
+    in backticks (e.g. `/proc/payments/pay_003.json`) — never substitute README.md
+    or generic references — so the subsequent `actions` array can target that file
+    directly.
+  created: '2026-05-26'
+  deactivated_reason: 'Consolidated: r027'
+  id: r027
+  reasoning: 'r025 and r026 both prohibit README.md in actions for fraud review tasks
+    and both require clarification messages to name the exact next unread payment
+    JSON path. r026 (higher id) is a strict superset: it additionally mandates OUTCOME_NONE_CLARIFICATION
+    when not all files have been read and makes the ''cite every means all files''
+    rule explicit. r025 adds nothing beyond r026''s scope. Deactivate r025; r026 content
+    unchanged.'
+  source: learn
+  status: inactive
+- content: Never include `/proc/payments/README.md` in the SDD `actions` array for
+    fraud review tasks where `spec_goal` requires inspecting every archived payment
+    JSON file under `/proc/payments/` for behavioral anomalies. ANSWER must return
+    `OUTCOME_NONE_CLARIFICATION` if the tree listing in EXECUTE_OUTPUT shows more
+    files in `/proc/payments/` than the file reads in FILES_READ_IN_PRIOR_CYCLES +
+    current cycle reads — do NOT return OUTCOME_OK on a subset ('cite every' means
+    all files inspected). The clarification message must always specify the exact
+    filesystem path of the next unread payment JSON file from `/proc/payments/` enclosed
+    in backticks (e.g. `/proc/payments/pay_003.json`) — never substitute README.md
+    or generic references — so the subsequent `actions` array can target that file
+    directly.
+  created: '2026-05-26'
+  deactivated_reason: 'Consolidated: r028'
+  id: r028
+  reasoning: r026 and r027 are string-identical. Deactivate r026, retain r027 as canonical.
+  source: learn
+  status: inactive
+- content: Never include `tree:/proc/payments/` in the SDD `actions` array when `tree:/proc/payments/`
+    already appears in PRIOR_ACTIONS and the `spec_goal` requires inspecting every
+    archived payment JSON file under `/proc/payments/` for behavioral anomalies; the
+    `actions` array must instead contain 1–3 exact unread payment file paths from
+    the cached tree listing so the pipeline can batch remaining unread files.
+  created: '2026-05-26'
+  deactivated_reason: 'Consolidated: r029'
+  id: r029
+  reasoning: 'The cycle failed because the SDD emitted `tree:/proc/payments/` as its
+    sole action even though the tree was already executed in a prior cycle and only
+    24 payment files had been read. This produced no new file reads in the current
+    cycle, forcing the ANSWER phase to return `OUTCOME_NONE_CLARIFICATION` asking
+    for more files instead of progressing with the fraud review. Root cause category:
+    `wrong-action`. The failing fragment is the SDD `actions` array containing `["tree:/proc/payments/"]`
+    when `tree:/proc/payments/` already appears in PRIOR_ACTIONS. Existing rule r020
+    prohibits enumerating all remaining unread paths but does not explicitly forbid
+    re-emitting the tree action itself, which the SDD used as a workaround that stalled
+    the pipeline.'
+  source: learn
+  status: inactive
+- content: Never include `/proc/payments/README.md` in the SDD `actions` array for
+    fraud review tasks where `spec_goal` requires inspecting every archived payment
+    JSON file under `/proc/payments/` for behavioral anomalies. ANSWER must return
+    `OUTCOME_NONE_CLARIFICATION` if the tree listing in EXECUTE_OUTPUT shows more
+    files in `/proc/payments/` than the file reads in FILES_READ_IN_PRIOR_CYCLES +
+    current cycle reads — do NOT return OUTCOME_OK on a subset ('cite every' means
+    all files inspected). The clarification message must always specify the exact
+    filesystem path of the next unread payment JSON file from `/proc/payments/` enclosed
+    in backticks (e.g. `/proc/payments/pay_003.json`) — never substitute README.md
+    or generic references — so the subsequent `actions` array can target that file
+    directly.
+  created: '2026-05-26'
+  deactivated_reason: These rules instructed ANSWER to return OUTCOME_NONE_CLARIFICATION
+    whenever unread payment files remain after a tree listing, which directly conflicts
+    with the STOP_RULE that mandates continuing inspection instead of concluding,
+    thereby causing the pipeline to stop prematurely rather than scheduling remaining
+    file reads via SDD actions.
+  id: r030
+  reasoning: r027 and r028 are identical duplicates; kept r028 and deactivated r027.
+  source: learn
+  status: inactive
+- content: When `tree:/proc/payments/` has been executed and appears in PRIOR_ACTIONS,
+    do NOT include `tree:/proc/payments/` in the `actions` array, and do NOT enumerate
+    all remaining unread payment file paths; the `actions` array must instead contain
+    only 1–3 exact unread payment file paths from the cached tree listing so the pipeline
+    can batch remaining unread files. The pipeline automatically batches additional
+    unread files from the cached tree listing up to batch_cap per cycle. Enumerating
+    all 50–100 file paths in a single actions array causes LLM timeout and conflicts
+    with the 1–3 action limit in sdd.md. This applies whenever the spec_goal requires
+    continuing to inspect archived payment JSON files under `/proc/payments/` (including,
+    but not limited to, fraud review for behavioral anomalies).
+  created: '2026-05-26'
+  deactivated_reason: null
+  id: r031
+  reasoning: r020 and r029 address the same post-tree action-selection scenario for
+    payment-file inspection; r029 explicitly prohibits re-adding the tree path, while
+    r020 provides the batching rationale. Merged using r029 as the base and extended
+    with r020's LLM-timeout and batch_cap rationale to cover the full scope.
+  source: learn
+  status: active
+- content: Never include `/proc/payments/README.md` in the SDD `actions` array for
+    fraud review tasks where `spec_goal` requires inspecting every archived payment
+    JSON file under `/proc/payments/` for behavioral anomalies. ANSWER must return
+    `OUTCOME_NONE_CLARIFICATION` if the tree listing in EXECUTE_OUTPUT shows more
+    files in `/proc/payments/` than the file reads in FILES_READ_IN_PRIOR_CYCLES +
+    current cycle reads — do NOT return OUTCOME_OK on a subset ('cite every' means
+    all files inspected). The clarification message must always specify the exact
+    filesystem path of the next unread payment JSON file from `/proc/payments/` enclosed
+    in backticks (e.g. `/proc/payments/pay_003.json`) — never substitute README.md
+    or generic references — so the subsequent `actions` array can target that file
+    directly.
+  created: '2026-05-26'
+  deactivated_reason: These rules instructed ANSWER to return OUTCOME_NONE_CLARIFICATION
+    whenever unread payment files remain after a tree listing, which directly conflicts
+    with the STOP_RULE that mandates continuing inspection instead of concluding,
+    thereby causing the pipeline to stop prematurely rather than scheduling remaining
+    file reads via SDD actions.
+  id: r032
+  reasoning: r028 and r030 are identical duplicates; r030 (higher id) is retained
+    and r028 is deactivated.
+  source: learn
+  status: inactive
+- content: When `tree:/proc/payments/` has been executed and appears in PRIOR_ACTIONS,
+    do NOT include `tree:/proc/payments/` in the `actions` array, and do NOT enumerate
+    all remaining unread payment file paths; the `actions` array must instead contain
+    only 1–3 exact unread payment file paths from the cached tree listing so the pipeline
+    can batch remaining unread files. The pipeline automatically batches additional
+    unread files from the cached tree listing up to batch_cap per cycle. Enumerating
+    all 50–100 file paths in a single actions array causes LLM timeout and conflicts
+    with the 1–3 action limit in sdd.md. This applies whenever the spec_goal requires
+    continuing to inspect archived payment JSON files under `/proc/payments/` (including,
+    but not limited to, fraud review for behavioral anomalies).
+  created: '2026-05-26'
+  deactivated_reason: null
+  id: r033
+  reasoning: r029 is a strict subset of r031; r031 (higher id) generalizes the batching
+    instruction to all payment-file inspection tasks while explicitly covering behavioral
+    anomalies. No semantic extension is needed because r031 already encompasses r029's
+    full scope.
+  source: learn
+  status: active
+- content: When `spec_goal` requires inspecting every archived payment JSON file under
+    `/proc/payments/` for behavioral anomalies, never include `/proc/payments/README.md`
+    in the SDD `actions` array, and never return `OUTCOME_NONE_CLARIFICATION` from
+    ANSWER solely because unread payment files remain after a prior `tree:/proc/payments/`;
+    the SDD `actions` array must instead contain 1–3 exact unread payment file paths
+    from the cached tree listing so the pipeline continues execution without user
+    clarification.
+  created: '2026-05-26'
+  deactivated_reason: r034 broke the CLARIFICATION→backtick→SDD mechanism. OUTCOME_NONE_CLARIFICATION
+    is the correct pipeline signal for iterative file enumeration; deactivated to
+    restore multi-cycle file reading via the backtick propagation path.
+  id: r034
+  reasoning: 'The ANSWER phase returned OUTCOME_NONE_CLARIFICATION with the message:
+    ''Need to inspect the older archived payment files... Please read /proc/payments/pay_001.json...
+    through pay_080.json''. The STOP_RULES explicitly mandate: ''If an unread payment
+    file remains in /proc/payments/ after a cycle, continue inspection instead of
+    concluding.'' Root cause category: wrong-action. The failing fragment is the ANSWER_OUTPUT
+    `outcome`: ''OUTCOME_NONE_CLARIFICATION'' produced because existing rules r030
+    and r032 instructed ANSWER to return OUTCOME_NONE_CLARIFICATION whenever unread
+    payment files remain after a tree listing, which directly conflicts with the STOP_RULE
+    to continue inspection and caused the pipeline to conclude prematurely rather
+    than scheduling the remaining file reads via SDD actions. The SDD_OUTPUT `actions`
+    array also incorrectly repeated `tree:/proc/payments/` instead of targeting specific
+    unread files, but the immediate semantic failure is the ANSWER concluding instead
+    of continuing.'
+  source: learn
+  status: inactive
+last_run:
+  cycles_used: 2
+  date: '2026-05-26'
+  grounding_refs_count: 13
+  outcome: OUTCOME_OK
+  status: failure
 task_id: t38
