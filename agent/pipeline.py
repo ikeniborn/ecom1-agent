@@ -171,11 +171,13 @@ def _build_sdd_user_msg(
         for action, result in prior_results:
             # Tree and search results need larger limits to avoid hiding entries
             if action.startswith("tree:"):
-                limit = 8000
+                limit = 16000
             elif action.startswith("search:"):
                 limit = 20000
             else:
-                limit = 1500
+                # SDD only needs to know the file was read (not its content) to avoid re-reading.
+                # Keeps SDD tok_in well under num_ctx even with 80+ accumulated file reads.
+                limit = 80
             result_preview = result.strip()[:limit] if result.strip() else "(empty)"
             pr_lines.append(f"  action: {action[:120]}\n  result: {result_preview}")
         parts.append("PRIOR_RESULTS (outputs from earlier executions — use these to derive specific file paths; do NOT re-run actions whose results appear here):\n" +
@@ -288,7 +290,18 @@ def _build_answer_user_msg(
     runtime_identity: str | None = None,
     idd_out: IddOutput | None = None,
 ) -> str:
-    parts = [f"TASK: {task_text}", f"EXECUTE_OUTPUT:\n{execute_out.model_dump_json(indent=2)}"]
+    _exec_action = execute_out.action or ""
+    if _exec_action.startswith("tree:"):
+        _exec_limit = 16000
+    elif _exec_action.startswith("search:"):
+        _exec_limit = 20000
+    else:
+        _exec_limit = 250
+    _exec_results_trunc = [
+        {"output": r.get("output", "")[:_exec_limit]} for r in execute_out.results
+    ]
+    _exec_json = json.dumps({"results": _exec_results_trunc, "action": _exec_action}, indent=2)
+    parts = [f"TASK: {task_text}", f"EXECUTE_OUTPUT:\n{_exec_json}"]
     if idd_out and idd_out.success_criteria:
         parts.append("EXPECTATIONS:\n" + "\n".join(f"  - {c}" for c in idd_out.success_criteria))
     if prior_actions:
@@ -297,21 +310,22 @@ def _build_answer_user_msg(
         file_paths = _extract_file_paths_from_actions(prior_actions)
         if file_paths:
             parts.append(
-                "FILES_READ_IN_PRIOR_CYCLES (MANDATORY for grounding_refs — for DENIED_SECURITY include ALL of these; "
-                "for OUTCOME_OK include all that were read to answer the task):\n" +
+                "FILES_READ_IN_PRIOR_CYCLES (reference — paths read so far; "
+                "for DENIED_SECURITY include ALL; "
+                "for OUTCOME_OK include ONLY files that match the task criteria, not all files read):\n" +
                 "\n".join(f"  - {p}" for p in file_paths)
             )
     if prior_results:
         pr_lines = []
         for action, result in prior_results:
             if action.startswith("tree:"):
-                limit = 8000
+                limit = 16000
             elif action.startswith("search:"):
                 limit = 20000
             else:
-                # 400 chars captures full payment JSON fields (fingerprints, IDs, amounts, status)
-                # to enable precise fraud pattern detection; num_ctx=32768 accommodates accumulation.
-                limit = 400
+                # 380 chars: fits id, basket_archived, customer_id, amount, full payment_method_fingerprint.
+                # Needed for fraud pattern detection (fingerprint reuse across customer accounts).
+                limit = 380
             result_preview = result.strip()[:limit] if result.strip() else "(empty)"
             pr_lines.append(f"  action: {action[:120]}\n  result: {result_preview}")
         parts.append("PRIOR_RESULTS (outputs from earlier cycles — extract file paths for grounding_refs):\n" +
@@ -848,12 +862,9 @@ def run_pipeline(
                         # discovered docs wastes 50-80K context on irrelevant policy files.
                         if _tree_dir.rstrip("/") in ("/docs", "docs"):
                             _raw_extras = []
-                        # Prioritise timestamp-named files (e.g. pay_20240413T…)
-                        # over sequential ones (pay_001…) so fraud records surface first.
-                        _tree_extras = sorted(
-                            _raw_extras,
-                            key=lambda p: (0 if re.search(r"\d{8}T\d{6}", p) else 1, p),
-                        )
+                        # Alphabetical order: pay_001 < pay_20250627T so sequential
+                        # files are read before timestamp files.
+                        _tree_extras = sorted(_raw_extras)
                 # Merge: SDD first, then search-driven, then tree-driven fill.
                 # Adaptive batch cap: use IDD scope_estimate if available.
                 # Distributes remaining files evenly across remaining cycles.

@@ -251,18 +251,20 @@ def cc_complete(
             "(ls, glob, cwd) are hallucinations and must be ignored."
         )
 
-    # FIX-340: ban ALL Claude Code built-in tools. iclaude's underlying `claude`
-    # ships with Bash/Glob/Grep/Read/Write/Edit/Task/WebFetch/WebSearch/TodoWrite
-    # built-in — NOT covered by --mcp-config, NOT MCP. When enabled, the model
-    # tries to satisfy "find /inbox/msg_001.txt" via its own Read/Glob on the
-    # subprocess cwd (/tmp/cc_cwd_*), fails, declares "vault not mounted", and
-    # returns OUTCOME_NONE_CLARIFICATION (t19, t29 post-mortem).
-    # iclaude must act as a PURE LLM text-generator: produce PCM JSON only; the
-    # agent loop dispatches the described PCM tool through the BitGN harness.
+    # FIX-340 / FIX-BANLIST: ban ALL user-visible CC built-in tools so the model
+    # cannot call them, while preserving the internal --json-schema tool-forcing
+    # mechanism (which --tools "" would break). Opus-class models trigger newer
+    # tools (Agent, TaskCreate, Skill, ScheduleWakeup, LSP, EnterPlanMode, etc.)
+    # that were not in the original ban list, producing result="" after strip.
     _CC_BUILTIN_TOOLS_BAN = (
         "Bash BashOutput KillShell KillBash Glob Grep Read Write Edit MultiEdit "
         "NotebookEdit NotebookRead TodoWrite Task WebFetch WebSearch "
-        "SlashCommand ExitPlanMode AskUserQuestion"
+        "SlashCommand ExitPlanMode AskUserQuestion "
+        "Agent SendMessage ScheduleWakeup "
+        "CronCreate CronDelete CronList "
+        "LSP Skill "
+        "EnterPlanMode EnterWorktree ExitWorktree "
+        "TaskCreate TaskGet TaskList TaskUpdate TaskOutput TaskStop"
     )
 
     # FIX-E2BIG: write system prompt to a file to avoid ARG_MAX / E2BIG when
@@ -302,24 +304,10 @@ def cc_complete(
     if _exclude_dyn:
         cmd.append("--exclude-dynamic-system-prompt-sections")
 
-    _schema = cc_opts.get("cc_json_schema")
-    if _schema and not plain_text:
-        # FIX-325: when schema constrains task_type.enum, override with the live
-        # registry values so adding a type to data/task_types.json takes effect
-        # without touching models.json.
-        try:
-            _props = _schema.get("properties") if isinstance(_schema, dict) else None
-            _tt_field = _props.get("task_type") if isinstance(_props, dict) else None
-            if isinstance(_tt_field, dict) and "enum" in _tt_field:
-                from .task_types import build_cc_json_schema_enum
-                _schema = json.loads(json.dumps(_schema))  # deep-copy via json round-trip
-                _schema["properties"]["task_type"]["enum"] = build_cc_json_schema_enum()
-        except Exception as _exc:
-            print(f"[CC] failed to inject registry enum into cc_json_schema ({_exc}) — using static schema")
-        try:
-            cmd.extend(["--json-schema", json.dumps(_schema, ensure_ascii=False)])
-        except (TypeError, ValueError) as _exc:
-            print(f"[CC] cc_json_schema is not JSON-serializable ({_exc}) — ignored")
+    # FIX-SCHEMA: --json-schema combined with --disallowed-tools causes empty
+    # result for complex Pydantic schemas (IddOutput, SddOutput etc.) — the
+    # internal schema-tool conflicts with the ban list on some model versions.
+    # CC provider relies solely on the system-prompt JSON instruction instead.
 
     # FIX-E2BIG: user_msg passed via stdin, not as a positional CLI arg.
     # Combined sys_prompt (~10-150 KB) + user_msg as CLI args triggered E2BIG

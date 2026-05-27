@@ -1,0 +1,27 @@
+entries:
+- content: When spec_goal filters by a series identifier that contains alphanumeric
+    tokens with visually ambiguous characters (O vs 0, I vs 1, S vs 5, etc.), never
+    use the literal token in LIKE; instead split the series string into 2–3 unambiguous
+    subtoken fragments and chain them as separate LIKE conditions (e.g., series LIKE
+    '%OS%' AND series LIKE '%UO%'). Additionally, when success_criteria includes a
+    product-type filter (e.g., 'jump starter'), do not filter on kind_id LIKE; instead
+    join product_properties filtering key='product_type' (or key='type') and value_text
+    LIKE '%jump%', because kind_id is an opaque foreign key whose label lives in the
+    kinds table.
+  created: '2026-05-26'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,brand,available_today''.
+    Root cause: wrong-value-type / wrong-filter — series identifier ''OS 2O4-0UO''
+    contains visually ambiguous characters (O vs 0, e.g. ''2O4'' vs ''204'', ''0UO''
+    vs ''OUO'') that are likely OCR artifacts; LIKE ''%OS 2O4-0UO%'' fails if stored
+    value uses different O/0 encoding. Secondary cause: kind_id LIKE ''%jump%'' assumes
+    kind_id encodes product-type label, but kind_id may be an opaque key — ''jump
+    starter'' may live in kinds table name column or in product_properties key=''product_type''.
+    Failing fragment: action ''series LIKE ''%OS 2O4-0UO%'''' and ''kind_id LIKE ''%jump%''''
+    from SDD_OUTPUT actions. Rule must address: (1) wildcard each ambiguous alphanumeric
+    segment of a series token, (2) resolve product_type via product_properties not
+    kind_id.'
+  source: learn
+  status: active
+task_id: t04

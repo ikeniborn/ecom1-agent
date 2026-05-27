@@ -1,0 +1,37 @@
+entries:
+- content: Never match a compound series identifier (containing spaces, hyphens, or
+    alphanumeric segment separators) as a single LIKE substring in the series filter;
+    instead split the identifier into its distinct tokens and apply a separate `p.series
+    LIKE '%TOKEN%'` condition for each token joined with AND, so minor separator or
+    spacing differences in stored values do not cause empty results.
+  created: '2026-05-26'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,available_today''.
+    Root cause: empty-result — series identifier contains compound tokens with mixed
+    separators (alphanumeric + hyphen segments). Failing fragment: action filter `p.series
+    LIKE ''%GTX 3PP-ZPA%''` matches only if stored value contains exact substring
+    including spacing and separator chars. Stored series value may differ in separators,
+    spacing, or token order. Rule must prescribe splitting compound series identifiers
+    into individual token LIKE conditions joined by AND.'
+  source: learn
+  status: active
+- content: 'When spec_goal targets a compound series identifier and SQL returns empty
+    even after applying token-split LIKE conditions per r001, escalate to filesystem
+    catalog search: execute `search:GTX /proc/catalog/` and `search:3PP /proc/catalog/`
+    to locate candidate product records, then verify volume and availability from
+    those paths.'
+  created: '2026-05-26'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''Empty result: sku,path,name,series,available_today''.
+    Root cause: empty-result. Failing fragment: action in PLAN_OUTPUT applied token-split
+    per r001 (''%GTX%'' AND ''%3PP%'' AND ''%ZPA%'') yet still returned empty — SQL
+    approach exhausted. r001 already covers token-split SQL refinement. Per Strategy
+    Escalation, 2+ SQL-refinement cycles on same empty-result failure → must prescribe
+    filesystem catalog search instead. Rule linkage: spec_goal ''Determine if a Castrol
+    GTX 3PP-ZPA series 500ml engine oil product has available_today > 0'' requires
+    fallback to catalog search when SQL returns empty after token-split.'
+  source: learn
+  status: active
+task_id: t03
