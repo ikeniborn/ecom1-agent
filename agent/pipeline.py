@@ -1,12 +1,14 @@
 """ASSEMBLE → SDD → PLAN → EXECUTE → ANSWER pipeline."""
 from __future__ import annotations
 
+import ast
 import json
 import math
 import os
 import re
 import time
 import traceback
+from pathlib import Path
 from typing import Any
 
 from google.protobuf.json_format import MessageToDict
@@ -23,7 +25,8 @@ from .llm import (
     CLI_BLUE, CLI_CLR, CLI_GREEN, CLI_RED, CLI_YELLOW,
 )
 from .json_extract import _extract_json_from_text
-from .models import IddOutput, SddOutput, PlanOutput, ExecuteOutput, LearnOutput, AnswerOutput, ConsolidateOutput
+from .mock_vm import MockVM
+from .models import IddOutput, SddOutput, PlanOutput, ExecuteOutput, LearnOutput, AnswerOutput, ConsolidateOutput, CodegenOutput
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest
 from .prompt import load_prompt
 from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff, save_last_run
@@ -43,6 +46,9 @@ _PHASE_MAX_TOKENS: dict[str, int] = {
     "answer":    int(os.environ.get("MAX_TOKENS_ANSWER",    "4096")),
     "consolidate": int(os.environ.get("MAX_TOKENS_CONSOLIDATE", "2048")),
 }
+
+_CODEGEN_MAX_TOKENS = int(os.environ.get("MAX_TOKENS_CODEGEN", "8192"))
+_CODEGEN_LINT_RETRIES = int(os.environ.get("CODEGEN_LINT_RETRIES", "3"))
 
 # Compat stubs — referenced by older tests that patch these names; no-ops in new pipeline
 def run_resolve(vm, model: str, task_text: str, pre, cfg: dict) -> dict:
@@ -418,6 +424,102 @@ def _run_execute(vm, plan_out, cycle: int) -> "tuple[ExecuteOutput | None, str]"
             return ExecuteOutput(results=[{"output": raw}], action=action), ""
     except Exception as e:
         return None, f"Execute exception [{plan_out.approach!r:.60}]: {e}"
+
+
+def _run_codegen(
+    unified_context: str,
+    model: str,
+    cfg: dict,
+    task_text: str,
+    task_id: str,
+    idd_out: "IddOutput",
+    sdd_out: "SddOutput",
+    plan_out: "PlanOutput",
+    pre: "PrephaseResult",
+    cycle: int,
+) -> "tuple[CodegenOutput | None, str]":
+    """CODEGEN phase: LLM generates heuristic script + mock test. Returns (CodegenOutput, error)."""
+    codegen_model = _resolve_model_for_phase("codegen", model)
+    codegen_guide = load_prompt("codegen") or "# PHASE: codegen"
+
+    import json as _json
+
+    user_parts = [
+        f"TASK: {task_text}",
+        f"TASK_ID: {task_id}",
+        f"REFORMULATED_TASK: {idd_out.reformulated_task}",
+        f"INTENT_TYPE: {idd_out.intent_type}",
+    ]
+    if idd_out.extracted_params:
+        user_parts.append(f"EXTRACTED_PARAMS: {_json.dumps(idd_out.extracted_params)}")
+    if idd_out.success_criteria:
+        user_parts.append("SUCCESS_CRITERIA:\n" + "\n".join(f"  - {c}" for c in idd_out.success_criteria))
+    user_parts.append(f"SDD_GOAL: {sdd_out.spec_goal}")
+    user_parts.append(f"PLAN_ACTION: {plan_out.action}")
+    user_msg = "\n\n".join(user_parts)
+
+    system: list[dict] = [
+        {"type": "text", "text": unified_context},
+        {"type": "text", "text": codegen_guide, "cache_control": {"type": "ephemeral"}},
+    ]
+
+    lint_error: str | None = None
+    script_code = ""
+    test_code = ""
+
+    for attempt in range(_CODEGEN_LINT_RETRIES):
+        if lint_error:
+            retry_msg = f"{user_msg}\n\nPREVIOUS_LINT_ERROR: {lint_error}\nFix the syntax error and regenerate."
+        else:
+            retry_msg = user_msg
+
+        tok_info: dict = {}
+        raw = call_llm_raw(system, retry_msg, codegen_model, cfg,
+                           max_tokens=_CODEGEN_MAX_TOKENS, token_out=tok_info)
+        if not raw:
+            lint_error = "LLM returned empty response"
+            continue
+
+        extracted = _extract_json_from_text(raw)
+        if not isinstance(extracted, dict):
+            lint_error = f"Could not parse JSON from LLM response: {raw[:200]}"
+            continue
+
+        script_code = extracted.get("script", "")
+        test_code = extracted.get("test", "")
+
+        lint_error = None
+        for label, code in [("script", script_code), ("test", test_code)]:
+            try:
+                ast.parse(code)
+            except SyntaxError as e:
+                lint_error = f"{label} syntax error: {e}"
+                break
+
+        if lint_error is None:
+            break
+
+    if lint_error:
+        return None, f"CODEGEN lint failed after {_CODEGEN_LINT_RETRIES} attempts: {lint_error}"
+
+    mock_vm = MockVM(
+        extracted_params=idd_out.extracted_params,
+        schema_digest=pre.schema_digest if isinstance(pre.schema_digest, str) else str(pre.schema_digest),
+    )
+    exec_globals: dict = {"vm": mock_vm, "task_text": task_text, "_result": None}
+    try:
+        exec(compile(script_code, f"{task_id}.py", "exec"), exec_globals)
+        exec(compile(test_code, f"{task_id}_test.py", "exec"), exec_globals)
+    except Exception as e:
+        return None, f"CODEGEN mock test failed: {e}"
+
+    heuristics_dir = Path("data/heuristics")
+    heuristics_dir.mkdir(exist_ok=True)
+    script_path = f"data/heuristics/{task_id}.py"
+    (heuristics_dir / f"{task_id}.py").write_text(script_code, encoding="utf-8")
+    (heuristics_dir / f"{task_id}_test.py").write_text(test_code, encoding="utf-8")
+
+    return CodegenOutput(script_path=script_path, script_code=script_code, test_code=test_code), ""
 
 
 def _run_learn(
