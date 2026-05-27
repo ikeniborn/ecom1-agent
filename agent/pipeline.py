@@ -29,7 +29,7 @@ from .mock_vm import MockVM
 from .models import IddOutput, SddOutput, PlanOutput, ExecuteOutput, LearnOutput, AnswerOutput, ConsolidateOutput, CodegenOutput
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest
 from .prompt import load_prompt
-from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff, save_last_run
+from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff, save_last_run, load_last_run
 from .sql_security import check_retry_loop
 from .trace import get_trace
 
@@ -600,6 +600,7 @@ def _run_learn(
     plan_out=None,
     answer_out=None,
     idd_out: IddOutput | None = None,
+    heuristic_code: str | None = None,
 ) -> None:
     learn_model = _resolve_model_for_phase("learn", model)
     learn_guide = load_prompt("learn") or "# PHASE: learn"
@@ -610,7 +611,7 @@ def _run_learn(
     existing_entries = load_learned_entries(task_id) if task_id else []
     learn_user = _build_learn_user_msg(task_text, error, error_type, existing_entries,
                                        sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out,
-                                       idd_out=idd_out)
+                                       idd_out=idd_out, heuristic_code=heuristic_code)
     learn_out, sgr_learn, _ = _call_llm_phase(
         learn_system, learn_user, learn_model, cfg, LearnOutput,
         max_tokens=_PHASE_MAX_TOKENS["learn"], phase="learn", cycle=cycle,
@@ -699,6 +700,58 @@ def _run_consolidate(
     print(f"[pipeline] CONSOLIDATE: {len(out.consolidations)} merge(s), active={len(learn_ctx)}")
 
 
+def _run_fast_path(
+    vm,
+    task_id: str,
+    task_text: str,
+) -> "tuple[bool, str, str]":
+    """Execute existing heuristic script. Returns (ok, error_string, outcome_str)."""
+    script_path = Path("data") / "heuristics" / f"{task_id}.py"
+    try:
+        script_code = script_path.read_text(encoding="utf-8")
+    except Exception as e:
+        return False, f"fast path read error: {e}", ""
+
+    exec_globals: dict = {"vm": vm, "task_text": task_text, "_result": None}
+    try:
+        exec(compile(script_code, str(script_path), "exec"), exec_globals)
+    except (OSError, PermissionError) as e:
+        save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION",
+                      cycles_used=0, heuristic_valid=False)
+        return False, f"fast path filesystem error: {e}", ""
+    except Exception as e:
+        save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION",
+                      cycles_used=0, heuristic_valid=False)
+        return False, f"fast path script error: {e}", ""
+
+    raw_result = exec_globals.get("_result")
+    if not raw_result or "outcome" not in raw_result or "message" not in raw_result:
+        save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION",
+                      cycles_used=0, heuristic_valid=False)
+        return False, "fast path: script did not produce valid _result", ""
+
+    if raw_result["outcome"] not in OUTCOME_BY_NAME:
+        save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION",
+                      cycles_used=0, heuristic_valid=False)
+        return False, f"fast path: unknown outcome {raw_result['outcome']!r}", ""
+
+    script_outcome = raw_result["outcome"]
+    try:
+        vm.answer(AnswerRequest(
+            message=raw_result["message"],
+            outcome=OUTCOME_BY_NAME[script_outcome],
+            refs=raw_result.get("refs", []),
+        ))
+    except Exception as e:
+        save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION",
+                      cycles_used=0, heuristic_valid=False)
+        return False, f"fast path vm.answer error: {e}", ""
+
+    save_last_run(task_id, status="success", outcome=script_outcome,
+                  cycles_used=0, heuristic_valid=True)
+    return True, "", script_outcome
+
+
 def run_pipeline(
     vm: EcomRuntimeClientSync,
     model: str,
@@ -709,7 +762,7 @@ def run_pipeline(
     injected_session_rules: list[str] | None = None,
     injected_prompt_addendum: str = "",
 ) -> tuple[dict, None]:
-    """ASSEMBLE → SDD → PLAN → EXECUTE → ANSWER pipeline. Returns (stats dict, None)."""
+    """ASSEMBLE → SDD → PLAN → CODEGEN → ANSWER pipeline. Returns (stats dict, None)."""
     _persisted = load_learned_ctx(task_id) if task_id else []
     learn_ctx: list[str] = list(dict.fromkeys(_persisted + list(injected_session_rules or [])))
     sgr_trace: list[dict] = []
@@ -727,6 +780,33 @@ def run_pipeline(
     plan_out: PlanOutput | None = None
     unified_context = ""
     final_grounding_refs_count = 0
+
+    # ── FAST PATH ─────────────────────────────────────────────────────────────
+    if task_id:
+        last_run_record = load_last_run(task_id)
+        _heuristic_script = Path("data") / "heuristics" / f"{task_id}.py"
+        _fast_eligible = (
+            last_run_record is not None
+            and last_run_record.get("heuristic_valid") is True
+            and _heuristic_script.exists()
+        )
+        if _fast_eligible:
+            print(f"{CLI_BLUE}[pipeline] fast path: {task_id}{CLI_CLR}")
+            _fp_ok, _fp_err, _fp_outcome = _run_fast_path(vm, task_id, task_text)
+            if _fp_ok:
+                return {
+                    "outcome": _fp_outcome,
+                    "cycles_used": 0,
+                    "grounding_refs_count": 0,
+                    "step_facts": ["fast path: 0 LLM calls"],
+                    "done_ops": [],
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_elapsed_ms": 0,
+                }, None
+            # Fast path failed → fall through to full path
+            last_error = _fp_err
+            print(f"{CLI_YELLOW}[pipeline] fast path failed: {_fp_err} — falling through to full path{CLI_CLR}")
 
     try:
         for cycle in range(_MAX_CYCLES):
@@ -935,14 +1015,25 @@ def run_pipeline(
                 plan_out = plan_out.model_copy(update={"action": _act})
                 print(f"{CLI_BLUE}[pipeline] injected store filter {_store_filter} into SQL{CLI_CLR}")
 
-            # ── EXECUTE ───────────────────────────────────────────────────────
+            # ── CODEGEN ──────────────────────────────────────────────────────
             _t0 = time.monotonic()
-            execute_out, execute_error = _run_execute(vm, plan_out, cycle + 1)
+            codegen_out, codegen_error = _run_codegen(
+                unified_context=unified_context,
+                model=model,
+                cfg=cfg,
+                task_text=task_text,
+                task_id=task_id,
+                idd_out=idd_out,
+                sdd_out=sdd_out,
+                plan_out=plan_out,
+                pre=pre,
+                cycle=cycle + 1,
+            )
             _dur = int((time.monotonic() - _t0) * 1000)
 
-            if execute_error or execute_out is None:
-                err = execute_error or "Execute returned None"
-                print(f"{CLI_YELLOW}[pipeline] EXECUTE failed: {err}{CLI_CLR}")
+            if codegen_error or codegen_out is None:
+                err = codegen_error or "CODEGEN returned None"
+                print(f"{CLI_YELLOW}[pipeline] CODEGEN failed: {err}{CLI_CLR}")
                 last_error = err
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
@@ -951,200 +1042,32 @@ def run_pipeline(
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
-            raw_output = execute_out.results[0].get("output", "") if execute_out.results else ""
-            _action_type = _infer_action_type(plan_out.action)
-            # exec-type actions (/bin/ tools) may legitimately return empty output on success;
-            # only gate on empty result for data-returning operations (sql, read, search, list, find, tree)
-            if _action_type != "exec" and not _csv_has_data(raw_output):
-                last_error = f"Empty result: {raw_output.strip()[:120]}"
-                print(f"{CLI_YELLOW}[pipeline] EXECUTE: empty result{CLI_CLR}")
-                _run_learn(unified_context, model, cfg, task_text, last_error,
-                           sgr_trace, learn_ctx, pre.agents_md_index,
-                           error_type="empty", cycle=cycle + 1, task_id=task_id,
-                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out)
-                _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
-                continue
-
-            if t := get_trace():
-                if _action_type == "sql":
-                    t.log_sql_execute(cycle + 1, plan_out.action, raw_output, _csv_has_data(raw_output), _dur)
-
-            prior_results.append((plan_out.action, raw_output))
-            print(f"{CLI_BLUE}[pipeline] EXECUTE ok: {raw_output[:80]}{CLI_CLR}")
-
-            # ── BATCH EXECUTE (homogeneous file reads) ────────────────────────
-            # When SDD proposed additional file-read candidates (beyond the one
-            # PLAN selected), execute them in the same cycle so ANSWER can
-            # compare multiple records. Also runs when PLAN picked a tree/list
-            # discovery action — any remaining read candidates are still useful.
-            # Limited to 4 extras per cycle to cap context growth.
-            if sdd_out and _action_type in ("read", "tree", "list", "search", "find"):
-                _executed = {a2 for s2 in prior_action_sets for a2 in s2}
-                # SDD-proposed candidates
-                _sdd_extras = [
-                    a for a in sdd_out.actions
-                    if a != plan_out.action
-                    and _infer_action_type(a) == "read"
-                    and a not in _executed
-                ]
-                # Search-driven batch: if primary was search:, read ALL matching paths
-                _search_extras: list[str] = []
-                if _action_type == "search":
-                    _search_extras = [
-                        m for m in re.findall(r"^(/[^:\n]+):\d+:", raw_output, re.MULTILINE)
-                        if m not in _executed and m != plan_out.action
-                    ]
-                # Tree-driven batch: fires when primary is a read OR when primary IS
-                # the tree (same-cycle reads right after discovery).
-                _tree_extras: list[str] = []
-                if _action_type in ("read", "tree"):
-                    if _action_type == "read":
-                        _tree_dir = "/".join(plan_out.action.rstrip("/").split("/")[:-1])
-                        _tree_key = (f"tree:{_tree_dir}/", f"tree:{_tree_dir}")
-                    else:
-                        # Primary was tree: use its own output
-                        _tree_dir = plan_out.action[len("tree:"):].rstrip("/")
-                        _tree_key = (plan_out.action, plan_out.action)
-                    # Search prior_results for a matching tree result
-                    _tree_source: str | None = None
-                    for _ta, _tr in prior_results:
-                        if _ta in _tree_key:
-                            _tree_source = _tr
-                            break
-                    # Also check the just-executed output if primary was tree
-                    if _action_type == "tree" and _tree_source is None:
-                        _tree_source = raw_output
-                    if _tree_source:
-                        _raw_extras = [
-                            f for f in _extract_tree_files(
-                                f"tree:{_tree_dir}/", _tree_source
-                            )
-                            if f not in _executed and f != plan_out.action
-                        ]
-                        # Never auto-batch /docs/ tree extras. The SDD explicitly selects
-                        # which policy doc to read via its actions array. Auto-batching all
-                        # discovered docs wastes 50-80K context on irrelevant policy files.
-                        if _tree_dir.rstrip("/") in ("/docs", "docs"):
-                            _raw_extras = []
-                        # Alphabetical order: pay_001 < pay_20250627T so sequential
-                        # files are read before timestamp files.
-                        _tree_extras = sorted(_raw_extras)
-                # Merge: SDD first, then search-driven, then tree-driven fill.
-                # Adaptive batch cap: use IDD scope_estimate if available.
-                # Distributes remaining files evenly across remaining cycles.
-                _scope_files = (idd_out.scope_estimate or {}).get("files_to_read", 0) if idd_out else 0
-                _remaining_cycles = _MAX_CYCLES - cycle  # includes current cycle
-                if _scope_files > 0 and _remaining_cycles > 0:
-                    _batch_cap = min(40, max(6, math.ceil(_scope_files / _remaining_cycles) + 2))
-                else:
-                    _batch_cap = 6
-                _seen: set[str] = set(_sdd_extras)
-                _search_fill = [f for f in _search_extras if f not in _seen]
-                _seen |= set(_search_fill)
-                _tree_fill = [f for f in _tree_extras if f not in _seen]
-                _batch_extras = (_sdd_extras + _search_fill + _tree_fill)[:_batch_cap]
-                for _xact in _batch_extras:
-                    _xplan = plan_out.model_copy(update={"action": _xact})
-                    if check_retry_loop([_xact], prior_action_sets):
-                        continue
-                    _xout, _xerr = _run_execute(vm, _xplan, cycle + 1)
-                    if _xout and not _xerr:
-                        _xraw = _xout.results[0].get("output", "") if _xout.results else ""
-                        if _csv_has_data(_xraw):
-                            prior_results.append((_xact, _xraw))
-                            prior_action_sets[-1] = prior_action_sets[-1] | frozenset([_xact])
-                            _executed.add(_xact)
-                            print(f"{CLI_BLUE}[pipeline] BATCH ok: {_xraw[:60]}{CLI_CLR}")
+            print(f"{CLI_BLUE}[pipeline] CODEGEN ok: {codegen_out.script_path}{CLI_CLR}")
 
             # ── ANSWER ────────────────────────────────────────────────────────
-            executor_model = _resolve_model_for_phase("executor", model)
-            _prior_for_answer = [a for s in prior_action_sets for a in s]
-            answer_user = _build_answer_user_msg(
-                task_text, execute_out,
-                prior_actions=_prior_for_answer,
-                prior_results=prior_results,
-                runtime_identity=pre.agent_id or None,
-                idd_out=idd_out,
-            )
-            answer_guide = load_prompt("answer") or "# PHASE: answer"
-            answer_system: list[dict] = [
-                {"type": "text", "text": answer_guide, "cache_control": {"type": "ephemeral"}},
-            ]
-            answer_out, sgr_answer, tok = _call_llm_phase(
-                answer_system, answer_user, executor_model, cfg, AnswerOutput,
-                max_tokens=_PHASE_MAX_TOKENS["answer"], phase="answer", cycle=cycle + 1,
-            )
-            total_in_tok += tok.get("input", 0)
-            total_out_tok += tok.get("output", 0)
-            sgr_trace.append(sgr_answer)
+            answer_out, answer_error = _run_answer(vm, codegen_out, task_text)
 
-            if not answer_out:
-                print(f"{CLI_RED}[pipeline] ANSWER parse failed{CLI_CLR}")
-                last_error = "ANSWER phase: failed to parse LLM output"
+            if answer_error or answer_out is None:
+                err = answer_error or "ANSWER returned None"
+                if "hard error" in (err or "").lower() or "filesystem" in (err or "").lower():
+                    print(f"{CLI_RED}[pipeline] ANSWER filesystem hard error: {err}{CLI_CLR}")
+                    last_error = err
+                    break
+                print(f"{CLI_YELLOW}[pipeline] ANSWER failed: {err}{CLI_CLR}")
+                last_error = err
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
                            error_type="semantic", cycle=cycle + 1, task_id=task_id,
-                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out)
+                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out,
+                           heuristic_code=codegen_out.script_code if codegen_out else None)
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
-                continue
-
-            # ── ANSWER CLARIFICATION: retry if cycles remain ──────────────────
-            if answer_out.outcome == "OUTCOME_NONE_CLARIFICATION" and cycle + 1 < _MAX_CYCLES:
-                last_error = f"ANSWER clarification: {answer_out.message[:500]}"
-                print(f"{CLI_YELLOW}[pipeline] ANSWER: OUTCOME_NONE_CLARIFICATION — retrying (cycle {cycle + 1}/{_MAX_CYCLES}){CLI_CLR}")
-                # LEARN fires only when there is no execute data at all (genuine failure).
-                # File-enumeration clarifications are intentional progress: the backtick path
-                # in last_error already propagates to SDD via PREVIOUS_ERROR; running LEARN
-                # here generates rules that break the backtick→SDD mechanism (e.g. r034).
-                _is_file_enum_clarification = bool(re.search(
-                    r"`/proc/", answer_out.message
-                ))
-                if not _csv_has_data(raw_output) and not _is_file_enum_clarification:
-                    _run_learn(unified_context, model, cfg, task_text, last_error,
-                               sgr_trace, learn_ctx, pre.agents_md_index,
-                               error_type="semantic", cycle=cycle + 1, task_id=task_id,
-                               sdd_out=sdd_out, plan_out=plan_out, answer_out=answer_out,
-                               idd_out=idd_out)
-                    _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 
             # ── SUCCESS ───────────────────────────────────────────────────────
             outcome = answer_out.outcome
             print(f"{CLI_GREEN}[pipeline] ANSWER: {outcome} — {answer_out.message[:100]}{CLI_CLR}")
 
-            sku_refs: list[str] = []
-            if _infer_action_type(plan_out.action) == "read":
-                sku_refs.append(plan_out.action)
-
-            clean_refs = list(answer_out.grounding_refs)
-            final_grounding_refs_count = len(clean_refs)
-            if outcome == "OUTCOME_NONE_UNSUPPORTED":
-                t_lower = task_text.lower()
-                policy_refs = ["/docs/security.md"]
-                if any(k in t_lower for k in ["checkout", "check out", "submit checkout", "place order", "complete order"]):
-                    policy_refs = ["/docs/checkout.md"] + policy_refs
-                    basket_m = re.search(r'\b(basket_\w+|cart_\w+)\b', task_text, re.IGNORECASE)
-                    if basket_m:
-                        basket_ref = f"/proc/baskets/{basket_m.group(1)}.json"
-                        if basket_ref not in clean_refs:
-                            clean_refs.append(basket_ref)
-                elif any(k in t_lower for k in ["3ds", "3d secure"]):
-                    policy_refs = ["/docs/payments/3ds.md"] + policy_refs
-                elif any(k in t_lower for k in ["discount", "service_recovery", "voucher"]):
-                    policy_refs = ["/docs/discounts.md"] + policy_refs
-                for pr in reversed(policy_refs):
-                    if pr not in clean_refs:
-                        clean_refs.insert(0, pr)
-
-            try:
-                vm.answer(AnswerRequest(
-                    message=answer_out.message,
-                    outcome=OUTCOME_BY_NAME[outcome],
-                    refs=clean_refs,
-                ))
-            except Exception as e:
-                print(f"{CLI_RED}[pipeline] vm.answer error: {e}{CLI_CLR}")
-
+            final_grounding_refs_count = len(answer_out.grounding_refs)
             if task_id:
                 print(f"{CLI_BLUE}[pipeline] SUCCESS: {len(learn_ctx)} active rules in data/learned/{task_id}.yaml{CLI_CLR}")
             success = True
@@ -1183,6 +1106,7 @@ def run_pipeline(
             outcome=outcome,
             cycles_used=cycles_used,
             grounding_refs_count=final_grounding_refs_count,
+            heuristic_valid=success and outcome in _SUCCESSFUL_OUTCOMES,
         )
 
     stats = {

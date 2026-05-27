@@ -48,6 +48,22 @@ def _answer_json(outcome="OUTCOME_OK", message="<YES> 3 found"):
     })
 
 
+_GOOD_SCRIPT = '''
+_result = {"message": "<YES> 3 found", "outcome": "OUTCOME_OK", "refs": ["/proc/catalog/ABC-001.json"]}
+if __name__ == "__main__":
+    pass
+'''
+
+
+def _codegen_json(outcome="OUTCOME_OK", message="<YES> 3 found"):
+    script = f'''
+_result = {{"message": "{message}", "outcome": "{outcome}", "refs": ["/proc/catalog/ABC-001.json"]}}
+if __name__ == "__main__":
+    pass
+'''
+    return json.dumps({"script": script, "test": "assert True"})
+
+
 def _learn_json(rule="use correct column name"):
     return json.dumps({
         "reasoning": "r",
@@ -89,13 +105,11 @@ def _seq_llm(call_seq):
 
 
 def test_happy_path():
-    """ASSEMBLE → SDD → PLAN → EXECUTE ok → ANSWER ok."""
+    """ASSEMBLE → IDD → SDD → PLAN → CODEGEN → ANSWER ok."""
     vm = MagicMock()
-    vm.exec.return_value = _make_exec_result('[{"count": 3}]')
-
     pre = _make_pre()
 
-    with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm([_idd_json(), _sdd_json(), _plan_json(), _answer_json()])), \
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm([_idd_json(), _sdd_json(), _plan_json(), _codegen_json()])), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         stats, _thread = run_pipeline(vm, "anthropic/claude-sonnet-4-6", "How many Lawn Mowers?", pre, {})
@@ -108,7 +122,6 @@ def test_happy_path():
 def test_sdd_fail_triggers_learn_then_retry():
     """SDD parse fail → LEARN → retry → success."""
     vm = MagicMock()
-    vm.exec.return_value = _make_exec_result('[{"count": 3}]')
     pre = _make_pre()
 
     with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm([
@@ -118,7 +131,7 @@ def test_sdd_fail_triggers_learn_then_retry():
         _idd_json(),         # IDD cycle 2
         _sdd_json(),         # SDD cycle 2
         _plan_json(),        # PLAN cycle 2
-        _answer_json(),      # ANSWER cycle 2
+        _codegen_json(),     # CODEGEN cycle 2
     ])), patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         stats, _ = run_pipeline(vm, "model", "task", pre, {})
@@ -130,18 +143,17 @@ def test_sdd_fail_triggers_learn_then_retry():
 def test_plan_fail_triggers_learn_then_retry():
     """PLAN parse fail → LEARN → retry → success."""
     vm = MagicMock()
-    vm.exec.return_value = _make_exec_result('[{"count": 3}]')
     pre = _make_pre()
 
     with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm([
-        _idd_json(),    # IDD cycle 1
-        _sdd_json(),    # SDD cycle 1
-        "INVALID",      # PLAN cycle 1 fails
-        _learn_json(),  # LEARN cycle 1
-        _idd_json(),    # IDD cycle 2
-        _sdd_json(),    # SDD cycle 2
-        _plan_json(),   # PLAN cycle 2
-        _answer_json(), # ANSWER cycle 2
+        _idd_json(),      # IDD cycle 1
+        _sdd_json(),      # SDD cycle 1
+        "INVALID",        # PLAN cycle 1 fails
+        _learn_json(),    # LEARN cycle 1
+        _idd_json(),      # IDD cycle 2
+        _sdd_json(),      # SDD cycle 2
+        _plan_json(),     # PLAN cycle 2
+        _codegen_json(),  # CODEGEN cycle 2
     ])), patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         stats, _ = run_pipeline(vm, "model", "task", pre, {})
@@ -150,26 +162,23 @@ def test_plan_fail_triggers_learn_then_retry():
     assert stats["cycles_used"] == 2
 
 
-def test_execute_fail_triggers_learn():
-    """EXECUTE empty result → LEARN → retry → success."""
+def test_codegen_fail_triggers_learn():
+    """CODEGEN lint fail → LEARN → retry → success."""
     vm = MagicMock()
-    vm.exec.side_effect = [
-        _make_exec_result(""),               # EXPLAIN cycle 1 (no error text)
-        _make_exec_result(""),               # EXECUTE cycle 1: empty
-        _make_exec_result("ok"),             # EXPLAIN cycle 2
-        _make_exec_result('[{"count":3}]'),  # EXECUTE cycle 2: has data
-    ]
     pre = _make_pre()
 
     with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm([
-        _idd_json(),    # IDD cycle 1
-        _sdd_json(),    # SDD cycle 1
-        _plan_json(),   # PLAN cycle 1
-        _learn_json(),  # LEARN cycle 1 (empty result)
-        _idd_json(),    # IDD cycle 2
-        _sdd_json(),    # SDD cycle 2
-        _plan_json(),   # PLAN cycle 2
-        _answer_json(), # ANSWER cycle 2
+        _idd_json(),                              # IDD cycle 1
+        _sdd_json(),                              # SDD cycle 1
+        _plan_json(),                             # PLAN cycle 1
+        "NOT_JSON",                               # CODEGEN cycle 1: fails (lint retries exhaust)
+        "NOT_JSON",                               # CODEGEN retry 2
+        "NOT_JSON",                               # CODEGEN retry 3
+        _learn_json(),                            # LEARN cycle 1
+        _idd_json(),                              # IDD cycle 2
+        _sdd_json(),                              # SDD cycle 2
+        _plan_json(),                             # PLAN cycle 2
+        _codegen_json(),                          # CODEGEN cycle 2: success
     ])), patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         stats, _ = run_pipeline(vm, "model", "task", pre, {})
@@ -204,27 +213,26 @@ def test_all_cycles_exhausted():
 def test_learn_ctx_accumulates():
     """learn_ctx grows across cycles; ASSEMBLE sees accumulated rules."""
     vm = MagicMock()
-    vm.exec.side_effect = [
-        _make_exec_result(""),               # c1 EXPLAIN (no error)
-        _make_exec_result(""),               # c1 EXECUTE: empty → triggers LEARN
-        _make_exec_result("ok"),             # c2 EXPLAIN
-        _make_exec_result('[{"count":3}]'),  # c2 EXECUTE: has data
-    ]
     pre = _make_pre()
+
+    # Cycle 1: CODEGEN returns empty script → _run_answer fails → LEARN fires
+    # Cycle 2: CODEGEN returns valid script → success
+    _empty_codegen = json.dumps({"script": "", "test": "assert True"})
 
     captured_user_msgs = []
 
     def fake_llm(_sys, user_msg, _model, _cfg, **_kw):
         captured_user_msgs.append(user_msg)
         n = len(captured_user_msgs)
-        if n == 1: return _idd_json()          # IDD cycle 1
-        if n == 2: return _sdd_json()          # SDD cycle 1
-        if n == 3: return _plan_json()         # PLAN cycle 1
-        if n == 4: return _learn_json("rule_ALPHA")  # LEARN cycle 1
-        if n == 5: return _idd_json()          # IDD cycle 2
-        if n == 6: return _sdd_json()          # SDD cycle 2
-        if n == 7: return _plan_json()         # PLAN cycle 2
-        if n == 8: return _answer_json()       # ANSWER cycle 2
+        if n == 1: return _idd_json()                 # IDD cycle 1
+        if n == 2: return _sdd_json()                 # SDD cycle 1
+        if n == 3: return _plan_json()                # PLAN cycle 1
+        if n == 4: return _empty_codegen              # CODEGEN cycle 1 (no _result → ANSWER fails)
+        if n == 5: return _learn_json("rule_ALPHA")   # LEARN cycle 1
+        if n == 6: return _idd_json()                 # IDD cycle 2
+        if n == 7: return _sdd_json()                 # SDD cycle 2
+        if n == 8: return _plan_json()                # PLAN cycle 2
+        if n == 9: return _codegen_json()             # CODEGEN cycle 2: success
         return None
 
     with patch("agent.pipeline.call_llm_raw", side_effect=fake_llm), \
@@ -278,24 +286,25 @@ def test_sdd_denied_security_exits():
     assert "Security" in vm.answer.call_args[0][0].message
 
 
-def test_file_read_action_uses_vm_read():
-    """PLAN action starting with /proc/ triggers vm.read, not vm.exec."""
+def test_file_read_action_plan_reaches_codegen():
+    """PLAN action starting with /proc/ reaches CODEGEN phase without error."""
     vm = MagicMock()
-    read_result = MagicMock()
-    read_result.content = '{"basket_id": "basket_117", "items": []}'
-    vm.read.return_value = read_result
     pre = _make_pre()
+
+    _unsupported_codegen = json.dumps({
+        "script": '_result = {"message": "Checkout not supported", "outcome": "OUTCOME_NONE_UNSUPPORTED", "refs": ["/docs/checkout.md"]}',
+        "test": "assert True",
+    })
 
     with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm([
         _idd_json(reformulated_task="Submit checkout basket_117"),
         _sdd_json(actions=["/proc/baskets/basket_117.json"]),
         _plan_json(action="/proc/baskets/basket_117.json"),
-        _answer_json(outcome="OUTCOME_NONE_UNSUPPORTED", message="Checkout not supported"),
+        _unsupported_codegen,
     ])), patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         stats, _ = run_pipeline(vm, "model", "Submit checkout basket_117", pre, {})
 
-    vm.read.assert_called_once()
     assert stats["outcome"] == "OUTCOME_NONE_UNSUPPORTED"
 
 
@@ -407,16 +416,15 @@ def test_idd_hard_stop_clarification():
 def test_idd_parse_fail_triggers_learn_and_continue():
     """IDD parse failure -> LEARN(error_type=llm_fail) -> next cycle -> success."""
     vm = MagicMock()
-    vm.exec.return_value = _make_exec_result('[{"count": 3}]')
     pre = _make_pre()
 
     with patch("agent.pipeline.call_llm_raw", side_effect=_seq_llm([
-        "NOT_JSON",     # IDD cycle 1 fails to parse
-        _learn_json(),  # LEARN cycle 1
-        _idd_json(),    # IDD cycle 2
-        _sdd_json(),    # SDD cycle 2
-        _plan_json(),   # PLAN cycle 2
-        _answer_json(), # ANSWER cycle 2
+        "NOT_JSON",       # IDD cycle 1 fails to parse
+        _learn_json(),    # LEARN cycle 1
+        _idd_json(),      # IDD cycle 2
+        _sdd_json(),      # SDD cycle 2
+        _plan_json(),     # PLAN cycle 2
+        _codegen_json(),  # CODEGEN cycle 2
     ])), patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         stats, _ = run_pipeline(vm, "model", "task", pre, {})
@@ -428,7 +436,6 @@ def test_idd_parse_fail_triggers_learn_and_continue():
 def test_idd_reformulated_task_reaches_sdd_user_msg():
     """IDD reformulated_task appears in the SDD user message."""
     vm = MagicMock()
-    vm.exec.return_value = _make_exec_result('[{"count": 3}]')
     pre = _make_pre()
 
     captured_user_msgs: list[str] = []
@@ -440,7 +447,7 @@ def test_idd_reformulated_task_reaches_sdd_user_msg():
             return _idd_json(reformulated_task="Return total active products in store_42")
         if n == 2: return _sdd_json()
         if n == 3: return _plan_json()
-        if n == 4: return _answer_json()
+        if n == 4: return _codegen_json()
         return None
 
     with patch("agent.pipeline.call_llm_raw", side_effect=fake_llm), \

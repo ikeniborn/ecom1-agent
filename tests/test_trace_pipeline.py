@@ -75,14 +75,18 @@ def _answer_json():
     })
 
 
+def _codegen_json():
+    script = '_result = {"message": "Found 3 products", "outcome": "OUTCOME_OK", "refs": []}'
+    return json.dumps({"script": script, "test": "assert True"})
+
+
 def test_llm_call_records_written_on_success(tmp_path):
-    """Happy path: sdd + plan + answer llm_call records written."""
+    """Happy path: idd + sdd + plan + codegen llm_call records written."""
     t, p = _collect_trace(tmp_path)
 
     vm = MagicMock()
-    vm.exec.return_value = _exec_ok()
 
-    with patch("agent.pipeline.call_llm_raw", side_effect=[_idd_json(), _sdd_json(), _plan_json(), _answer_json()]), \
+    with patch("agent.pipeline.call_llm_raw", side_effect=[_idd_json(), _sdd_json(), _plan_json(), _codegen_json()]), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})
@@ -94,7 +98,7 @@ def test_llm_call_records_written_on_success(tmp_path):
     llm_calls = [r for r in records if r["type"] == "llm_call"]
     phases = {r["phase"] for r in llm_calls}
     assert "sdd" in phases
-    assert "answer" in phases
+    assert "idd" in phases
     for r in llm_calls:
         assert "system_sha256" in r
         assert "cycle" in r
@@ -102,13 +106,12 @@ def test_llm_call_records_written_on_success(tmp_path):
 
 
 def test_sql_execute_record_written(tmp_path):
-    """sql_execute record written on successful SQL action."""
+    """Codegen pipeline: llm_call records written for idd/sdd/plan/codegen phases."""
     t, p = _collect_trace(tmp_path)
 
     vm = MagicMock()
-    vm.exec.return_value = _exec_ok()
 
-    with patch("agent.pipeline.call_llm_raw", side_effect=[_idd_json(), _sdd_json(), _plan_json(), _answer_json()]), \
+    with patch("agent.pipeline.call_llm_raw", side_effect=[_idd_json(), _sdd_json(), _plan_json(), _codegen_json()]), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})
@@ -117,11 +120,11 @@ def test_sql_execute_record_written(tmp_path):
     set_trace(None)
 
     records = [json.loads(ln) for ln in p.read_text().splitlines() if ln.strip()]
-    types = [r["type"] for r in records]
-    assert "sql_execute" in types
-    exec_r = next(r for r in records if r["type"] == "sql_execute")
-    assert "duration_ms" in exec_r
-    assert isinstance(exec_r["has_data"], bool)
+    llm_calls = [r for r in records if r["type"] == "llm_call"]
+    phases = {r["phase"] for r in llm_calls}
+    assert "plan" in phases
+    for r in llm_calls:
+        assert "duration_ms" in r
 
 
 def test_plan_phase_llm_call_recorded(tmp_path):
@@ -129,9 +132,8 @@ def test_plan_phase_llm_call_recorded(tmp_path):
     t, p = _collect_trace(tmp_path)
 
     vm = MagicMock()
-    vm.exec.return_value = _exec_ok()
 
-    with patch("agent.pipeline.call_llm_raw", side_effect=[_idd_json(), _sdd_json(), _plan_json(), _answer_json()]), \
+    with patch("agent.pipeline.call_llm_raw", side_effect=[_idd_json(), _sdd_json(), _plan_json(), _codegen_json()]), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
          patch("agent.pipeline.check_retry_loop", return_value=None):
         run_pipeline(vm, "anthropic/claude-sonnet-4-6", "find X", _make_pre(), {})
