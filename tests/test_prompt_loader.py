@@ -60,3 +60,10 @@ def test_task_blocks_yaml_has_no_email_inbox():
         assert "email" not in cfg
         assert "inbox" not in cfg
         assert "queue" not in cfg
+
+
+def test_codegen_prompt_exists():
+    from agent.prompt import load_prompt
+    content = load_prompt("codegen")
+    assert content, "codegen.md prompt must exist and be non-empty"
+    assert "CODEGEN" in content or "script" in content.lower()
