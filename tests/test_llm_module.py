@@ -72,3 +72,13 @@ def test_resolve_model_for_phase_unknown_phase(monkeypatch):
     import agent.llm as llm
     result = llm._resolve_model_for_phase("unknown_phase", "anthropic/claude-sonnet-4-6")
     assert result == "anthropic/claude-sonnet-4-6"
+
+
+def test_resolve_codegen_phase_uses_model_codegen(monkeypatch):
+    import os
+    monkeypatch.setenv("MODEL_CODEGEN", "anthropic/claude-haiku-4-5-20251001")
+    import importlib
+    import agent.llm as llm_mod
+    importlib.reload(llm_mod)
+    result = llm_mod._resolve_model_for_phase("codegen", "anthropic/claude-sonnet-4-6")
+    assert result == "anthropic/claude-haiku-4-5-20251001"
