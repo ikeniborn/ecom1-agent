@@ -251,6 +251,7 @@ def _build_learn_user_msg(
     plan_out=None,
     answer_out=None,
     idd_out: IddOutput | None = None,
+    heuristic_code: str | None = None,
 ) -> str:
     parts = [
         f"TASK: {task_text}",
@@ -265,6 +266,8 @@ def _build_learn_user_msg(
         parts.append(f"PLAN_OUTPUT:\n{plan_out.model_dump_json(indent=2)}")
     if answer_out is not None:
         parts.append(f"ANSWER_OUTPUT:\n{answer_out.model_dump_json(indent=2)}")
+    if heuristic_code:
+        parts.append(f"HEURISTIC_CODE:\n```python\n{heuristic_code[:3000]}\n```")
     if existing_entries:
         rules_lines = "\n".join(
             f"  - id: {e['id']}\n    content: {e['content']!r}"
@@ -520,6 +523,65 @@ def _run_codegen(
     (heuristics_dir / f"{task_id}_test.py").write_text(test_code, encoding="utf-8")
 
     return CodegenOutput(script_path=script_path, script_code=script_code, test_code=test_code), ""
+
+
+def _run_answer(
+    vm,
+    codegen_out: "CodegenOutput",
+    task_text: str,
+) -> "tuple[AnswerOutput | None, str]":
+    """ANSWER phase: exec heuristic script, call vm.answer(). No LLM call."""
+    # Pre-exec: scan for filesystem access outside data/
+    try:
+        tree = ast.parse(codegen_out.script_code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                fname = ""
+                if isinstance(func, ast.Name):
+                    fname = func.id
+                elif isinstance(func, ast.Attribute):
+                    fname = func.attr
+                if fname == "open" and node.args:
+                    first_arg = node.args[0]
+                    if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+                        if not first_arg.value.startswith("data/"):
+                            return None, f"Script filesystem hard error: open() outside data/ detected: {first_arg.value!r}"
+    except Exception:
+        pass
+
+    exec_globals: dict = {"vm": vm, "task_text": task_text, "_result": None}
+    try:
+        exec(compile(codegen_out.script_code, codegen_out.script_path, "exec"), exec_globals)
+    except (OSError, PermissionError) as e:
+        return None, f"Script filesystem hard error (not routed to LEARN): {e}"
+    except Exception as e:
+        return None, f"Script runtime error: {e}"
+
+    raw_result = exec_globals.get("_result")
+    if not raw_result or not isinstance(raw_result, dict):
+        return None, "Script did not set _result"
+    if "outcome" not in raw_result or "message" not in raw_result:
+        return None, "Script _result missing required fields: outcome, message"
+    if raw_result["outcome"] not in OUTCOME_BY_NAME:
+        return None, f"Unknown outcome code in _result: {raw_result['outcome']!r}"
+
+    try:
+        vm.answer(AnswerRequest(
+            message=raw_result["message"],
+            outcome=OUTCOME_BY_NAME[raw_result["outcome"]],
+            refs=raw_result.get("refs", []),
+        ))
+    except Exception as e:
+        return None, f"vm.answer() error: {e}"
+
+    return AnswerOutput(
+        reasoning="",
+        message=raw_result["message"],
+        outcome=raw_result["outcome"],
+        grounding_refs=raw_result.get("refs", []),
+        completed_steps=[],
+    ), ""
 
 
 def _run_learn(

@@ -1,7 +1,7 @@
 import json
 from typing import Literal
 from unittest.mock import MagicMock, patch
-from agent.pipeline import run_pipeline, _run_learn, _build_plan_user_msg, _build_idd_user_msg, _build_sdd_user_msg
+from agent.pipeline import run_pipeline, _run_learn, _build_plan_user_msg, _build_idd_user_msg, _build_sdd_user_msg, _build_learn_user_msg
 from agent.prephase import PrephaseResult
 from agent.prompt_assembler import AssembledPrompt
 from agent.models import IddOutput as _IddOutput
@@ -452,3 +452,15 @@ def test_idd_reformulated_task_reaches_sdd_user_msg():
     sdd_user_msg = captured_user_msgs[1]  # second call = SDD
     assert "Return total active products in store_42" in sdd_user_msg
     assert "TASK:" in sdd_user_msg
+
+
+def test_build_learn_user_msg_includes_heuristic_code():
+    msg = _build_learn_user_msg(
+        task_text="How many orders?",
+        error="Script runtime error: KeyError",
+        error_type="semantic",
+        existing_entries=[],
+        heuristic_code="_result = {'message': 'bad', 'outcome': 'OUTCOME_OK', 'refs': []}",
+    )
+    assert "HEURISTIC_CODE" in msg
+    assert "KeyError" in msg
