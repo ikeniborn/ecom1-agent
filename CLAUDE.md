@@ -29,6 +29,9 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `MODEL_PLAN` | Override for PLAN phase (defaults to `MODEL`) |
 | `MODEL_LEARN` | Override for LEARN phase (defaults to `MODEL`) |
 | `MODEL_CONSOLIDATE` | Override for CONSOLIDATE phase (defaults to `MODEL`) |
+| `MODEL_CODEGEN` | Override for CODEGEN phase (defaults to `MODEL`) |
+| `MAX_TOKENS_CODEGEN` | Max tokens for CODEGEN phase response (default 8192) |
+| `CODEGEN_LINT_RETRIES` | Max AST lint retry attempts in CODEGEN before LEARN (default 3) |
 | `MAX_STEPS` | Pipeline cycle limit per task (default 3) |
 | `MAX_TOKENS_SDD` | Max tokens for SDD phase response (default 8192) |
 | `MAX_TOKENS_PLAN` | Max tokens for PLAN phase response (default 4096) |
@@ -49,17 +52,17 @@ Entry point: `main.py` → BitGN harness → `agent/orchestrator.py:run_agent()`
 
 **Execution flow per task:**
 1. `prephase.py:run_prephase()` — fetches `/AGENTS.MD` (vault rules), reads `.schema` + PRAGMA, builds `schema_digest` and `agents_md_index`
-2. `pipeline.py:run_pipeline()` — main loop (max `MAX_STEPS` cycles):
+2. `pipeline.py:run_pipeline()` — fast path check, then main loop (max `MAX_STEPS` cycles):
+   - **FAST PATH** (if `data/heuristics/{task_id}.py` exists and `last_run.heuristic_valid==True`) → exec script → `vm.answer()` — 0 LLM calls; on failure falls through to full path immediately
    - **ASSEMBLE** → `prompt_assembler.py:assemble_prompt()` — 1 LLM call builds `unified_context` from learned knowledge, vault, and schema
+   - **IDD** → LLM call → `IddOutput` (intent, extracted_params, success_criteria)
    - **SDD** → LLM call with `[unified_context, sdd_guide]` → `json_extract.py` → `SddOutput`
-   - **SCHEMA CHECK** → `schema_gate.py` validates column/table names
-   - **VALIDATE** → EXPLAIN check for SQL syntax
-   - **TDD** → `test_runner.py` generates and runs SQL+answer tests (always enabled)
-   - **EXECUTE** → runs SQL on ECOM VM via Connect-RPC
-   - **ANSWER** → LLM with `[unified_context, answer_guide]` → `AnswerOutput` → `vm.answer()`
-   - On any phase failure: **LEARN** → LLM with `[unified_context, learn_guide]` → appends rule to `learn_ctx` → next cycle
-   - On success: marks in-session learn entries active; they persist in `data/learned/{task_id}.yaml`
-   - On all cycles exhausted: in-session learn entries remain written incrementally via `_apply_learn_diff`
+   - **PLAN** → LLM call → `PlanOutput` (primary action anchor)
+   - **CODEGEN** → LLM call with `[unified_context, codegen_guide]` → generates `data/heuristics/{task_id}.py` (self-contained Python script); internal lint-fix loop (ast.parse) + MockVM test execution
+   - **ANSWER** → exec heuristic script → `vm.answer()` — no LLM call; script produces complete answer
+   - On any phase failure: **LEARN** → LLM with `[unified_context, learn_guide]` → appends rule to `learn_ctx` → next cycle (LEARN receives failed script as `heuristic_code`)
+   - On success: marks in-session learn entries active; they persist in `data/learned/{task_id}.yaml`; sets `heuristic_valid=True` in `last_run`
+   - On all cycles exhausted: entries written incrementally; last `data/heuristics/{task_id}.py` preserved
 
 **Prompt assembly** (`prompt_assembler.py:assemble_prompt()`):
 - Called once per cycle with current `learn_ctx`
@@ -77,6 +80,8 @@ Entry point: `main.py` → BitGN harness → `agent/orchestrator.py:run_agent()`
 |------|---------|
 | `data/prompts/*.md` | Phase guides: `sdd`, `tdd`, `learn`, `answer`, `assembler` |
 | `data/learned/{task_id}.yaml` | Permanent per-task knowledge base; entries have active/inactive status; never deleted on success |
+| `data/heuristics/{task_id}.py` | Generated heuristic script; fast path executes this |
+| `data/heuristics/{task_id}_test.py` | Mock test generated alongside script (debug only) |
 | `models.json` | Per-model provider hints and Ollama options (e.g. `num_ctx`) |
 
 ## Notable Constraints

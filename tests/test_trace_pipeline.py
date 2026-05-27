@@ -16,13 +16,6 @@ def _make_pre(db_schema="CREATE TABLE products(id INT, brand TEXT, type TEXT, sk
     return PrephaseResult(agents_md_content="", agents_md_path="/AGENTS.MD", db_schema=db_schema, task_type="sql")
 
 
-def _exec_ok(stdout='[{"count": 3}]'):
-    r = MagicMock()
-    r.stdout = stdout
-    r.output = stdout
-    return r
-
-
 def _collect_trace(tmp_path, task_id="t01"):
     p = tmp_path / f"{task_id}.jsonl"
     t = TraceLogger(p, task_id)
@@ -62,16 +55,6 @@ def _plan_json():
         "approach": "single count query",
         "steps": ["filter products by type='X'", "return count"],
         "action": "SELECT COUNT(*) FROM products WHERE type='X'",
-    })
-
-
-def _answer_json():
-    return json.dumps({
-        "reasoning": "SQL returned 3",
-        "message": "Found 3 products",
-        "outcome": "OUTCOME_OK",
-        "grounding_refs": [],
-        "completed_steps": [],
     })
 
 

@@ -38,23 +38,6 @@ def _plan_json(action=None):
     })
 
 
-def _answer_json(outcome="OUTCOME_OK", message="<YES> 3 found"):
-    return json.dumps({
-        "reasoning": "SQL returned 3 rows",
-        "message": message,
-        "outcome": outcome,
-        "grounding_refs": ["/proc/catalog/ABC-001.json"],
-        "completed_steps": ["ran SQL", "found products"],
-    })
-
-
-_GOOD_SCRIPT = '''
-_result = {"message": "<YES> 3 found", "outcome": "OUTCOME_OK", "refs": ["/proc/catalog/ABC-001.json"]}
-if __name__ == "__main__":
-    pass
-'''
-
-
 def _codegen_json(outcome="OUTCOME_OK", message="<YES> 3 found"):
     script = f'''
 _result = {{"message": "{message}", "outcome": "{outcome}", "refs": ["/proc/catalog/ABC-001.json"]}}
