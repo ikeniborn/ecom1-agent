@@ -22,10 +22,19 @@ run_pipeline():
   )
 
   if fast_path_eligible:
-      → _run_fast_path()
-  else:
-      → full pipeline cycle loop
+      ok, fast_error = _run_fast_path()
+      if ok:
+          return                        # done, 0 LLM calls
+      # fast path failed → fall through to full path immediately
+      last_error = fast_error           # error context passed to first LEARN cycle
+      save_last_run(task_id, heuristic_valid=False)
+
+  # full pipeline cycle loop (runs on first encounter OR after fast path failure)
+  for cycle in range(MAX_STEPS):
+    ASSEMBLE → IDD → SDD → PLAN → CODEGEN → ANSWER → LEARN/CONSOLIDATE
 ```
+
+LLM вызывается **только если fast path упал или скрипт ещё не существует**.
 
 ### Fast path
 
@@ -50,14 +59,15 @@ _run_fast_path(vm, task_id, task_text):
       refs=raw_result.get("refs", []),
   ))                                     # may raise APIError
 
-  on APIError:
+  on APIError or script exception:
     save_last_run(task_id, status="failure", heuristic_valid=False)
-    return  # next run → full path
+    return False, f"fast path error: {error}"   # → caller runs full path immediately
 
   save_last_run(task_id, status="success", heuristic_valid=True)
+  return True, ""
 ```
 
-Failure at any step invalidates the heuristic flag; next run runs the full path which regenerates the script.
+Fast path failure triggers full path **in the same run**. The `fast_error` is passed as `last_error` into the first LEARN cycle so the script is regenerated with error context.
 
 ### Full path (existing cycle loop, phases modified)
 
