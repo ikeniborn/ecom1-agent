@@ -96,6 +96,12 @@ class AnswerOutput(BaseModel):
     completed_steps: list[str]
 
 
+class CodegenOutput(BaseModel):
+    script_path: str
+    script_code: str
+    test_code: str
+
+
 class ResolveCandidate(BaseModel):
     term: str
     field: str

@@ -27,3 +27,14 @@ def test_learn_output_with_deactivate():
     )
     assert out.deactivate == ["old-rule-1"]
     assert out.deactivate_reason == "superseded"
+
+
+def test_codegen_output_model():
+    from agent.models import CodegenOutput
+    obj = CodegenOutput(
+        script_path="data/heuristics/t01.py",
+        script_code="_result = {'message': 'ok', 'outcome': 'OUTCOME_OK', 'refs': []}",
+        test_code="assert True",
+    )
+    assert obj.script_path == "data/heuristics/t01.py"
+    assert "OUTCOME_OK" in obj.script_code

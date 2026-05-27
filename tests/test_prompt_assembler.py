@@ -56,3 +56,28 @@ def test_assemble_includes_learn_ctx_in_sources(tmp_path):
 
     assert "Always SELECT sku" in captured_sources[0]
     assert "## LEARNED" in captured_sources[0]
+
+
+def test_save_last_run_heuristic_valid(tmp_path, monkeypatch):
+    from agent import prompt_assembler
+    monkeypatch.setattr(prompt_assembler, "_LEARNED_DIR", tmp_path)
+    prompt_assembler.save_last_run(
+        task_id="t99",
+        status="success",
+        outcome="OUTCOME_OK",
+        cycles_used=1,
+        grounding_refs_count=2,
+        heuristic_valid=True,
+    )
+    import yaml
+    data = yaml.safe_load((tmp_path / "t99.yaml").read_text())
+    assert data["last_run"]["heuristic_valid"] is True
+
+
+def test_save_last_run_heuristic_valid_default_false(tmp_path, monkeypatch):
+    from agent import prompt_assembler
+    monkeypatch.setattr(prompt_assembler, "_LEARNED_DIR", tmp_path)
+    prompt_assembler.save_last_run("t99", "failure", "OUTCOME_NONE_CLARIFICATION", 3)
+    import yaml
+    data = yaml.safe_load((tmp_path / "t99.yaml").read_text())
+    assert data["last_run"]["heuristic_valid"] is False
