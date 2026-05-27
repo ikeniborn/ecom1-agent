@@ -11,7 +11,7 @@ Change: LLM becomes a **heuristic generator**, not a data analyzer. Code becomes
 
 ## Desired Outcomes
 
-- Pipeline produces `data/heuristics/{task_id}.py` — self-contained Python script with all logic (SQL, regex, conditions, loops) to solve the task
+- Pipeline produces `data/heuristics/{task_id}.py` — self-contained Python script with any effective logic to solve the task: SQL queries, regex, if/else conditions, loops, string matching, data aggregation, sorting, filtering, statistical calculations, fuzzy matching, graph traversal, caching, memoization, or any other technique appropriate for the task
 - Script runs in isolated sandbox; produces result without LLM data analysis
 - LLM validates result (IDD/SDD/PLAN context) before calling `vm.answer()`
 - Repeat task execution: no LLM calls, or minimal patch to existing heuristic
@@ -36,7 +36,7 @@ Change: LLM becomes a **heuristic generator**, not a data analyzer. Code becomes
 
 ### Steering (behavioral guidance)
 
-- LLM generates heuristic code with all knowledge baked in (schema, SQL) — script is self-contained, not runtime-context-dependent
+- LLM generates heuristic code with all knowledge baked in (schema, data patterns, queries) — script is self-contained, not runtime-context-dependent; no restriction on technique: any Python approach that solves the task efficiently is valid
 - No forbidden code patterns in generated scripts, but network access and FS outside `data/` are blocked at sandbox level
 - `vm.answer()` must only be called after LLM validates heuristic output — never directly from generated script
 - Generated script may call `vm.*` SQL methods directly (data reads)
