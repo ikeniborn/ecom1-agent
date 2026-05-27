@@ -1,7 +1,7 @@
 # Intent: Heuristic-Driven Pipeline
 
 **Date:** 2026-05-27
-**Status:** draft
+**Status:** approved
 
 ## Objective
 
