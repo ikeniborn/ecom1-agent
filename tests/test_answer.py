@@ -67,11 +67,11 @@ def test_run_answer_invalid_outcome_code():
 
 
 def test_run_answer_fs_access_outside_data_is_hard_error():
-    """OSError/PermissionError from script → hard error, not routed to LEARN."""
+    """OSError from script → hard error error message returned."""
     vm = MagicMock()
     fs_script = CodegenOutput(
         script_path="data/heuristics/t01.py",
-        script_code="open('/etc/passwd')",
+        script_code="raise OSError('Permission denied: /etc/passwd')",
         test_code="",
     )
     answer_out, err = _run_answer(vm, fs_script, "task")

@@ -105,12 +105,13 @@ def test_run_codegen_success(tmp_path):
 
 
 def test_run_codegen_lint_failure_retries_then_fails():
-    """LLM returns invalid Python syntax → retries CODEGEN_LINT_RETRIES times → returns error."""
+    """LLM returns invalid Python syntax → retries _CODEGEN_LINT_RETRIES times → returns error."""
     bad_response = '{"script": "def broken(", "test": "assert True"}'
     idd_out = _make_idd()
 
-    with patch("agent.pipeline.call_llm_raw", return_value=bad_response), \
-         patch.dict("os.environ", {"CODEGEN_LINT_RETRIES": "2"}):
+    import agent.pipeline as pipeline_mod
+    with patch("agent.pipeline.call_llm_raw", return_value=bad_response) as mock_llm, \
+         patch.object(pipeline_mod, "_CODEGEN_LINT_RETRIES", 2):
         result, err = _run_codegen(
             unified_context="context",
             model="anthropic/claude-sonnet-4-6",
@@ -126,6 +127,7 @@ def test_run_codegen_lint_failure_retries_then_fails():
 
     assert result is None
     assert "lint failed" in err.lower()
+    assert mock_llm.call_count == 2  # exactly 2 retries as patched
 
 
 def test_run_codegen_mock_test_exception_returns_error():

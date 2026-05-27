@@ -2,8 +2,7 @@
 from unittest.mock import MagicMock, patch
 
 from agent.json_extract import _obj_mutation_tool
-from agent.pipeline import _build_answer_user_msg, run_pipeline
-from agent.models import ExecuteOutput
+from agent.pipeline import _build_learn_user_msg, run_pipeline
 from agent.prephase import PrephaseResult
 from agent.prompt_assembler import AssembledPrompt
 
@@ -46,17 +45,19 @@ def test_obj_mutation_tool_no_mutation():
     assert _obj_mutation_tool(obj) is None
 
 
-# ── Bug 1 / Part 1: _build_answer_user_msg ───────────────────────────────────
+# ── Bug 1 / Part 1: _build_learn_user_msg ────────────────────────────────────
 
-def test_build_answer_user_msg_includes_task_and_execute():
-    """_build_answer_user_msg includes task text and execute output in message."""
-    execute_out = ExecuteOutput(
-        results=[{"output": '[{"path": "/proc/catalog/plumbing/PLB-2GJZ9R7K.json"}]'}],
-        action="SELECT path FROM products WHERE type='Pipe Fittings'",
+def test_build_learn_user_msg_includes_task_and_error():
+    """_build_learn_user_msg includes task text and error in message."""
+    msg = _build_learn_user_msg(
+        task_text="find pipe fittings",
+        error="Schema check failed: unknown column foo",
+        error_type="semantic",
+        existing_entries=[],
     )
-    msg = _build_answer_user_msg("find pipe fittings", execute_out)
     assert "find pipe fittings" in msg
-    assert "EXECUTE_OUTPUT" in msg
+    assert "Schema check failed" in msg
+    assert "ERROR_TYPE" in msg
 
 
 # ── Bug 1 / Part 2: clean_refs exact-path filter ─────────────────────────────

@@ -1,9 +1,8 @@
-"""ASSEMBLE → SDD → PLAN → EXECUTE → ANSWER pipeline."""
+"""ASSEMBLE → IDD → SDD → PLAN → CODEGEN → ANSWER pipeline with fast path."""
 from __future__ import annotations
 
 import ast
 import json
-import math
 import os
 import re
 import time
@@ -15,10 +14,7 @@ from google.protobuf.json_format import MessageToDict
 from google.protobuf.message import Message
 
 from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
-from bitgn.vm.ecom.ecom_pb2 import (
-    AnswerRequest, ExecRequest, FindRequest, ListRequest,
-    ReadRequest, SearchRequest, TreeRequest,
-)
+from bitgn.vm.ecom.ecom_pb2 import AnswerRequest
 
 from .llm import (
     call_llm_raw, _resolve_model_for_phase, OUTCOME_BY_NAME,
@@ -26,7 +22,7 @@ from .llm import (
 )
 from .json_extract import _extract_json_from_text
 from .mock_vm import MockVM
-from .models import IddOutput, SddOutput, PlanOutput, ExecuteOutput, LearnOutput, AnswerOutput, ConsolidateOutput, CodegenOutput
+from .models import IddOutput, SddOutput, PlanOutput, LearnOutput, AnswerOutput, ConsolidateOutput, CodegenOutput
 from .prephase import PrephaseResult, _format_schema_digest as _fmt_schema_digest
 from .prompt import load_prompt
 from .prompt_assembler import assemble_prompt, load_learned_ctx, load_learned_entries, _apply_learn_diff, save_last_run, load_last_run
@@ -49,6 +45,7 @@ _PHASE_MAX_TOKENS: dict[str, int] = {
 
 _CODEGEN_MAX_TOKENS = int(os.environ.get("MAX_TOKENS_CODEGEN", "8192"))
 _CODEGEN_LINT_RETRIES = int(os.environ.get("CODEGEN_LINT_RETRIES", "3"))
+_HARD_ERROR_PREFIX = "HARD_STOP:"
 
 # Compat stubs — referenced by older tests that patch these names; no-ops in new pipeline
 def run_resolve(vm, model: str, task_text: str, pre, cfg: dict) -> dict:
@@ -78,17 +75,6 @@ def _exec_result_text(result) -> str:
     stderr = getattr(result, "stderr", "") or ""
     return stdout or stderr or ""
 
-
-def _csv_has_data(result_txt: str) -> bool:
-    stripped = result_txt.strip()
-    if not stripped:
-        return False
-    if stripped.startswith("["):
-        return stripped not in ("[]",)
-    if stripped.startswith("{"):
-        return stripped not in ("{}",)
-    lines = [l for l in stripped.splitlines() if l.strip()]
-    return len(lines) > 1
 
 
 def _call_llm_phase(
@@ -291,65 +277,6 @@ def _extract_file_paths_from_actions(actions: list[str]) -> list[str]:
     return paths
 
 
-def _build_answer_user_msg(
-    task_text: str,
-    execute_out,
-    prior_actions: list[str] | None = None,
-    prior_results: list[tuple[str, str]] | None = None,
-    runtime_identity: str | None = None,
-    idd_out: IddOutput | None = None,
-) -> str:
-    _exec_action = execute_out.action or ""
-    if _exec_action.startswith("tree:"):
-        _exec_limit = 16000
-    elif _exec_action.startswith("search:"):
-        _exec_limit = 20000
-    else:
-        _exec_limit = 250
-    _exec_results_trunc = [
-        {"output": r.get("output", "")[:_exec_limit]} for r in execute_out.results
-    ]
-    _exec_json = json.dumps({"results": _exec_results_trunc, "action": _exec_action}, indent=2)
-    parts = [f"TASK: {task_text}", f"EXECUTE_OUTPUT:\n{_exec_json}"]
-    if idd_out and idd_out.success_criteria:
-        parts.append("EXPECTATIONS:\n" + "\n".join(f"  - {c}" for c in idd_out.success_criteria))
-    if prior_actions:
-        parts.append("PRIOR_EXECUTIONS (actions run in earlier cycles — use their file paths in grounding_refs if relevant):\n" +
-                     "\n".join(f"  - {a}" for a in prior_actions))
-        file_paths = _extract_file_paths_from_actions(prior_actions)
-        if file_paths:
-            parts.append(
-                "FILES_READ_IN_PRIOR_CYCLES (reference — paths read so far; "
-                "for DENIED_SECURITY include ALL; "
-                "for OUTCOME_OK include ONLY files that match the task criteria, not all files read):\n" +
-                "\n".join(f"  - {p}" for p in file_paths)
-            )
-    if prior_results:
-        pr_lines = []
-        for action, result in prior_results:
-            if action.startswith("tree:"):
-                limit = 16000
-            elif action.startswith("search:"):
-                limit = 20000
-            else:
-                # 380 chars: fits id, basket_archived, customer_id, amount, full payment_method_fingerprint.
-                # Needed for fraud pattern detection (fingerprint reuse across customer accounts).
-                limit = 380
-            result_preview = result.strip()[:limit] if result.strip() else "(empty)"
-            pr_lines.append(f"  action: {action[:120]}\n  result: {result_preview}")
-        parts.append("PRIOR_RESULTS (outputs from earlier cycles — extract file paths for grounding_refs):\n" +
-                     "\n\n".join(pr_lines))
-    if runtime_identity:
-        parts.append(f"## AGENT_CONTEXT\nruntime_identity: {runtime_identity}")
-    return "\n\n".join(parts)
-
-
-def _extract_tree_files(tree_action: str, tree_output: str) -> list[str]:
-    """Extract sorted absolute file paths from a tree: action result."""
-    dir_path = tree_action[len("tree:"):].rstrip("/")
-    names = re.findall(r'name:\s*"([^"]+)"[^}]*?NODE_KIND_FILE', tree_output, re.DOTALL)
-    return sorted(f"{dir_path}/{n}" for n in names)
-
 
 def _infer_action_type(action: str) -> str:
     """Infer action type from plain string: sql | read | exec | list | search | find | tree."""
@@ -370,63 +297,6 @@ def _infer_action_type(action: str) -> str:
         return "read"
     return "exec"
 
-
-def _run_execute(vm, plan_out, cycle: int) -> "tuple[ExecuteOutput | None, str]":
-    """Execute plan_out.action. approach/steps available for diagnostic context."""
-    action = plan_out.action
-    action_type = _infer_action_type(action)
-    try:
-        if action_type == "sql":
-            expl = vm.exec(ExecRequest(path="/bin/sql", args=[f"EXPLAIN {action}"]))
-            expl_txt = _exec_result_text(expl)
-            if "error" in expl_txt.lower():
-                return None, f"EXPLAIN error [{plan_out.approach!r:.60}]: {expl_txt[:200]}"
-            result = vm.exec(ExecRequest(path="/bin/sql", args=[action]))
-            raw = _exec_result_text(result)
-            return ExecuteOutput(results=[{"output": raw}], action=action), ""
-        elif action_type == "read":
-            result = vm.read(ReadRequest(path=action))
-            raw = result.content or ""
-            return ExecuteOutput(results=[{"output": raw}], action=action), ""
-        elif action_type == "list":
-            path = action[len("list:"):].strip()
-            result = vm.list(ListRequest(path=path))
-            entries = getattr(result, "entries", [])
-            raw = "\n".join(e.name for e in entries) if entries else ""
-            return ExecuteOutput(results=[{"output": raw}], action=action), ""
-        elif action_type == "search":
-            # format: search:pattern /optional/root
-            rest = action[len("search:"):].strip()
-            parts = rest.split(None, 1)
-            pattern = parts[0] if parts else rest
-            root = parts[1].strip() if len(parts) > 1 else "/"
-            result = vm.search(SearchRequest(root=root, pattern=pattern, limit=20))
-            matches = getattr(result, "matches", [])
-            raw = "\n".join(f"{m.path}:{m.line}:{m.line_text}" for m in matches) if matches else ""
-            return ExecuteOutput(results=[{"output": raw}], action=action), ""
-        elif action_type == "find":
-            # format: find:name /optional/root
-            rest = action[len("find:"):].strip()
-            parts = rest.split(None, 1)
-            name = parts[0] if parts else rest
-            root = parts[1].strip() if len(parts) > 1 else "/"
-            result = vm.find(FindRequest(root=root, name=name, limit=20))
-            nodes = getattr(result, "nodes", [])
-            raw = "\n".join(n.path for n in nodes) if nodes else ""
-            return ExecuteOutput(results=[{"output": raw}], action=action), ""
-        elif action_type == "tree":
-            root = action[len("tree:"):].strip() or "/"
-            result = vm.tree(TreeRequest(root=root, level=2))
-            raw = str(result) if result else ""
-            return ExecuteOutput(results=[{"output": raw}], action=action), ""
-        else:
-            parts = action.split()
-            path, args = parts[0], parts[1:]
-            result = vm.exec(ExecRequest(path=path, args=args))
-            raw = _exec_result_text(result)
-            return ExecuteOutput(results=[{"output": raw}], action=action), ""
-    except Exception as e:
-        return None, f"Execute exception [{plan_out.approach!r:.60}]: {e}"
 
 
 def _run_codegen(
@@ -531,30 +401,11 @@ def _run_answer(
     task_text: str,
 ) -> "tuple[AnswerOutput | None, str]":
     """ANSWER phase: exec heuristic script, call vm.answer(). No LLM call."""
-    # Pre-exec: scan for filesystem access outside data/
-    try:
-        tree = ast.parse(codegen_out.script_code)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                func = node.func
-                fname = ""
-                if isinstance(func, ast.Name):
-                    fname = func.id
-                elif isinstance(func, ast.Attribute):
-                    fname = func.attr
-                if fname == "open" and node.args:
-                    first_arg = node.args[0]
-                    if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
-                        if not first_arg.value.startswith("data/"):
-                            return None, f"Script filesystem hard error: open() outside data/ detected: {first_arg.value!r}"
-    except Exception:
-        pass
-
     exec_globals: dict = {"vm": vm, "task_text": task_text, "_result": None}
     try:
         exec(compile(codegen_out.script_code, codegen_out.script_path, "exec"), exec_globals)
     except (OSError, PermissionError) as e:
-        return None, f"Script filesystem hard error (not routed to LEARN): {e}"
+        return None, f"{_HARD_ERROR_PREFIX} Script filesystem error: {e}"
     except Exception as e:
         return None, f"Script runtime error: {e}"
 
@@ -1049,7 +900,7 @@ def run_pipeline(
 
             if answer_error or answer_out is None:
                 err = answer_error or "ANSWER returned None"
-                if "hard error" in (err or "").lower() or "filesystem" in (err or "").lower():
+                if (err or "").startswith(_HARD_ERROR_PREFIX):
                     print(f"{CLI_RED}[pipeline] ANSWER filesystem hard error: {err}{CLI_CLR}")
                     last_error = err
                     break

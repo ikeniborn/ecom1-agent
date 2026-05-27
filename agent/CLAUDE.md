@@ -25,21 +25,23 @@ Entry: `orchestrator.py:run_agent()` → `prephase.py` → `pipeline.py`
 **Phase execution order (per cycle, up to `MAX_STEPS` cycles):**
 
 1. **ASSEMBLE** (`prompt_assembler.py:assemble_prompt()`) — 1 LLM call; merges learned knowledge + vault + schema into `unified_context` string
-2. **SDD** — LLM call with `[unified_context, sdd_guide]` → `json_extract.py` → `SddOutput` (queries + agents_md_refs)
-3. **AGENTS.MD refs check** — if `agents_md_refs` empty but index terms appear in task → LEARN
-4. **SCHEMA** (`schema_gate.py:check_schema_compliance()`) — unknown columns, unverified literals, double-key JOINs on `product_properties`
-5. **VALIDATE** — `EXPLAIN <query>` via VM exec
-6. **TDD** (`test_runner.py`) — always runs; generates SQL + answer tests, executes them
-7. **EXECUTE** — runs queries; empty result set triggers LEARN
-8. **ANSWER** — LLM with `[unified_context, answer_guide]` → `AnswerOutput` → `vm.answer()`
-9. **LEARN** (on any failure) — LLM with `[unified_context, learn_guide]` → appends rule to `learn_ctx` → `continue` to next cycle
+2. **IDD** — LLM call → `IddOutput`; classifies intent, extracts params; may hard-stop with `vm.answer()`
+3. **SDD** — LLM call with `[unified_context, sdd_guide]` → `json_extract.py` → `SddOutput`; may short-circuit on DENIED_SECURITY/UNSUPPORTED
+4. **PLAN** — LLM call → `PlanOutput`; selects action; retry-loop guard applied
+5. **CODEGEN** — LLM generates heuristic script + mock test → lint + mock-exec; writes `data/heuristics/{task_id}.py`
+6. **ANSWER** — executes heuristic script on real VM → `vm.answer()`; no LLM call
+7. **LEARN** (on any failure) — LLM with `[unified_context, learn_guide]` → appends rule to `learn_ctx` → `continue` to next cycle
+
+**Fast path** (when `data/heuristics/{task_id}.py` exists and last run was successful): skips all LLM calls, runs existing script directly → `vm.answer()`; falls through to full path on failure.
 
 On **success**: in-session learn entries remain in `data/learned/{task_id}.yaml` (written incrementally by `_apply_learn_diff`); no separate clear step.
 On **exhaustion**: same — entries already written incrementally; no extra persist call.
 
 **Pydantic models** (`models.py`):
-- `SddOutput` — `queries`, `agents_md_refs`, `reasoning`, `error`
-- `TestOutput` — `sql_tests`, `answer_tests`
+- `IddOutput` — `intent_objective`, `reformulated_task`, `intent_type`, `extracted_params`, `decision`, `stop_code`, `stop_message`
+- `SddOutput` — `spec_goal`, `success_criteria`, `plan`, `actions`, `error_code`
+- `PlanOutput` — `approach`, `steps`, `action`
+- `CodegenOutput` — `script_path`, `script_code`, `test_code`
 - `LearnOutput` — `rule_content`, `agents_md_anchor`, `reasoning`, `deactivate`, `deactivate_reason`, `skip`, `skip_reason`
 - `AnswerOutput` — `message`, `outcome`, `grounding_refs`
 
