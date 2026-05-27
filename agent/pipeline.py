@@ -10,9 +10,6 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from google.protobuf.json_format import MessageToDict
-from google.protobuf.message import Message
-
 from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
 from bitgn.vm.ecom.ecom_pb2 import AnswerRequest
 
@@ -61,19 +58,6 @@ def _format_confirmed_values(cv: dict) -> str:
     """Compat stub — confirmed_values removed from SDD pipeline."""
     return ""
 
-
-def _exec_result_text(result) -> str:
-    if isinstance(result, Message):
-        try:
-            d = MessageToDict(result)
-            stdout = d.get("stdout", "") or d.get("output", "") or ""
-            stderr = d.get("stderr", "") or ""
-            return stdout or stderr or ""
-        except Exception:
-            pass
-    stdout = getattr(result, "stdout", "") or getattr(result, "output", "") or ""
-    stderr = getattr(result, "stderr", "") or ""
-    return stdout or stderr or ""
 
 
 
@@ -264,17 +248,6 @@ def _build_learn_user_msg(
             parts.append(f"EXISTING_RULES:\n{rules_lines}")
     return "\n\n".join(parts)
 
-
-def _extract_file_paths_from_actions(actions: list[str]) -> list[str]:
-    """Extract absolute file paths from action strings for grounding_refs hints."""
-    paths: list[str] = []
-    for a in actions:
-        s = a.strip()
-        if s.startswith("/") and not s.startswith("/bin/") and not s.startswith("/usr/"):
-            paths.append(s)
-        elif s.startswith("search:"):
-            pass  # search results have paths extracted at answer time
-    return paths
 
 
 
