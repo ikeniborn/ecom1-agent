@@ -949,6 +949,14 @@ def run_pipeline(
                 print(f"{CLI_BLUE}[pipeline] injected store filter {_store_filter} into SQL{CLI_CLR}")
 
             # ── CODEGEN ──────────────────────────────────────────────────────
+            _heuristic_hint = ""
+            if last_error.startswith("schema changed") and task_id:
+                _h_path = Path("data") / "heuristics" / f"{task_id}.py"
+                if _h_path.exists():
+                    _heuristic_hint = (
+                        f"HEURISTIC_HINT: data/heuristics/{task_id}.py may be reusable with updated schema.\n"
+                        f"{last_error}. Review SQL/read calls for schema compatibility."
+                    )
             _t0 = time.monotonic()
             codegen_out, codegen_error = _run_codegen(
                 unified_context=unified_context,
@@ -961,6 +969,7 @@ def run_pipeline(
                 plan_out=plan_out,
                 pre=pre,
                 cycle=cycle + 1,
+                heuristic_hint=_heuristic_hint,
             )
             _dur = int((time.monotonic() - _t0) * 1000)
 

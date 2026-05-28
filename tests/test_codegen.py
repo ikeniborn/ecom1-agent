@@ -269,3 +269,35 @@ def test_run_codegen_dual_run_crash_returns_hardcoded_prefix():
             cycle=1,
         )
     assert err.startswith("HARDCODED_PARAMS:"), f"Expected HARDCODED_PARAMS: prefix, got: {err!r}"
+
+
+def test_run_codegen_includes_heuristic_hint_when_provided():
+    """When heuristic_hint is passed, it appears in the user message sent to LLM."""
+    captured_user_msgs: list[str] = []
+
+    def _capture_llm(system, user_msg, *a, **kw):
+        captured_user_msgs.append(user_msg)
+        return _GOOD_LLM_RESPONSE
+
+    with patch("agent.pipeline.call_llm_raw", side_effect=_capture_llm), \
+         patch("agent.pipeline.Path") as mock_path_cls:
+        mock_dir = MagicMock()
+        mock_path_cls.return_value = mock_dir
+        mock_dir.__truediv__ = MagicMock(return_value=MagicMock())
+
+        _run_codegen(
+            unified_context="context",
+            model="anthropic/claude-sonnet-4-6",
+            cfg={},
+            task_text="How many orders?",
+            task_id="t01",
+            idd_out=_make_idd(),
+            sdd_out=_make_sdd(),
+            plan_out=_make_plan(),
+            pre=_make_pre(),
+            cycle=1,
+            heuristic_hint="HEURISTIC_HINT: data/heuristics/t01.py may be reusable.",
+        )
+
+    assert captured_user_msgs, "LLM should have been called"
+    assert "HEURISTIC_HINT" in captured_user_msgs[0], "Hint must appear in first LLM call user message"
