@@ -1,7 +1,7 @@
 # Intent: Pipeline Redesign — DESIGN + CODEGEN Two-Phase Architecture
 
 **Date:** 2026-05-28
-**Status:** draft
+**Status:** approved
 
 ## Objective
 
