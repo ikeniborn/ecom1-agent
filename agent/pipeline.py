@@ -321,6 +321,7 @@ def _run_codegen(
     plan_out: "PlanOutput",
     pre: "PrephaseResult",
     cycle: int,
+    heuristic_hint: str = "",
 ) -> "tuple[CodegenOutput | None, str]":
     """CODEGEN phase: LLM generates heuristic script + mock test. Returns (CodegenOutput, error)."""
     codegen_model = _resolve_model_for_phase("codegen", model)
@@ -340,6 +341,8 @@ def _run_codegen(
         user_parts.append("SUCCESS_CRITERIA:\n" + "\n".join(f"  - {c}" for c in idd_out.success_criteria))
     user_parts.append(f"SDD_GOAL: {sdd_out.spec_goal}")
     user_parts.append(f"PLAN_ACTION: {plan_out.action}")
+    if heuristic_hint:
+        user_parts.append(heuristic_hint)
     user_msg = "\n\n".join(user_parts)
 
     system: list[dict] = [
@@ -350,12 +353,13 @@ def _run_codegen(
     lint_error: str | None = None
     script_code = ""
     test_code = ""
+    _last_was_hardcoded = False
+    _schema_str = pre.schema_digest if isinstance(pre.schema_digest, str) else str(pre.schema_digest)
+    exec_globals_for_test: dict = {}
 
     for attempt in range(_CODEGEN_LINT_RETRIES):
-        if lint_error:
-            retry_msg = f"{user_msg}\n\nPREVIOUS_LINT_ERROR: {lint_error}\nFix the syntax error and regenerate."
-        else:
-            retry_msg = user_msg
+        _last_was_hardcoded = False
+        retry_msg = f"{user_msg}\n\nPREVIOUS_LINT_ERROR: {lint_error}\nFix and regenerate." if lint_error else user_msg
 
         tok_info: dict = {}
         raw = call_llm_raw(system, retry_msg, codegen_model, cfg,
@@ -372,6 +376,7 @@ def _run_codegen(
         script_code = extracted.get("script", "")
         test_code = extracted.get("test", "")
 
+        # AST lint check
         lint_error = None
         for label, code in [("script", script_code), ("test", test_code)]:
             try:
@@ -379,24 +384,71 @@ def _run_codegen(
             except SyntaxError as e:
                 lint_error = f"{label} syntax error: {e}"
                 break
+        if lint_error:
+            continue
 
-        if lint_error is None:
-            break
+        # AST hardcode detection
+        hc_reason = _detect_hardcoded_params(script_code, task_text)
+        if hc_reason:
+            lint_error = (
+                f"Hardcoded param detected: {hc_reason}. "
+                f"Extract all task-specific values from the task_text variable using regex."
+            )
+            _last_was_hardcoded = True
+            continue
+
+        # Dual-run step 1: original task_text
+        mock_vm_orig = MockVM(extracted_params=idd_out.extracted_params, schema_digest=_schema_str)
+        _eg_orig: dict = {"vm": mock_vm_orig, "task_text": task_text, "_result": None}
+        try:
+            exec(compile(script_code, f"{task_id}.py", "exec"), _eg_orig)
+        except Exception as e:
+            lint_error = f"Script runtime error on original task_text: {e}"
+            continue
+        _raw_result = _eg_orig.get("_result")
+        if not _raw_result or not isinstance(_raw_result, dict) \
+                or "outcome" not in _raw_result or "message" not in _raw_result:
+            lint_error = "Script did not set valid _result (needs outcome + message) on original task_text"
+            continue
+
+        # Dual-run step 2: mutated task_text
+        _mutated = re.sub(
+            r"[A-Za-z0-9_-]{4,}",
+            lambda m: "SYNTHTOK" if m.group(0).lower() not in _STOP_WORDS else m.group(0),
+            task_text,
+        )
+        mock_vm_mut = MockVM(extracted_params={}, schema_digest=_schema_str)
+        _eg_mut: dict = {"vm": mock_vm_mut, "task_text": _mutated, "_result": None}
+        try:
+            exec(compile(script_code, f"{task_id}_mut.py", "exec"), _eg_mut)
+        except (KeyError, IndexError, AttributeError) as e:
+            lint_error = (
+                f"Script crashed on mutated task_text ({type(e).__name__}: {e}). "
+                f"Script must not rely on hardcoded values from task_text."
+            )
+            _last_was_hardcoded = True
+            continue
+        except Exception:
+            pass  # Non-hardcode crash — not a generality failure
+
+        exec_globals_for_test = _eg_orig
+        break  # All checks passed
 
     if lint_error:
-        return None, f"CODEGEN lint failed after {_CODEGEN_LINT_RETRIES} attempts: {lint_error}"
+        if _last_was_hardcoded and script_code:
+            partial: CodegenOutput | None = CodegenOutput(script_path="", script_code=script_code, test_code=test_code)
+        else:
+            partial = None
+        prefix = "HARDCODED_PARAMS:" if _last_was_hardcoded else ""
+        return partial, f"{prefix}CODEGEN lint failed after {_CODEGEN_LINT_RETRIES} attempts: {lint_error}"
 
-    mock_vm = MockVM(
-        extracted_params=idd_out.extracted_params,
-        schema_digest=pre.schema_digest if isinstance(pre.schema_digest, str) else str(pre.schema_digest),
-    )
-    exec_globals: dict = {"vm": mock_vm, "task_text": task_text, "_result": None}
+    # Mock test — run test_code using exec_globals with _result from original run
     try:
-        exec(compile(script_code, f"{task_id}.py", "exec"), exec_globals)
-        exec(compile(test_code, f"{task_id}_test.py", "exec"), exec_globals)
+        exec(compile(test_code, f"{task_id}_test.py", "exec"), exec_globals_for_test)
     except Exception as e:
         return None, f"CODEGEN mock test failed: {e}"
 
+    # Persist script
     heuristics_dir = Path("data/heuristics")
     heuristics_dir.mkdir(exist_ok=True)
     script_path = f"data/heuristics/{task_id}.py"

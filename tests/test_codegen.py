@@ -191,3 +191,81 @@ def test_run_codegen_mock_test_exception_returns_error():
 
     assert result is None
     assert "mock test" in err.lower() or "valueerror" in err.lower()
+
+
+_HARDCODED_SCRIPT = '''
+import csv, io
+from bitgn.vm.ecom.ecom_pb2 import ExecRequest
+result = vm.exec(ExecRequest(path="/bin/sql", args=["SELECT * FROM products WHERE brand = 'Heco'"]))
+rows = list(csv.DictReader(io.StringIO(result.stdout.strip())))
+_result = {"message": f"{len(rows)} Heco products", "outcome": "OUTCOME_OK", "refs": []}
+if __name__ == "__main__":
+    pass
+'''
+
+_HARDCODED_LLM_RESPONSE = (
+    '{"script": ' + repr(_HARDCODED_SCRIPT) + ', "test": ' + repr(_GOOD_TEST) + '}'
+)
+
+
+def test_run_codegen_detects_hardcoded_params_returns_prefixed_error():
+    """Script hardcodes brand from task_text → all retries fail → HARDCODED_PARAMS: prefix in error."""
+    import agent.pipeline as pipeline_mod
+    with patch("agent.pipeline.call_llm_raw", return_value=_HARDCODED_LLM_RESPONSE), \
+         patch.object(pipeline_mod, "_CODEGEN_LINT_RETRIES", 2):
+        result, err = _run_codegen(
+            unified_context="context",
+            model="anthropic/claude-sonnet-4-6",
+            cfg={},
+            task_text="Find products for brand Heco",
+            task_id="t01",
+            idd_out=_make_idd(extracted_params={"brand": "Heco"}),
+            sdd_out=_make_sdd(),
+            plan_out=_make_plan(),
+            pre=_make_pre(),
+            cycle=1,
+        )
+    assert err.startswith("HARDCODED_PARAMS:"), f"Expected HARDCODED_PARAMS: prefix, got: {err!r}"
+    assert result is not None, "Should return partial CodegenOutput for LEARN to inspect"
+    assert result.script_code == _HARDCODED_SCRIPT
+
+
+_CRASH_ON_MUTATED_SCRIPT = '''
+import re, csv, io
+from bitgn.vm.ecom.ecom_pb2 import ExecRequest
+
+_prices = {"Heco": 100, "Sony": 200}
+brand_m = re.search(r"brand\\s+(\\S+)", task_text, re.I)
+brand = brand_m.group(1) if brand_m else "Heco"
+price = _prices[brand]
+
+result = vm.exec(ExecRequest(path="/bin/sql", args=[f"SELECT * FROM products WHERE brand = '{brand}'"]))
+rows = list(csv.DictReader(io.StringIO(result.stdout.strip())))
+_result = {"message": f"Price: {price}", "outcome": "OUTCOME_OK", "refs": []}
+if __name__ == "__main__":
+    pass
+'''
+
+_CRASH_LLM_RESPONSE = (
+    '{"script": ' + repr(_CRASH_ON_MUTATED_SCRIPT) + ', "test": ' + repr(_GOOD_TEST) + '}'
+)
+
+
+def test_run_codegen_dual_run_crash_returns_hardcoded_prefix():
+    """Script passes AST hardcode check but crashes on mutated task_text → HARDCODED_PARAMS:."""
+    import agent.pipeline as pipeline_mod
+    with patch("agent.pipeline.call_llm_raw", return_value=_CRASH_LLM_RESPONSE), \
+         patch.object(pipeline_mod, "_CODEGEN_LINT_RETRIES", 2):
+        result, err = _run_codegen(
+            unified_context="context",
+            model="anthropic/claude-sonnet-4-6",
+            cfg={},
+            task_text="Get price for brand Heco",
+            task_id="t01",
+            idd_out=_make_idd(extracted_params={"brand": "Heco"}),
+            sdd_out=_make_sdd(),
+            plan_out=_make_plan(),
+            pre=_make_pre(),
+            cycle=1,
+        )
+    assert err.startswith("HARDCODED_PARAMS:"), f"Expected HARDCODED_PARAMS: prefix, got: {err!r}"
