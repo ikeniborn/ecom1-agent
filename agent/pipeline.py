@@ -620,6 +620,7 @@ def _run_fast_path(
     vm,
     task_id: str,
     task_text: str,
+    schema_hash: str = "",
 ) -> "tuple[bool, str, str]":
     """Execute existing heuristic script. Returns (ok, error_string, outcome_str)."""
     script_path = Path("data") / "heuristics" / f"{task_id}.py"
@@ -664,7 +665,7 @@ def _run_fast_path(
         return False, f"fast path vm.answer error: {e}", ""
 
     save_last_run(task_id, status="success", outcome=script_outcome,
-                  cycles_used=0, heuristic_valid=True)
+                  cycles_used=0, heuristic_valid=True, schema_hash=schema_hash)
     return True, "", script_outcome
 
 
@@ -697,18 +698,35 @@ def run_pipeline(
     unified_context = ""
     final_grounding_refs_count = 0
 
+    # ── SCHEMA HASH ───────────────────────────────────────────────────────────
+    import hashlib as _hashlib
+    _schema_src = str(pre.schema_digest) if pre.schema_digest else ""
+    _current_schema_hash = _hashlib.md5(_schema_src.encode()).hexdigest()[:8]
+
     # ── FAST PATH ─────────────────────────────────────────────────────────────
     if task_id:
         last_run_record = load_last_run(task_id)
         _heuristic_script = Path("data") / "heuristics" / f"{task_id}.py"
+        _stored_schema_hash = (last_run_record or {}).get("schema_hash", "")
+        _schema_hash_ok = (
+            _stored_schema_hash == ""
+            or _stored_schema_hash == _current_schema_hash
+        )
         _fast_eligible = (
             last_run_record is not None
             and last_run_record.get("heuristic_valid") is True
             and _heuristic_script.exists()
+            and _schema_hash_ok
         )
+        if not _fast_eligible and last_run_record is not None \
+                and last_run_record.get("heuristic_valid") is True \
+                and _heuristic_script.exists() \
+                and not _schema_hash_ok:
+            last_error = f"schema changed since last heuristic ({_stored_schema_hash} → {_current_schema_hash})"
+            print(f"{CLI_YELLOW}[pipeline] fast path skipped: schema changed{CLI_CLR}")
         if _fast_eligible:
             print(f"{CLI_BLUE}[pipeline] fast path: {task_id}{CLI_CLR}")
-            _fp_ok, _fp_err, _fp_outcome = _run_fast_path(vm, task_id, task_text)
+            _fp_ok, _fp_err, _fp_outcome = _run_fast_path(vm, task_id, task_text, schema_hash=_current_schema_hash)
             if _fp_ok:
                 return {
                     "outcome": _fp_outcome,
@@ -720,7 +738,6 @@ def run_pipeline(
                     "output_tokens": 0,
                     "total_elapsed_ms": 0,
                 }, None
-            # Fast path failed → fall through to full path
             last_error = _fp_err
             print(f"{CLI_YELLOW}[pipeline] fast path failed: {_fp_err} — falling through to full path{CLI_CLR}")
 
@@ -1025,6 +1042,7 @@ def run_pipeline(
             cycles_used=cycles_used,
             grounding_refs_count=final_grounding_refs_count,
             heuristic_valid=success and outcome in _SUCCESSFUL_OUTCOMES,
+            schema_hash=_current_schema_hash if (success and outcome in _SUCCESSFUL_OUTCOMES) else "",
         )
 
     stats = {

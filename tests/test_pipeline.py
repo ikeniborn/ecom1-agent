@@ -477,3 +477,72 @@ def test_build_learn_user_msg_semantic_no_error_category():
         existing_entries=[],
     )
     assert "ERROR_CATEGORY" not in msg
+
+
+def test_fast_path_skips_when_schema_hash_mismatch(tmp_path):
+    """last_run.schema_hash differs from current schema_hash → fast path skipped, full path runs."""
+    import json as _json
+    import yaml as _yaml
+    from unittest.mock import patch, MagicMock
+    from agent.pipeline import run_pipeline
+    from agent.prephase import PrephaseResult
+
+    vm = MagicMock()
+    pre = PrephaseResult(
+        agents_md_content="AGENTS", agents_md_path="/AGENTS.MD",
+        db_schema="CREATE TABLE orders(id INT)", task_type="sql",
+        schema_digest={"orders": ["id INT", "status TEXT"]},
+    )
+    task_id = "t_schema_test"
+    heur_dir = tmp_path / "data" / "heuristics"
+    heur_dir.mkdir(parents=True)
+    _script = '_result = {"message": "3", "outcome": "OUTCOME_OK", "refs": []}\nif __name__ == "__main__": pass\n'
+    (heur_dir / f"{task_id}.py").write_text(_script)
+
+    # Store a DIFFERENT schema_hash in last_run
+    learned_dir = tmp_path / "data" / "learned"
+    learned_dir.mkdir(parents=True)
+    last_run_record = {
+        "task_id": task_id,
+        "last_run": {
+            "status": "success", "outcome": "OUTCOME_OK", "cycles_used": 1,
+            "grounding_refs_count": 0, "heuristic_valid": True, "schema_hash": "deadbeef",
+            "date": "2026-05-28",
+        },
+        "entries": [],
+    }
+    (_yaml_path := learned_dir / f"{task_id}.yaml").write_text(
+        _yaml.dump(last_run_record, allow_unicode=True)
+    )
+
+    llm_calls: list[str] = []
+    def _idd_resp(*a, **kw):
+        llm_calls.append("called")
+        return _json.dumps({
+            "intent_objective": "x", "reformulated_task": "y", "intent_type": "read",
+            "extracted_params": {}, "success_criteria": [], "stop_rules": [],
+            "health_metrics": [], "decision": "hard_stop",
+            "stop_code": "OUTCOME_NONE_CLARIFICATION",
+            "stop_message": "schema changed, test", "stop_refs": [], "reasoning": "",
+        })
+
+    with patch("agent.pipeline.call_llm_raw", side_effect=_idd_resp), \
+         patch("agent.pipeline.assemble_prompt") as mock_assemble, \
+         patch("agent.prompt_assembler._LEARNED_DIR", learned_dir), \
+         patch("agent.pipeline.Path") as mock_path_cls:
+        mock_assemble.return_value = type("AP", (), {"unified_context": "ctx"})()
+        def _path_side_effect(p):
+            from pathlib import Path as RealPath
+            if "heuristics" in str(p):
+                return heur_dir / RealPath(p).name
+            return RealPath(p)
+        mock_path_cls.side_effect = _path_side_effect
+        mock_path_cls.return_value = heur_dir
+        run_pipeline(
+            vm=vm, model="anthropic/claude-sonnet-4-6",
+            task_text="How many orders?", pre=pre, cfg={}, task_id=task_id,
+        )
+
+    # Full path ran (LLM called), fast path was skipped
+    assert len(llm_calls) > 0, "Fast path should be skipped, full path should call LLM"
+    vm.answer.assert_called()
