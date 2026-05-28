@@ -1,7 +1,5 @@
 import textwrap
 
-import pytest
-
 from agent.fidelity import (
     generate_fidelity_test,
     exec_fidelity_in_subprocess,
