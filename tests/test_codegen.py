@@ -3,9 +3,47 @@ import ast
 from unittest.mock import patch, MagicMock
 import pytest
 
-from agent.pipeline import _run_codegen
+from agent.pipeline import _run_codegen, _detect_hardcoded_params
 from agent.models import IddOutput, SddOutput, PlanOutput, CodegenOutput
 from agent.prephase import PrephaseResult
+
+
+def test_detect_hardcoded_params_catches_task_token():
+    """Token from task_text that appears as a string literal in script → detected."""
+    script = '''
+_result = {"message": "found Heco brand", "outcome": "OUTCOME_OK", "refs": []}
+sql = "SELECT * FROM products WHERE brand = 'Heco'"
+'''
+    reason = _detect_hardcoded_params(script, "Find products for brand Heco")
+    assert reason is not None, "Should detect 'Heco' hardcoded from task_text"
+    assert "Heco" in reason
+
+
+def test_detect_hardcoded_params_ignores_stopwords():
+    """SQL keywords and short words not in task_text are not flagged."""
+    script = '''
+import csv, io
+from bitgn.vm.ecom.ecom_pb2 import ExecRequest
+result = vm.exec(ExecRequest(path="/bin/sql", args=["SELECT COUNT(*) AS cnt FROM orders"]))
+rows = list(csv.DictReader(io.StringIO(result.stdout.strip())))
+count = int(rows[0]["cnt"]) if rows else 0
+_result = {"message": f"{count} orders", "outcome": "OUTCOME_OK", "refs": []}
+'''
+    reason = _detect_hardcoded_params(script, "How many orders?")
+    assert reason is None, f"Should not detect false positives, but got: {reason}"
+
+
+def test_detect_hardcoded_params_ignores_short_tokens():
+    """Tokens shorter than 4 chars are not checked."""
+    script = '_result = {"message": "ok", "outcome": "OUTCOME_OK", "refs": []}'
+    reason = _detect_hardcoded_params(script, "ok id")
+    assert reason is None
+
+
+def test_detect_hardcoded_params_returns_none_on_syntax_error():
+    """Broken script (SyntaxError) → returns None, not raises."""
+    reason = _detect_hardcoded_params("def broken(", "find brand Sony")
+    assert reason is None
 
 
 def _make_idd(extracted_params=None):
@@ -47,20 +85,21 @@ def _make_pre(schema_digest=None):
 
 
 _GOOD_SCRIPT = '''
-import json
+import csv, io
 from bitgn.vm.ecom.ecom_pb2 import ExecRequest
-result = vm.exec(ExecRequest(path="/bin/sql", args=["SELECT COUNT(*) FROM orders"]))
-rows = json.loads(result.stdout)
-_result = {"message": "3 orders found", "outcome": "OUTCOME_OK", "refs": []}
+result = vm.exec(ExecRequest(path="/bin/sql", args=["SELECT COUNT(*) AS cnt FROM orders"]))
+rows = list(csv.DictReader(io.StringIO(result.stdout.strip())))
+count = int(rows[0]["cnt"]) if rows else 0
+_result = {"message": f"{count} orders found", "outcome": "OUTCOME_OK", "refs": []}
 
 if __name__ == "__main__":
     pass
 '''
 
 _GOOD_TEST = '''
-import json
+import csv, io
 result = vm.exec(None)
-rows = json.loads(result.stdout)
+rows = list(csv.DictReader(io.StringIO(result.stdout.strip())))
 assert _result is not None
 assert _result["outcome"] in ("OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION", "OUTCOME_DENIED_SECURITY", "OUTCOME_NONE_UNSUPPORTED")
 assert _result["message"]

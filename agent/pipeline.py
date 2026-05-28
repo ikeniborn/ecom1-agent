@@ -44,6 +44,44 @@ _CODEGEN_MAX_TOKENS = int(os.environ.get("MAX_TOKENS_CODEGEN", "8192"))
 _CODEGEN_LINT_RETRIES = int(os.environ.get("CODEGEN_LINT_RETRIES", "3"))
 _HARD_ERROR_PREFIX = "HARD_STOP:"
 
+_STOP_WORDS = frozenset({
+    "from", "where", "select", "count", "inner", "join", "lower",
+    "like", "true", "false", "none", "outcome", "message", "result",
+    "python", "import", "return", "stdout", "strip", "items",
+    "orders", "many", "much", "have", "what", "with", "this", "that",
+    "find", "brand", "products", "product", "show", "list", "give",
+    "query", "table", "column", "value", "field", "record", "data",
+})
+
+
+def _detect_hardcoded_params(script_code: str, task_text: str) -> str | None:
+    """Return a reason string if script_code contains a string literal copied from task_text.
+
+    Checks whether any meaningful token from task_text appears as a whole word inside
+    any string constant in the script (e.g. a brand/SKU embedded in a SQL WHERE clause).
+
+    Returns None if no hardcoded params detected or if script_code has a SyntaxError.
+    """
+    task_tokens = {
+        t.lower() for t in re.findall(r"[A-Za-z0-9_-]{4,}", task_text)
+        if t.lower() not in _STOP_WORDS
+    }
+    try:
+        tree = ast.parse(script_code)
+    except SyntaxError:
+        return None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            val = node.value
+            if val.lower() in task_tokens:
+                return f"hardcoded value {val!r} from task_text"
+            for tok in task_tokens:
+                m = re.search(rf"\b{re.escape(tok)}\b", val, re.IGNORECASE)
+                if m:
+                    return f"hardcoded value {m.group()!r} from task_text"
+    return None
+
+
 # Compat stubs — referenced by older tests that patch these names; no-ops in new pipeline
 def run_resolve(vm, model: str, task_text: str, pre, cfg: dict) -> dict:
     """Compat stub — RESOLVE phase removed from SDD pipeline."""
