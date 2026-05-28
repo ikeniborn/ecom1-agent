@@ -12,6 +12,21 @@ Respond with a single JSON object:
 }
 ```
 
+## Param extraction — MANDATORY
+
+NEVER hardcode values from the task. ALL task-specific tokens
+(brand, model, SKU, name, category, amount, date, order ID, etc.)
+MUST be extracted from `task_text` at runtime.
+
+Required pattern:
+```python
+import re
+brand = re.search(r'brand[=:\s]+(["\']?)(\S+)\1', task_text, re.I)
+brand = brand.group(2) if brand else ""
+```
+
+Scripts that hardcode task values will be rejected.
+
 ## Script requirements
 
 The script receives two injected variables:
@@ -39,10 +54,17 @@ _result = {
 
 Use `vm.exec` for SQL queries:
 ```python
+import csv, io
 from bitgn.vm.ecom.ecom_pb2 import ExecRequest
 result = vm.exec(ExecRequest(path="/bin/sql", args=["SELECT ..."]))
-import json
-rows = json.loads(result.stdout)
+# stdout is CSV with header row — parse with csv.DictReader
+rows = list(csv.DictReader(io.StringIO(result.stdout.strip())))
+# rows is a list of dicts — ALWAYS use key access:
+#   rows[0]["column_name"]   ✓ correct
+#   rows[0][0]               ✗ wrong
+# For COUNT: always use alias → SELECT COUNT(*) AS cnt FROM ...
+#   count = int(rows[0]["cnt"]) if rows else 0
+# All CSV values are strings — cast numbers with int()/float()
 ```
 
 Use `vm.read` for file reads:

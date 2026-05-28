@@ -67,3 +67,11 @@ def test_codegen_prompt_exists():
     content = load_prompt("codegen")
     assert content, "codegen.md prompt must exist and be non-empty"
     assert "CODEGEN" in content or "script" in content.lower()
+
+
+def test_codegen_prompt_has_mandatory_param_extraction():
+    from agent.prompt import load_prompt
+    content = load_prompt("codegen")
+    assert "MANDATORY" in content, "codegen.md must contain MANDATORY param extraction rule"
+    assert "task_text" in content, "codegen.md must reference task_text variable"
+    assert "re.search" in content, "codegen.md must show regex extraction pattern"
