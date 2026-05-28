@@ -1,3 +1,25 @@
+---
+review:
+  spec_hash: "e8dd2408d0014152"
+  last_run: "2026-05-28"
+  phases:
+    structure:    { status: passed }
+    coverage:     { status: passed }
+    clarity:      { status: passed }
+    consistency:  { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: WARNING
+      section: "§1.3"
+      section_hash: "7bbd78725b03440a"
+      text: "Mutation algorithm now explicitly references _STOP_WORDS and regex from §1.2"
+      verdict: fixed
+      verdict_at: "2026-05-28"
+chain:
+  intent: docs/superpowers/intents/2026-05-28-knowledge-lifecycle-pipeline-speed-intent.md
+---
+
 # Design: Knowledge Lifecycle & Pipeline Speed
 
 **Date:** 2026-05-28
@@ -94,7 +116,7 @@ This feeds into the existing retry loop (up to `CODEGEN_LINT_RETRIES`).
 After AST check passes, run the script twice:
 
 1. **Original** `task_text` — existing behavior
-2. **Mutated** `task_text` — replace non-stop-word tokens >4 chars with `SYNTH_TOK`
+2. **Mutated** `task_text` — apply `re.sub(r"[A-Za-z0-9_-]{4,}", lambda m: "SYNTHTOK" if m.group(0).lower() not in _STOP_WORDS else m.group(0), task_text)` (same regex and `_STOP_WORDS` as §1.2)
 
 Both runs use MockVM. Both must complete without exception — `_result` must be non-None with `outcome` and `message` fields. Any outcome code (including `OUTCOME_NONE_CLARIFICATION`) is acceptable; the check is for crashes, not for data presence. If the mutated run raises `KeyError`/`IndexError`/`AttributeError`, that indicates the script relied on hardcoded values and couldn't handle the synthetic input — add to `lint_error` and retry.
 
