@@ -266,6 +266,8 @@ def _build_learn_user_msg(
         f"ERROR: {error}",
         f"ERROR_TYPE: {error_type}",
     ]
+    if error_type == "hardcoded_params":
+        parts.insert(1, "ERROR_CATEGORY: script hardcodes task-specific values instead of parsing from task_text — write a rule describing the PARSING PATTERN, not the SQL logic")
     if idd_out and idd_out.stop_rules:
         parts.append("STOP_RULES:\n" + "\n".join(f"  - {r}" for r in idd_out.stop_rules))
     if sdd_out is not None:
@@ -949,10 +951,12 @@ def run_pipeline(
                 err = codegen_error or "CODEGEN returned None"
                 print(f"{CLI_YELLOW}[pipeline] CODEGEN failed: {err}{CLI_CLR}")
                 last_error = err
+                _learn_error_type = "hardcoded_params" if err.startswith("HARDCODED_PARAMS:") else "semantic"
                 _run_learn(unified_context, model, cfg, task_text, last_error,
                            sgr_trace, learn_ctx, pre.agents_md_index,
-                           error_type="semantic", cycle=cycle + 1, task_id=task_id,
-                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out)
+                           error_type=_learn_error_type, cycle=cycle + 1, task_id=task_id,
+                           sdd_out=sdd_out, plan_out=plan_out, idd_out=idd_out,
+                           heuristic_code=codegen_out.script_code if codegen_out else None)
                 _run_consolidate(unified_context, model, cfg, task_id, learn_ctx, cycle + 1)
                 continue
 

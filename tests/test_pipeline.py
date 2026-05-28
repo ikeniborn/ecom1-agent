@@ -454,3 +454,26 @@ def test_build_learn_user_msg_includes_heuristic_code():
     )
     assert "HEURISTIC_CODE" in msg
     assert "KeyError" in msg
+
+
+def test_build_learn_user_msg_hardcoded_params_inserts_error_category():
+    from agent.pipeline import _build_learn_user_msg
+    msg = _build_learn_user_msg(
+        task_text="Find products for brand Heco",
+        error="HARDCODED_PARAMS:CODEGEN lint failed...",
+        error_type="hardcoded_params",
+        existing_entries=[],
+    )
+    assert "ERROR_CATEGORY" in msg
+    assert "parsing" in msg.lower() or "PARSING" in msg
+
+
+def test_build_learn_user_msg_semantic_no_error_category():
+    from agent.pipeline import _build_learn_user_msg
+    msg = _build_learn_user_msg(
+        task_text="How many orders?",
+        error="some semantic error",
+        error_type="semantic",
+        existing_entries=[],
+    )
+    assert "ERROR_CATEGORY" not in msg
