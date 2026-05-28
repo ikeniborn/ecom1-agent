@@ -70,7 +70,6 @@ def test_codegen_prompt_exists():
 
 
 def test_codegen_prompt_has_mandatory_param_extraction():
-    from agent.prompt import load_prompt
     content = load_prompt("codegen")
     assert "MANDATORY" in content, "codegen.md must contain MANDATORY param extraction rule"
     assert "task_text" in content, "codegen.md must reference task_text variable"
