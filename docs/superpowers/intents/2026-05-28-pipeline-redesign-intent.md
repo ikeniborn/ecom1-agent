@@ -9,6 +9,91 @@ Current pipeline (PREPHASE + ASSEMBLE + IDD + SDD + PLAN + CODEGEN + ANSWER) req
 
 Redesign target: collapse intent/spec/plan reasoning into a single deterministic DESIGN phase grounded in `docs/proto-api-reference.md`, then iterate only on CODEGEN (the part that actually needs to learn). Goal: every benchmark task solved in one run under one hour wall-clock with parallelism.
 
+## New Pipeline Flow
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {
+  'background': '#1e1e2e',
+  'primaryColor': '#313244',
+  'primaryTextColor': '#cdd6f4',
+  'primaryBorderColor': '#89b4fa',
+  'lineColor': '#888888',
+  'secondaryColor': '#181825',
+  'tertiaryColor': '#45475a'
+}}}%%
+flowchart TD
+    ENTRY["main.py\nThreadPoolExecutor\ninstruction + task_id"]
+
+    READ_AGENTS["vm.read /AGENTS.MD\n(no PREPHASE — single read)"]
+
+    DESIGN["DESIGN\n1x LLM call\nsystem: design.md + proto-api-reference.md\ninput: instruction + AGENTS.MD\noutput: tool_plan JSON"]
+
+    LOOP_START["step = 1"]
+
+    CODEGEN["CODEGEN\n1x LLM call\nsystem: codegen.md + proto-api-reference.md\ninput: tool_plan + learned_rules + prev_error?\noutput: heuristic .py"]
+
+    AST{"ast.parse OK?"}
+    MOCK{"mock test OK?"}
+    ANSWER["ANSWER\nexec script on real VM\n0x LLM call"]
+    ANS_OK{"vm result OK?"}
+
+    LEARN["LEARN\n1x LLM call\nappend rule to data/learned/tid.yaml"]
+    CONSOLIDATE["CONSOLIDATE\n0–1x LLM call\nif >=2 active rules"]
+
+    STEP_CHECK{"step < MAX_STEPS?"}
+    STEP_INC["step += 1"]
+
+    SUCCESS["vm.answer OUTCOME_OK"]
+    EXHAUST["vm.answer OUTCOME_NONE_CLARIFICATION\n(all steps failed)"]
+
+    HARD_OUT{"design.outcome_override\n!= null?"}
+    HARD_ANSWER["vm.answer\nDENIED_SECURITY |\nUNSUPPORTED |\nCLARIFICATION"]
+
+    ENTRY --> READ_AGENTS --> DESIGN
+    DESIGN --> HARD_OUT
+    HARD_OUT -- Yes --> HARD_ANSWER
+    HARD_OUT -- No --> LOOP_START --> CODEGEN
+
+    CODEGEN --> AST
+    AST -- No --> LEARN
+    AST -- Yes --> MOCK
+    MOCK -- No --> LEARN
+    MOCK -- Yes --> ANSWER --> ANS_OK
+    ANS_OK -- No --> LEARN
+    ANS_OK -- Yes --> SUCCESS
+
+    LEARN --> CONSOLIDATE --> STEP_CHECK
+    STEP_CHECK -- Yes --> STEP_INC --> CODEGEN
+    STEP_CHECK -- No --> EXHAUST
+
+    classDef entry   fill:#89b4fa,color:#1e1e2e,stroke:#74c7ec,stroke-width:2px
+    classDef phase   fill:#313244,color:#cdd6f4,stroke:#89b4fa
+    classDef decision fill:#f9e2af,color:#1e1e2e,stroke:#df8e1d
+    classDef learn   fill:#94e2d5,color:#1e1e2e,stroke:#179299
+    classDef success fill:#a6e3a1,color:#1e1e2e,stroke:#40a02b
+    classDef danger  fill:#f38ba8,color:#1e1e2e,stroke:#d20f39
+
+    class ENTRY entry
+    class READ_AGENTS,DESIGN,CODEGEN,ANSWER phase
+    class AST,MOCK,ANS_OK,STEP_CHECK,HARD_OUT decision
+    class LEARN,CONSOLIDATE learn
+    class SUCCESS,HARD_ANSWER success
+    class EXHAUST danger
+```
+
+### Key differences vs current pipeline
+
+| Aspect | Current | New |
+|--------|---------|-----|
+| Pre-task setup | PREPHASE (6+ vm calls: AGENTS.MD, date, id, schema, PRAGMA) | Single `vm.read /AGENTS.MD` |
+| Context assembly | ASSEMBLE phase (1x LLM) | None — DESIGN reads inputs directly |
+| Reasoning phases | IDD + SDD + PLAN (3x LLM, sequential) | DESIGN (1x LLM, JSON output) |
+| Retry boundary | Outer cycle (MAX_STEPS=3) + inner CODEGEN lint loop (CODEGEN_LINT_RETRIES=3) | Single unified counter; CODEGEN+ANSWER share retry budget |
+| LEARN scope | Modifies subsequent ASSEMBLE/IDD/SDD/PLAN/CODEGEN | Modifies CODEGEN only; DESIGN frozen per task run |
+| Fast path | `data/heuristics/{tid}.py` executed if `heuristic_valid=True` | Removed; every run = full DESIGN → CODEGEN |
+| Best-case LLM calls | ≥6 (ASSEMBLE+IDD+SDD+PLAN+CODEGEN; ANSWER 0x) | 2 (DESIGN + CODEGEN_1) |
+| Worst-case LLM calls | ASSEMBLE+IDD+SDD+PLAN+CODEGEN+LEARN × 3 cycles ≈ 18+ | DESIGN + 3×(CODEGEN+LEARN) = 7 |
+
 ## Desired Outcomes
 
 - **OC1.** First-cycle success rate (`step=1` in CODEGEN loop) grows from current baseline toward majority of benchmark tasks
