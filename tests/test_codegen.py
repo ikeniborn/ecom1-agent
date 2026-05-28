@@ -256,7 +256,7 @@ def test_run_codegen_dual_run_crash_returns_hardcoded_prefix():
     import agent.pipeline as pipeline_mod
     with patch("agent.pipeline.call_llm_raw", return_value=_CRASH_LLM_RESPONSE), \
          patch.object(pipeline_mod, "_CODEGEN_LINT_RETRIES", 2):
-        result, err = _run_codegen(
+        _, err = _run_codegen(
             unified_context="context",
             model="anthropic/claude-sonnet-4-6",
             cfg={},
