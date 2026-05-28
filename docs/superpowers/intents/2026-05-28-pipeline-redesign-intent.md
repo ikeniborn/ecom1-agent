@@ -33,9 +33,7 @@ flowchart TD
     CODEGEN["CODEGEN\n1x LLM call\nsystem: codegen.md + proto-api-reference.md\ninput: tool_plan + learned_rules + prev_error?\noutput: heuristic .py"]
 
     AST{"ast.parse OK?"}
-    MOCK{"mock test OK?"}
-    ANSWER["ANSWER\nexec script on real VM\n0x LLM call"]
-    ANS_OK{"vm result OK?"}
+    MOCK{"mock test PASS?\n(gate for ANSWER)"}
 
     LEARN["LEARN\n1x LLM call\nappend rule to data/learned/tid.yaml"]
     CONSOLIDATE["CONSOLIDATE\n0–1x LLM call\nif >=2 active rules"]
@@ -43,11 +41,11 @@ flowchart TD
     STEP_CHECK{"step < MAX_STEPS?"}
     STEP_INC["step += 1"]
 
-    SUCCESS["vm.answer OUTCOME_OK"]
-    EXHAUST["vm.answer OUTCOME_NONE_CLARIFICATION\n(all steps failed)"]
+    ANSWER_OK["ANSWER (terminal)\nexec script on real VM\nvm.answer OUTCOME_OK\n0x LLM call"]
+    ANSWER_EXHAUST["ANSWER (terminal)\nvm.answer OUTCOME_NONE_CLARIFICATION\n(all steps failed mock test)"]
 
     HARD_OUT{"design.outcome_override\n!= null?"}
-    HARD_ANSWER["vm.answer\nDENIED_SECURITY |\nUNSUPPORTED |\nCLARIFICATION"]
+    HARD_ANSWER["ANSWER (terminal)\nvm.answer\nDENIED_SECURITY |\nUNSUPPORTED |\nCLARIFICATION"]
 
     ENTRY --> READ_AGENTS --> DESIGN
     DESIGN --> HARD_OUT
@@ -58,13 +56,11 @@ flowchart TD
     AST -- No --> LEARN
     AST -- Yes --> MOCK
     MOCK -- No --> LEARN
-    MOCK -- Yes --> ANSWER --> ANS_OK
-    ANS_OK -- No --> LEARN
-    ANS_OK -- Yes --> SUCCESS
+    MOCK -- Yes --> ANSWER_OK
 
     LEARN --> CONSOLIDATE --> STEP_CHECK
     STEP_CHECK -- Yes --> STEP_INC --> CODEGEN
-    STEP_CHECK -- No --> EXHAUST
+    STEP_CHECK -- No --> ANSWER_EXHAUST
 
     classDef entry   fill:#89b4fa,color:#1e1e2e,stroke:#74c7ec,stroke-width:2px
     classDef phase   fill:#313244,color:#cdd6f4,stroke:#89b4fa
@@ -74,11 +70,11 @@ flowchart TD
     classDef danger  fill:#f38ba8,color:#1e1e2e,stroke:#d20f39
 
     class ENTRY entry
-    class READ_AGENTS,DESIGN,CODEGEN,ANSWER phase
-    class AST,MOCK,ANS_OK,STEP_CHECK,HARD_OUT decision
+    class READ_AGENTS,DESIGN,CODEGEN phase
+    class AST,MOCK,STEP_CHECK,HARD_OUT decision
     class LEARN,CONSOLIDATE learn
-    class SUCCESS,HARD_ANSWER success
-    class EXHAUST danger
+    class ANSWER_OK,HARD_ANSWER success
+    class ANSWER_EXHAUST danger
 ```
 
 ### Key differences vs current pipeline
@@ -88,7 +84,7 @@ flowchart TD
 | Pre-task setup | PREPHASE (6+ vm calls: AGENTS.MD, date, id, schema, PRAGMA) | Single `vm.read /AGENTS.MD` |
 | Context assembly | ASSEMBLE phase (1x LLM) | None — DESIGN reads inputs directly |
 | Reasoning phases | IDD + SDD + PLAN (3x LLM, sequential) | DESIGN (1x LLM, JSON output) |
-| Retry boundary | Outer cycle (MAX_STEPS=3) + inner CODEGEN lint loop (CODEGEN_LINT_RETRIES=3) | Single unified counter; CODEGEN+ANSWER share retry budget |
+| Retry boundary | Outer cycle (MAX_STEPS=3) + inner CODEGEN lint loop (CODEGEN_LINT_RETRIES=3) | Single unified counter; mock test = gate, ANSWER is terminal one-shot outside loop |
 | LEARN scope | Modifies subsequent ASSEMBLE/IDD/SDD/PLAN/CODEGEN | Modifies CODEGEN only; DESIGN frozen per task run |
 | Fast path | `data/heuristics/{tid}.py` executed if `heuristic_valid=True` | Removed; every run = full DESIGN → CODEGEN |
 | Best-case LLM calls | ≥6 (ASSEMBLE+IDD+SDD+PLAN+CODEGEN; ANSWER 0x) | 2 (DESIGN + CODEGEN_1) |
@@ -150,7 +146,8 @@ flowchart TD
 - **H15.** LEARN feedback feeds back **only into CODEGEN**. DESIGN treats each invocation as fresh from `(instruction, agents.md)`. DESIGN does not change across retries within one task run.
 - **H16.** `data/learned/{tid}.yaml` semantics shift to CODEGEN-knowledge: heuristic-generation patterns, common translation errors, vm-tool selection anchors
 - **H17.** Every task = full pipeline. `heuristic_valid` flag removed. `data/heuristics/{tid}.py` is written as last-attempt reference for LEARN context, not executed pre-DESIGN
-- **H18.** `CODEGEN_LINT_RETRIES` unified with `MAX_STEPS`. One retry counter wraps `[CODEGEN → ast.parse → mock test → ANSWER]`. Any failure on any step → LEARN → next step.
+- **H18.** `CODEGEN_LINT_RETRIES` unified with `MAX_STEPS`. One retry counter wraps `[CODEGEN → ast.parse → mock test]`. Any failure on any step → LEARN → next step. **ANSWER lives outside the retry loop** as terminal one-shot.
+- **H19.** **Mock test pass = gate for ANSWER.** Only after mock test succeeds the heuristic is executed on the real VM and `vm.answer()` is called. `vm.answer()` closes the task irreversibly — never invoke it speculatively. If all `MAX_STEPS` exhaust without a passing mock test, terminate with `vm.answer(OUTCOME_NONE_CLARIFICATION)`. LEARN never fires after `vm.answer()`.
 
 ## Autonomy Zones
 
