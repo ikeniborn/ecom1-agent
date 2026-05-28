@@ -198,8 +198,9 @@ def test_learn_ctx_accumulates():
     vm = MagicMock()
     pre = _make_pre()
 
-    # Cycle 1: CODEGEN returns empty script → _run_answer fails → LEARN fires
+    # Cycle 1: CODEGEN fails (no _result) with 1 retry → LEARN fires
     # Cycle 2: CODEGEN returns valid script → success
+    # _CODEGEN_LINT_RETRIES=1 so CODEGEN consumes exactly 1 LLM call before giving up
     _empty_codegen = json.dumps({"script": "", "test": "assert True"})
 
     captured_user_msgs = []
@@ -210,7 +211,7 @@ def test_learn_ctx_accumulates():
         if n == 1: return _idd_json()                 # IDD cycle 1
         if n == 2: return _sdd_json()                 # SDD cycle 1
         if n == 3: return _plan_json()                # PLAN cycle 1
-        if n == 4: return _empty_codegen              # CODEGEN cycle 1 (no _result → ANSWER fails)
+        if n == 4: return _empty_codegen              # CODEGEN cycle 1 (no _result → fails, 1 retry)
         if n == 5: return _learn_json("rule_ALPHA")   # LEARN cycle 1
         if n == 6: return _idd_json()                 # IDD cycle 2
         if n == 7: return _sdd_json()                 # SDD cycle 2
@@ -220,7 +221,8 @@ def test_learn_ctx_accumulates():
 
     with patch("agent.pipeline.call_llm_raw", side_effect=fake_llm), \
          patch("agent.pipeline.assemble_prompt", side_effect=_mock_assemble), \
-         patch("agent.pipeline.check_retry_loop", return_value=None):
+         patch("agent.pipeline.check_retry_loop", return_value=None), \
+         patch("agent.pipeline._CODEGEN_LINT_RETRIES", 1):
         stats, _ = run_pipeline(vm, "model", "task", pre, {})
 
     assert stats["outcome"] == "OUTCOME_OK"
@@ -275,7 +277,7 @@ def test_file_read_action_plan_reaches_codegen():
     pre = _make_pre()
 
     _unsupported_codegen = json.dumps({
-        "script": '_result = {"message": "Checkout not supported", "outcome": "OUTCOME_NONE_UNSUPPORTED", "refs": ["/docs/checkout.md"]}',
+        "script": '_result = {"message": "Operation not supported", "outcome": "OUTCOME_NONE_UNSUPPORTED", "refs": ["/docs/limits.md"]}',
         "test": "assert True",
     })
 
