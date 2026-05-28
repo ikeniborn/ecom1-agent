@@ -81,3 +81,28 @@ def test_save_last_run_heuristic_valid_default_false(tmp_path, monkeypatch):
     import yaml
     data = yaml.safe_load((tmp_path / "t99.yaml").read_text())
     assert data["last_run"]["heuristic_valid"] is False
+
+
+def test_save_last_run_stores_schema_hash(tmp_path, monkeypatch):
+    from agent import prompt_assembler
+    monkeypatch.setattr(prompt_assembler, "_LEARNED_DIR", tmp_path)
+    prompt_assembler.save_last_run(
+        task_id="t99",
+        status="success",
+        outcome="OUTCOME_OK",
+        cycles_used=1,
+        heuristic_valid=True,
+        schema_hash="abc12345",
+    )
+    import yaml
+    data = yaml.safe_load((tmp_path / "t99.yaml").read_text())
+    assert data["last_run"]["schema_hash"] == "abc12345"
+
+
+def test_save_last_run_schema_hash_default_empty(tmp_path, monkeypatch):
+    from agent import prompt_assembler
+    monkeypatch.setattr(prompt_assembler, "_LEARNED_DIR", tmp_path)
+    prompt_assembler.save_last_run("t99", "success", "OUTCOME_OK", 1)
+    import yaml
+    data = yaml.safe_load((tmp_path / "t99.yaml").read_text())
+    assert data["last_run"]["schema_hash"] == ""

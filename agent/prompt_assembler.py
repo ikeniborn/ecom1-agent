@@ -63,6 +63,7 @@ def save_last_run(
     cycles_used: int,
     grounding_refs_count: int = 0,
     heuristic_valid: bool = False,
+    schema_hash: str = "",
 ) -> None:
     """Write last_run metadata to data/learned/{task_id}.yaml."""
     if not task_id:
@@ -84,6 +85,7 @@ def save_last_run(
         "cycles_used": cycles_used,
         "grounding_refs_count": grounding_refs_count,
         "heuristic_valid": heuristic_valid,
+        "schema_hash": schema_hash,
         "date": str(date.today()),
     }
     path.write_text(
