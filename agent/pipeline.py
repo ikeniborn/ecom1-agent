@@ -6,8 +6,6 @@ import os
 import re
 from pathlib import Path
 
-from bitgn.vm.ecom.ecom_pb2 import AnswerRequest
-
 from .codegen_v2 import CodegenError, run_codegen
 from .design import DesignError, run_design
 from .fidelity import exec_fidelity_in_subprocess, generate_fidelity_test
@@ -127,7 +125,7 @@ def _learn_consolidate(
 
     apply_learn_diff(task_id, out)
 
-    if not out.skip:
+    if not out.skip and out.rule_content:
         learn_ctx.append({
             "id": "in-session",
             "content": out.rule_content,
@@ -174,8 +172,11 @@ def run_pipeline(
     instruction: str,
     task_id: str,
     agents_md_text: str,
-) -> None:
-    """Per-task pipeline. Exactly one vm.answer() call before returning."""
+) -> dict:
+    """Per-task pipeline. Exactly one vm.answer() call before returning.
+
+    Returns metrics dict: {cycles_used, outcome, status}.
+    """
     tlog = get_trace()
     if tlog:
         tlog.log_header(instruction, os.environ.get("MODEL", ""))
@@ -189,13 +190,13 @@ def run_pipeline(
         print(f"{CLI_RED}[pipeline] DESIGN failed: {e}{CLI_CLR}")
         save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION", cycles_used=0)
         _terminal_clarification(vm, f"DESIGN failed: {e}")
-        return
+        return {"cycles_used": 0, "outcome": "OUTCOME_NONE_CLARIFICATION", "status": "failure"}
 
     if design.outcome_override:
         print(f"{CLI_YELLOW}[pipeline] outcome_override: {design.outcome_override}{CLI_CLR}")
         save_last_run(task_id, status="success", outcome=design.outcome_override, cycles_used=0)
         _terminal_outcome_override(vm, design)
-        return
+        return {"cycles_used": 0, "outcome": design.outcome_override, "status": "success"}
 
     # ── CODEGEN retry loop (unified MAX_STEPS counter, F-003) ──────────────
     last_error: str | None = None
@@ -221,16 +222,18 @@ def run_pipeline(
             _learn_consolidate(task_id, learn_ctx, design, last_error, cg.script_code)
             continue
 
-        # check_retry_loop — anti-infinite-loop guard (HM4)
+        # check_retry_loop — anti-infinite-loop guard (HM4).
+        # DESIGN is a starting point; CODEGEN reshapes through LEARN. Same SQL across
+        # cycles is normal when the bug is elsewhere (shape, refs, lint). Break only
+        # after 3 consecutive identical SQL multisets — gives LEARN 2 chances to refine.
         sqls = _extract_sql_literals(cg.script_code)
-        if prior_sql_sets and _identical_sql_set(sqls, prior_sql_sets[-1]):
-            print(f"{CLI_RED}[pipeline] check_retry_loop: identical SQL set, breaking{CLI_CLR}")
-            last_error = last_error or "identical SQL set across cycles"
-            break
-        loop_msg = check_retry_loop([_normalise(s) for s in sqls], [frozenset(_normalise(s) for s in p) for p in prior_sql_sets])
-        if loop_msg:
-            print(f"{CLI_RED}[pipeline] {loop_msg}{CLI_CLR}")
-            last_error = loop_msg
+        if (
+            len(prior_sql_sets) >= 2
+            and _identical_sql_set(sqls, prior_sql_sets[-1])
+            and _identical_sql_set(prior_sql_sets[-1], prior_sql_sets[-2])
+        ):
+            print(f"{CLI_RED}[pipeline] check_retry_loop: 3rd identical SQL set, breaking{CLI_CLR}")
+            last_error = last_error or "identical SQL set across 3 cycles"
             break
         prior_sql_sets.append(sqls)
 
@@ -251,7 +254,7 @@ def run_pipeline(
         print(f"{CLI_RED}[pipeline] exhausted {_MAX_STEPS} cycles{CLI_CLR}")
         save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION", cycles_used=_MAX_STEPS)
         _terminal_clarification(vm, last_error or "all cycles exhausted")
-        return
+        return {"cycles_used": _MAX_STEPS, "outcome": "OUTCOME_NONE_CLARIFICATION", "status": "failure"}
 
     # ── Persist last-attempt script (reference for LEARN, not for re-exec) ─
     heur_dir = Path("data/heuristics")
@@ -265,7 +268,8 @@ def run_pipeline(
         print(f"{CLI_RED}[pipeline] real-vm exec failed: {e}{CLI_CLR}")
         save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION", cycles_used=cycle)
         _terminal_clarification(vm, f"real-vm exec: {e}")
-        return
+        return {"cycles_used": cycle, "outcome": "OUTCOME_NONE_CLARIFICATION", "status": "failure"}
 
     print(f"{CLI_GREEN}[pipeline] success after {cycle} cycle(s){CLI_CLR}")
     save_last_run(task_id, status="success", outcome="OUTCOME_OK", cycles_used=cycle)
+    return {"cycles_used": cycle, "outcome": "OUTCOME_OK", "status": "success"}

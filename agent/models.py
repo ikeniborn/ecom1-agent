@@ -46,7 +46,8 @@ class CodegenOutput(BaseModel):
 class LearnConsolidateOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    rule_content: str
+    # Null rule_content allowed when skip=True or when only deactivating prior rules.
+    rule_content: str | None = None
     agents_md_anchor: str | None = None
     reasoning: str
     deactivate_ids: list[str] = []

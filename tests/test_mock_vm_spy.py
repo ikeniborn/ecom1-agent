@@ -8,8 +8,16 @@ def test_records_calls_in_order():
     vm.exec(path="/bin/sql", args=[".schema baskets"])
     vm.read(path="/AGENTS.MD")
     assert vm.calls == [
-        ("Exec", {"path": "/bin/sql", "args": [".schema baskets"]}),
+        ("Exec", {"path": "/bin/sql", "args": [".schema baskets"], "stdin": ""}),
         ("Read", {"path": "/AGENTS.MD"}),
+    ]
+
+
+def test_exec_records_stdin():
+    vm = MockVMSpy(fixtures={})
+    vm.exec(path="/bin/sql", args=[], stdin="select 1;")
+    assert vm.calls == [
+        ("Exec", {"path": "/bin/sql", "args": [], "stdin": "select 1;"}),
     ]
 
 

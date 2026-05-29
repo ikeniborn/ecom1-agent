@@ -51,7 +51,7 @@ class MockVMSpy:
 
     def exec(self, path: str, args: list[str] | None = None, stdin: str = "") -> Any:
         args_list = list(args or [])
-        self._record("Exec", path=path, args=args_list)
+        self._record("Exec", path=path, args=args_list, stdin=stdin)
         return self._lookup("Exec", path, args_list)
 
     def write(self, path: str, content: str = "", if_match_sha256: str = "") -> Any:

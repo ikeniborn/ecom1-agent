@@ -32,8 +32,12 @@ def run_agent(
     raw_vm = EcomRuntimeClientSync(harness_url)
     agents_md_text = _read_agents_md(raw_vm)
     vm = VMAdapter(raw_vm)
-    run_pipeline(vm, instruction=task_text, task_id=task_id, agents_md_text=agents_md_text)
+    metrics = run_pipeline(vm, instruction=task_text, task_id=task_id, agents_md_text=agents_md_text)
     return {
         "model_used": os.environ.get("MODEL", ""),
         "task_type": "lookup",
+        "cycles_used": metrics.get("cycles_used", 0),
+        "outcome": metrics.get("outcome", ""),
+        "input_tokens": 0,
+        "output_tokens": 0,
     }
