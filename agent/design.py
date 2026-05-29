@@ -9,9 +9,15 @@ import os
 from pathlib import Path
 
 from .json_extract import _extract_json_from_text
-from .llm import call_llm_raw, _resolve_model_for_phase
+from .llm import _resolve_model_for_phase
 from .models import DesignOutput
 from .prompt import load_prompt
+
+
+def _call_llm_raw(*args, **kwargs):
+    """Indirect through agent.pipeline so test patches on `agent.pipeline.call_llm_raw` apply."""
+    from . import pipeline as _pipeline
+    return _pipeline.call_llm_raw(*args, **kwargs)
 
 
 class DesignError(RuntimeError):
@@ -48,7 +54,7 @@ def run_design(instruction: str, agents_md_text: str) -> DesignOutput:
     )
 
     model = _resolve_model_for_phase("design", os.environ.get("MODEL", ""))
-    raw = call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_DESIGN)
+    raw = _call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_DESIGN)
     if not raw:
         raise DesignError("DESIGN LLM returned empty response")
 

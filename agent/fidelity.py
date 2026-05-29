@@ -10,9 +10,12 @@ import json
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .models import DesignOutput, ToolOp
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 @dataclass
@@ -116,6 +119,7 @@ def exec_fidelity_in_subprocess(
             capture_output=True,
             text=True,
             timeout=timeout_s,
+            cwd=str(_PROJECT_ROOT),
         )
     except subprocess.TimeoutExpired as e:
         return FidelityResult(passed=False, error=f"fidelity timeout after {timeout_s}s", stdout=e.stdout or "", stderr=e.stderr or "")
