@@ -10,8 +10,8 @@ uv run python main.py                            # run all benchmark tasks
 make task TASKS='t01,t03'                        # run specific tasks
 
 uv run python -m pytest tests/ -v               # all tests
-uv run pytest tests/test_pipeline.py -v         # single file
-uv run pytest tests/test_pipeline.py::test_name -v  # single test
+uv run pytest tests/test_pipeline_v2.py -v      # single file
+uv run pytest tests/test_pipeline_v2.py::test_name -v  # single test
 
 make proto                                       # rebuild protobuf stubs (requires buf)
 ```
@@ -24,21 +24,13 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 |-----|---------|
 | `MODEL` | Primary LLM (`anthropic/claude-sonnet-4-6`, `openrouter/…`, `ollama/…`, or bare Ollama name) |
 | `MODEL_FALLBACK` | Fallback model after primary exhausts all tiers |
-| `MODEL_ASSEMBLER` | LLM for unified_context assembly (defaults to `MODEL`) |
-| `MODEL_SDD` | Override for SDD phase (defaults to `MODEL`) |
-| `MODEL_PLAN` | Override for PLAN phase (defaults to `MODEL`) |
 | `MODEL_LEARN` | Override for LEARN phase (defaults to `MODEL`) |
-| `MODEL_CONSOLIDATE` | Override for CONSOLIDATE phase (defaults to `MODEL`) |
 | `MODEL_CODEGEN` | Override for CODEGEN phase (defaults to `MODEL`) |
+| `MAX_TOKENS_DESIGN` | Max tokens for DESIGN phase response (default 4096) |
 | `MAX_TOKENS_CODEGEN` | Max tokens for CODEGEN phase response (default 8192) |
-| `CODEGEN_LINT_RETRIES` | Max AST lint retry attempts in CODEGEN before LEARN (default 3) |
-| `MAX_STEPS` | Pipeline cycle limit per task (default 3) |
-| `MAX_TOKENS_SDD` | Max tokens for SDD phase response (default 8192) |
-| `MAX_TOKENS_PLAN` | Max tokens for PLAN phase response (default 4096) |
 | `MAX_TOKENS_LEARN` | Max tokens for LEARN phase response (default 2048) |
-| `MAX_TOKENS_CONSOLIDATE` | Max tokens for CONSOLIDATE phase response (default 2048) |
-| `MAX_TOKENS_ANSWER` | Max tokens for ANSWER phase response (default 4096) |
-| `MAX_TOKENS_ASSEMBLER` | Max tokens for ASSEMBLER phase response (default 4096) |
+| `FIDELITY_TIMEOUT_S` | Subprocess timeout for fidelity gate (default 30) |
+| `MAX_STEPS` | Pipeline cycle limit per task (default 3) |
 | `LOG_LEVEL=DEBUG` | Full LLM response logging |
 | `OLLAMA_BASE_URL` | Ollama endpoint (default `http://localhost:11434/v1`) |
 | `CC_ENABLED=1` | Enable Claude Code CLI tier (iclaude subprocess, OAuth) |
@@ -51,24 +43,21 @@ Credentials (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `OLLAMA_API_KEY`) belong
 Entry point: `main.py` → BitGN harness → `agent/orchestrator.py:run_agent()`
 
 **Execution flow per task:**
-1. `prephase.py:run_prephase()` — fetches `/AGENTS.MD` (vault rules), reads `.schema` + PRAGMA, builds `schema_digest` and `agents_md_index`
-2. `pipeline.py:run_pipeline()` — fast path check, then main loop (max `MAX_STEPS` cycles):
-   - **FAST PATH** (if `data/heuristics/{task_id}.py` exists and `last_run.heuristic_valid==True`) → exec script → `vm.answer()` — 0 LLM calls; on failure falls through to full path immediately
-   - **ASSEMBLE** → `prompt_assembler.py:assemble_prompt()` — 1 LLM call builds `unified_context` from learned knowledge, vault, and schema
-   - **IDD** → LLM call → `IddOutput` (intent, extracted_params, success_criteria)
-   - **SDD** → LLM call with `[unified_context, sdd_guide]` → `json_extract.py` → `SddOutput`
-   - **PLAN** → LLM call → `PlanOutput` (primary action anchor)
-   - **CODEGEN** → LLM call with `[unified_context, codegen_guide]` → generates `data/heuristics/{task_id}.py` (self-contained Python script); internal lint-fix loop (ast.parse) + MockVM test execution
-   - **ANSWER** → exec heuristic script → `vm.answer()` — no LLM call; script produces complete answer
-   - On any phase failure: **LEARN** → LLM with `[unified_context, learn_guide]` → appends rule to `learn_ctx` → next cycle (LEARN receives failed script as `heuristic_code`)
-   - On success: marks in-session learn entries active; they persist in `data/learned/{task_id}.yaml`; sets `heuristic_valid=True` in `last_run`
-   - On all cycles exhausted: entries written incrementally; last `data/heuristics/{task_id}.py` preserved
+1. `orchestrator.py:run_agent()` — opens VM, reads `/AGENTS.MD` directly, calls `run_pipeline`
+2. `pipeline.py:run_pipeline(vm, instruction, task_id, agents_md_text)`:
+   - **DESIGN** (1 LLM call, frozen for the run) — system: `design.md` + `proto-api-reference.md`. Input strictly `[instruction, AGENTS.MD]`. Output: `DesignOutput` (`intent`, `params`, `success_criteria`, `discovery`, `ops`, `agents_md_constraints`, `answer_template`, `outcome_override?`).
+   - If `outcome_override` set → `vm.answer(...)` → END.
+   - **LOOP** — single counter `cycle = 1..MAX_STEPS`:
+     - **CODEGEN** (LLM call) — input: `[tool_plan, learn_ctx, prev_error?]`. Output: `CodegenOutput.script_code` (a module exposing `run(vm, params)`).
+     - **AST lint** — `ast.parse(script_code)`; on `SyntaxError` → LEARN+CONSOLIDATE → next cycle.
+     - **check_retry_loop** — extract literal SQL via `ast.walk` over `vm.exec(path="/bin/sql", args=[...])`; compare normalised multiset to prior cycle; identical → break with CLARIFICATION.
+     - **Fidelity gate** — `agent/fidelity.py:generate_fidelity_test(design, task_id)` emits a deterministic test; run in subprocess (`FIDELITY_TIMEOUT_S=30s`). Mismatch → LEARN+CONSOLIDATE → next cycle.
+     - Pass → break.
+   - **ANSWER terminal one-shot** — exec script on real VM (`run(vm, params)`); the script calls `vm.answer(...)` itself. On any real-VM exception → terminal `OUTCOME_NONE_CLARIFICATION`.
+   - On loop exhaust → terminal `OUTCOME_NONE_CLARIFICATION`.
+3. `learned_store.py` — `load_entries(tid)` (active only), `apply_learn_diff(tid, LearnConsolidateOutput)`, `save_last_run(tid, status, outcome, cycles_used)`.
 
-**Prompt assembly** (`prompt_assembler.py:assemble_prompt()`):
-- Called once per cycle with current `learn_ctx`
-- Sources assembled: learned knowledge from `data/learned/{task_id}.yaml` (highest priority) → vault rules → schema
-- LLM produces single `unified_context` doc with sections: `# LEARNED`, `# BASE`
-- Each phase then gets `[unified_context, phase_guide]` as system — phase guide is `data/prompts/{phase}.md`
+**LLM call budget:** 1 (hard-stop) / 2 (best happy path) / 7 (worst, `MAX_STEPS=3`).
 
 **LLM routing** (`llm.py`): provider prefix determines tier — `anthropic/` → Anthropic SDK; `openrouter/` → OpenRouter; `ollama/` or bare name → local Ollama; `claude-code` → CC CLI subprocess. All tiers tried in order per `models.json` before falling through to `MODEL_FALLBACK`.
 
@@ -78,10 +67,9 @@ Entry point: `main.py` → BitGN harness → `agent/orchestrator.py:run_agent()`
 
 | Path | Purpose |
 |------|---------|
-| `data/prompts/*.md` | Phase guides: `sdd`, `tdd`, `learn`, `answer`, `assembler` |
-| `data/learned/{task_id}.yaml` | Permanent per-task knowledge base; entries have active/inactive status; never deleted on success |
-| `data/heuristics/{task_id}.py` | Generated heuristic script; fast path executes this |
-| `data/heuristics/{task_id}_test.py` | Mock test generated alongside script (debug only) |
+| `data/prompts/*.md` | Phase guides: `design`, `codegen`, `learn` only |
+| `data/learned/{task_id}.yaml` | Per-task active+inactive LearnConsolidate rules; `last_run` carries `status/outcome/cycles_used/date` only (no `heuristic_valid`, no `schema_hash`) |
+| `data/heuristics/{task_id}.py` | Last successful or last-attempted heuristic script. Reference only — pipeline always regenerates via DESIGN + CODEGEN. |
 | `models.json` | Per-model provider hints and Ollama options (e.g. `num_ctx`) |
 
 ## Notable Constraints
