@@ -93,13 +93,13 @@ from bitgn.harness_connect import HarnessServiceClientSync
 from bitgn.harness_pb2 import (
     EndTrialRequest, EvalPolicy, GetBenchmarkRequest,
     StartRunRequest, StartTrialRequest,
-    StatusRequest, SubmitRunRequest,
+    StatusRequest, SubmitRunRequest, TRIAL_STATE_DONE,
 )
 from connectrpc.errors import ConnectError
 
 from agent import run_agent
 from agent.learned_store import save_last_run
-from agent.trace import TraceLogger, get_trace, set_trace
+from agent.trace import TraceLogger, set_trace
 
 BITGN_URL = os.getenv("BENCHMARK_HOST") or "https://api.bitgn.com"
 BENCHMARK_ID = os.getenv("BENCHMARK_ID") or "bitgn/pac1-dev"
@@ -128,13 +128,14 @@ CLI_BLUE = "\x1B[34m"
 
 
 def _run_single_task(trial_id: str, task_filter: list) -> tuple:
-    """Execute one benchmark trial."""
+    """Execute one benchmark trial. Score is read later from SubmitRun."""
     client = HarnessServiceClientSync(BITGN_URL)
     trial = client.start_trial(StartTrialRequest(trial_id=trial_id))
     task_id = trial.task_id
 
     if task_filter and task_id not in task_filter:
-        return (task_id, -1, [], 0.0, {})
+        client.end_trial(EndTrialRequest(trial_id=trial.trial_id))
+        return (task_id, trial.trial_id, 0.0, {}, None, True)
 
     _task_local.task_id = task_id
     assert _run_dir is not None
@@ -151,46 +152,41 @@ def _run_single_task(trial_id: str, task_filter: list) -> tuple:
         except Exception as exc:
             print(exc)
         task_elapsed = time.time() - task_start
-        result = client.end_trial(EndTrialRequest(trial_id=trial.trial_id))
-        score = result.score
-        detail = list(result.score_detail)
-        if task_id and float(score) < 1.0:
-            save_last_run(
-                task_id=task_id,
-                status="failure",
-                outcome=token_stats.get("outcome", "OUTCOME_OK"),
-                cycles_used=token_stats.get("cycles_used", 0),
-                grounding_refs_count=token_stats.get("grounding_refs_count", 0),
-            )
-        if t := get_trace():
-            t.log_task_result(
-                outcome=token_stats.get("outcome", ""),
-                score=float(score),
-                cycles=token_stats.get("cycles_used", 0),
-                total_in=token_stats.get("input_tokens", 0),
-                total_out=token_stats.get("output_tokens", 0),
-                elapsed_ms=int(task_elapsed * 1000),
-                score_detail=detail,
-            )
-        _score_f = float(score)
+        client.end_trial(EndTrialRequest(trial_id=trial.trial_id))
         in_t = token_stats.get("input_tokens", 0)
         out_t = token_stats.get("output_tokens", 0)
         cycles = token_stats.get("cycles_used", 0)
         m_short = (token_stats.get("model_used") or "—").split("/")[-1]
-        style = CLI_GREEN if score == 1 else CLI_RED
-        detail_str = "\n" + textwrap.indent("\n".join(detail), "  ") if detail else ""
         print(
-            f"{style}[{task_id}] Score: {score:0.2f}"
-            f" | {task_elapsed:.1f}s"
+            f"[{task_id}] trial done in {task_elapsed:.1f}s"
             f" | in {in_t:,} / out {out_t:,} tok"
             f" | cycles={cycles} | {m_short}"
-            f"{detail_str}{CLI_CLR}"
         )
-        return (task_id, _score_f, detail, task_elapsed, token_stats)
+        return (task_id, trial.trial_id, task_elapsed, token_stats, _trace, False)
     finally:
-        if t := get_trace():
-            t.close()
         set_trace(None)
+
+
+def _finalize_task_trace(
+    trace: "TraceLogger | None",
+    task_id: str,
+    score: float,
+    detail: list,
+    elapsed: float,
+    token_stats: dict,
+) -> None:
+    if trace is None:
+        return
+    trace.log_task_result(
+        outcome=token_stats.get("outcome", ""),
+        score=float(score),
+        cycles=token_stats.get("cycles_used", 0),
+        total_in=token_stats.get("input_tokens", 0),
+        total_out=token_stats.get("output_tokens", 0),
+        elapsed_ms=int(elapsed * 1000),
+        score_detail=detail,
+    )
+    trace.close()
 
 
 def _print_table_header() -> None:
@@ -237,9 +233,8 @@ def _write_summary(scores: list, run_start: float) -> None:
 def main() -> None:
     task_filter = [t for arg in sys.argv[1:] for t in arg.split(",") if t]
 
-    scores = []
-    scores_lock = threading.Lock()
     run_start = time.time()
+    pending: dict[str, tuple] = {}
     try:
         client = HarnessServiceClientSync(BITGN_URL)
         print("Connecting to BitGN", client.status(StatusRequest()))
@@ -257,7 +252,6 @@ def main() -> None:
         print(f"Run started: {run.run_id} ({len(run.trial_ids)} trials)")
 
         try:
-            _print_table_header()
             with ThreadPoolExecutor(max_workers=PARALLEL_TASKS) as pool:
                 futures = {
                     pool.submit(_run_single_task, tid, task_filter): tid
@@ -265,25 +259,81 @@ def main() -> None:
                 }
                 for fut in as_completed(futures):
                     try:
-                        task_id, score, detail, task_elapsed, token_stats = fut.result()
+                        task_id, trial_id, task_elapsed, token_stats, trace, filtered = fut.result()
                     except Exception as exc:
                         failed_tid = futures[fut]
                         print(f"{CLI_RED}[{failed_tid}] Task error: {exc}{CLI_CLR}")
                         continue
-                    if score >= 0:
-                        with scores_lock:
-                            scores.append((task_id, score, detail, task_elapsed, token_stats))
-                        _print_table_row(task_id, score, detail, task_elapsed, token_stats)
+                    if filtered:
+                        continue
+                    pending[task_id] = (trial_id, task_elapsed, token_stats, trace)
         finally:
-            if scores:
-                _write_summary(scores, run_start)
-            client.submit_run(SubmitRunRequest(run_id=run.run_id, force=True))
+            print(f"\n{CLI_GREEN}>>>> Submitting run... <<<<{CLI_CLR}")
+            result = client.submit_run(SubmitRunRequest(run_id=run.run_id, force=True))
             print(f"Run submitted: {run.run_id}")
+            scores = _settle_scores(result, pending)
+            if scores:
+                _print_table_header()
+                for row in scores:
+                    _print_table_row(*row)
+                _write_summary(scores, run_start)
+            if result.score_available:
+                print(f"\n{CLI_GREEN}FINAL SCORE: {result.score:0.2f}{CLI_CLR}")
+            else:
+                print(f"\n{CLI_RED}Score is not available. Results are sealed and will be revealed later{CLI_CLR}\n")
 
     except ConnectError as exc:
         print(f"{exc.code}: {exc.message}")
     except KeyboardInterrupt:
         print(f"{CLI_RED}Interrupted{CLI_CLR}")
+
+
+def _settle_scores(submit_result, pending: dict) -> list:
+    """Match SubmitRunResponse.trials back to pending per-task data.
+    Writes deferred trace task_result rows, save_last_run for failures, prints per-task line."""
+    rows = []
+    incomplete = 0
+    seen: set[str] = set()
+    for t in submit_result.trials:
+        task_id = t.task_id
+        if task_id not in pending:
+            continue
+        seen.add(task_id)
+        trial_id, task_elapsed, token_stats, trace = pending[task_id]
+        score = float(t.score) if t.score_available else 0.0
+        detail = list(t.score_detail)
+        if t.state != TRIAL_STATE_DONE:
+            incomplete += 1
+        _finalize_task_trace(trace, task_id, score, detail, task_elapsed, token_stats)
+        if t.score_available and score < 1.0:
+            save_last_run(
+                task_id,
+                status="failure",
+                outcome=token_stats.get("outcome", "OUTCOME_OK"),
+                cycles_used=token_stats.get("cycles_used", 0),
+            )
+        style = CLI_GREEN if score == 1 else CLI_RED
+        detail_str = "\n" + textwrap.indent("\n".join(detail), "  ") if detail else ""
+        in_t = token_stats.get("input_tokens", 0)
+        out_t = token_stats.get("output_tokens", 0)
+        cycles = token_stats.get("cycles_used", 0)
+        m_short = (token_stats.get("model_used") or "—").split("/")[-1]
+        print(
+            f"{style}[{task_id}] Score: {score:0.2f}"
+            f" | {task_elapsed:.1f}s"
+            f" | in {in_t:,} / out {out_t:,} tok"
+            f" | cycles={cycles} | {m_short}"
+            f"{detail_str}{CLI_CLR}"
+        )
+        rows.append((task_id, score, detail, task_elapsed, token_stats))
+    # close + emit unmatched (e.g., sealed-eval blind runs return no per-trial scores)
+    for task_id, (_, task_elapsed, token_stats, trace) in pending.items():
+        if task_id in seen:
+            continue
+        _finalize_task_trace(trace, task_id, 0.0, [], task_elapsed, token_stats)
+    if incomplete > 0:
+        print(f"{CLI_RED}incomplete trials: {incomplete}{CLI_CLR}")
+    return rows
 
 
 if __name__ == "__main__":
