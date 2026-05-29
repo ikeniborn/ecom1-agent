@@ -98,7 +98,7 @@ from bitgn.harness_pb2 import (
 from connectrpc.errors import ConnectError
 
 from agent import run_agent
-from agent.prompt_assembler import save_last_run
+from agent.learned_store import save_last_run
 from agent.trace import TraceLogger, get_trace, set_trace
 
 BITGN_URL = os.getenv("BENCHMARK_HOST") or "https://api.bitgn.com"
