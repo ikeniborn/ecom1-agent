@@ -1,14 +1,23 @@
-"""Minimal orchestrator for ecom benchmark."""
+"""Minimal orchestrator — reads AGENTS.MD then dispatches the pipeline."""
 from __future__ import annotations
 
 import os
 
 from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
+from bitgn.vm.ecom.ecom_pb2 import ReadRequest
 
-from agent.prephase import run_prephase
 from agent.pipeline import run_pipeline
 
-_MODEL = os.environ.get("MODEL", "")
+
+def _read_agents_md(vm: EcomRuntimeClientSync) -> str:
+    for candidate in ("/AGENTS.MD", "/AGENTS.md"):
+        try:
+            r = vm.read(ReadRequest(path=candidate))
+            if r.content:
+                return r.content
+        except Exception:
+            continue
+    return ""
 
 
 def run_agent(
@@ -16,20 +25,13 @@ def run_agent(
     harness_url: str,
     task_text: str,
     task_id: str = "",
-    injected_session_rules: list[str] | None = None,
-    injected_prompt_addendum: str = "",
+    injected_session_rules: list[str] | None = None,    # accepted for harness compat; unused
+    injected_prompt_addendum: str = "",                  # accepted for harness compat; unused
 ) -> dict:
-    """Execute a single benchmark task."""
     vm = EcomRuntimeClientSync(harness_url)
-    model = _MODEL
-    cfg = model_configs.get(model, {}) if model_configs else {}
-    pre = run_prephase(vm, task_text)
-    stats, _ = run_pipeline(
-        vm, model, task_text, pre, cfg,
-        task_id=task_id,
-        injected_session_rules=injected_session_rules or [],
-        injected_prompt_addendum=injected_prompt_addendum,
-    )
-    stats["model_used"] = model
-    stats["task_type"] = "lookup"
-    return stats
+    agents_md_text = _read_agents_md(vm)
+    run_pipeline(vm, instruction=task_text, task_id=task_id, agents_md_text=agents_md_text)
+    return {
+        "model_used": os.environ.get("MODEL", ""),
+        "task_type": "lookup",
+    }
