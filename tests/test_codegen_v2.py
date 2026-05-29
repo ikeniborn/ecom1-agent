@@ -32,7 +32,7 @@ def run(vm, params):
 
 def test_happy_path_returns_codegen_output():
     payload = json.dumps({"script_code": _GOOD_SCRIPT})
-    with patch("agent.codegen_v2.call_llm_raw", return_value=payload):
+    with patch("agent.pipeline.call_llm_raw", return_value=payload):
         out = run_codegen(_design(), learn_ctx=[], prev_error=None)
     assert isinstance(out, CodegenOutput)
     assert "def run(vm, params)" in out.script_code
@@ -45,7 +45,7 @@ def test_learn_ctx_passed_in_user_msg():
         captured["user_msg"] = user_msg
         return json.dumps({"script_code": _GOOD_SCRIPT})
 
-    with patch("agent.codegen_v2.call_llm_raw", side_effect=_fake_llm):
+    with patch("agent.pipeline.call_llm_raw", side_effect=_fake_llm):
         run_codegen(_design(), learn_ctx=["Never hardcode SKUs"], prev_error=None)
     assert "Never hardcode SKUs" in captured["user_msg"]
 
@@ -57,12 +57,12 @@ def test_prev_error_appended():
         captured["user_msg"] = user_msg
         return json.dumps({"script_code": _GOOD_SCRIPT})
 
-    with patch("agent.codegen_v2.call_llm_raw", side_effect=_fake_llm):
+    with patch("agent.pipeline.call_llm_raw", side_effect=_fake_llm):
         run_codegen(_design(), learn_ctx=[], prev_error="lint: invalid syntax")
     assert "lint: invalid syntax" in captured["user_msg"]
 
 
 def test_unparseable_raises_codegen_error():
-    with patch("agent.codegen_v2.call_llm_raw", return_value="<not json>"):
+    with patch("agent.pipeline.call_llm_raw", return_value="<not json>"):
         with pytest.raises(CodegenError):
             run_codegen(_design(), learn_ctx=[], prev_error=None)

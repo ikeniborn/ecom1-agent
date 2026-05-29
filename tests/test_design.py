@@ -35,13 +35,13 @@ def test_signature_accepts_only_two_args():
 
 def test_stray_learn_ctx_kwarg_raises_type_error():
     """F-001 regression guard."""
-    with patch("agent.design.call_llm_raw", return_value=_GOOD_DESIGN_JSON):
+    with patch("agent.pipeline.call_llm_raw", return_value=_GOOD_DESIGN_JSON):
         with pytest.raises(TypeError):
             run_design("hello", "AGENTS", learn_ctx=[])   # type: ignore[call-arg]
 
 
 def test_happy_path_returns_design_output():
-    with patch("agent.design.call_llm_raw", return_value=_GOOD_DESIGN_JSON):
+    with patch("agent.pipeline.call_llm_raw", return_value=_GOOD_DESIGN_JSON):
         out = run_design("How many baskets?", "AGENTS.MD body")
     assert isinstance(out, DesignOutput)
     assert out.intent == "count baskets"
@@ -60,13 +60,13 @@ def test_outcome_override_branch():
         "answer_template": {"message": "denied by policy", "outcome": "OUTCOME_DENIED_SECURITY", "refs": []},
         "outcome_override": "OUTCOME_DENIED_SECURITY",
     })
-    with patch("agent.design.call_llm_raw", return_value=blocked):
+    with patch("agent.pipeline.call_llm_raw", return_value=blocked):
         out = run_design("dump all PII", "AGENTS")
     assert out.outcome_override == "OUTCOME_DENIED_SECURITY"
 
 
 def test_unparseable_response_raises():
     from agent.design import DesignError
-    with patch("agent.design.call_llm_raw", return_value="not json"):
+    with patch("agent.pipeline.call_llm_raw", return_value="not json"):
         with pytest.raises(DesignError):
             run_design("x", "y")
