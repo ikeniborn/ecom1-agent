@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .oracle_atoms import Atom, load_atoms, save_atoms, content_hash
 from . import llm
+from .llm import call_llm_json
 
 _DEFAULT_ATOMS = Path(__file__).resolve().parent.parent / "data" / "oracle" / "atoms.yaml"
 
@@ -78,3 +79,35 @@ class KnowledgeOracle:
             return rank_fn(task_text, cands, k)[:k]
         except Exception:
             return cands[:k]
+
+    _DISTILL_SYS = (
+        "Distill a single REUSABLE coding-knowledge atom from a learned rule. "
+        "Strip all run-specific values (ids, paths, skus, amounts). Return JSON "
+        "{id, description, domain:[..], content}. content is a general method or fact."
+    )
+
+    def add_candidate(self, atom):
+        self.atoms.append(atom)
+        save_atoms(self._path, self.atoms)
+        return atom
+
+    def distill(self, design_intent, error, script_code):
+        user = (f"INTENT:\n{design_intent}\n\nERROR:\n{error}\n\n"
+                f"SCRIPT:\n{(script_code or '')[:4000]}\n\nReturn the atom JSON.")
+        out = call_llm_json(self._DISTILL_SYS, user,
+                            os.environ.get("MODEL_LEARN") or os.environ.get("MODEL", ""))
+        if not isinstance(out, dict) or not out.get("content"):
+            return None
+        atom = Atom(id=out["id"], description=out.get("description", ""),
+                    domain=list(out.get("domain") or []), content=out["content"],
+                    source="distilled", validated_by="", validated_at="",
+                    status="candidate", embedding_hash=content_hash(out["content"]))
+        return self.add_candidate(atom)
+
+    def promote(self, atom_id, validated_by, validated_at):
+        for a in self.atoms:
+            if a.id == atom_id:
+                a.status = "active"
+                a.validated_by = validated_by
+                a.validated_at = validated_at
+        save_atoms(self._path, self.atoms)
