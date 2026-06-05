@@ -43,6 +43,15 @@ def _next_entry_id(entries: list[dict]) -> str:
     return f"r{(max(used, default=0) + 1):03d}"
 
 
+def _next_verdict_id(entries: list[dict]) -> str:
+    used = {
+        int(e["id"][1:])
+        for e in entries
+        if isinstance(e.get("id"), str) and e["id"].startswith("v") and e["id"][1:].isdigit()
+    }
+    return f"v{(max(used, default=0) + 1):03d}"
+
+
 def load_entries(tid: str) -> list[dict]:
     """Return active entries only."""
     data = _read(tid)
@@ -99,4 +108,46 @@ def save_last_run(
         "cycles_used": cycles_used,
         "date": str(date.today()),
     }
+    _write(tid, data)
+
+
+def write_verdict(
+    tid: str,
+    score: float,
+    score_detail: list[str],
+    submitted_message: str,
+    submitted_outcome: str,
+    submitted_refs: list[str],
+) -> None:
+    """Record grader feedback as a `source: verdict` entry in entries[].
+
+    One active verdict per task: writing a new one deactivates all prior
+    `source: verdict` entries. `content: null` flags this as a fact, not a
+    rule — `apply_learn_diff` validation is bypassed (this writes directly).
+    """
+    if not tid:
+        return
+    data = _read(tid)
+    entries: list[dict] = list(data.get("entries", []))
+
+    for e in entries:
+        if e.get("source") == "verdict" and e.get("status") == "active":
+            e["status"] = "inactive"
+            e["deactivated_reason"] = "superseded by newer verdict"
+
+    entries.append({
+        "id": _next_verdict_id(entries),
+        "source": "verdict",
+        "score": score,
+        "score_detail": list(score_detail or []),
+        "submitted_message": submitted_message,
+        "submitted_outcome": submitted_outcome,
+        "submitted_refs": list(submitted_refs or []),
+        "status": "active",
+        "created": str(date.today()),
+        "content": None,
+    })
+
+    data["task_id"] = tid
+    data["entries"] = entries
     _write(tid, data)

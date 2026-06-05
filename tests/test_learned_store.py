@@ -94,3 +94,61 @@ def test_save_last_run_no_heuristic_valid_no_schema_hash(tid_dir):
     assert "heuristic_valid" not in lr
     assert "schema_hash" not in lr
     assert "date" in lr
+
+
+def test_next_verdict_id_first(tid_dir):
+    assert learned_store._next_verdict_id([]) == "v001"
+
+
+def test_next_verdict_id_skips_rule_ids(tid_dir):
+    entries = [
+        {"id": "r001", "status": "active"},
+        {"id": "v001", "status": "active"},
+        {"id": "v002", "status": "inactive"},
+    ]
+    assert learned_store._next_verdict_id(entries) == "v003"
+
+
+def test_write_verdict_appends_entry(tid_dir):
+    _seed(tid_dir, "t10", entries=[])
+    learned_store.write_verdict(
+        "t10",
+        score=0.5,
+        score_detail=["answer missing field customer_id", "wrong total: expected 3, got 1"],
+        submitted_message="Found 1 basket.",
+        submitted_outcome="OUTCOME_OK",
+        submitted_refs=["ref://basket/42"],
+    )
+    data = yaml.safe_load((tid_dir / "t10.yaml").read_text())
+    e = data["entries"][0]
+    assert e["id"] == "v001"
+    assert e["source"] == "verdict"
+    assert e["score"] == 0.5
+    assert e["score_detail"] == ["answer missing field customer_id", "wrong total: expected 3, got 1"]
+    assert e["submitted_message"] == "Found 1 basket."
+    assert e["submitted_outcome"] == "OUTCOME_OK"
+    assert e["submitted_refs"] == ["ref://basket/42"]
+    assert e["status"] == "active"
+    assert e["content"] is None
+
+
+def test_write_verdict_deactivates_prior_verdict(tid_dir):
+    _seed(tid_dir, "t11", entries=[
+        {"id": "v001", "source": "verdict", "status": "active", "content": None},
+        {"id": "r001", "source": "rule", "status": "active", "content": "always cite the catalog path"},
+    ])
+    learned_store.write_verdict(
+        "t11", score=0.0, score_detail=["nope"],
+        submitted_message="m", submitted_outcome="OUTCOME_OK", submitted_refs=[],
+    )
+    data = yaml.safe_load((tid_dir / "t11.yaml").read_text())
+    by_id = {e["id"]: e for e in data["entries"]}
+    assert by_id["v001"]["status"] == "inactive"
+    assert by_id["v002"]["status"] == "active"
+    assert by_id["r001"]["status"] == "active"
+
+
+def test_write_verdict_empty_tid_noop(tid_dir):
+    learned_store.write_verdict("", score=0.0, score_detail=[], submitted_message="",
+                                submitted_outcome="", submitted_refs=[])
+    assert not (tid_dir / ".yaml").exists()
