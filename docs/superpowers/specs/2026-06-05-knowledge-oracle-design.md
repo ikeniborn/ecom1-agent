@@ -1,7 +1,7 @@
 # Design: knowledge-oracle (validated knowledge bank with semantic retrieval)
 
 **Date:** 2026-06-05
-**Status:** draft
+**Status:** approved
 **Intent:** [2026-06-05-knowledge-oracle-intent.md](../intents/2026-06-05-knowledge-oracle-intent.md)
 
 ## Problem (from intent)
