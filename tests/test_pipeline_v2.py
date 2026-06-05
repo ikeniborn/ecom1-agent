@@ -436,3 +436,17 @@ def test_compact_empty_llm_response_returns_unchanged(monkeypatch):
     with patch("agent.pipeline.call_llm_raw", return_value=""):
         out = _compact_learn_ctx(ctx)
     assert out == ctx
+
+
+def test_compact_keep_recent_zero_is_guarded(monkeypatch):
+    from agent.pipeline import _compact_learn_ctx
+    monkeypatch.setenv("COMPACTION_THRESHOLD", "5")
+    monkeypatch.setenv("COMPACTION_KEEP_RECENT", "0")
+    ctx = _entries(10)
+    with patch("agent.pipeline.call_llm_raw", return_value="condensed") as m:
+        out = _compact_learn_ctx(ctx)
+    # keep_recent must be clamped to >= 1: exactly one recent entry kept, older summarized
+    assert out[0] == {"id": "compacted", "content": "condensed", "source": "compaction"}
+    assert out[1:] == ctx[-1:]
+    assert len(out) == 2
+    m.assert_called_once()

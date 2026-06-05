@@ -195,7 +195,7 @@ def _compact_learn_ctx(
     or failed LLM response, return the input unchanged (green tasks must not
     regress)."""
     threshold = int(os.environ.get("COMPACTION_THRESHOLD", "15"))
-    keep_recent = int(os.environ.get("COMPACTION_KEEP_RECENT", "5"))
+    keep_recent = max(1, int(os.environ.get("COMPACTION_KEEP_RECENT", "5")))
     if len(learn_ctx) <= threshold:
         return learn_ctx
 
