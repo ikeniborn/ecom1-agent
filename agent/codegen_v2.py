@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 
 from .json_extract import _extract_json_from_text
+from .learned_store import _format_entry
 from .llm import _resolve_model_for_phase
 from .models import CodegenOutput, DesignOutput
 from .prompt import load_prompt
@@ -45,7 +46,7 @@ def run_codegen(
     if learn_ctx:
         def _fmt(e):
             if isinstance(e, dict):
-                return f"  - [{e.get('id', '?')}] {e.get('content', '')}"
+                return _format_entry(e)
             return f"  - {e}"
         rule_lines = "\n".join(_fmt(e) for e in learn_ctx)
         parts.append(f"LEARNED_RULES (active):\n{rule_lines}")

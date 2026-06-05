@@ -152,3 +152,25 @@ def test_write_verdict_empty_tid_noop(tid_dir):
     learned_store.write_verdict("", score=0.0, score_detail=[], submitted_message="",
                                 submitted_outcome="", submitted_refs=[])
     assert not (tid_dir / ".yaml").exists()
+
+
+def test_format_entry_rule(tid_dir):
+    e = {"id": "r001", "content": "always cite the catalog path"}
+    assert learned_store._format_entry(e) == "  - [r001] always cite the catalog path"
+
+
+def test_format_entry_verdict(tid_dir):
+    e = {
+        "id": "v001", "source": "verdict", "score": 0.5,
+        "score_detail": ["answer missing field customer_id", "wrong total: expected 3, got 1"],
+        "content": None,
+    }
+    assert learned_store._format_entry(e) == (
+        "  - [v001] VERDICT score=0.5: "
+        "answer missing field customer_id; wrong total: expected 3, got 1"
+    )
+
+
+def test_format_entry_verdict_no_detail(tid_dir):
+    e = {"id": "v002", "source": "verdict", "score": 0.0, "score_detail": [], "content": None}
+    assert learned_store._format_entry(e) == "  - [v002] VERDICT score=0.0: "

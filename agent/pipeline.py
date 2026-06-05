@@ -10,7 +10,7 @@ from .codegen_v2 import CodegenError, run_codegen
 from .design import DesignError, run_design
 from .fidelity import exec_fidelity_in_subprocess, generate_fidelity_test
 from .json_extract import _extract_json_from_text
-from .learned_store import apply_learn_diff, load_entries, save_last_run
+from .learned_store import _format_entry, apply_learn_diff, load_entries, save_last_run
 from .llm import (
     CLI_BLUE, CLI_CLR, CLI_GREEN, CLI_RED, CLI_YELLOW,
     OUTCOME_BY_NAME, _resolve_model_for_phase, call_llm_raw,
@@ -103,9 +103,7 @@ def _learn_consolidate(
     guide = load_prompt("learn") or "# PHASE: LEARN"
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
 
-    rules_lines = "\n".join(
-        f"  - [{e.get('id', '?')}] {e.get('content', '')}" for e in learn_ctx
-    ) or "(none)"
+    rules_lines = "\n".join(_format_entry(e) for e in learn_ctx) or "(none)"
     observed_block = ""
     if observed:
         observed_block = "OBSERVED_RPC_OUTPUTS:\n" + "\n".join(observed) + "\n\n"

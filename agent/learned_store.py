@@ -52,6 +52,15 @@ def _next_verdict_id(entries: list[dict]) -> str:
     return f"v{(max(used, default=0) + 1):03d}"
 
 
+def _format_entry(e: dict) -> str:
+    """Render one learn_ctx entry for an LLM prompt. Verdict entries have
+    content=None and must show their score_detail instead."""
+    if e.get("source") == "verdict":
+        detail = "; ".join(e.get("score_detail") or [])
+        return f"  - [{e.get('id', '?')}] VERDICT score={e.get('score', '?')}: {detail}"
+    return f"  - [{e.get('id', '?')}] {e.get('content', '')}"
+
+
 def load_entries(tid: str) -> list[dict]:
     """Return active entries only."""
     data = _read(tid)
