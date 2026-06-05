@@ -143,6 +143,19 @@ def _learn_consolidate(
             "agents_md_anchor": out.agents_md_anchor,
         })
 
+    # Opt-in: distill a general candidate atom for the knowledge oracle (never raises).
+    if (os.environ.get("ORACLE_ENABLED", "1") != "0"
+            and os.environ.get("ORACLE_DISTILL", "0") == "1"):
+        try:
+            from .oracle import KnowledgeOracle
+            KnowledgeOracle().distill(
+                design_intent=getattr(design, "intent", ""),
+                error=error or "",
+                script_code=script_code or "",
+            )
+        except Exception as e:
+            print(f"{CLI_YELLOW}[pipeline] oracle distill skipped: {e}{CLI_CLR}")
+
 
 # ---------------------------------------------------------------------------
 # Post-trial LEARN — grader feedback distilled via the same LEARN pipeline
