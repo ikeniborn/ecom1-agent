@@ -1,0 +1,61 @@
+- id: fraud-impossible-travel
+  description: "Archived-payment fraud = single-device impossible travel; flag the account's far-from-home payments"
+  domain: [payments, fraud, sql]
+  content: >
+    Archived-payment fraud review has no /docs fraud policy and no fraud flag on payment
+    records — it is geographic-anomaly detection over payment_transactions JOIN
+    customer_accounts (which has home_latitude/home_longitude). Step 1: identify the single
+    compromised account = the customer owning ONE device_fingerprint that shows impossible
+    travel: per device, order archived rows (is_archived_basket_reference=1) by
+    payment_created_at and compute consecutive-leg
+    (ABS(observed_latitude-LAG(observed_latitude))+ABS(observed_longitude-LAG(observed_longitude)))
+    / NULLIF((julianday(payment_created_at)-julianday(LAG(payment_created_at)))*24.0,0) deg/hr;
+    the fraud device has MAX abs deg/hr impossibly high (>5). Customers with multi-DEVICE
+    spread are red herrings. Step 2: flag that customer's archived payments far from the
+    registered home (ABS(obs_lat-home_lat)+ABS(obs_lon-home_lon) > 0.5); the at-home payments
+    are the genuine cardholder. Cite record_path of the flagged rows; cite /docs/security.md.
+  source: investigation
+  validated_by: manual
+  validated_at: '2026-06-05'
+  status: active
+  embedding_hash: ''
+- id: sql-no-name-binds
+  description: "/bin/sql rejects :name binds; inline single-quoted literals in IN()"
+  domain: [sql, vm-io]
+  content: >
+    The /bin/sql tool does not accept :name bind parameters passed as
+    args=[sql, 'name=value'] — it returns exit_code 1 'missing named argument' and zero rows.
+    Always inline values as single-quoted SQL string literals, e.g.
+    WHERE product_sku IN ('AAA-111','BBB-222').
+  source: investigation
+  validated_by: manual
+  validated_at: '2026-06-05'
+  status: active
+  embedding_hash: ''
+- id: catalog-price-ex-vat
+  description: "catalogue price_cents is ex-VAT (net); no VAT division for ex-VAT totals"
+  domain: [pricing, sql]
+  content: >
+    Per /docs/discounts.md the basket subtotal is computed directly from catalogue
+    product_variants.price_cents, so price_cents is ex-VAT (net). For ex-VAT comparisons,
+    today_ex = SUM(qty*price_cents)/100 with NO division by (1+vat). The receipt SUBTOTAL is
+    already the ex-VAT total and the VAT rate is printed on the receipt, not in /docs — do not
+    search /docs for VAT.
+  source: investigation
+  validated_by: manual
+  validated_at: '2026-06-05'
+  status: active
+  embedding_hash: ''
+- id: never-read-directory
+  description: "Never vm.read a directory path; list then read the file entry"
+  domain: [vm-io]
+  content: >
+    vm.read on a directory path (e.g. '/uploads/') raises 'read failed: is a directory' and
+    aborts the script. Always vm.list the directory, pick the FILE entry (kind FILE or a name
+    with an extension), and vm.read that exact file path. When a planned read path is resolved
+    from an empty Search/List, fall back to a known regular file rather than a directory root.
+  source: investigation
+  validated_by: manual
+  validated_at: '2026-06-05'
+  status: active
+  embedding_hash: ''
