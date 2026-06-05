@@ -243,6 +243,7 @@ class _AnswerGuard:
         self.observed: list[str] = []
         self._observed_total = 0
         self.actual_outcome: str = ""
+        self._captured: dict = {}
 
     def _record(self, rpc: str, kwargs: dict, result) -> None:
         if self._observed_total >= self._OBS_TOTAL_MAX:
@@ -317,6 +318,7 @@ class _AnswerGuard:
         # matches grader expectation. Pass through; grader feedback drives
         # LEARN via `learn_from_grader` between training cycles.
         if outcome != "OUTCOME_OK":
+            self._captured = {"message": message, "outcome": outcome, "refs": refs_list}
             self._vm.answer(message=message, outcome=outcome, refs=refs_list)
             return
 
@@ -349,6 +351,7 @@ class _AnswerGuard:
                     "check `:name` bindings on /bin/sql and the SELECT columns"
                 )
 
+        self._captured = {"message": message, "outcome": outcome, "refs": refs_list}
         self._vm.answer(message=message, outcome=outcome, refs=refs_list)
 
 
@@ -564,8 +567,10 @@ def run_pipeline(
     save_last_run(task_id, status=status, outcome=actual_outcome, cycles_used=cycle)
     return {
         "cycles_used": cycle,
-        "outcome": actual_outcome,
+        "outcome": guarded_vm._captured.get("outcome", actual_outcome),
         "status": status,
         "input_tokens": total_in,
         "output_tokens": total_out,
+        "answer_message": guarded_vm._captured.get("message", ""),
+        "answer_refs": guarded_vm._captured.get("refs", []),
     }

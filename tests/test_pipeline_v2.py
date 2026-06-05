@@ -385,3 +385,21 @@ def test_identical_sql_set_normalises_whitespace():
     c = ["SELECT  1", "  SELECT 2  "]
     d = ["SELECT 1", "SELECT 2"]
     assert _identical_sql_set(c, d)
+
+
+def test_answer_guard_captures_submitted_answer():
+    design = DesignOutput(**_GOOD_DESIGN)
+    vm = MagicMock()
+    guard = _AnswerGuard(vm, design)
+    guard.answer(message="Found 1 basket.", outcome="OUTCOME_OK", refs=["ref://basket/42"])
+    assert guard._captured == {
+        "message": "Found 1 basket.",
+        "outcome": "OUTCOME_OK",
+        "refs": ["ref://basket/42"],
+    }
+
+
+def test_answer_guard_captured_empty_before_answer():
+    design = DesignOutput(**_GOOD_DESIGN)
+    guard = _AnswerGuard(MagicMock(), design)
+    assert guard._captured == {}
