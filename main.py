@@ -98,7 +98,7 @@ from bitgn.harness_pb2 import (
 from connectrpc.errors import ConnectError
 
 from agent import run_agent
-from agent.learned_store import save_last_run
+from agent.learned_store import save_last_run, write_verdict
 from agent.pipeline import learn_from_grader
 from agent.trace import TraceLogger, set_trace
 
@@ -365,6 +365,14 @@ def _settle_scores(submit_result, pending: dict) -> list:
                 status="failure",
                 outcome=token_stats.get("outcome", "OUTCOME_OK"),
                 cycles_used=token_stats.get("cycles_used", 0),
+            )
+            write_verdict(
+                task_id,
+                score=score,
+                score_detail=detail,
+                submitted_message=token_stats.get("answer_message", ""),
+                submitted_outcome=token_stats.get("outcome", ""),
+                submitted_refs=token_stats.get("answer_refs", []),
             )
         style = CLI_GREEN if score == 1 else CLI_RED
         detail_str = "\n" + textwrap.indent("\n".join(detail), "  ") if detail else ""
