@@ -1,7 +1,7 @@
 # Intent: agent memory — verdict feedback loop + context compaction
 
 **Date:** 2026-06-05
-**Status:** draft
+**Status:** approved
 
 ## Objective
 
