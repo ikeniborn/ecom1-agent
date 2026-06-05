@@ -30,6 +30,8 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `MAX_TOKENS_CODEGEN` | Max tokens for CODEGEN phase response (default 8192) |
 | `MAX_TOKENS_LEARN` | Max tokens for LEARN phase response (default 2048) |
 | `FIDELITY_TIMEOUT_S` | Subprocess timeout for fidelity gate (default 30) |
+| `COMPACTION_THRESHOLD` | Entry count in `learn_ctx` that triggers in-memory LLM compaction (default 15) |
+| `COMPACTION_KEEP_RECENT` | Recent `learn_ctx` entries kept verbatim after compaction (default 5) |
 | `MAX_STEPS` | Pipeline cycle limit per task (default 3) |
 | `LOG_LEVEL=DEBUG` | Full LLM response logging |
 | `OLLAMA_BASE_URL` | Ollama endpoint (default `http://localhost:11434/v1`) |
