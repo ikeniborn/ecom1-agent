@@ -450,3 +450,28 @@ def test_compact_keep_recent_zero_is_guarded(monkeypatch):
     assert out[1:] == ctx[-1:]
     assert len(out) == 2
     m.assert_called_once()
+
+
+def test_learn_consolidate_sends_full_script(tmp_path, monkeypatch):
+    import agent.learned_store as ls
+    from agent.pipeline import _learn_consolidate
+    monkeypatch.setattr(ls, "_LEARNED_DIR", tmp_path)
+
+    design = DesignOutput(**_GOOD_DESIGN)
+    # Build a script where the tail (unique sentinel) lands well past char 4000
+    padding = "    x = 1  # pad\n" * 600  # ~10 200 chars total
+    unique_sentinel = "    return  # UNIQUE_TAIL_SENTINEL_XYZ"
+    long_script = "def run(vm, params):\n" + padding + unique_sentinel + "\n"
+    assert len(long_script) > 4000
+    assert unique_sentinel not in long_script[:4000]  # sentinel is beyond the old cap
+
+    captured = {}
+
+    def _fake_llm(system, user_msg, model, opts, **kw):
+        captured["user_msg"] = user_msg
+        return json.dumps({"reasoning": "noop", "skip": True, "skip_reason": "noop", "deactivate_ids": []})
+
+    with patch("agent.pipeline.call_llm_raw", side_effect=_fake_llm):
+        _learn_consolidate("t10", [], design, "some error", long_script)
+
+    assert unique_sentinel in captured["user_msg"]   # sentinel survived — no truncation

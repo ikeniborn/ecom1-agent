@@ -111,7 +111,7 @@ def _learn_consolidate(
         f"TOOL_PLAN:\n{design.model_dump_json(indent=2)}\n\n"
         f"ERROR:\n{error}\n\n"
         f"{observed_block}"
-        f"SCRIPT_CODE:\n```python\n{script_code[:4000]}\n```\n\n"
+        f"SCRIPT_CODE:\n```python\n{script_code}\n```\n\n"
         f"EXISTING_RULES:\n{rules_lines}"
     )
 
