@@ -27,11 +27,22 @@ def _design_to_tool_plan_json(d: DesignOutput) -> str:
     return d.model_dump_json(indent=2)
 
 
+def build_oracle_block(oracle_atoms) -> str:
+    """Render retrieved knowledge atoms as a context block for CODEGEN."""
+    if not oracle_atoms:
+        return ""
+    lines = ["## VALIDATED KNOWLEDGE (apply when relevant; verified methods)"]
+    for a in oracle_atoms:
+        lines.append(f"- ({', '.join(a.domain)}) {a.content.strip()}")
+    return "\n".join(lines)
+
+
 def run_codegen(
     design: DesignOutput,
     learn_ctx: list[dict],
     prev_error: str | None,
     token_out: dict | None = None,
+    oracle_atoms: list | None = None,
 ) -> CodegenOutput:
     """Translate `design.tool_plan` into a Python module. Returns CodegenOutput or raises."""
     guide = load_prompt("codegen") or "# PHASE: CODEGEN"
@@ -40,9 +51,11 @@ def run_codegen(
         {"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}},
     ]
 
-    parts = [
-        f"TOOL_PLAN:\n{_design_to_tool_plan_json(design)}",
-    ]
+    parts = []
+    oracle_block = build_oracle_block(oracle_atoms)
+    if oracle_block:
+        parts.append(oracle_block)
+    parts.append(f"TOOL_PLAN:\n{_design_to_tool_plan_json(design)}")
     if learn_ctx:
         def _fmt(e):
             if isinstance(e, dict):
