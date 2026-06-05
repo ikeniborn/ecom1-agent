@@ -38,6 +38,14 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `CC_ENABLED=1` | Enable Claude Code CLI tier (iclaude subprocess, OAuth) |
 | `LLM_HTTP_READ_TIMEOUT_S` | HTTP read timeout in seconds (default 180) |
 | `TRAIN_MAX_CYCLES` | Per-task training cycles (default 1 = no training). Each cycle is a fresh `StartRun → SubmitRun`; failing tasks (score < 1.0) get a LEARN rule distilled from grader feedback via `pipeline.learn_from_grader`, then re-run next cycle. Loop exits early when all targeted tasks reach score ≥ 1.0. |
+| `ORACLE_ENABLED` | Knowledge-oracle master toggle; `0` → pipeline behaves as before (default 1) |
+| `EMBED_MODEL` | Embedding model id for oracle retrieval (key into `models.json`, default `nomic-embed-text`) |
+| `EMBED_BASE_URL` | Embeddings endpoint; falls back to `OLLAMA_BASE_URL` |
+| `ORACLE_TOPN` | Stage-1 cosine candidate count (default 10) |
+| `ORACLE_K` | Final atoms injected into CODEGEN after re-rank (default 4) |
+| `MODEL_RANK` | Model for stage-2 re-rank; falls back to `MODEL` |
+| `ORACLE_RANK_ENABLED` | `0` → skip LLM re-rank, use cosine top-k (default 1) |
+| `ORACLE_DISTILL` | `1` → auto-distill candidate atoms after LEARN (default 0) |
 
 Credentials (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `OLLAMA_API_KEY`) belong in `.secrets`, not `.env`.
 
@@ -78,6 +86,7 @@ Entry point: `main.py` → BitGN harness → `agent/orchestrator.py:run_agent()`
 | `data/heuristics/{task_id}.py` | Last successful or last-attempted heuristic script. Reference only — pipeline always regenerates via DESIGN + CODEGEN. |
 | `data/heuristics/{task_id}.design.json` | Persisted `DesignOutput` from the last run; consumed by `learn_from_grader` in training mode. |
 | `models.json` | Per-model provider hints and Ollama options (e.g. `num_ctx`) |
+| `data/oracle/atoms.yaml` | Validated general knowledge atoms; retrieved semantically into CODEGEN by `agent/oracle.py` |
 
 ## Notable Constraints
 
