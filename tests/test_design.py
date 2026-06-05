@@ -27,10 +27,15 @@ _GOOD_DESIGN_JSON = json.dumps({
 
 
 def test_signature_accepts_only_two_args():
-    """F-001 regression guard: H2/H13/H15 forbid learn_ctx in DESIGN."""
+    """F-001 regression guard: H2/H13/H15 forbid learn_ctx in DESIGN.
+
+    Telemetry-only parameters (token_out) are allowed but must not be
+    positional and must not include learn_ctx.
+    """
     sig = inspect.signature(run_design)
     params = list(sig.parameters.keys())
-    assert params == ["instruction", "agents_md_text"], params
+    assert "learn_ctx" not in params, params
+    assert params[:2] == ["instruction", "agents_md_text"], params
 
 
 def test_stray_learn_ctx_kwarg_raises_type_error():

@@ -4,7 +4,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent.pipeline import run_pipeline, _extract_sql_literals, _identical_sql_set
+from agent.pipeline import (
+    _AnswerGuard,
+    _AnswerRefsError,
+    _extract_sql_literals,
+    _identical_sql_set,
+    learn_from_grader,
+    run_pipeline,
+)
+from agent.models import DesignOutput
 
 
 _GOOD_DESIGN = {
@@ -124,6 +132,249 @@ def run(vm, params):
 '''
     sqls = _extract_sql_literals(code)
     assert sqls == []
+
+
+def _design_with_template_refs(refs: list[str]) -> DesignOutput:
+    obj = dict(_GOOD_DESIGN)
+    obj["answer_template"] = {
+        "message": "ok",
+        "outcome": "OUTCOME_OK",
+        "refs": refs,
+    }
+    return DesignOutput(**obj)
+
+
+def test_answer_guard_passes_resolved_refs():
+    vm = MagicMock()
+    design = _design_with_template_refs(["$path"])
+    g = _AnswerGuard(vm, design)
+    g.answer(message="ok", outcome="OUTCOME_OK", refs=["/proc/catalog/abc.json"])
+    vm.answer.assert_called_once_with(
+        message="ok", outcome="OUTCOME_OK", refs=["/proc/catalog/abc.json"]
+    )
+
+
+def test_answer_guard_raises_on_unresolved_placeholder():
+    vm = MagicMock()
+    design = _design_with_template_refs(["$path"])
+    g = _AnswerGuard(vm, design)
+    with pytest.raises(_AnswerRefsError, match="unresolved placeholder"):
+        g.answer(message="ok", outcome="OUTCOME_OK", refs=["$path"])
+    vm.answer.assert_not_called()
+
+
+def test_answer_guard_raises_on_empty_refs_when_template_needs_runtime():
+    vm = MagicMock()
+    design = _design_with_template_refs(["$path"])
+    g = _AnswerGuard(vm, design)
+    with pytest.raises(_AnswerRefsError, match="only static template"):
+        g.answer(message="ok", outcome="OUTCOME_OK", refs=[])
+    vm.answer.assert_not_called()
+
+
+def test_answer_guard_raises_when_only_static_refs_present():
+    """Real regression: template ['/proc/catalog', '$path'], script returned only '/proc/catalog'."""
+    vm = MagicMock()
+    design = _design_with_template_refs(["/proc/catalog", "$path"])
+    g = _AnswerGuard(vm, design)
+    with pytest.raises(_AnswerRefsError, match="only static template"):
+        g.answer(message="ok", outcome="OUTCOME_OK", refs=["/proc/catalog"])
+    vm.answer.assert_not_called()
+
+
+def test_learn_from_grader_missing_state_returns_false(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert learn_from_grader("nonexistent_task", ["something"]) is False
+
+
+def test_learn_from_grader_invokes_learn_consolidate(tmp_path, monkeypatch):
+    from agent import learned_store
+    monkeypatch.setattr(learned_store, "_LEARNED_DIR", tmp_path)
+    monkeypatch.chdir(tmp_path)
+    heur_dir = tmp_path / "data" / "heuristics"
+    heur_dir.mkdir(parents=True)
+
+    design = DesignOutput(**_GOOD_DESIGN)
+    (heur_dir / "t_learn.design.json").write_text(design.model_dump_json())
+    (heur_dir / "t_learn.py").write_text("def run(vm, params): pass\n")
+
+    learn_payload = json.dumps({
+        "rule_content": "Always include the matched row's catalog path in refs",
+        "agents_md_anchor": None,
+        "reasoning": "Grader rejected answer missing path ref",
+        "deactivate_ids": [],
+        "deactivate_reason": None,
+        "skip": False,
+        "skip_reason": None,
+    })
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(learn_payload)):
+        assert learn_from_grader("t_learn", ["answer missing required reference 'X'"]) is True
+
+    import yaml
+    data = yaml.safe_load((tmp_path / "t_learn.yaml").read_text())
+    assert data["entries"][-1]["content"].startswith("Always include")
+
+
+def test_answer_guard_passes_with_static_plus_runtime_refs():
+    vm = MagicMock()
+    design = _design_with_template_refs(["/proc/catalog", "$path"])
+    g = _AnswerGuard(vm, design)
+    g.answer(
+        message="ok",
+        outcome="OUTCOME_OK",
+        refs=["/proc/catalog", "/proc/catalog/FST-1.json"],
+    )
+    vm.answer.assert_called_once()
+
+
+def test_answer_guard_allows_empty_refs_when_template_has_no_runtime():
+    vm = MagicMock()
+    design = _design_with_template_refs([])  # template has no $-placeholders
+    g = _AnswerGuard(vm, design)
+    g.answer(message="ok", outcome="OUTCOME_OK", refs=[])
+    vm.answer.assert_called_once()
+
+
+def test_answer_guard_infers_runtime_demand_from_success_criteria():
+    """No $placeholder in template, but success_criteria mentions 'full path' → require runtime ref."""
+    obj = dict(_GOOD_DESIGN)
+    obj["success_criteria"] = ["Answer references matched product with full path"]
+    obj["answer_template"] = {"message": "ok", "outcome": "OUTCOME_OK", "refs": ["/proc/catalog"]}
+    design = DesignOutput(**obj)
+    vm = MagicMock()
+    g = _AnswerGuard(vm, design)
+    with pytest.raises(_AnswerRefsError, match="only static template"):
+        g.answer(message="ok", outcome="OUTCOME_OK", refs=["/proc/catalog"])
+    vm.answer.assert_not_called()
+
+
+def test_answer_guard_infers_runtime_demand_from_agents_md_constraints():
+    """AGENTS.MD constraint mentions 'reference' → require runtime ref."""
+    obj = dict(_GOOD_DESIGN)
+    obj["agents_md_constraints"] = [
+        {"anchor": "#x", "rule": "When responding with reference - provide full path"}
+    ]
+    obj["answer_template"] = {"message": "ok", "outcome": "OUTCOME_OK", "refs": ["/proc/catalog"]}
+    design = DesignOutput(**obj)
+    vm = MagicMock()
+    g = _AnswerGuard(vm, design)
+    with pytest.raises(_AnswerRefsError, match="only static template"):
+        g.answer(message="ok", outcome="OUTCOME_OK", refs=["/proc/catalog"])
+    vm.answer.assert_not_called()
+
+
+def test_answer_guard_infers_runtime_demand_satisfied_by_path_like_ref():
+    """Inferred demand satisfied when refs contain a non-static path."""
+    obj = dict(_GOOD_DESIGN)
+    obj["success_criteria"] = ["Answer references matched product with full path"]
+    obj["answer_template"] = {"message": "ok", "outcome": "OUTCOME_OK", "refs": ["/proc/catalog"]}
+    design = DesignOutput(**obj)
+    vm = MagicMock()
+    g = _AnswerGuard(vm, design)
+    g.answer(message="ok", outcome="OUTCOME_OK", refs=["/proc/catalog", "/proc/catalog/FST-X.json"])
+    vm.answer.assert_called_once()
+
+
+def test_answer_guard_skips_refs_check_on_non_ok_outcome():
+    """If the script gave up (e.g. CLARIFICATION), empty refs is fine."""
+    vm = MagicMock()
+    design = _design_with_template_refs(["$path"])
+    g = _AnswerGuard(vm, design)
+    g.answer(message="cannot find", outcome="OUTCOME_NONE_CLARIFICATION", refs=[])
+    vm.answer.assert_called_once()
+
+
+def test_answer_guard_passes_unsupported_when_template_expects_ok():
+    """Non-OK outcomes are legitimate escape paths; grader-feedback (not pipeline)
+    decides whether the script's verdict was right. Pipeline must not block."""
+    vm = MagicMock()
+    design = _design_with_template_refs([])
+    g = _AnswerGuard(vm, design)
+    g.answer(message="cannot do", outcome="OUTCOME_NONE_UNSUPPORTED", refs=[])
+    vm.answer.assert_called_once()
+    assert g.actual_outcome == "OUTCOME_NONE_UNSUPPORTED"
+
+
+def test_answer_guard_requires_static_refs_on_unsupported():
+    """Static template refs (e.g. /docs/security.md) are grader-required citations
+    even for non-OK outcomes."""
+    vm = MagicMock()
+    design = _design_with_template_refs(["/docs/security.md"])
+    g = _AnswerGuard(vm, design)
+    with pytest.raises(_AnswerRefsError, match="missing static template refs"):
+        g.answer(message="cannot do", outcome="OUTCOME_NONE_UNSUPPORTED", refs=[])
+    vm.answer.assert_not_called()
+
+
+def test_answer_guard_requires_static_refs_on_denied():
+    vm = MagicMock()
+    design = _design_with_template_refs(["/docs/security.md"])
+    g = _AnswerGuard(vm, design)
+    with pytest.raises(_AnswerRefsError, match="missing static template refs"):
+        g.answer(message="denied", outcome="OUTCOME_DENIED_SECURITY", refs=[])
+    vm.answer.assert_not_called()
+
+
+def test_answer_guard_passes_unsupported_with_static_refs_present():
+    vm = MagicMock()
+    design = _design_with_template_refs(["/docs/security.md"])
+    g = _AnswerGuard(vm, design)
+    g.answer(
+        message="cannot do",
+        outcome="OUTCOME_NONE_UNSUPPORTED",
+        refs=["/docs/security.md"],
+    )
+    vm.answer.assert_called_once()
+
+
+def test_answer_guard_clarification_skips_static_refs_check():
+    """CLARIFICATION is the giveup path — refs can be dropped legitimately."""
+    vm = MagicMock()
+    design = _design_with_template_refs(["/docs/x.md"])
+    g = _AnswerGuard(vm, design)
+    g.answer(message="?", outcome="OUTCOME_NONE_CLARIFICATION", refs=[])
+    vm.answer.assert_called_once()
+
+
+def test_answer_guard_captures_actual_outcome():
+    vm = MagicMock()
+    design = _design_with_template_refs([])
+    g = _AnswerGuard(vm, design)
+    g.answer(message="ok", outcome="OUTCOME_OK", refs=[])
+    assert g.actual_outcome == "OUTCOME_OK"
+
+
+def test_answer_guard_captures_actual_outcome_on_clarification():
+    vm = MagicMock()
+    design = _design_with_template_refs([])
+    g = _AnswerGuard(vm, design)
+    g.answer(message="?", outcome="OUTCOME_NONE_CLARIFICATION", refs=[])
+    assert g.actual_outcome == "OUTCOME_NONE_CLARIFICATION"
+
+
+def test_answer_guard_allows_unsupported_when_template_outcome_matches():
+    """If DESIGN itself plans UNSUPPORTED, script returning UNSUPPORTED is fine."""
+    obj = dict(_GOOD_DESIGN)
+    obj["answer_template"] = {
+        "message": "no support",
+        "outcome": "OUTCOME_NONE_UNSUPPORTED",
+        "refs": [],
+    }
+    design = DesignOutput(**obj)
+    vm = MagicMock()
+    g = _AnswerGuard(vm, design)
+    g.answer(message="no support", outcome="OUTCOME_NONE_UNSUPPORTED", refs=[])
+    vm.answer.assert_called_once()
+    assert g.actual_outcome == "OUTCOME_NONE_UNSUPPORTED"
+
+
+def test_answer_guard_proxies_non_answer_attrs():
+    vm = MagicMock()
+    vm.exec.return_value = "stub"
+    design = _design_with_template_refs([])
+    g = _AnswerGuard(vm, design)
+    assert g.exec(path="/bin/sql", args=["SELECT 1"]) == "stub"
+    vm.exec.assert_called_once_with(path="/bin/sql", args=["SELECT 1"])
 
 
 def test_identical_sql_set_normalises_whitespace():

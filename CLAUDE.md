@@ -35,6 +35,7 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `OLLAMA_BASE_URL` | Ollama endpoint (default `http://localhost:11434/v1`) |
 | `CC_ENABLED=1` | Enable Claude Code CLI tier (iclaude subprocess, OAuth) |
 | `LLM_HTTP_READ_TIMEOUT_S` | HTTP read timeout in seconds (default 180) |
+| `TRAIN_MAX_CYCLES` | Per-task training cycles (default 1 = no training). Each cycle is a fresh `StartRun → SubmitRun`; failing tasks (score < 1.0) get a LEARN rule distilled from grader feedback via `pipeline.learn_from_grader`, then re-run next cycle. Loop exits early when all targeted tasks reach score ≥ 1.0. |
 
 Credentials (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `OLLAMA_API_KEY`) belong in `.secrets`, not `.env`.
 
@@ -53,9 +54,12 @@ Entry point: `main.py` → BitGN harness → `agent/orchestrator.py:run_agent()`
      - **check_retry_loop** — extract literal SQL via `ast.walk` over `vm.exec(path="/bin/sql", args=[...])`; compare normalised multiset to prior cycle; identical → break with CLARIFICATION.
      - **Fidelity gate** — `agent/fidelity.py:generate_fidelity_test(design, task_id)` emits a deterministic test; run in subprocess (`FIDELITY_TIMEOUT_S=30s`). Mismatch → LEARN+CONSOLIDATE → next cycle.
      - Pass → break.
-   - **ANSWER terminal one-shot** — exec script on real VM (`run(vm, params)`); the script calls `vm.answer(...)` itself. On any real-VM exception → terminal `OUTCOME_NONE_CLARIFICATION`.
+   - **ANSWER terminal one-shot** — exec script on real VM via `_AnswerGuard` proxy. Guard raises `_AnswerRefsError` on unresolved `$name` in refs OR on `OUTCOME_OK` with only static template refs (no runtime-bound entries). Both `_AnswerRefsError` and any other real-VM `Exception` route through `_learn_consolidate` before terminal `OUTCOME_NONE_CLARIFICATION` — these are the only failure categories that bypass the in-loop LEARN gate.
    - On loop exhaust → terminal `OUTCOME_NONE_CLARIFICATION`.
+   - On success — pipeline persists `data/heuristics/{tid}.py` AND `data/heuristics/{tid}.design.json`. The latter is consumed by `pipeline.learn_from_grader` between training cycles to distil grader feedback into a LEARN rule without re-running DESIGN.
 3. `learned_store.py` — `load_entries(tid)` (active only), `apply_learn_diff(tid, LearnConsolidateOutput)`, `save_last_run(tid, status, outcome, cycles_used)`.
+
+**Training mode** (`TRAIN_MAX_CYCLES > 1`): `main.py` wraps the StartRun/SubmitRun pass in an outer loop. After each SubmitRun, tasks with `score < 1.0` get `pipeline.learn_from_grader(task_id, score_detail)` — loads persisted `DesignOutput` + script and runs the same `_learn_consolidate` LLM call used in-pipeline. Next cycle a fresh StartRun targets only failing tasks; non-targets get `EndTrial` immediately. Successive cycles' trace files are named `{tid}.c{N}.jsonl`.
 
 **LLM call budget:** 1 (hard-stop) / 2 (best happy path) / 7 (worst, `MAX_STEPS=3`).
 
@@ -70,6 +74,7 @@ Entry point: `main.py` → BitGN harness → `agent/orchestrator.py:run_agent()`
 | `data/prompts/*.md` | Phase guides: `design`, `codegen`, `learn` only |
 | `data/learned/{task_id}.yaml` | Per-task active+inactive LearnConsolidate rules; `last_run` carries `status/outcome/cycles_used/date` only (no `heuristic_valid`, no `schema_hash`) |
 | `data/heuristics/{task_id}.py` | Last successful or last-attempted heuristic script. Reference only — pipeline always regenerates via DESIGN + CODEGEN. |
+| `data/heuristics/{task_id}.design.json` | Persisted `DesignOutput` from the last run; consumed by `learn_from_grader` in training mode. |
 | `models.json` | Per-model provider hints and Ollama options (e.g. `num_ctx`) |
 
 ## Notable Constraints

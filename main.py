@@ -99,6 +99,7 @@ from connectrpc.errors import ConnectError
 
 from agent import run_agent
 from agent.learned_store import save_last_run
+from agent.pipeline import learn_from_grader
 from agent.trace import TraceLogger, set_trace
 
 BITGN_URL = os.getenv("BENCHMARK_HOST") or "https://api.bitgn.com"
@@ -107,6 +108,7 @@ BITGN_API_KEY = os.getenv("BITGN_API_KEY") or ""
 _base_run_name = os.getenv("BITGN_RUN_NAME") or ""
 BITGN_RUN_NAME = f"{_base_run_name}-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}" if _base_run_name else ""
 PARALLEL_TASKS = max(1, int(os.getenv("PARALLEL_TASKS", "1")))
+TRAIN_MAX_CYCLES = max(1, int(os.getenv("TRAIN_MAX_CYCLES", "1")))
 
 _MODELS_JSON = Path(__file__).parent / "models.json"
 _raw = json.loads(_MODELS_JSON.read_text())
@@ -127,8 +129,12 @@ CLI_CLR = "\x1B[0m"
 CLI_BLUE = "\x1B[34m"
 
 
-def _run_single_task(trial_id: str, task_filter: list) -> tuple:
-    """Execute one benchmark trial. Score is read later from SubmitRun."""
+def _run_single_task(trial_id: str, task_filter: list, train_cycle: int = 1) -> tuple:
+    """Execute one benchmark trial. Score is read later from SubmitRun.
+
+    `train_cycle` is appended to the trace filename so successive cycles
+    in TRAIN_MAX_CYCLES > 1 don't overwrite each other.
+    """
     client = HarnessServiceClientSync(BITGN_URL)
     trial = client.start_trial(StartTrialRequest(trial_id=trial_id))
     task_id = trial.task_id
@@ -139,7 +145,8 @@ def _run_single_task(trial_id: str, task_filter: list) -> tuple:
 
     _task_local.task_id = task_id
     assert _run_dir is not None
-    _trace = TraceLogger(_run_dir / f"{task_id}.jsonl", task_id)
+    trace_name = f"{task_id}.jsonl" if train_cycle <= 1 else f"{task_id}.c{train_cycle}.jsonl"
+    _trace = TraceLogger(_run_dir / trace_name, task_id)
     set_trace(_trace)
     try:
         task_start = time.time()
@@ -230,11 +237,47 @@ def _write_summary(scores: list, run_start: float) -> None:
         _log_stats(line)
 
 
+def _run_one_pass(client, task_filter: list, train_cycle: int):
+    """One StartRun → trial loop → SubmitRun. Returns (scores, submit_result).
+
+    `train_cycle` is threaded down to `_run_single_task` for trace naming.
+    """
+    run = client.start_run(StartRunRequest(
+        name=BITGN_RUN_NAME,
+        benchmark_id=BENCHMARK_ID,
+        api_key=BITGN_API_KEY,
+    ))
+    print(f"Run started: {run.run_id} ({len(run.trial_ids)} trials)")
+
+    pending: dict[str, tuple] = {}
+    try:
+        with ThreadPoolExecutor(max_workers=PARALLEL_TASKS) as pool:
+            futures = {
+                pool.submit(_run_single_task, tid, task_filter, train_cycle): tid
+                for tid in run.trial_ids
+            }
+            for fut in as_completed(futures):
+                try:
+                    task_id, trial_id, task_elapsed, token_stats, trace, filtered = fut.result()
+                except Exception as exc:
+                    failed_tid = futures[fut]
+                    print(f"{CLI_RED}[{failed_tid}] Task error: {exc}{CLI_CLR}")
+                    continue
+                if filtered:
+                    continue
+                pending[task_id] = (trial_id, task_elapsed, token_stats, trace)
+    finally:
+        print(f"\n{CLI_GREEN}>>>> Submitting run... <<<<{CLI_CLR}")
+        result = client.submit_run(SubmitRunRequest(run_id=run.run_id, force=True))
+        print(f"Run submitted: {run.run_id}")
+        scores = _settle_scores(result, pending)
+    return scores, result
+
+
 def main() -> None:
     task_filter = [t for arg in sys.argv[1:] for t in arg.split(",") if t]
 
     run_start = time.time()
-    pending: dict[str, tuple] = {}
     try:
         client = HarnessServiceClientSync(BITGN_URL)
         print("Connecting to BitGN", client.status(StatusRequest()))
@@ -244,43 +287,54 @@ def main() -> None:
             f"with {len(res.tasks)} tasks.\n{CLI_GREEN}{res.description}{CLI_CLR}"
         )
 
-        run = client.start_run(StartRunRequest(
-            name=BITGN_RUN_NAME,
-            benchmark_id=BENCHMARK_ID,
-            api_key=BITGN_API_KEY,
-        ))
-        print(f"Run started: {run.run_id} ({len(run.trial_ids)} trials)")
+        # Training loop: per-task. Each cycle is a fresh StartRun → SubmitRun.
+        # Subsequent cycles target only tasks that scored < 1.0 in the prior pass.
+        # Grader feedback distilled via `learn_from_grader` between cycles.
+        final_state: dict[str, tuple] = {}  # task_id -> (score, detail, elapsed, ts)
+        current_filter = task_filter
+        last_result = None
 
-        try:
-            with ThreadPoolExecutor(max_workers=PARALLEL_TASKS) as pool:
-                futures = {
-                    pool.submit(_run_single_task, tid, task_filter): tid
-                    for tid in run.trial_ids
-                }
-                for fut in as_completed(futures):
-                    try:
-                        task_id, trial_id, task_elapsed, token_stats, trace, filtered = fut.result()
-                    except Exception as exc:
-                        failed_tid = futures[fut]
-                        print(f"{CLI_RED}[{failed_tid}] Task error: {exc}{CLI_CLR}")
-                        continue
-                    if filtered:
-                        continue
-                    pending[task_id] = (trial_id, task_elapsed, token_stats, trace)
-        finally:
-            print(f"\n{CLI_GREEN}>>>> Submitting run... <<<<{CLI_CLR}")
-            result = client.submit_run(SubmitRunRequest(run_id=run.run_id, force=True))
-            print(f"Run submitted: {run.run_id}")
-            scores = _settle_scores(result, pending)
-            if scores:
-                _print_table_header()
-                for row in scores:
-                    _print_table_row(*row)
-                _write_summary(scores, run_start)
-            if result.score_available:
-                print(f"\n{CLI_GREEN}FINAL SCORE: {result.score:0.2f}{CLI_CLR}")
-            else:
-                print(f"\n{CLI_RED}Score is not available. Results are sealed and will be revealed later{CLI_CLR}\n")
+        for cycle in range(1, TRAIN_MAX_CYCLES + 1):
+            if cycle > 1:
+                print(
+                    f"\n{CLI_BLUE}>>>> Training cycle {cycle}/{TRAIN_MAX_CYCLES}: "
+                    f"retrying {len(current_filter)} task(s) <<<<{CLI_CLR}"
+                )
+
+            try:
+                scores, last_result = _run_one_pass(client, current_filter, cycle)
+            except ConnectError as exc:
+                print(f"{exc.code}: {exc.message}")
+                break
+
+            next_filter: list[str] = []
+            for row in scores:
+                task_id, score, detail, elapsed, token_stats = row
+                final_state[task_id] = (score, detail, elapsed, token_stats)
+                if score < 1.0:
+                    next_filter.append(task_id)
+                    if cycle < TRAIN_MAX_CYCLES:
+                        if learn_from_grader(task_id, list(detail)):
+                            print(
+                                f"{CLI_BLUE}[{task_id}] LEARN distilled from grader feedback{CLI_CLR}"
+                            )
+
+            if not next_filter:
+                if TRAIN_MAX_CYCLES > 1:
+                    print(f"{CLI_GREEN}>>>> All targeted tasks passed at cycle {cycle} <<<<{CLI_CLR}")
+                break
+            current_filter = next_filter
+
+        if final_state:
+            final_rows = [(tid, *vals) for tid, vals in final_state.items()]
+            _print_table_header()
+            for row in final_rows:
+                _print_table_row(*row)
+            _write_summary(final_rows, run_start)
+        if last_result is not None and last_result.score_available:
+            print(f"\n{CLI_GREEN}FINAL SCORE: {last_result.score:0.2f}{CLI_CLR}")
+        else:
+            print(f"\n{CLI_RED}Score is not available. Results are sealed and will be revealed later{CLI_CLR}\n")
 
     except ConnectError as exc:
         print(f"{exc.code}: {exc.message}")

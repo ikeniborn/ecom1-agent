@@ -63,16 +63,14 @@ _HTTP_TIMEOUT = httpx.Timeout(
     connect=_HTTP_CONNECT_TIMEOUT_S,
 )
 
-# Per-phase model overrides — enable LLM routing by execution phase
+# Per-phase model overrides — enable LLM routing by execution phase.
+# Active phases only (design, codegen, learn). Add new entries when introducing
+# additional phases; never re-introduce removed ones (idd/sdd/plan/executor/
+# assembler/consolidate) — they belong to the pre-90f6920 pipeline.
 _PHASE_MODEL_MAP: dict[str, str | None] = {
-    "idd":         os.environ.get("MODEL_IDD") or None,
-    "sdd":         os.environ.get("MODEL_SDD") or None,
-    "plan":        os.environ.get("MODEL_PLAN") or None,
-    "codegen":     os.environ.get("MODEL_CODEGEN") or None,
-    "executor":    os.environ.get("MODEL_EXECUTOR") or None,
-    "learn":       os.environ.get("MODEL_LEARN") or None,
-    "assembler":   os.environ.get("MODEL_ASSEMBLER") or None,
-    "consolidate": os.environ.get("MODEL_CONSOLIDATE") or None,
+    "design":  os.environ.get("MODEL_DESIGN") or None,
+    "codegen": os.environ.get("MODEL_CODEGEN") or None,
+    "learn":   os.environ.get("MODEL_LEARN") or None,
 }
 
 

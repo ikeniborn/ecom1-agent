@@ -185,36 +185,10 @@ StatResponse { path, kind: NodeKind, content_type, writable: bool }
 AnswerRequest {
   message: string
   outcome: Outcome
-  refs: repeated string  // supporting file paths; may contain `$name` placeholders bound at runtime
+  refs: repeated string  // supporting file paths
 }
 AnswerResponse {}
 ```
-
----
-
-## Semantic notes (DESIGN + CODEGEN + fidelity)
-
-DESIGN's tool_plan is a **starting point**, not a byte-exact contract. CODEGEN refines through LEARN cycles and may legitimately reshape calls. Fidelity gate compares **semantic equivalence**, not literal form.
-
-### `/bin/sql` — SQL transport
-
-Two equivalent shapes:
-- `Exec(path="/bin/sql", args=[sql_text])`
-- `Exec(path="/bin/sql", args=[], stdin=sql_text)`
-
-Fidelity gate folds them: SQL in `stdin` is canonicalised into `args[0]` before comparison. Pick whichever; both are valid.
-
-### `Answer.refs` — `$placeholder` substitution
-
-Refs may contain `$name` tokens that resolve to runtime-bound values (e.g. `$product_path` → the matched SKU file path from a SQL result). Fidelity gate filters out `$`-prefixed refs before comparison — only static refs are matched. CODEGEN is expected to materialise the actual path at runtime.
-
-### `ExecResponse` access pattern
-
-When dispatched through `VMAdapter` (real VM), the response is a protobuf message — access fields as attributes (`result.stdout`, `result.exit_code`). When evaluated under `MockVMSpy` (fidelity subprocess), fixtures default to `dict` stubs — both forms must be handled if CODEGEN's script will run under both. Use `getattr(result, "stdout", "")` or check the type for safe access.
-
-### `params` — `$`-prefixed pre-resolution
-
-Values in `DesignOutput.params` starting with `$` (e.g. `$agent_store_id`) are pre-resolved by the caller. CODEGEN should read them directly: `store_id = params["store_id"]`. Pass through parameterised SQL (`:name`) — never interpolate into the SQL string literal.
 
 ---
 

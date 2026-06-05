@@ -25,15 +25,19 @@ Entry: `orchestrator.py:run_agent()` → opens VM, reads `/AGENTS.MD` inline →
 
 **Per-task execution flow:**
 
-1. **DESIGN** (`design.py:run_design(instruction, agents_md_text)`) — 1 LLM call, frozen for the run. System prompt: `proto-api-reference.md` + `design.md` (both `cache_control: ephemeral`). Output: `DesignOutput` (intent, params, success_criteria, discovery, ops, agents_md_constraints, answer_template, outcome_override?).
+1. **DESIGN** (`design.py:run_design(instruction, agents_md_text)`) — 1 LLM call, frozen for the run. System prompt: `design.md` (`cache_control: ephemeral`). VM API surface is documented inline in the prompt; `docs/proto-api-reference.md` is no longer injected (per H-NN, kept as repo-side reference only). Output: `DesignOutput` (intent, params, success_criteria, discovery, ops, agents_md_constraints, answer_template, outcome_override?).
 2. If `outcome_override` set → `vm.answer(...)` → END.
 3. **LOOP** (`cycle = 1..MAX_STEPS`):
    - **CODEGEN** (`codegen_v2.py:run_codegen(design, learn_ctx, prev_error)`) — LLM call → `CodegenOutput.script_code` (module exposing `run(vm, params)`).
    - **AST lint** — `ast.parse(script_code)`; on `SyntaxError` → LearnConsolidate → next cycle.
-   - **check_retry_loop** — extract literal SQL via `ast.walk` over `vm.exec(path="/bin/sql", args=[...])`; multiset compare to prior cycle; identical → break with CLARIFICATION.
-   - **Fidelity gate** (`fidelity.py:generate_fidelity_test` + `exec_fidelity_in_subprocess`) — emits deterministic expected-call test; runs script in subprocess (timeout `FIDELITY_TIMEOUT_S`). Mismatch → LearnConsolidate → next cycle.
+   - **check_retry_loop** — extract literal SQL via `ast.walk` over `vm.exec(path="/bin/sql", args=[...])`; break only after **3 consecutive identical SQL multisets** (gives LEARN 2 chances to refine).
+   - **Fidelity gate** (`fidelity.py:generate_fidelity_test` + `exec_fidelity_in_subprocess`) — emits a multiset-of-RPC-names test; runs script in subprocess (timeout `FIDELITY_TIMEOUT_S`). Mismatch → LearnConsolidate → next cycle.
    - Pass → break.
-4. **ANSWER terminal one-shot** — exec script on real VM; the script calls `vm.answer(...)`. Any real-VM exception → terminal `OUTCOME_NONE_CLARIFICATION`.
+4. **ANSWER terminal one-shot** — exec script on real VM via `_AnswerGuard` proxy. The guard inspects refs passed to `vm.answer`:
+   - Unresolved `$name` placeholder in refs → `_AnswerRefsError` → LearnConsolidate → `OUTCOME_NONE_CLARIFICATION`.
+   - Empty refs while `answer_template.refs` contained `$`-placeholders and outcome is `OUTCOME_OK` → `_AnswerRefsError` → LearnConsolidate → `OUTCOME_NONE_CLARIFICATION`.
+   - Any other real-VM exception → LearnConsolidate → `OUTCOME_NONE_CLARIFICATION`.
+   These two LEARN hooks are the only path that surfaces grader-relevant content gaps and real-VM exceptions back into `learned_store`; without them, next run starts blind.
 5. Loop exhaust → terminal `OUTCOME_NONE_CLARIFICATION`.
 
 **Persistence** (`learned_store.py`):
@@ -70,4 +74,5 @@ Transient errors (503, rate-limit, timeout) retry with exponential backoff.
 - `check_retry_loop` in `sql_security.py` is the standalone anti-infinite-loop guard
 - DESIGN signature is strictly `(instruction, agents_md_text)` — no `learn_ctx` (F-001 regression guard tests in `tests/test_design.py`)
 - DESIGN is frozen for the run — `learn_ctx` updates only affect CODEGEN
-- System prompt blocks passed as `list[dict]` (Anthropic multi-block format): `[{"type":"text","text":proto_ref}, {"type":"text","text":guide,"cache_control":{"type":"ephemeral"}}]`
+- System prompt blocks passed as `list[dict]` (Anthropic multi-block format): `[{"type":"text","text":guide,"cache_control":{"type":"ephemeral"}}]` — single block; do not re-introduce `docs/proto-api-reference.md` injection (agent-relevant VM API is inline in `data/prompts/{design,codegen}.md`)
+- `_AnswerGuard` only validates refs when `outcome == "OUTCOME_OK"` — non-OK outcomes (CLARIFICATION, DENIED_SECURITY) are allowed empty refs since they signal an explicit give-up path

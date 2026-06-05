@@ -56,15 +56,15 @@ def test_ollama_key_constant_exists_and_fallback():
 
 def test_resolve_model_for_phase_uses_env(monkeypatch):
     import agent.llm as llm
-    monkeypatch.setitem(llm._PHASE_MODEL_MAP, "sdd", "anthropic/claude-haiku-4-5-20251001")
-    result = llm._resolve_model_for_phase("sdd", "anthropic/claude-sonnet-4-6")
+    monkeypatch.setitem(llm._PHASE_MODEL_MAP, "design", "anthropic/claude-haiku-4-5-20251001")
+    result = llm._resolve_model_for_phase("design", "anthropic/claude-sonnet-4-6")
     assert result == "anthropic/claude-haiku-4-5-20251001"
 
 
 def test_resolve_model_for_phase_falls_back_to_default(monkeypatch):
     import agent.llm as llm
-    monkeypatch.setitem(llm._PHASE_MODEL_MAP, "sdd", None)
-    result = llm._resolve_model_for_phase("sdd", "anthropic/claude-sonnet-4-6")
+    monkeypatch.setitem(llm._PHASE_MODEL_MAP, "design", None)
+    result = llm._resolve_model_for_phase("design", "anthropic/claude-sonnet-4-6")
     assert result == "anthropic/claude-sonnet-4-6"
 
 

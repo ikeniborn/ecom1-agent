@@ -17,8 +17,7 @@ from .llm import (
 )
 from .models import DesignOutput, LearnConsolidateOutput
 from .prompt import load_prompt
-from .sql_security import check_retry_loop
-from .trace import get_trace
+from .sql_security import check_retry_loop  # noqa: F401  (retained for backward import compat)
 
 _MAX_STEPS = int(os.environ.get("MAX_STEPS", "3"))
 _MAX_TOKENS_LEARN = int(os.environ.get("MAX_TOKENS_LEARN", "2048"))
@@ -91,23 +90,35 @@ def _learn_consolidate(
     design: DesignOutput,
     error: str,
     script_code: str,
+    token_out: dict | None = None,
+    observed: list[str] | None = None,
 ) -> None:
-    """Single LLM call. Writes a diff to data/learned/{tid}.yaml and mutates learn_ctx."""
+    """Single LLM call. Writes a diff to data/learned/{tid}.yaml and mutates learn_ctx.
+
+    `observed` carries RPC stdouts captured during the failed real-VM run so
+    LEARN can see WHY refs were empty (table missing, column wrong, search
+    returned nothing). Without it LEARN only sees the guard error string and
+    tends to write the same rule each cycle.
+    """
     guide = load_prompt("learn") or "# PHASE: LEARN"
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
 
     rules_lines = "\n".join(
         f"  - [{e.get('id', '?')}] {e.get('content', '')}" for e in learn_ctx
     ) or "(none)"
+    observed_block = ""
+    if observed:
+        observed_block = "OBSERVED_RPC_OUTPUTS:\n" + "\n".join(observed) + "\n\n"
     user_msg = (
         f"TOOL_PLAN:\n{design.model_dump_json(indent=2)}\n\n"
         f"ERROR:\n{error}\n\n"
+        f"{observed_block}"
         f"SCRIPT_CODE:\n```python\n{script_code[:4000]}\n```\n\n"
         f"EXISTING_RULES:\n{rules_lines}"
     )
 
     model = _resolve_model_for_phase("learn", os.environ.get("MODEL", ""))
-    raw = call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_LEARN)
+    raw = call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_LEARN, token_out=token_out)
     if not raw:
         print(f"{CLI_YELLOW}[pipeline] LEARN: empty response, skipping{CLI_CLR}")
         return
@@ -131,6 +142,45 @@ def _learn_consolidate(
             "content": out.rule_content,
             "agents_md_anchor": out.agents_md_anchor,
         })
+
+
+# ---------------------------------------------------------------------------
+# Post-trial LEARN — grader feedback distilled via the same LEARN pipeline
+# ---------------------------------------------------------------------------
+
+def learn_from_grader(
+    task_id: str,
+    score_detail: list[str],
+    token_out: dict | None = None,
+) -> bool:
+    """Distill a LEARN rule from grader-side feedback for the next training cycle.
+
+    Loads the DesignOutput + script_code persisted by the prior pipeline run
+    (in data/heuristics/{tid}.*) and reuses `_learn_consolidate`. Returns
+    True if a LEARN call was made, False if persisted state was unavailable.
+
+    The pipeline cannot see grader feedback during a trial (the score
+    arrives only on SubmitRun). This helper is the seam that lets a training
+    loop in main.py feed grader output back into learned_store.
+    """
+    if not task_id or not score_detail:
+        return False
+    heur_dir = Path("data/heuristics")
+    script_path = heur_dir / f"{task_id}.py"
+    design_path = heur_dir / f"{task_id}.design.json"
+    if not script_path.exists() or not design_path.exists():
+        return False
+    try:
+        design = DesignOutput.model_validate_json(
+            design_path.read_text(encoding="utf-8")
+        )
+    except Exception:
+        return False
+    script_code = script_path.read_text(encoding="utf-8")
+    learn_ctx = load_entries(task_id)
+    error = "grader: " + " | ".join(s.strip() for s in score_detail if s.strip())
+    _learn_consolidate(task_id, learn_ctx, design, error, script_code, token_out=token_out)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +214,147 @@ def _run_script_on_vm(script_code: str, vm, params: dict[str, str]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# AnswerGuard — refs pre-check before real vm.answer
+# ---------------------------------------------------------------------------
+
+class _AnswerRefsError(RuntimeError):
+    """Raised when the script's vm.answer call has invalid refs.
+
+    Grader-side feedback ('answer missing required reference') is not visible
+    to the pipeline. This guard catches the precursor — unresolved `$name`
+    placeholders or empty refs when the template demanded runtime-bound refs —
+    so LEARN can react before the trial closes.
+    """
+
+
+class _AnswerGuard:
+    """Proxy passing all RPCs through to `_vm` while intercepting `answer`.
+
+    Also captures the head of each RPC stdout into `self.observed` so the
+    next LEARN cycle can see WHY refs were empty (table missing? column
+    wrong? search returned nothing?). Without this, LEARN sees only the
+    guard error string and writes the same rule each cycle.
+    """
+
+    _OBS_PER_CALL = 800
+    _OBS_TOTAL_MAX = 8000
+
+    def __init__(self, vm, design: DesignOutput):
+        self._vm = vm
+        self._design = design
+        self.observed: list[str] = []
+        self._observed_total = 0
+        self.actual_outcome: str = ""
+
+    def _record(self, rpc: str, kwargs: dict, result) -> None:
+        if self._observed_total >= self._OBS_TOTAL_MAX:
+            return
+        stdout = getattr(result, "stdout", None)
+        if stdout is None and isinstance(result, dict):
+            stdout = result.get("stdout", "")
+        content = getattr(result, "content", None)
+        if content is None and isinstance(result, dict):
+            content = result.get("content", "")
+        payload = (stdout or content or "").strip()
+        if not payload:
+            payload = "<empty>"
+        head = payload[: self._OBS_PER_CALL]
+        # show what was called so LEARN can map output back to plan step
+        key_args = {k: v for k, v in kwargs.items() if k in ("path", "root", "pattern", "stdin", "args")}
+        entry = f"[{rpc} {key_args}] {head}"
+        self.observed.append(entry)
+        self._observed_total += len(entry)
+
+    def _wrap(self, rpc: str):
+        method = getattr(self._vm, rpc)
+
+        def _call(**kwargs):
+            result = method(**kwargs)
+            try:
+                self._record(rpc, kwargs, result)
+            except Exception:
+                pass
+            return result
+
+        return _call
+
+    def __getattr__(self, name):
+        if name in ("read", "list", "tree", "find", "search", "exec", "stat", "write", "delete"):
+            return self._wrap(name)
+        return getattr(self._vm, name)
+
+    def answer(self, *, message: str, outcome: str, refs=None) -> None:
+        refs_list = list(refs or [])
+        self.actual_outcome = outcome
+        template_refs = list(self._design.answer_template.refs or [])
+        static_template = {
+            r for r in template_refs if isinstance(r, str) and "$" not in r
+        }
+        runtime_placeholders = [
+            r for r in template_refs if isinstance(r, str) and "$" in r
+        ]
+
+        for r in refs_list:
+            if isinstance(r, str) and r.startswith("$"):
+                raise _AnswerRefsError(
+                    f"unresolved placeholder {r!r} in refs — "
+                    "bind runtime value from a discovery/op result"
+                )
+
+        # Static template refs are grader requirements — DESIGN listed them
+        # because AGENTS.MD/instruction demands citation (e.g. /docs/security.md
+        # for DENIED, /docs/checkout.md for UNSUPPORTED). Must appear in actual
+        # refs regardless of outcome. CLARIFICATION is the only legitimate
+        # path where refs can be dropped (script gave up before discovery).
+        missing_static = static_template - set(refs_list)
+        if missing_static and outcome != "OUTCOME_NONE_CLARIFICATION":
+            raise _AnswerRefsError(
+                f"missing static template refs {sorted(missing_static)!r}; "
+                f"actual refs {refs_list!r}. Static refs are grader-required "
+                "citations — always pass them through."
+            )
+
+        # Non-OK outcomes (UNSUPPORTED/CLARIFICATION/DENIED) are legitimate
+        # escape paths — pipeline cannot tell whether the script's verdict
+        # matches grader expectation. Pass through; grader feedback drives
+        # LEARN via `learn_from_grader` between training cycles.
+        if outcome != "OUTCOME_OK":
+            self._vm.answer(message=message, outcome=outcome, refs=refs_list)
+            return
+
+        # Safety net: even if the template forgot a $placeholder, the
+        # DESIGN's own success_criteria / agents_md_constraints may demand
+        # a runtime reference. Infer the demand from those fields.
+        ref_hint_re = re.compile(
+            r"\b(reference|full path|grounding|file path|path to|object path|"
+            r"matched row|matched product|matched file|catalog (file|path|entry))\b",
+            re.IGNORECASE,
+        )
+        demands_runtime = bool(runtime_placeholders) or any(
+            ref_hint_re.search(s or "") for s in self._design.success_criteria
+        ) or any(
+            ref_hint_re.search(c.rule or "") for c in self._design.agents_md_constraints
+        )
+
+        if demands_runtime:
+            non_static = [r for r in refs_list if r not in static_template]
+            if not non_static:
+                hint = (
+                    f"({runtime_placeholders!r})" if runtime_placeholders
+                    else "(inferred from success_criteria/agents_md_constraints)"
+                )
+                raise _AnswerRefsError(
+                    f"template/constraints require runtime refs {hint} but "
+                    f"actual refs {refs_list!r} contain only static template "
+                    f"entries {sorted(static_template)!r} — SQL likely returned "
+                    "no rows or row parsing dropped the path column; "
+                    "check `:name` bindings on /bin/sql and the SELECT columns"
+                )
+
+        self._vm.answer(message=message, outcome=outcome, refs=refs_list)
+
+
+# ---------------------------------------------------------------------------
 # Main entry
 # ---------------------------------------------------------------------------
 
@@ -177,37 +368,68 @@ def run_pipeline(
 
     Returns metrics dict: {cycles_used, outcome, status}.
     """
-    tlog = get_trace()
-    if tlog:
-        tlog.log_header(instruction, os.environ.get("MODEL", ""))
+    # main.py already emits log_header for this task; pipeline doesn't re-emit.
     learn_ctx = load_entries(task_id)
     print(f"{CLI_BLUE}[pipeline] task={task_id} active_rules={len(learn_ctx)}{CLI_CLR}")
 
+    total_in = 0
+    total_out = 0
+
+    def _accum(tk: dict) -> None:
+        nonlocal total_in, total_out
+        total_in += int(tk.get("input", 0) or 0)
+        total_out += int(tk.get("output", 0) or 0)
+
     # ── DESIGN ──────────────────────────────────────────────────────────────
     try:
-        design = run_design(instruction, agents_md_text)
+        _tk: dict = {}
+        design = run_design(instruction, agents_md_text, token_out=_tk)
+        _accum(_tk)
     except DesignError as e:
         print(f"{CLI_RED}[pipeline] DESIGN failed: {e}{CLI_CLR}")
         save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION", cycles_used=0)
         _terminal_clarification(vm, f"DESIGN failed: {e}")
-        return {"cycles_used": 0, "outcome": "OUTCOME_NONE_CLARIFICATION", "status": "failure"}
+        return {
+            "cycles_used": 0,
+            "outcome": "OUTCOME_NONE_CLARIFICATION",
+            "status": "failure",
+            "input_tokens": total_in,
+            "output_tokens": total_out,
+        }
 
     if design.outcome_override:
         print(f"{CLI_YELLOW}[pipeline] outcome_override: {design.outcome_override}{CLI_CLR}")
         save_last_run(task_id, status="success", outcome=design.outcome_override, cycles_used=0)
         _terminal_outcome_override(vm, design)
-        return {"cycles_used": 0, "outcome": design.outcome_override, "status": "success"}
+        return {
+            "cycles_used": 0,
+            "outcome": design.outcome_override,
+            "status": "success",
+            "input_tokens": total_in,
+            "output_tokens": total_out,
+        }
 
-    # ── CODEGEN retry loop (unified MAX_STEPS counter, F-003) ──────────────
+    # Mutations make real-VM retry unsafe: if a Write/Delete already landed in
+    # an earlier cycle we cannot re-run the script. Read-only ops (Exec, Read,
+    # List, Tree, Find, Search, Stat) are idempotent for benchmark tasks, so
+    # _AnswerRefsError is retryable then. Anything else → terminal.
+    mutating_rpcs = {"Write", "Delete"}
+    has_mutations = any(op.rpc in mutating_rpcs for op in design.ops)
+
+    # ── CODEGEN+ANSWER retry loop (unified MAX_STEPS counter) ──────────────
     last_error: str | None = None
-    script_code: str | None = None
     prior_sql_sets: list[list[str]] = []
+    cycle = 0  # bound for the post-loop branches when _MAX_STEPS < 1 is misconfigured
+    answered = False
+    actual_outcome = "OUTCOME_OK"
 
     for cycle in range(1, _MAX_STEPS + 1):
         print(f"{CLI_BLUE}[pipeline] cycle {cycle}/{_MAX_STEPS}{CLI_CLR}")
 
         try:
-            cg = run_codegen(design, learn_ctx, last_error)
+            _tk = {}
+            cg = run_codegen(design, learn_ctx, last_error, token_out=_tk)
+            _accum(_tk)
         except CodegenError as e:
             last_error = f"codegen_llm_fail: {e}"
             print(f"{CLI_YELLOW}[pipeline] CODEGEN llm fail: {e}{CLI_CLR}")
@@ -219,16 +441,22 @@ def run_pipeline(
         except SyntaxError as e:
             last_error = f"lint: {e}"
             print(f"{CLI_YELLOW}[pipeline] lint fail: {e}{CLI_CLR}")
-            _learn_consolidate(task_id, learn_ctx, design, last_error, cg.script_code)
+            _tk = {}
+            _learn_consolidate(task_id, learn_ctx, design, last_error, cg.script_code, token_out=_tk)
+            _accum(_tk)
             continue
 
         # check_retry_loop — anti-infinite-loop guard (HM4).
         # DESIGN is a starting point; CODEGEN reshapes through LEARN. Same SQL across
         # cycles is normal when the bug is elsewhere (shape, refs, lint). Break only
         # after 3 consecutive identical SQL multisets — gives LEARN 2 chances to refine.
+        # Skip when last error was answer_refs: SQL may be semantically correct and
+        # the fix lives in parsing/refs/answer_template, not in SQL — same SQL is OK.
         sqls = _extract_sql_literals(cg.script_code)
+        prev_was_answer_refs = bool(last_error and last_error.startswith("answer_refs:"))
         if (
-            len(prior_sql_sets) >= 2
+            not prev_was_answer_refs
+            and len(prior_sql_sets) >= 2
             and _identical_sql_set(sqls, prior_sql_sets[-1])
             and _identical_sql_set(prior_sql_sets[-1], prior_sql_sets[-2])
         ):
@@ -243,33 +471,103 @@ def run_pipeline(
         if not result.passed:
             last_error = f"fidelity: {result.error}"
             print(f"{CLI_YELLOW}[pipeline] fidelity fail: {result.error}{CLI_CLR}")
-            _learn_consolidate(task_id, learn_ctx, design, last_error, cg.script_code)
+            _tk = {}
+            _learn_consolidate(task_id, learn_ctx, design, last_error, cg.script_code, token_out=_tk)
+            _accum(_tk)
             continue
 
-        # Gate passed — break out of loop
-        script_code = cg.script_code
-        break
+        # Persist last-attempt script + design (consumed by learn_from_grader
+        # for post-SubmitRun training cycles). Persist on every gate-pass so
+        # the latest script is on disk even when ANSWER later fails.
+        heur_dir = Path("data/heuristics")
+        heur_dir.mkdir(parents=True, exist_ok=True)
+        (heur_dir / f"{task_id}.py").write_text(cg.script_code, encoding="utf-8")
+        (heur_dir / f"{task_id}.design.json").write_text(
+            design.model_dump_json(indent=2), encoding="utf-8"
+        )
 
-    if script_code is None:
-        print(f"{CLI_RED}[pipeline] exhausted {_MAX_STEPS} cycles{CLI_CLR}")
-        save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION", cycles_used=_MAX_STEPS)
-        _terminal_clarification(vm, last_error or "all cycles exhausted")
-        return {"cycles_used": _MAX_STEPS, "outcome": "OUTCOME_NONE_CLARIFICATION", "status": "failure"}
+        # ── ANSWER on real VM (guarded) ────────────────────────────────────
+        # Real-VM exceptions and answer-refs gaps are the two failure categories
+        # that bypass the in-loop gates. Without these hooks both classes vanish
+        # after _terminal_clarification — next run starts blind. The guard also
+        # captures stdouts so LEARN can see WHY refs were empty.
+        guarded_vm = _AnswerGuard(vm, design)
+        try:
+            _run_script_on_vm(cg.script_code, guarded_vm, design.params)
+            actual_outcome = guarded_vm.actual_outcome or "OUTCOME_OK"
+            answered = True
+            break
+        except _AnswerRefsError as e:
+            last_error = f"answer_refs: {e}"
+            print(f"{CLI_RED}[pipeline] answer refs check failed: {e}{CLI_CLR}")
+            _tk = {}
+            _learn_consolidate(
+                task_id, learn_ctx, design, last_error, cg.script_code,
+                token_out=_tk, observed=guarded_vm.observed,
+            )
+            _accum(_tk)
+            if has_mutations:
+                print(f"{CLI_RED}[pipeline] mutations in plan — refs retry unsafe, terminating{CLI_CLR}")
+                break
+            continue
+        except Exception as e:
+            msg = str(e).lower()
+            # These VM errors are deterministic input-validation failures (bad
+            # tool path, reading a directory, missing file). They surface from
+            # the failing op itself — partial mutations BEFORE them are still
+            # possible, so retry is only safe when the plan is read-only.
+            retryable_patterns = (
+                "runtime tool not found",
+                "is a directory",
+                "does not exist",
+                "no such file",
+                "not a file",
+                # Network/VM transients. Read-only plans are safe to re-run; mutating
+                # plans are guarded above by `has_mutations` (set from design.ops).
+                "the read operation timed out",
+                "the write operation timed out",
+                "connection reset",
+                "remote disconnected",
+                "connection aborted",
+            )
+            is_retryable = any(p in msg for p in retryable_patterns)
+            last_error = f"real_vm_exec: {e}"
+            print(f"{CLI_RED}[pipeline] real-vm exec failed: {e}{CLI_CLR}")
+            _tk = {}
+            _learn_consolidate(
+                task_id, learn_ctx, design, last_error, cg.script_code,
+                token_out=_tk, observed=guarded_vm.observed,
+            )
+            _accum(_tk)
+            if is_retryable and not has_mutations:
+                continue
+            # Other real-VM exec errors can land mid-script (after partial
+            # writes); never retry — break to terminal clarification.
+            break
 
-    # ── Persist last-attempt script (reference for LEARN, not for re-exec) ─
-    heur_dir = Path("data/heuristics")
-    heur_dir.mkdir(parents=True, exist_ok=True)
-    (heur_dir / f"{task_id}.py").write_text(script_code, encoding="utf-8")
-
-    # ── ANSWER terminal one-shot (real VM) ──────────────────────────────────
-    try:
-        _run_script_on_vm(script_code, vm, design.params)
-    except Exception as e:
-        print(f"{CLI_RED}[pipeline] real-vm exec failed: {e}{CLI_CLR}")
+    if not answered:
+        reason = (
+            f"loop broken at cycle {cycle}/{_MAX_STEPS}"
+            if cycle < _MAX_STEPS else f"exhausted {_MAX_STEPS} cycles"
+        )
+        print(f"{CLI_RED}[pipeline] {reason}: {last_error or 'no error'}{CLI_CLR}")
         save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION", cycles_used=cycle)
-        _terminal_clarification(vm, f"real-vm exec: {e}")
-        return {"cycles_used": cycle, "outcome": "OUTCOME_NONE_CLARIFICATION", "status": "failure"}
+        _terminal_clarification(vm, last_error or "all cycles exhausted")
+        return {
+            "cycles_used": cycle,
+            "outcome": "OUTCOME_NONE_CLARIFICATION",
+            "status": "failure",
+            "input_tokens": total_in,
+            "output_tokens": total_out,
+        }
 
-    print(f"{CLI_GREEN}[pipeline] success after {cycle} cycle(s){CLI_CLR}")
-    save_last_run(task_id, status="success", outcome="OUTCOME_OK", cycles_used=cycle)
-    return {"cycles_used": cycle, "outcome": "OUTCOME_OK", "status": "success"}
+    status = "success" if actual_outcome == "OUTCOME_OK" else "failure"
+    print(f"{CLI_GREEN}[pipeline] {status} after {cycle} cycle(s) outcome={actual_outcome}{CLI_CLR}")
+    save_last_run(task_id, status=status, outcome=actual_outcome, cycles_used=cycle)
+    return {
+        "cycles_used": cycle,
+        "outcome": actual_outcome,
+        "status": status,
+        "input_tokens": total_in,
+        "output_tokens": total_out,
+    }

@@ -1,0 +1,96 @@
+{
+  "intent": "Submit checkout for basket_150 via payments tool",
+  "params": {
+    "basket_id": "basket_150"
+  },
+  "success_criteria": [
+    "payments tool invoked with checkout submit for basket_150",
+    "basket_150 exists and belongs to current customer",
+    "response references basket and resulting payment"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id",
+        "args": []
+      },
+      "bind": "identity"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT basket_id, record_path, customer_id, store_id, basket_status FROM shopping_baskets WHERE basket_id = :basket_id"
+      },
+      "bind": "basket_row"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/payments",
+        "args": [
+          "--help"
+        ]
+      },
+      "bind": "payments_help"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT line_number, product_sku, requested_quantity FROM shopping_basket_items WHERE basket_id = :basket_id ORDER BY line_number"
+      },
+      "bind": "basket_items"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/checkout.md",
+        "number": true
+      },
+      "bind": "checkout_policy"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/payments",
+        "args": [
+          "checkout",
+          "submit",
+          "--basket",
+          ":basket_id"
+        ]
+      },
+      "bind": "checkout_result"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#Important tools > payments",
+      "rule": "use payments tool to manage payment workflow state and supported refund approval/finalization"
+    },
+    {
+      "anchor": "#Important things > policy grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#Important things > full path",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    }
+  ],
+  "answer_template": {
+    "message": "Checkout submitted for $basket_id. Result: $checkout_result.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$basket_path",
+      "$payment_path",
+      "/docs/checkout.md"
+    ]
+  },
+  "outcome_override": null
+}

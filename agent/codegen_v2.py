@@ -1,9 +1,7 @@
 """CODEGEN phase v2 — translates a tool_plan to a Python `run(vm, params)` module."""
 from __future__ import annotations
 
-import json
 import os
-from pathlib import Path
 
 from .json_extract import _extract_json_from_text
 from .llm import _resolve_model_for_phase
@@ -21,15 +19,7 @@ class CodegenError(RuntimeError):
     pass
 
 
-_PROTO_REF_PATH = Path(__file__).parent.parent / "docs" / "proto-api-reference.md"
 _MAX_TOKENS_CODEGEN = int(os.environ.get("MAX_TOKENS_CODEGEN", "8192"))
-
-
-def _proto_reference() -> str:
-    try:
-        return _PROTO_REF_PATH.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return ""
 
 
 def _design_to_tool_plan_json(d: DesignOutput) -> str:
@@ -40,13 +30,12 @@ def run_codegen(
     design: DesignOutput,
     learn_ctx: list[dict],
     prev_error: str | None,
+    token_out: dict | None = None,
 ) -> CodegenOutput:
     """Translate `design.tool_plan` into a Python module. Returns CodegenOutput or raises."""
     guide = load_prompt("codegen") or "# PHASE: CODEGEN"
-    proto_ref = _proto_reference()
 
     system: list[dict] = [
-        {"type": "text", "text": proto_ref, "cache_control": {"type": "ephemeral"}},
         {"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}},
     ]
 
@@ -66,7 +55,7 @@ def run_codegen(
     user_msg = "\n\n".join(parts)
 
     model = _resolve_model_for_phase("codegen", os.environ.get("MODEL", ""))
-    raw = _call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_CODEGEN)
+    raw = _call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_CODEGEN, token_out=token_out)
     if not raw:
         raise CodegenError("CODEGEN LLM returned empty response")
 

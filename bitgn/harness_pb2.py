@@ -11,47 +11,87 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13\x62itgn/harness.proto\x12\x05\x62itgn\"\x0f\n\rStatusRequest\"1\n\x0eStatusResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\":\n\x08TaskInfo\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0f\n\x07preview\x18\x02 \x01(\t\x12\x0c\n\x04hint\x18\x03 \x01(\t\"+\n\x13GetBenchmarkRequest\x12\x14\n\x0c\x62\x65nchmark_id\x18\x01 \x01(\t\"\x98\x01\n\x14GetBenchmarkResponse\x12!\n\x06policy\x18\x01 \x01(\x0e\x32\x11.bitgn.EvalPolicy\x12\x14\n\x0c\x62\x65nchmark_id\x18\x02 \x01(\t\x12\x1e\n\x05tasks\x18\x03 \x03(\x0b\x32\x0f.bitgn.TaskInfo\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12\x12\n\nharness_id\x18\x05 \x01(\t\"?\n\x16StartPlaygroundRequest\x12\x14\n\x0c\x62\x65nchmark_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\"U\n\x17StartPlaygroundResponse\x12\x13\n\x0bharness_url\x18\x01 \x01(\t\x12\x13\n\x0binstruction\x18\x02 \x01(\t\x12\x10\n\x08trial_id\x18\x03 \x01(\t\"F\n\x0fStartRunRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x14\n\x0c\x62\x65nchmark_id\x18\x02 \x01(\t\x12\x0f\n\x07\x61pi_key\x18\x03 \x01(\t\"5\n\x10StartRunResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x11\n\ttrial_ids\x18\x02 \x03(\t\"%\n\x11StartTrialRequest\x12\x10\n\x08trial_id\x18\x01 \x01(\t\"a\n\x12StartTrialResponse\x12\x13\n\x0bharness_url\x18\x01 \x01(\t\x12\x13\n\x0binstruction\x18\x02 \x01(\t\x12\x10\n\x08trial_id\x18\x03 \x01(\t\x12\x0f\n\x07task_id\x18\x04 \x01(\t\"#\n\x0f\x45ndTrialRequest\x12\x10\n\x08trial_id\x18\x01 \x01(\t\"7\n\x10\x45ndTrialResponse\x12\r\n\x05score\x18\x01 \x01(\x02\x12\x14\n\x0cscore_detail\x18\x02 \x03(\t\"1\n\x10SubmitRunRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\"\x13\n\x11SubmitRunResponse*T\n\nEvalPolicy\x12\x17\n\x13\x45VAL_POLICY_UNKNOWN\x10\x00\x12\x14\n\x10\x45VAL_POLICY_OPEN\x10\x01\x12\x17\n\x13\x45VAL_POLICY_PRIVATE\x10\x02\x32\xdf\x03\n\x0eHarnessService\x12\x35\n\x06Status\x12\x14.bitgn.StatusRequest\x1a\x15.bitgn.StatusResponse\x12G\n\x0cGetBenchmark\x12\x1a.bitgn.GetBenchmarkRequest\x1a\x1b.bitgn.GetBenchmarkResponse\x12P\n\x0fStartPlayground\x12\x1d.bitgn.StartPlaygroundRequest\x1a\x1e.bitgn.StartPlaygroundResponse\x12;\n\x08StartRun\x12\x16.bitgn.StartRunRequest\x1a\x17.bitgn.StartRunResponse\x12\x41\n\nStartTrial\x12\x18.bitgn.StartTrialRequest\x1a\x19.bitgn.StartTrialResponse\x12;\n\x08\x45ndTrial\x12\x16.bitgn.EndTrialRequest\x1a\x17.bitgn.EndTrialResponse\x12>\n\tSubmitRun\x12\x17.bitgn.SubmitRunRequest\x1a\x18.bitgn.SubmitRunResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13\x62itgn/harness.proto\x12\rbitgn.harness\x1a\x1cgoogle/protobuf/struct.proto\"\x0f\n\rStatusRequest\"1\n\x0eStatusResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"+\n\x13GetBenchmarkRequest\x12\x14\n\x0c\x62\x65nchmark_id\x18\x01 \x01(\t\":\n\x04Link\x12\x0b\n\x03url\x18\x01 \x01(\t\x12%\n\x04kind\x18\x02 \x01(\x0e\x32\x17.bitgn.harness.LinkKind\"\x95\x02\n\x14GetBenchmarkResponse\x12\x14\n\x0c\x62\x65nchmark_id\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x12\n\nharness_id\x18\x03 \x01(\t\x12)\n\x06policy\x18\x04 \x01(\x0e\x32\x19.bitgn.harness.EvalPolicy\x12\"\n\x05links\x18\x05 \x03(\x0b\x32\x13.bitgn.harness.Link\x12\x37\n\x05tasks\x18\x06 \x03(\x0b\x32(.bitgn.harness.GetBenchmarkResponse.Task\x1a\x36\n\x04Task\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0f\n\x07preview\x18\x02 \x01(\t\x12\x0c\n\x04hint\x18\x03 \x01(\t\"%\n\x11StartTrialRequest\x12\x10\n\x08trial_id\x18\x01 \x01(\t\"\x87\x01\n\x12StartTrialResponse\x12\x10\n\x08trial_id\x18\x01 \x01(\t\x12\x14\n\x0c\x62\x65nchmark_id\x18\x02 \x01(\t\x12\x0f\n\x07task_id\x18\x03 \x01(\t\x12\x0e\n\x06run_id\x18\x04 \x01(\t\x12\x13\n\x0binstruction\x18\x05 \x01(\t\x12\x13\n\x0bharness_url\x18\x06 \x01(\t\"\x80\x01\n\x17StartPlaygroundResponse\x12\x10\n\x08trial_id\x18\x01 \x01(\t\x12\x14\n\x0c\x62\x65nchmark_id\x18\x02 \x01(\t\x12\x0f\n\x07task_id\x18\x03 \x01(\t\x12\x13\n\x0binstruction\x18\x04 \x01(\t\x12\x13\n\x0bharness_url\x18\x05 \x01(\t:\x02\x18\x01\"#\n\x0f\x45ndTrialRequest\x12\x10\n\x08trial_id\x18\x01 \x01(\t\"\xa7\x01\n\x10\x45ndTrialResponse\x12\x10\n\x08trial_id\x18\x01 \x01(\t\x12(\n\x05state\x18\x02 \x01(\x0e\x32\x19.bitgn.harness.TrialState\x12\x16\n\x05score\x18\x03 \x01(\x02\x42\x02\x18\x01H\x00\x88\x01\x01\x12\x18\n\x0cscore_detail\x18\x04 \x03(\tB\x02\x18\x01\x12\x1b\n\x0fscore_available\x18\x05 \x01(\x08\x42\x02\x18\x01\x42\x08\n\x06_score\"3\n\x0fGetTrialRequest\x12\x10\n\x08trial_id\x18\x01 \x01(\t\x12\x0e\n\x06\x63ursor\x18\x02 \x01(\x03\"\x83\x03\n\x10GetTrialResponse\x12\x10\n\x08trial_id\x18\x01 \x01(\t\x12\x13\n\x0binstruction\x18\x02 \x01(\t\x12\x14\n\x0c\x62\x65nchmark_id\x18\x03 \x01(\t\x12\x0f\n\x07task_id\x18\x04 \x01(\t\x12\r\n\x05\x65rror\x18\x05 \x01(\t\x12\x12\n\x05score\x18\x06 \x01(\x02H\x00\x88\x01\x01\x12\x17\n\x0fscore_available\x18\x0c \x01(\x08\x12\x14\n\x0cscore_detail\x18\x07 \x03(\t\x12(\n\x05state\x18\x08 \x01(\x0e\x32\x19.bitgn.harness.TrialState\x12$\n\x04logs\x18\t \x03(\x0b\x32\x16.bitgn.harness.LogLine\x12\x13\n\x0bnext_cursor\x18\n \x01(\x03\x12\x0e\n\x06run_id\x18\x0b \x01(\t\x12\x14\n\x0c\x64uration_sec\x18\r \x01(\x02\x12\x11\n\tapi_calls\x18\x0e \x01(\x03\x12\x12\n\napi_errors\x18\x0f \x01(\x03\x12\x13\n\x0b\x65vent_count\x18\x10 \x01(\x03\x42\x08\n\x06_score\"\x9f\x01\n\x07LogLine\x12\x0c\n\x04time\x18\x01 \x01(\t\x12\x0f\n\x07unix_ms\x18\x02 \x01(\x03\x12\x0c\n\x04text\x18\x03 \x01(\t\x12$\n\x04kind\x18\x04 \x01(\x0e\x32\x16.bitgn.harness.LogKind\x12\x0c\n\x04type\x18\x05 \x01(\t\x12*\n\x04\x64\x61ta\x18\x06 \x01(\x0b\x32\x17.google.protobuf.StructH\x00\x88\x01\x01\x42\x07\n\x05_data\"F\n\x0fStartRunRequest\x12\x14\n\x0c\x62\x65nchmark_id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0f\n\x07\x61pi_key\x18\x03 \x01(\t\"K\n\x10StartRunResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x14\n\x0c\x62\x65nchmark_id\x18\x02 \x01(\t\x12\x11\n\ttrial_ids\x18\x03 \x03(\t\"\x1f\n\rGetRunRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\t\"_\n\nTrialStats\x12\x11\n\tnew_count\x18\x01 \x01(\x05\x12\x15\n\rrunning_count\x18\x02 \x01(\x05\x12\x12\n\ndone_count\x18\x03 \x01(\x05\x12\x13\n\x0b\x65rror_count\x18\x04 \x01(\x05\"\xa7\x02\n\tTrialHead\x12\x10\n\x08trial_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x0b\n\x03num\x18\x03 \x01(\x05\x12(\n\x05state\x18\x04 \x01(\x0e\x32\x19.bitgn.harness.TrialState\x12\x18\n\x0binstruction\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x12\n\x05score\x18\x06 \x01(\x02H\x01\x88\x01\x01\x12\x17\n\x0fscore_available\x18\x08 \x01(\x08\x12\r\n\x05\x65rror\x18\x07 \x01(\t\x12\x14\n\x0c\x64uration_sec\x18\t \x01(\x02\x12\x11\n\tapi_calls\x18\n \x01(\x03\x12\x12\n\napi_errors\x18\x0b \x01(\x03\x12\x13\n\x0b\x65vent_count\x18\x0c \x01(\x03\x42\x0e\n\x0c_instructionB\x08\n\x06_score\"\xa2\x02\n\x0eGetRunResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x14\n\x0c\x62\x65nchmark_id\x18\x02 \x01(\t\x12\x0c\n\x04name\x18\x03 \x01(\t\x12\x12\n\x05score\x18\x04 \x01(\x02H\x00\x88\x01\x01\x12\x17\n\x0fscore_available\x18\t \x01(\x08\x12(\n\x05stats\x18\x05 \x01(\x0b\x32\x19.bitgn.harness.TrialStats\x12(\n\x06trials\x18\x06 \x03(\x0b\x32\x18.bitgn.harness.TrialHead\x12&\n\x05state\x18\x07 \x01(\x0e\x32\x17.bitgn.harness.RunState\x12)\n\x06policy\x18\x08 \x01(\x0e\x32\x19.bitgn.harness.EvalPolicyB\x08\n\x06_score\"1\n\x10SubmitRunRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\"\xc9\x01\n\x11ScoredTrialResult\x12\x10\n\x08trial_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x0b\n\x03num\x18\x03 \x01(\x05\x12(\n\x05state\x18\x04 \x01(\x0e\x32\x19.bitgn.harness.TrialState\x12\x12\n\x05score\x18\x05 \x01(\x02H\x00\x88\x01\x01\x12\x17\n\x0fscore_available\x18\x06 \x01(\x08\x12\x14\n\x0cscore_detail\x18\x07 \x03(\t\x12\r\n\x05\x65rror\x18\x08 \x01(\tB\x08\n\x06_score\"\xb4\x01\n\x11SubmitRunResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12&\n\x05state\x18\x02 \x01(\x0e\x32\x17.bitgn.harness.RunState\x12\x12\n\x05score\x18\x03 \x01(\x02H\x00\x88\x01\x01\x12\x17\n\x0fscore_available\x18\x04 \x01(\x08\x12\x30\n\x06trials\x18\x05 \x03(\x0b\x32 .bitgn.harness.ScoredTrialResultB\x08\n\x06_score\"C\n\x16StartPlaygroundRequest\x12\x14\n\x0c\x62\x65nchmark_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t:\x02\x18\x01*o\n\nEvalPolicy\x12\x1b\n\x17\x45VAL_POLICY_UNSPECIFIED\x10\x00\x12\x15\n\x11\x45VAL_POLICY_BLIND\x10\x01\x12\x14\n\x10\x45VAL_POLICY_OPEN\x10\x02\x12\x17\n\x13\x45VAL_POLICY_PRIVATE\x10\x03*y\n\x08LinkKind\x12\x19\n\x15LINK_KIND_UNSPECIFIED\x10\x00\x12\x14\n\x10LINK_KIND_SAMPLE\x10\x01\x12\x15\n\x11LINK_KIND_LANDING\x10\x02\x12\x12\n\x0eLINK_KIND_NEWS\x10\x03\x12\x11\n\rLINK_KIND_SDK\x10\x04*\x84\x01\n\nTrialState\x12\x1b\n\x17TRIAL_STATE_UNSPECIFIED\x10\x00\x12\x13\n\x0fTRIAL_STATE_NEW\x10\x01\x12\x17\n\x13TRIAL_STATE_RUNNING\x10\x02\x12\x14\n\x10TRIAL_STATE_DONE\x10\x03\x12\x15\n\x11TRIAL_STATE_ERROR\x10\x04*q\n\x08RunState\x12\x19\n\x15RUN_STATE_UNSPECIFIED\x10\x00\x12\x15\n\x11RUN_STATE_RUNNING\x10\x01\x12\x1a\n\x16RUN_STATE_PENDING_EVAL\x10\x02\x12\x17\n\x13RUN_STATE_EVALUATED\x10\x03*\xb9\x01\n\x07LogKind\x12\x18\n\x14LOG_KIND_UNSPECIFIED\x10\x00\x12\x13\n\x0fLOG_KIND_SYSTEM\x10\x01\x12\x14\n\x10LOG_KIND_REQUEST\x10\x02\x12\x15\n\x11LOG_KIND_RESPONSE\x10\x03\x12\x12\n\x0eLOG_KIND_ERROR\x10\x04\x12\x13\n\x0fLOG_KIND_CHANGE\x10\x05\x12\x16\n\x12LOG_KIND_TELEMETRY\x10\x06\x12\x11\n\rLOG_KIND_USER\x10\x07\x32\xe8\x05\n\x0eHarnessService\x12\x45\n\x06Status\x12\x1c.bitgn.harness.StatusRequest\x1a\x1d.bitgn.harness.StatusResponse\x12W\n\x0cGetBenchmark\x12\".bitgn.harness.GetBenchmarkRequest\x1a#.bitgn.harness.GetBenchmarkResponse\x12K\n\x08StartRun\x12\x1e.bitgn.harness.StartRunRequest\x1a\x1f.bitgn.harness.StartRunResponse\x12\x45\n\x06GetRun\x12\x1c.bitgn.harness.GetRunRequest\x1a\x1d.bitgn.harness.GetRunResponse\x12N\n\tSubmitRun\x12\x1f.bitgn.harness.SubmitRunRequest\x1a .bitgn.harness.SubmitRunResponse\x12\x65\n\x0fStartPlayground\x12%.bitgn.harness.StartPlaygroundRequest\x1a&.bitgn.harness.StartPlaygroundResponse\"\x03\x88\x02\x01\x12Q\n\nStartTrial\x12 .bitgn.harness.StartTrialRequest\x1a!.bitgn.harness.StartTrialResponse\x12K\n\x08GetTrial\x12\x1e.bitgn.harness.GetTrialRequest\x1a\x1f.bitgn.harness.GetTrialResponse\x12K\n\x08\x45ndTrial\x12\x1e.bitgn.harness.EndTrialRequest\x1a\x1f.bitgn.harness.EndTrialResponseB*Z(bitgn.com/harness/v2/api/harness;harnessb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'bitgn.harness_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _EVALPOLICY._serialized_start=941
-  _EVALPOLICY._serialized_end=1025
-  _STATUSREQUEST._serialized_start=30
-  _STATUSREQUEST._serialized_end=45
-  _STATUSRESPONSE._serialized_start=47
-  _STATUSRESPONSE._serialized_end=96
-  _TASKINFO._serialized_start=98
-  _TASKINFO._serialized_end=156
-  _GETBENCHMARKREQUEST._serialized_start=158
-  _GETBENCHMARKREQUEST._serialized_end=201
-  _GETBENCHMARKRESPONSE._serialized_start=204
-  _GETBENCHMARKRESPONSE._serialized_end=356
-  _STARTPLAYGROUNDREQUEST._serialized_start=358
-  _STARTPLAYGROUNDREQUEST._serialized_end=421
-  _STARTPLAYGROUNDRESPONSE._serialized_start=423
-  _STARTPLAYGROUNDRESPONSE._serialized_end=508
-  _STARTRUNREQUEST._serialized_start=510
-  _STARTRUNREQUEST._serialized_end=580
-  _STARTRUNRESPONSE._serialized_start=582
-  _STARTRUNRESPONSE._serialized_end=635
-  _STARTTRIALREQUEST._serialized_start=637
-  _STARTTRIALREQUEST._serialized_end=674
-  _STARTTRIALRESPONSE._serialized_start=676
-  _STARTTRIALRESPONSE._serialized_end=773
-  _ENDTRIALREQUEST._serialized_start=775
-  _ENDTRIALREQUEST._serialized_end=810
-  _ENDTRIALRESPONSE._serialized_start=812
-  _ENDTRIALRESPONSE._serialized_end=867
-  _SUBMITRUNREQUEST._serialized_start=869
-  _SUBMITRUNREQUEST._serialized_end=918
-  _SUBMITRUNRESPONSE._serialized_start=920
-  _SUBMITRUNRESPONSE._serialized_end=939
-  _HARNESSSERVICE._serialized_start=1028
-  _HARNESSSERVICE._serialized_end=1507
+  DESCRIPTOR._serialized_options = b'Z(bitgn.com/harness/v2/api/harness;harness'
+  _STARTPLAYGROUNDRESPONSE._options = None
+  _STARTPLAYGROUNDRESPONSE._serialized_options = b'\030\001'
+  _ENDTRIALRESPONSE.fields_by_name['score']._options = None
+  _ENDTRIALRESPONSE.fields_by_name['score']._serialized_options = b'\030\001'
+  _ENDTRIALRESPONSE.fields_by_name['score_detail']._options = None
+  _ENDTRIALRESPONSE.fields_by_name['score_detail']._serialized_options = b'\030\001'
+  _ENDTRIALRESPONSE.fields_by_name['score_available']._options = None
+  _ENDTRIALRESPONSE.fields_by_name['score_available']._serialized_options = b'\030\001'
+  _STARTPLAYGROUNDREQUEST._options = None
+  _STARTPLAYGROUNDREQUEST._serialized_options = b'\030\001'
+  _HARNESSSERVICE.methods_by_name['StartPlayground']._options = None
+  _HARNESSSERVICE.methods_by_name['StartPlayground']._serialized_options = b'\210\002\001'
+  _EVALPOLICY._serialized_start=3018
+  _EVALPOLICY._serialized_end=3129
+  _LINKKIND._serialized_start=3131
+  _LINKKIND._serialized_end=3252
+  _TRIALSTATE._serialized_start=3255
+  _TRIALSTATE._serialized_end=3387
+  _RUNSTATE._serialized_start=3389
+  _RUNSTATE._serialized_end=3502
+  _LOGKIND._serialized_start=3505
+  _LOGKIND._serialized_end=3690
+  _STATUSREQUEST._serialized_start=68
+  _STATUSREQUEST._serialized_end=83
+  _STATUSRESPONSE._serialized_start=85
+  _STATUSRESPONSE._serialized_end=134
+  _GETBENCHMARKREQUEST._serialized_start=136
+  _GETBENCHMARKREQUEST._serialized_end=179
+  _LINK._serialized_start=181
+  _LINK._serialized_end=239
+  _GETBENCHMARKRESPONSE._serialized_start=242
+  _GETBENCHMARKRESPONSE._serialized_end=519
+  _GETBENCHMARKRESPONSE_TASK._serialized_start=465
+  _GETBENCHMARKRESPONSE_TASK._serialized_end=519
+  _STARTTRIALREQUEST._serialized_start=521
+  _STARTTRIALREQUEST._serialized_end=558
+  _STARTTRIALRESPONSE._serialized_start=561
+  _STARTTRIALRESPONSE._serialized_end=696
+  _STARTPLAYGROUNDRESPONSE._serialized_start=699
+  _STARTPLAYGROUNDRESPONSE._serialized_end=827
+  _ENDTRIALREQUEST._serialized_start=829
+  _ENDTRIALREQUEST._serialized_end=864
+  _ENDTRIALRESPONSE._serialized_start=867
+  _ENDTRIALRESPONSE._serialized_end=1034
+  _GETTRIALREQUEST._serialized_start=1036
+  _GETTRIALREQUEST._serialized_end=1087
+  _GETTRIALRESPONSE._serialized_start=1090
+  _GETTRIALRESPONSE._serialized_end=1477
+  _LOGLINE._serialized_start=1480
+  _LOGLINE._serialized_end=1639
+  _STARTRUNREQUEST._serialized_start=1641
+  _STARTRUNREQUEST._serialized_end=1711
+  _STARTRUNRESPONSE._serialized_start=1713
+  _STARTRUNRESPONSE._serialized_end=1788
+  _GETRUNREQUEST._serialized_start=1790
+  _GETRUNREQUEST._serialized_end=1821
+  _TRIALSTATS._serialized_start=1823
+  _TRIALSTATS._serialized_end=1918
+  _TRIALHEAD._serialized_start=1921
+  _TRIALHEAD._serialized_end=2216
+  _GETRUNRESPONSE._serialized_start=2219
+  _GETRUNRESPONSE._serialized_end=2509
+  _SUBMITRUNREQUEST._serialized_start=2511
+  _SUBMITRUNREQUEST._serialized_end=2560
+  _SCOREDTRIALRESULT._serialized_start=2563
+  _SCOREDTRIALRESULT._serialized_end=2764
+  _SUBMITRUNRESPONSE._serialized_start=2767
+  _SUBMITRUNRESPONSE._serialized_end=2947
+  _STARTPLAYGROUNDREQUEST._serialized_start=2949
+  _STARTPLAYGROUNDREQUEST._serialized_end=3016
+  _HARNESSSERVICE._serialized_start=3693
+  _HARNESSSERVICE._serialized_end=4437
 # @@protoc_insertion_point(module_scope)

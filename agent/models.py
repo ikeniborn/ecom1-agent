@@ -26,7 +26,7 @@ class DesignOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     intent: str
-    params: dict[str, str]
+    params: dict[str, Any]
     success_criteria: list[str]        # F-002 / H10
     discovery: list[ToolOp] = []
     ops: list[ToolOp]

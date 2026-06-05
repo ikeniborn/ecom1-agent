@@ -1,93 +1,356 @@
 syntax = "proto3";
 
-package bitgn;
+import "google/protobuf/struct.proto";
 
-enum EvalPolicy {
-  EVAL_POLICY_UNKNOWN = 0;
-  EVAL_POLICY_OPEN = 1;
-  EVAL_POLICY_PRIVATE = 2;
-}
+// Harness API - provides control-plane access to the BitGN Platform and its per-trial agent runtimes.
+package bitgn.harness;
 
-service HarnessService {
-  rpc Status(StatusRequest) returns (StatusResponse);
-  rpc GetBenchmark(GetBenchmarkRequest) returns (GetBenchmarkResponse);
-  rpc StartPlayground(StartPlaygroundRequest) returns (StartPlaygroundResponse);
-  rpc StartRun(StartRunRequest) returns (StartRunResponse);
-  rpc StartTrial(StartTrialRequest) returns (StartTrialResponse);
-  rpc EndTrial(EndTrialRequest) returns (EndTrialResponse);
-  rpc SubmitRun(SubmitRunRequest) returns (SubmitRunResponse);
-}
+option go_package = "bitgn.com/harness/v2/api/harness;harness";
 
 message StatusRequest {}
 
 message StatusResponse {
   string status = 1;
+  // platform version
   string version = 2;
 }
 
-message TaskInfo {
-  string task_id = 1;
-  string preview = 2;
-  string hint = 3;
+
+enum EvalPolicy {
+  EVAL_POLICY_UNSPECIFIED = 0;
+  // in Blind mode we hide hints. Runs that start and end while benchmark is in Blind mode - will have their results sealed until the reveal
+  EVAL_POLICY_BLIND = 1;
+  // in Open mode we execute evaluations at the end of the run, also hints are visible
+  EVAL_POLICY_OPEN = 2;
+  // private runs, not part of leaderboards.
+  EVAL_POLICY_PRIVATE = 3;
 }
 
+// Pulls information about current benchmark, including task samples. Id is in format org/bench
 message GetBenchmarkRequest {
+  // e.g. bitgn/ecom1-dev
   string benchmark_id = 1;
+}
+
+enum LinkKind {
+  LINK_KIND_UNSPECIFIED = 0;
+  LINK_KIND_SAMPLE = 1;
+  LINK_KIND_LANDING = 2;
+  LINK_KIND_NEWS = 3;
+  LINK_KIND_SDK = 4;
+}
+
+message Link {
+  string url = 1;
+  LinkKind kind = 2;
 }
 
 message GetBenchmarkResponse {
-  EvalPolicy policy = 1;
-  string benchmark_id = 2;
-  repeated TaskInfo tasks = 3;
-  string description = 4;
-  string harness_id = 5;
-}
-
-message StartPlaygroundRequest {
   string benchmark_id = 1;
-  string task_id = 2;
+  string description = 2;
+  // Runtime/tool-surface identifier, e.g. `bitgn/mini-harness`.
+  string harness_id = 3;
+  EvalPolicy policy = 4;
+  repeated Link links = 5;
+  message Task {
+    string task_id = 1;
+    // Catalog preview generated from a deterministic sample seed.
+    // The real trial instruction is regenerated from the trial id seed and may differ.
+    string preview =  2;
+    // hint will be empty for blind benchmarks
+    string hint = 3;
+  }
+
+  // list of different tasks that we cover in the benchmark.
+  repeated Task tasks = 6;
 }
 
-message StartPlaygroundResponse {
-  string harness_url = 1;
-  string instruction = 2;
-  string trial_id = 3;
-}
 
-message StartRunRequest {
-  string name = 1;
-  string benchmark_id = 2;
-  string api_key = 3;
-}
 
-message StartRunResponse {
-  string run_id = 1;
-  repeated string trial_ids = 2;
-}
+
 
 message StartTrialRequest {
+  // Prepared trial identifier, typically created as part of a run.
+  // Trial identifiers are allocated by StartRun.
   string trial_id = 1;
 }
 
-message StartTrialResponse {
-  string harness_url = 1;
-  string instruction = 2;
-  string trial_id = 3;
-  string task_id = 4;
+enum TrialState {
+  TRIAL_STATE_UNSPECIFIED = 0;
+  TRIAL_STATE_NEW = 1;
+  TRIAL_STATE_RUNNING = 2;
+  TRIAL_STATE_DONE = 3;
+  TRIAL_STATE_ERROR = 4;
 }
+
+
+enum RunState {
+  RUN_STATE_UNSPECIFIED = 0;
+  // run was created and started
+  RUN_STATE_RUNNING = 1;
+  RUN_STATE_PENDING_EVAL = 2;
+  RUN_STATE_EVALUATED = 3;
+
+}
+
+message StartTrialResponse {
+  string trial_id = 1;
+  string benchmark_id = 2;
+  // e.g. t01
+  string task_id = 3;
+  string run_id = 4;
+  string instruction = 5;
+  // Trial-local agent runtime endpoint for the harness workspace/tool surface.
+  // Agents use this URL for runtime operations, not the control-plane API path.
+  string harness_url = 6;
+}
+
+message StartPlaygroundResponse {
+  option deprecated = true;
+
+  string trial_id = 1;
+  string benchmark_id = 2;
+  // e.g. t01
+  string task_id = 3;
+  string instruction = 4;
+  // Deprecated: StartPlayground always returns an error. Use StartRun and StartTrial.
+  string harness_url = 5;
+}
+
+
 
 message EndTrialRequest {
   string trial_id = 1;
 }
 
+
+
 message EndTrialResponse {
-  float score = 1;
-  repeated string score_detail = 2;
+  string trial_id = 1;
+  TrialState state =2;
+
+  // Deprecated: EndTrial is lifecycle-only. Scores are produced by SubmitRun.
+  optional float score = 3 [deprecated = true];
+
+  // Deprecated: EndTrial is lifecycle-only. Score details are produced by SubmitRun.
+  repeated string score_detail = 4 [deprecated = true];
+
+  // Deprecated: EndTrial no longer grades. Use SubmitRunResponse scores.
+  bool score_available = 5 [deprecated = true];
 }
+
+message GetTrialRequest{
+  string trial_id = 1;
+  // Opaque cursor from the previous response; `0` means start from the first page.
+  int64 cursor = 2;
+}
+
+message GetTrialResponse {
+  string trial_id = 1;
+  string instruction = 2;
+  string benchmark_id = 3;
+  string task_id = 4;
+  // set if trial failed
+  string error = 5;
+
+  // score will be set if evaluated
+  optional float score = 6;
+  // mirrors score presence for raw generated SDKs that treat absent optional scalars as zero
+  bool score_available = 12;
+
+  repeated string score_detail = 7;
+
+  TrialState state = 8;
+  // Human-facing activity feed from the harness instance, not a replayable event stream.
+  repeated LogLine logs = 9;
+  // Opaque cursor to continue fetching logs.
+  int64 next_cursor = 10;
+  // will be set if associated with trial run
+  string run_id = 11;
+  // Trial wall time in seconds based on persisted trial lifecycle timestamps.
+  float duration_sec = 13;
+  // Terminal summary counters mirrored from persisted trial metadata when available.
+  int64 api_calls = 14;
+  int64 api_errors = 15;
+  int64 event_count = 16;
+}
+
+enum LogKind {
+  LOG_KIND_UNSPECIFIED = 0;
+  // system notifications from the harness and platform
+  LOG_KIND_SYSTEM = 1;
+  // Request from agent to the environment
+  LOG_KIND_REQUEST = 2;
+  // Response of env to the agent
+  LOG_KIND_RESPONSE = 3;
+  // Some kind of failure (e.g. env failure or bad request)
+  LOG_KIND_ERROR = 4;
+  // Change detected in the environment
+  LOG_KIND_CHANGE = 5;
+  // Telemetry from an agent
+  LOG_KIND_TELEMETRY = 6;
+  // Free logs from an agent
+  LOG_KIND_USER = 7;
+}
+
+// represents nicely renderable log line for humans and UX
+message LogLine {
+  // Display-oriented timestamp. Use `unix_ms` for ordering and machine logic.
+  string time = 1;
+  // unix ms
+  int64 unix_ms = 2;
+  // human-readable text display
+  string text = 3;
+  // log category (for filtering and human display)
+  LogKind kind = 4;
+  // Underlying entry type for richer rendering in clients.
+  string type = 5;
+  // Best-effort structured payload for UI rendering. Omitted when plain text is enough.
+  optional google.protobuf.Struct data = 6;
+}
+
+
+message StartRunRequest {
+  string benchmark_id = 1;
+  string name = 2;
+  // get BitGN Api Key in your profile https://bitgn.com/me
+  string api_key = 3;
+}
+
+message StartRunResponse {
+  string run_id = 1;
+  string benchmark_id = 2;
+  repeated string trial_ids = 3;
+}
+
+// used in displays or to show status on a high level
+message GetRunRequest {
+  string run_id = 1;
+}
+
+message TrialStats {
+  int32 new_count = 1;
+  int32 running_count = 2;
+  int32 done_count = 3;
+  int32 error_count = 4;
+}
+
+// brief summary of a trial
+message TrialHead {
+  string trial_id = 1;
+  string task_id = 2;
+  // Sequential number within the run, not a globally meaningful identifier.
+  int32 num = 3;
+  TrialState state = 4;
+  // will be populated only if task has started
+  optional string instruction = 5;
+  // will be populated after evaluation
+  optional float score = 6;
+  // mirrors score presence for raw generated SDKs that treat absent optional scalars as zero
+  bool score_available = 8;
+
+  // error message, if trial failed
+  string error = 7;
+  // Trial wall time in seconds based on persisted trial lifecycle timestamps.
+  float duration_sec = 9;
+  // Terminal summary counters mirrored from persisted trial metadata when available.
+  int64 api_calls = 10;
+  int64 api_errors = 11;
+  int64 event_count = 12;
+
+}
+
+message GetRunResponse {
+  string run_id = 1;
+  string benchmark_id = 2;
+  // custom name for the run
+  string name = 3;
+  // score, if it was evaluated
+  optional float score = 4;
+  // mirrors score presence for raw generated SDKs that treat absent optional scalars as zero
+  bool score_available = 9;
+  TrialStats stats = 5;
+  repeated TrialHead trials = 6;
+
+  RunState state = 7;
+  EvalPolicy policy = 8;
+}
+
+
 
 message SubmitRunRequest {
   string run_id = 1;
+  // force to submit run even if some trials are still not done
   bool force = 2;
 }
 
-message SubmitRunResponse {}
+message ScoredTrialResult {
+  string trial_id = 1;
+  string task_id = 2;
+
+  // Sequential number within the run.
+  int32 num = 3;
+
+  TrialState state = 4;
+
+  // Present only when the submitted run's result is public at submit time.
+  optional float score = 5;
+
+  // Mirrors score presence for SDKs that expose absent optional floats as 0.0.
+  bool score_available = 6;
+
+  // Present only when score_available is true.
+  repeated string score_detail = 7;
+
+  // Set if the trial ended in harness/runtime error rather than normal grading.
+  string error = 8;
+}
+
+message SubmitRunResponse {
+  string run_id = 1;
+  // EVALUATED when scores are public at submit time.
+  // PENDING_EVAL for sealed blind submissions whose scores were evaluated but withheld.
+  RunState state = 2;
+  // Present only when the submitted run's aggregate score is public at submit time.
+  optional float score = 3;
+
+  bool score_available = 4;
+
+  // Per-trial public submit results. Returned if run is not sealed
+  repeated ScoredTrialResult trials = 5;
+}
+
+
+message StartPlaygroundRequest {
+  option deprecated = true;
+
+  // Deprecated: sandbox/playground mode is no longer supported. Use StartRun and StartTrial.
+  string benchmark_id = 1;
+  // task id in this benchmark - e.g. t01
+  string task_id = 2;
+}
+
+// HarnessService is the primary entrypoint into the BitGN Benchmarks platform.
+// Most methods require authentication with BitGN platform API key
+service HarnessService {
+  rpc Status(StatusRequest) returns (StatusResponse);
+  // Fetch information about a given benchmark
+  rpc GetBenchmark(GetBenchmarkRequest) returns (GetBenchmarkResponse);
+
+  // Starting a leaderboard run will prepopulate trial parameters from the benchmark
+  rpc StartRun(StartRunRequest) returns (StartRunResponse);
+  rpc GetRun(GetRunRequest) returns (GetRunResponse);
+  // submit run. This will trigger evaluation of trials within the open benchmarks
+  rpc SubmitRun(SubmitRunRequest) returns (SubmitRunResponse);
+
+  // Deprecated: sandbox/playground mode is no longer supported. Use StartRun and StartTrial.
+  rpc StartPlayground(StartPlaygroundRequest) returns (StartPlaygroundResponse) {
+    option deprecated = true;
+  }
+  // Start a prepared trial whose seed and metadata were fixed earlier by the platform (by starting a run). This also starts the timer
+  rpc StartTrial(StartTrialRequest) returns (StartTrialResponse);
+  // Get current state of the trial
+  rpc GetTrial(GetTrialRequest) returns (GetTrialResponse);
+  // End trial. Evaluation will be done at the end of the Run
+  rpc EndTrial(EndTrialRequest) returns (EndTrialResponse);
+}

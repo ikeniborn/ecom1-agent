@@ -4,7 +4,9 @@ from bitgn.harness_pb2 import (
     GetBenchmarkRequest, GetBenchmarkResponse,
     StartPlaygroundRequest, StartPlaygroundResponse,
     StartRunRequest, StartRunResponse,
+    GetRunRequest, GetRunResponse,
     StartTrialRequest, StartTrialResponse,
+    GetTrialRequest, GetTrialResponse,
     EndTrialRequest, EndTrialResponse,
     SubmitRunRequest, SubmitRunResponse,
 )
@@ -28,8 +30,14 @@ class HarnessServiceClientSync:
     def start_run(self, req: StartRunRequest) -> StartRunResponse:
         return self._c.call(_SERVICE, "StartRun", req, StartRunResponse)
 
+    def get_run(self, req: GetRunRequest) -> GetRunResponse:
+        return self._c.call(_SERVICE, "GetRun", req, GetRunResponse)
+
     def start_trial(self, req: StartTrialRequest) -> StartTrialResponse:
         return self._c.call(_SERVICE, "StartTrial", req, StartTrialResponse)
+
+    def get_trial(self, req: GetTrialRequest) -> GetTrialResponse:
+        return self._c.call(_SERVICE, "GetTrial", req, GetTrialResponse)
 
     def end_trial(self, req: EndTrialRequest) -> EndTrialResponse:
         return self._c.call(_SERVICE, "EndTrial", req, EndTrialResponse)

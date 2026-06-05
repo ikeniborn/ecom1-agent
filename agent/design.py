@@ -6,7 +6,6 @@ DESIGN is frozen per task run; LEARN feedback only feeds CODEGEN.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 from .json_extract import _extract_json_from_text
 from .llm import _resolve_model_for_phase
@@ -24,27 +23,21 @@ class DesignError(RuntimeError):
     pass
 
 
-_PROTO_REF_PATH = Path(__file__).parent.parent / "docs" / "proto-api-reference.md"
-_MAX_TOKENS_DESIGN = int(os.environ.get("MAX_TOKENS_DESIGN", "4096"))
+_MAX_TOKENS_DESIGN = int(os.environ.get("MAX_TOKENS_DESIGN", "8192"))
 
 
-def _proto_reference() -> str:
-    try:
-        return _PROTO_REF_PATH.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return ""
-
-
-def run_design(instruction: str, agents_md_text: str) -> DesignOutput:
+def run_design(
+    instruction: str,
+    agents_md_text: str,
+    token_out: dict | None = None,
+) -> DesignOutput:
     """Run DESIGN phase. Returns DesignOutput or raises DesignError.
 
     H2/H13/H15: signature MUST NOT accept learn_ctx.
     """
     guide = load_prompt("design") or "# PHASE: DESIGN"
-    proto_ref = _proto_reference()
 
     system: list[dict] = [
-        {"type": "text", "text": proto_ref, "cache_control": {"type": "ephemeral"}},
         {"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}},
     ]
 
@@ -54,7 +47,7 @@ def run_design(instruction: str, agents_md_text: str) -> DesignOutput:
     )
 
     model = _resolve_model_for_phase("design", os.environ.get("MODEL", ""))
-    raw = _call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_DESIGN)
+    raw = _call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_DESIGN, token_out=token_out)
     if not raw:
         raise DesignError("DESIGN LLM returned empty response")
 

@@ -11,7 +11,39 @@ from __future__ import annotations
 from bitgn.vm.ecom.ecom_pb2 import (
     ReadRequest, ListRequest, TreeRequest, FindRequest, SearchRequest,
     ExecRequest, WriteRequest, DeleteRequest, StatRequest, AnswerRequest,
+    NodeKind,
 )
+
+
+_NODE_KIND_ALIASES = {
+    "": NodeKind.NODE_KIND_UNSPECIFIED,
+    "any": NodeKind.NODE_KIND_UNSPECIFIED,
+    "all": NodeKind.NODE_KIND_UNSPECIFIED,
+    "unspecified": NodeKind.NODE_KIND_UNSPECIFIED,
+    "node_kind_unspecified": NodeKind.NODE_KIND_UNSPECIFIED,
+    "file": NodeKind.NODE_KIND_FILE,
+    "node_kind_file": NodeKind.NODE_KIND_FILE,
+    "dir": NodeKind.NODE_KIND_DIR,
+    "directory": NodeKind.NODE_KIND_DIR,
+    "folder": NodeKind.NODE_KIND_DIR,
+    "node_kind_dir": NodeKind.NODE_KIND_DIR,
+}
+
+
+def _normalise_kind(kwargs: dict) -> dict:
+    """Map free-form kind strings ('file', 'dir', ...) to NodeKind enum values.
+
+    LLM-generated scripts commonly emit lower-case English ('file', 'dir');
+    protobuf only accepts the enum int or full label. Without this bridge,
+    every Find/Tree call dies with 'unknown enum label "file"'.
+    """
+    if "kind" not in kwargs:
+        return kwargs
+    k = kwargs["kind"]
+    if isinstance(k, str):
+        kwargs = dict(kwargs)
+        kwargs["kind"] = _NODE_KIND_ALIASES.get(k.lower().strip(), k)
+    return kwargs
 
 
 class VMAdapter:
@@ -25,10 +57,10 @@ class VMAdapter:
         return self._c.list(ListRequest(**kwargs))
 
     def tree(self, **kwargs):
-        return self._c.tree(TreeRequest(**kwargs))
+        return self._c.tree(TreeRequest(**_normalise_kind(kwargs)))
 
     def find(self, **kwargs):
-        return self._c.find(FindRequest(**kwargs))
+        return self._c.find(FindRequest(**_normalise_kind(kwargs)))
 
     def search(self, **kwargs):
         return self._c.search(SearchRequest(**kwargs))

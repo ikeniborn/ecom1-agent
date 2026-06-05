@@ -1,0 +1,81 @@
+{
+  "intent": "Compare old receipt total (ex-VAT) in /uploads/ against today's catalog prices within 2 EUR.",
+  "params": {},
+  "success_criteria": [
+    "Receipt file found and parsed",
+    "Each line item mapped to product_variants by SKU or name",
+    "Today's ex-VAT total computed and diff vs old total reported",
+    "Answer includes <YES> or <NO> token"
+  ],
+  "discovery": [
+    {
+      "rpc": "List",
+      "args": {
+        "path": "/uploads"
+      },
+      "bind": "uploads_listing"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$receipt_path",
+        "number": true
+      },
+      "bind": "receipt_content"
+    },
+    {
+      "rpc": "Tree",
+      "args": {
+        "root": "/docs",
+        "level": 2
+      },
+      "bind": "docs_tree"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/docs",
+        "pattern": "VAT|tax",
+        "limit": 20
+      },
+      "bind": "vat_policy_hits"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT product_sku, product_name, price_cents, price_currency FROM product_variants WHERE product_sku IN (:skus) OR product_name IN (:names);"
+      },
+      "bind": "current_prices"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#Important things > reference paths",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#Important things > policy grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#Important things > yes/no tokens",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response."
+    },
+    {
+      "anchor": "#Important tools > sql",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session."
+    }
+  ],
+  "answer_template": {
+    "message": "<$yesno> Old receipt total ex-VAT: €$old_total. Today's catalog total ex-VAT: €$new_total. Diff: €$diff (threshold 2 EUR).",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$receipt_path",
+      "$vat_policy_path"
+    ]
+  },
+  "outcome_override": null
+}

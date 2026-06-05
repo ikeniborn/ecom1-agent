@@ -1,0 +1,96 @@
+{
+  "intent": "Identify archived payment records belonging to the confirmed fraud incident; read-only.",
+  "params": {},
+  "success_criteria": [
+    "Only payments with is_archived_basket_reference=1 considered",
+    "Each cited payment matches the fraud incident criteria documented in /docs",
+    "No writes or mutations performed",
+    "Each fraud payment's record_path appears in refs"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/tree",
+        "args": [
+          "-L",
+          "2",
+          "/docs"
+        ]
+      },
+      "bind": "docs_tree"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/docs",
+        "pattern": "(?i)fraud|incident",
+        "limit": 50
+      },
+      "bind": "fraud_hits"
+    },
+    {
+      "rpc": "Find",
+      "args": {
+        "root": "/docs",
+        "name": "fraud",
+        "kind": "file",
+        "limit": 10
+      },
+      "bind": "fraud_docs"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$fraud_doc_path",
+        "number": true
+      },
+      "bind": "fraud_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "SELECT name, sql FROM sqlite_schema WHERE name LIKE '%payment%' OR name LIKE '%incident%' OR name LIKE '%fraud%';"
+        ]
+      },
+      "bind": "schema_check"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "SELECT payment_id, record_path, basket_id, customer_id, store_id, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, three_ds_status, three_ds_failure_reason FROM payment_transactions WHERE is_archived_basket_reference = 1 ORDER BY payment_created_at;"
+        ]
+      },
+      "bind": "archived_payments"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#Important things > full path",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#Important things > policy grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#Key locations > payments",
+      "rule": "Customer profiles are in proc/customers, baskets are in proc/baskets, payments are in proc/payments"
+    }
+  ],
+  "answer_template": {
+    "message": "Fraud incident payments (archived): {fraud_payment_list}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$fraud_doc_path",
+      "$payment_paths"
+    ]
+  },
+  "outcome_override": null
+}

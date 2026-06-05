@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 
 def test_run_single_task_creates_jsonl_and_removes_log(tmp_path, monkeypatch):
-    """After _run_single_task: .jsonl created, no .log file, log_header + log_task_result called."""
+    """After _run_single_task + _finalize_task_trace: .jsonl has header + task_result; no .log file."""
     import main as m
 
     monkeypatch.setattr(m, "_run_dir", tmp_path)
@@ -15,19 +15,18 @@ def test_run_single_task_creates_jsonl_and_removes_log(tmp_path, monkeypatch):
     fake_trial.harness_url = "http://x"
     fake_trial.instruction = "find item"
 
-    fake_end = MagicMock()
-    fake_end.score = 1.0
-    fake_end.score_detail = ["ok"]
-
     fake_client = MagicMock()
     fake_client.start_trial.return_value = fake_trial
-    fake_client.end_trial.return_value = fake_end
+    fake_client.end_trial.return_value = MagicMock()
 
     with patch("main.HarnessServiceClientSync", return_value=fake_client), \
          patch("main.run_agent", return_value={"input_tokens": 10, "output_tokens": 5,
                                                 "outcome": "OUTCOME_OK", "cycles_used": 1,
                                                 "task_type": "lookup", "model_used": "m"}):
-        m._run_single_task("trial-1", [])
+        task_id, _trial_id, elapsed, token_stats, trace, filtered = m._run_single_task("trial-1", [])
+
+    assert not filtered
+    m._finalize_task_trace(trace, task_id, score=1.0, detail=["ok"], elapsed=elapsed, token_stats=token_stats)
 
     jsonl_path = tmp_path / "t01.jsonl"
     assert jsonl_path.exists(), "t01.jsonl must be created"
