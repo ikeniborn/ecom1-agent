@@ -614,3 +614,13 @@ def embed_texts(texts, model, base_url=None):
     resp.raise_for_status()
     data = resp.json().get("data", [])
     return [row["embedding"] for row in data]
+
+
+def call_llm_json(system, user_msg, model, max_tokens=1024, token_out=None):
+    """Call the LLM and parse a JSON object from the reply. Returns {} on failure."""
+    from .json_extract import _extract_json_from_text
+    raw = call_llm_raw(system, user_msg, model, {}, max_tokens=max_tokens, token_out=token_out)
+    if not raw:
+        return {}
+    obj = _extract_json_from_text(raw)
+    return obj if isinstance(obj, dict) else {}
