@@ -423,6 +423,7 @@ def run_pipeline(
     cycle = 0  # bound for the post-loop branches when _MAX_STEPS < 1 is misconfigured
     answered = False
     actual_outcome = "OUTCOME_OK"
+    guarded_vm: _AnswerGuard | None = None
 
     for cycle in range(1, _MAX_STEPS + 1):
         print(f"{CLI_BLUE}[pipeline] cycle {cycle}/{_MAX_STEPS}{CLI_CLR}")
@@ -565,12 +566,13 @@ def run_pipeline(
     status = "success" if actual_outcome == "OUTCOME_OK" else "failure"
     print(f"{CLI_GREEN}[pipeline] {status} after {cycle} cycle(s) outcome={actual_outcome}{CLI_CLR}")
     save_last_run(task_id, status=status, outcome=actual_outcome, cycles_used=cycle)
+    captured = guarded_vm._captured if guarded_vm is not None else {}
     return {
         "cycles_used": cycle,
-        "outcome": guarded_vm._captured.get("outcome", actual_outcome),
+        "outcome": captured.get("outcome", actual_outcome),
         "status": status,
         "input_tokens": total_in,
         "output_tokens": total_out,
-        "answer_message": guarded_vm._captured.get("message", ""),
-        "answer_refs": guarded_vm._captured.get("refs", []),
+        "answer_message": captured.get("message", ""),
+        "answer_refs": captured.get("refs", []),
     }
