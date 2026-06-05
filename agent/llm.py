@@ -598,3 +598,19 @@ OUTCOME_BY_NAME = {
     "OUTCOME_ERR_INTERNAL": Outcome.OUTCOME_ERR_INTERNAL,
 }
 
+
+
+def embed_texts(texts, model, base_url=None):
+    """Return a list of embedding vectors (one per input) via the Ollama OpenAI-compat
+    /v1/embeddings endpoint. Raises on HTTP error; callers handle fallback."""
+    import os
+    base = (base_url or os.environ.get("EMBED_BASE_URL")
+            or os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434/v1")
+    url = base.rstrip("/") + "/embeddings"
+    key = os.environ.get("OLLAMA_API_KEY", "")
+    headers = {"Authorization": f"Bearer {key}"} if key else {}
+    resp = httpx.post(url, json={"model": model, "input": list(texts)},
+                      headers=headers, timeout=60.0)
+    resp.raise_for_status()
+    data = resp.json().get("data", [])
+    return [row["embedding"] for row in data]
