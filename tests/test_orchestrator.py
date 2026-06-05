@@ -78,3 +78,24 @@ def test_augment_agents_md_skips_sample_block_when_empty():
 
 def test_augment_agents_md_returns_text_when_nothing_to_add():
     assert _augment_agents_md("# Original\n", "", "") == "# Original\n"
+
+
+def test_run_agent_forwards_answer_message_and_refs(monkeypatch):
+    import agent.orchestrator as orch
+
+    monkeypatch.setattr(orch, "EcomRuntimeClientSync", lambda url: MagicMock())
+    monkeypatch.setattr(orch, "VMAdapter", lambda raw: MagicMock())
+    monkeypatch.setattr(orch, "_read_agents_md", lambda vm: "AGENTS")
+    monkeypatch.setattr(orch, "_discover_schema", lambda vm: "")
+    monkeypatch.setattr(orch, "_discover_table_names", lambda vm: [])
+    monkeypatch.setattr(orch, "_discover_sample_rows", lambda vm, tables: "")
+    monkeypatch.setattr(orch, "run_pipeline", lambda *a, **kw: {
+        "cycles_used": 1, "outcome": "OUTCOME_OK", "status": "success",
+        "input_tokens": 0, "output_tokens": 0,
+        "answer_message": "Found 1 basket.", "answer_refs": ["ref://basket/42"],
+    })
+
+    out = orch.run_agent({}, "http://vm", "count baskets", task_id="t10")
+    assert out["answer_message"] == "Found 1 basket."
+    assert out["answer_refs"] == ["ref://basket/42"]
+    assert out["outcome"] == "OUTCOME_OK"

@@ -115,4 +115,6 @@ def run_agent(
         "outcome": metrics.get("outcome", ""),
         "input_tokens": metrics.get("input_tokens", 0),
         "output_tokens": metrics.get("output_tokens", 0),
+        "answer_message": metrics.get("answer_message", ""),
+        "answer_refs": metrics.get("answer_refs", []),
     }
