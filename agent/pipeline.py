@@ -182,6 +182,42 @@ def learn_from_grader(
 
 
 # ---------------------------------------------------------------------------
+# Context compaction — bound learn_ctx growth in-memory (YAML untouched)
+# ---------------------------------------------------------------------------
+
+def _compact_learn_ctx(
+    learn_ctx: list[dict],
+    token_out: dict | None = None,
+) -> list[dict]:
+    """Summarize older learn_ctx entries via one LLM call when the list grows
+    past COMPACTION_THRESHOLD. In-memory only — the YAML store is never
+    rewritten, so each run compacts fresh from the full stored list. On empty
+    or failed LLM response, return the input unchanged (green tasks must not
+    regress)."""
+    threshold = int(os.environ.get("COMPACTION_THRESHOLD", "15"))
+    keep_recent = int(os.environ.get("COMPACTION_KEEP_RECENT", "5"))
+    if len(learn_ctx) <= threshold:
+        return learn_ctx
+
+    older = learn_ctx[:-keep_recent]
+    recent = learn_ctx[-keep_recent:]
+
+    guide = load_prompt("compact") or "# PHASE: COMPACT"
+    system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
+    user_msg = "\n".join(_format_entry(e) for e in older)
+
+    model = _resolve_model_for_phase("learn", os.environ.get("MODEL", ""))
+    raw = call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_LEARN, token_out=token_out)
+    summary = (raw or "").strip()
+    if not summary:
+        print(f"{CLI_YELLOW}[pipeline] compaction: empty response, keeping full ctx{CLI_CLR}")
+        return learn_ctx
+
+    print(f"{CLI_BLUE}[pipeline] compacted {len(older)} entries → 1 summary{CLI_CLR}")
+    return [{"id": "compacted", "content": summary, "source": "compaction"}] + recent
+
+
+# ---------------------------------------------------------------------------
 # Terminal exits — exactly one vm.answer() per task
 # ---------------------------------------------------------------------------
 
@@ -371,7 +407,6 @@ def run_pipeline(
     """
     # main.py already emits log_header for this task; pipeline doesn't re-emit.
     learn_ctx = load_entries(task_id)
-    print(f"{CLI_BLUE}[pipeline] task={task_id} active_rules={len(learn_ctx)}{CLI_CLR}")
 
     total_in = 0
     total_out = 0
@@ -380,6 +415,11 @@ def run_pipeline(
         nonlocal total_in, total_out
         total_in += int(tk.get("input", 0) or 0)
         total_out += int(tk.get("output", 0) or 0)
+
+    _tk_compact: dict = {}
+    learn_ctx = _compact_learn_ctx(learn_ctx, token_out=_tk_compact)
+    _accum(_tk_compact)
+    print(f"{CLI_BLUE}[pipeline] task={task_id} active_rules={len(learn_ctx)}{CLI_CLR}")
 
     # ── DESIGN ──────────────────────────────────────────────────────────────
     try:

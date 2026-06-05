@@ -403,3 +403,36 @@ def test_answer_guard_captured_empty_before_answer():
     design = DesignOutput(**_GOOD_DESIGN)
     guard = _AnswerGuard(MagicMock(), design)
     assert guard._captured == {}
+
+
+def _entries(n):
+    return [{"id": f"r{i:03d}", "content": f"always do thing {i}", "status": "active"} for i in range(n)]
+
+
+def test_compact_below_threshold_returns_unchanged(monkeypatch):
+    from agent.pipeline import _compact_learn_ctx
+    monkeypatch.setenv("COMPACTION_THRESHOLD", "15")
+    ctx = _entries(10)
+    assert _compact_learn_ctx(ctx) == ctx
+
+
+def test_compact_above_threshold_summarizes_older(monkeypatch):
+    from agent.pipeline import _compact_learn_ctx
+    monkeypatch.setenv("COMPACTION_THRESHOLD", "5")
+    monkeypatch.setenv("COMPACTION_KEEP_RECENT", "3")
+    ctx = _entries(10)
+    with patch("agent.pipeline.call_llm_raw", return_value="condensed summary of older rules"):
+        out = _compact_learn_ctx(ctx)
+    assert out[0] == {"id": "compacted", "content": "condensed summary of older rules", "source": "compaction"}
+    assert out[1:] == ctx[-3:]
+    assert len(out) == 4
+
+
+def test_compact_empty_llm_response_returns_unchanged(monkeypatch):
+    from agent.pipeline import _compact_learn_ctx
+    monkeypatch.setenv("COMPACTION_THRESHOLD", "5")
+    monkeypatch.setenv("COMPACTION_KEEP_RECENT", "3")
+    ctx = _entries(10)
+    with patch("agent.pipeline.call_llm_raw", return_value=""):
+        out = _compact_learn_ctx(ctx)
+    assert out == ctx
