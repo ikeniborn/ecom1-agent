@@ -22,6 +22,8 @@ from .sql_security import check_retry_loop  # noqa: F401  (retained for backward
 _MAX_STEPS = int(os.environ.get("MAX_STEPS", "3"))
 _MAX_TOKENS_LEARN = int(os.environ.get("MAX_TOKENS_LEARN", "2048"))
 _FIDELITY_TIMEOUT_S = int(os.environ.get("FIDELITY_TIMEOUT_S", "30"))
+# Retries for transient DESIGN parse/empty failures (CC subprocess truncation).
+_DESIGN_MAX_ATTEMPTS = int(os.environ.get("DESIGN_MAX_ATTEMPTS", "3"))
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
@@ -421,15 +423,43 @@ def run_pipeline(
     _accum(_tk_compact)
     print(f"{CLI_BLUE}[pipeline] task={task_id} active_rules={len(learn_ctx)}{CLI_CLR}")
 
-    # ── DESIGN ──────────────────────────────────────────────────────────────
+    # Knowledge oracle: retrieve validated general atoms (augments per-task learn_ctx).
+    oracle_atoms: list = []
     try:
-        _tk: dict = {}
-        design = run_design(instruction, agents_md_text, token_out=_tk)
-        _accum(_tk)
-    except DesignError as e:
-        print(f"{CLI_RED}[pipeline] DESIGN failed: {e}{CLI_CLR}")
+        from .oracle import KnowledgeOracle
+        oracle_atoms = KnowledgeOracle().retrieve(instruction)
+        if oracle_atoms:
+            print(f"{CLI_BLUE}[pipeline] oracle retrieved {len(oracle_atoms)} atom(s): "
+                  f"{[a.id for a in oracle_atoms]}{CLI_CLR}")
+    except Exception as e:  # oracle must never break the pipeline
+        print(f"{CLI_YELLOW}[pipeline] oracle retrieve skipped: {e}{CLI_CLR}")
+
+    # ── DESIGN ──────────────────────────────────────────────────────────────
+    # DESIGN is a single frozen call, but the CC subprocess tier intermittently
+    # truncates/empties its JSON (SIGTERM exit=143 under load), so a parse/empty
+    # DesignError here is usually transient. Retry the call a few times before
+    # giving up — far cheaper than losing the whole training pass to one flake.
+    design = None
+    design_err: DesignError | None = None
+    _tk: dict = {}
+    for _design_attempt in range(_DESIGN_MAX_ATTEMPTS):
+        _tk = {}
+        try:
+            design = run_design(instruction, agents_md_text, token_out=_tk)
+            _accum(_tk)
+            break
+        except DesignError as e:
+            design_err = e
+            _accum(_tk)
+            if _design_attempt + 1 < _DESIGN_MAX_ATTEMPTS:
+                print(
+                    f"{CLI_YELLOW}[pipeline] DESIGN parse/empty fail "
+                    f"(attempt {_design_attempt + 1}/{_DESIGN_MAX_ATTEMPTS}), retrying: {e}{CLI_CLR}"
+                )
+    if design is None:
+        print(f"{CLI_RED}[pipeline] DESIGN failed: {design_err}{CLI_CLR}")
         save_last_run(task_id, status="failure", outcome="OUTCOME_NONE_CLARIFICATION", cycles_used=0)
-        _terminal_clarification(vm, f"DESIGN failed: {e}")
+        _terminal_clarification(vm, f"DESIGN failed: {design_err}")
         return {
             "cycles_used": 0,
             "outcome": "OUTCOME_NONE_CLARIFICATION",
@@ -470,7 +500,7 @@ def run_pipeline(
 
         try:
             _tk = {}
-            cg = run_codegen(design, learn_ctx, last_error, token_out=_tk)
+            cg = run_codegen(design, learn_ctx, last_error, token_out=_tk, oracle_atoms=oracle_atoms)
             _accum(_tk)
         except CodegenError as e:
             last_error = f"codegen_llm_fail: {e}"
