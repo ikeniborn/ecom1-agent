@@ -102,9 +102,35 @@ entries:
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /docs/discounts.md
+- agents_md_anchor: '#Important things > reference path'
+  content: When parsing /bin/sql stdout to extract row columns (e.g. record_path needed
+    for a runtime ref or binding), split each line on the delimiter the tool actually
+    emits — /bin/sql returns comma-separated CSV with a header row, not pipe-delimited
+    output — and skip only the header line; assuming a '|' delimiter and dropping
+    lines that lack it discards every data row, leaving basket_path/selected_id empty
+    so the required runtime ref is never appended.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim ERROR: "answer_refs: template/constraints require runtime refs
+    ([''$basket_path'']) but actual refs [''/docs/discounts.md'', ''/docs/security.md'',
+    ''/docs/checkout.md''] contain only static template entries ... — SQL likely returned
+    no rows or row parsing dropped the path column". Root cause: /bin/sql returned
+    valid CSV (header + 5 rows, comma-delimited: ''basket_097,/proc/baskets/basket_097.json,cust_027,...''),
+    but the parser splits on ''|'' and gates each line with `if not line or "|" not
+    in line: continue`. No SQL line contains ''|'', so every row is skipped, `rows`
+    stays empty, basket_path stays "", and `if basket_path: refs.append(basket_path)`
+    never fires — answer ships only the 3 static policy docs, missing the $basket_path
+    runtime ref the template demands. Failing fragments: `if not line or "|" not in
+    line: continue` and `cols = [c.strip() for c in line.split("|")]`. Rule linkage:
+    r003 covers including every matched Search doc path in refs, not delimiter handling
+    of /bin/sql tabular output; r001/r002 cover RPC emission/error-isolation, not
+    stdout column extraction. No existing rule covers the SQL-output delimiter mismatch,
+    so a new CODEGEN parsing-technique rule is needed.'
+  status: active
 last_run:
-  cycles_used: 1
+  cycles_used: 2
   date: '2026-06-06'
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t46

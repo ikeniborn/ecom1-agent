@@ -1,26 +1,36 @@
 {
-  "intent": "Count how many of the 6 specified product specs have at least 4 available_today_quantity at the Vienna Meidling store.",
+  "intent": "Count how many of the 5 specified product variants have available_today_quantity >= 2 in the Lend district PowerTool store.",
   "params": {
-    "store": "%Meidling%",
-    "line_nbw": "Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer",
-    "line_clean": "Ajax Eco Classic 25C-DXE Cleaning Liquid",
-    "line_box": "Festool Stackable SYS 3JJ-9LM Tool Box and Bag",
-    "line_screw": "Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw",
-    "ft_rod": "threaded rod",
-    "ct_floor": "floor cleaner",
-    "st_bag": "tool bag",
-    "sc_wood": "wood screw",
-    "dia6": 6,
-    "ct_deg": "degreaser",
-    "ft_bolt": "bolt",
-    "dia10": 10,
-    "min_qty": 4
+    "district": "Lend",
+    "min_qty": 2,
+    "spec1_family": "Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw",
+    "spec1_brand": "Heco",
+    "spec1_prop_key": "screw_type",
+    "spec1_prop_val": "drywall screw",
+    "spec2_family": "Festool Stackable SYS 3JJ-9LM Tool Box and Bag",
+    "spec2_brand": "Festool",
+    "spec2_prop_key": "storage_type",
+    "spec2_prop_val": "tool bag",
+    "spec3_family": "Ajax Eco Classic 25C-DXE Cleaning Liquid",
+    "spec3_brand": "Ajax",
+    "spec3_prop_key": "cleaner_type",
+    "spec3_prop_val": "floor cleaner",
+    "spec4_family": "Festool Stackable SYS 3JJ-9LM Tool Box and Bag",
+    "spec4_brand": "Festool",
+    "spec4_prop_key": "storage_type",
+    "spec4_prop_val": "parts case",
+    "spec5_family": "Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer",
+    "spec5_brand": "Heco",
+    "spec5_prop_key": "fastener_type",
+    "spec5_prop_val": "threaded rod"
   },
   "success_criteria": [
-    "Resolve store_id for the Vienna Meidling hardware branch via store_name LIKE '%Meidling%'.",
-    "Each of the 6 specs is matched by product_family_name + brand + variant properties (fastener_type/cleaner_type/storage_type/screw_type/diameter_mm).",
-    "A spec counts if any matching SKU has available_today_quantity >= 4 at that store.",
-    "Final answer is the count of qualifying specs in exactly the format '%d products'."
+    "Lend district PowerTool store resolved to a single store_id + record_path",
+    "Each of the 5 specs resolved to its matching product_sku via family_name+brand and product_variant_properties (property_key/value)",
+    "available_today_quantity in the Lend store fetched per matched SKU",
+    "Count = number of specs whose matched SKU has available_today_quantity >= 2",
+    "Answer string is exactly '<count> products'",
+    "refs cite the store path and only the available (>=2) product paths, not unavailable ones"
   ],
   "discovery": [
     {
@@ -28,18 +38,9 @@
       "args": {
         "path": "/bin/sql",
         "args": [],
-        "stdin": "SELECT store_id, store_name, record_path FROM stores WHERE store_name LIKE :store;"
+        "stdin": "SELECT store_id, record_path, store_name, city FROM stores WHERE city = :district OR store_name LIKE '%' || :district || '%' LIMIT 1;"
       },
       "bind": "store"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "args": [],
-        "stdin": "WITH s AS (SELECT store_id FROM stores WHERE store_name LIKE :store) SELECT DISTINCT pv.record_path FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id LEFT JOIN product_variant_properties pft ON pft.product_sku=pv.product_sku AND pft.property_key='fastener_type' LEFT JOIN product_variant_properties pct ON pct.product_sku=pv.product_sku AND pct.property_key='cleaner_type' LEFT JOIN product_variant_properties pst ON pst.product_sku=pv.product_sku AND pst.property_key='storage_type' LEFT JOIN product_variant_properties psc ON psc.product_sku=pv.product_sku AND psc.property_key='screw_type' LEFT JOIN product_variant_properties pdi ON pdi.product_sku=pv.product_sku AND pdi.property_key='diameter_mm' WHERE si.available_today_quantity >= :min_qty AND ( (pf.product_family_name=:line_nbw AND pft.property_value_text=:ft_rod) OR (pf.product_family_name=:line_clean AND pct.property_value_text=:ct_floor) OR (pf.product_family_name=:line_box AND pst.property_value_text=:st_bag) OR (pf.product_family_name=:line_screw AND psc.property_value_text=:sc_wood AND pdi.property_value_number=:dia6) OR (pf.product_family_name=:line_clean AND pct.property_value_text=:ct_deg) OR (pf.product_family_name=:line_nbw AND pft.property_value_text=:ft_bolt AND pdi.property_value_number=:dia10) );"
-      },
-      "bind": "paths"
     }
   ],
   "ops": [
@@ -48,30 +49,27 @@
       "args": {
         "path": "/bin/sql",
         "args": [],
-        "stdin": "WITH s AS (SELECT store_id FROM stores WHERE store_name LIKE :store) SELECT (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='fastener_type' AND p.property_value_text=:ft_rod WHERE pf.product_family_name=:line_nbw AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='cleaner_type' AND p.property_value_text=:ct_floor WHERE pf.product_family_name=:line_clean AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='storage_type' AND p.property_value_text=:st_bag WHERE pf.product_family_name=:line_box AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='screw_type' AND p.property_value_text=:sc_wood JOIN product_variant_properties d ON d.product_sku=pv.product_sku AND d.property_key='diameter_mm' AND d.property_value_number=:dia6 WHERE pf.product_family_name=:line_screw AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='cleaner_type' AND p.property_value_text=:ct_deg WHERE pf.product_family_name=:line_clean AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='fastener_type' AND p.property_value_text=:ft_bolt JOIN product_variant_properties d ON d.product_sku=pv.product_sku AND d.property_key='diameter_mm' AND d.property_value_number=:dia10 WHERE pf.product_family_name=:line_nbw AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) AS products;"
+        "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = :district OR store_name LIKE '%' || :district || '%' LIMIT 1), specs(spec_no, family_name, brand, prop_key, prop_val) AS (VALUES (1, :spec1_family, :spec1_brand, :spec1_prop_key, :spec1_prop_val), (2, :spec2_family, :spec2_brand, :spec2_prop_key, :spec2_prop_val), (3, :spec3_family, :spec3_brand, :spec3_prop_key, :spec3_prop_val), (4, :spec4_family, :spec4_brand, :spec4_prop_key, :spec4_prop_val), (5, :spec5_family, :spec5_brand, :spec5_prop_key, :spec5_prop_val)) SELECT s.spec_no, s.family_name, s.prop_val, pv.product_sku, pv.record_path, COALESCE(si.available_today_quantity, 0) AS avail FROM specs s JOIN product_families pf ON pf.product_family_name = s.family_name AND pf.brand = s.brand JOIN product_variants pv ON pv.product_family_id = pf.product_family_id JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku AND pvp.property_key = s.prop_key AND pvp.property_value_text = s.prop_val LEFT JOIN store_inventory si ON si.product_sku = pv.product_sku AND si.store_id = (SELECT store_id FROM store) ORDER BY s.spec_no;"
       },
-      "bind": "count"
+      "bind": "rows"
     }
   ],
   "agents_md_constraints": [
     {
-      "anchor": "#important-things > availability",
+      "anchor": "#Important things > availability references",
       "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
     },
     {
-      "anchor": "#important-things > references",
+      "anchor": "#Important things > full path references",
       "rule": "When responding with reference - provide full path in the repo to the object."
-    },
-    {
-      "anchor": "#important-tools > sql",
-      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
     }
   ],
   "answer_template": {
     "message": "{count} products",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$paths"
+      "$store_path",
+      "$available_product_paths"
     ]
   },
   "outcome_override": null

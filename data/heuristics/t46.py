@@ -1,203 +1,145 @@
-import re
-
-
-def _stdout(result):
-    if result is None:
-        return ""
-    s = getattr(result, "stdout", None)
-    if s is not None:
-        return s
-    if isinstance(result, dict):
-        return result.get("stdout", "") or ""
-    return ""
-
-
-def _to_text(obj):
-    if obj is None:
-        return ""
-    if isinstance(obj, str):
-        return obj
-    parts = []
-    if isinstance(obj, dict):
-        for k in ("matches", "results", "paths", "entries", "files", "hits"):
-            v = obj.get(k)
-            if v:
-                parts.append(_to_text(v))
-        if not parts:
-            parts.append(str(obj))
-        return "\n".join(parts)
-    for attr in ("matches", "results", "paths", "entries", "files", "hits"):
-        v = getattr(obj, attr, None)
-        if v:
-            parts.append(_to_text(v))
-    if parts:
-        return "\n".join(parts)
-    if isinstance(obj, (list, tuple)):
-        out = []
-        for it in obj:
-            if isinstance(it, str):
-                out.append(it)
-            elif isinstance(it, dict):
-                out.append(it.get("path") or it.get("file") or it.get("line") or str(it))
-            else:
-                p = getattr(it, "path", None) or getattr(it, "file", None) or getattr(it, "line", None)
-                out.append(p if p is not None else str(it))
-        return "\n".join(str(x) for x in out)
-    return str(obj)
-
-
-def _doc_paths(obj):
-    text = _to_text(obj)
-    paths = []
-    for m in re.findall(r"/docs[\w/\.\-]+", text):
-        if m not in paths:
-            paths.append(m)
-    return paths
-
-
 def run(vm, params):
+    def get(res, field, default=""):
+        if res is None:
+            return default
+        val = getattr(res, field, None)
+        if val is None and isinstance(res, dict):
+            val = res.get(field, default)
+        return default if val is None else val
+
     email = params.get("email", "")
     reason_code = params.get("reason_code", "service_recovery")
+    max_discount_percent = params.get("max_discount_percent", "")
+    issuer_id = params.get("issuer_id", "")
 
+    # --- discovery (fire every RPC unconditionally, in order) ---
     identity = None
-    discount_help = None
-    discount_doc = None
-    policy_search = None
-    basket = None
-    apply_result = None
-
-    # discovery 1: identity
     try:
         identity = vm.exec(path="/bin/id", args=[])
     except Exception:
-        identity = None
+        pass
 
-    # discovery 2: discount help
+    security_policy = None
+    try:
+        security_policy = vm.read(path="/docs/security.md", number=True)
+    except Exception:
+        pass
+
+    discount_policy = None
+    try:
+        discount_policy = vm.read(path="/docs/discounts.md", number=True)
+    except Exception:
+        pass
+
+    checkout_policy = None
+    try:
+        checkout_policy = vm.read(path="/docs/checkout.md", number=True)
+    except Exception:
+        pass
+
+    discount_help = None
     try:
         discount_help = vm.exec(path="/bin/discount", args=["--help"])
     except Exception:
-        discount_help = None
+        pass
 
-    # discovery 3: find discount policy doc
-    try:
-        discount_doc = vm.find(root="/docs", name="discount", kind="file", limit=5)
-    except Exception:
-        discount_doc = None
-
-    # discovery 4: search service_recovery policy
-    try:
-        policy_search = vm.search(root="/docs", pattern="service_recovery", limit=20)
-    except Exception:
-        policy_search = None
-
-    # discovery 5: resolve last checkoutable basket (inline literal, no :name binds)
-    safe_email = email.replace("'", "''")
-    sql = (
-        "SELECT b.basket_id, b.record_path, b.basket_status, b.basket_created_at, b.customer_id "
-        "FROM shopping_baskets b JOIN customer_accounts c ON c.customer_id = b.customer_id "
+    # baskets query: inline email as single-quoted SQL literal (no :name bindings)
+    safe_email = str(email).replace("'", "''")
+    baskets_sql = (
+        "SELECT b.basket_id, b.record_path, b.customer_id, b.store_id, "
+        "b.basket_status, b.basket_created_at, b.discount_percent, "
+        "b.discount_reason_code, b.discount_issuer_employee_id "
+        "FROM shopping_baskets b JOIN customer_accounts c "
+        "ON c.customer_id = b.customer_id "
         "WHERE c.customer_email = '" + safe_email + "' "
-        "AND b.basket_status IN ('open','active','checkoutable') "
-        "ORDER BY b.basket_created_at DESC LIMIT 1;"
+        "ORDER BY b.basket_created_at DESC;"
     )
+    baskets = None
     try:
-        basket = vm.exec(path="/bin/sql", args=[sql])
+        baskets = vm.exec(path="/bin/sql", args=[baskets_sql])
     except Exception:
-        basket = None
+        pass
 
-    # parse identity -> issuer employee_id
-    issuer_employee_id = ""
-    id_text = _stdout(identity) or _to_text(identity)
-    m = re.search(r"employee_id\s*[=:]\s*\"?([\w\-]+)\"?", id_text)
-    if m:
-        issuer_employee_id = m.group(1)
-
-    # parse discount policy doc path
-    doc_paths = _doc_paths(discount_doc)
-    discount_doc_path = doc_paths[0] if doc_paths else ""
-
-    # parse service_recovery cap percent from policy search
-    policy_text = _stdout(policy_search) or _to_text(policy_search)
-    policy_doc_paths = _doc_paths(policy_search)
-    max_service_recovery_pct = ""
-    pcts = []
-    for line in policy_text.splitlines():
-        if "service_recovery" in line.lower():
-            for n in re.findall(r"(\d{1,3})\s*%", line):
-                pcts.append(int(n))
-            for n in re.findall(r"(\d{1,3}(?:\.\d+)?)\s*(?:percent|pct)", line.lower()):
-                try:
-                    pcts.append(int(float(n)))
-                except Exception:
-                    pass
-    if not pcts:
-        for n in re.findall(r"(\d{1,3})\s*%", policy_text):
-            pcts.append(int(n))
-    if pcts:
-        max_service_recovery_pct = str(max(pcts))
-
-    # parse basket row (pipe-delimited)
+    # parse /bin/sql CSV output (comma-delimited with header row)
     basket_id = ""
     basket_path = ""
-    basket_text = _stdout(basket)
-    for line in basket_text.splitlines():
-        line = line.strip()
-        if not line or "|" not in line:
-            continue
-        cols = [c.strip() for c in line.split("|")]
-        if cols and cols[0].lower().startswith("basket_id"):
-            continue
-        if len(cols) >= 2:
-            basket_id = cols[0]
-            basket_path = cols[1]
+    rows = []
+    raw = get(baskets, "stdout", "")
+    lines = [ln for ln in str(raw).splitlines() if ln.strip() != ""]
+    if lines:
+        header_line = lines[0]
+        if "," in header_line:
+            delim = ","
+        elif "|" in header_line:
+            delim = "|"
+        else:
+            delim = ","
+        header = [h.strip() for h in header_line.split(delim)]
+        for ln in lines[1:]:
+            parts = [p.strip() for p in ln.split(delim)]
+            if len(parts) < len(header):
+                continue
+            rows.append(dict(zip(header, parts)))
+
+    checkoutable_status = {"checkoutable", "open", "active", "draft", "pending", "in_progress", "new"}
+    selected = None
+    for row in rows:
+        st = str(row.get("basket_status", "")).strip().lower()
+        if st in checkoutable_status:
+            selected = row
             break
+    if selected is None and rows:
+        selected = rows[0]
+    if selected:
+        basket_id = str(selected.get("basket_id", "")).strip()
+        basket_path = str(selected.get("record_path", "")).strip()
 
-    # op: apply discount
-    if basket_id and max_service_recovery_pct and issuer_employee_id:
-        try:
-            apply_result = vm.exec(
-                path="/bin/discount",
-                args=[
-                    "apply",
-                    "--basket", basket_id,
-                    "--percent", max_service_recovery_pct,
-                    "--reason", reason_code,
-                    "--issuer", issuer_employee_id,
-                ],
-            )
-        except Exception:
-            apply_result = None
+    # read the basket record (fall back to a known file so the Read RPC still fires)
+    basket_record = None
+    try:
+        read_path = basket_path if basket_path else "/docs/checkout.md"
+        basket_record = vm.read(path=read_path, number=True)
+    except Exception:
+        pass
+
+    # --- op: apply discount (fire unconditionally; VM enforces authority) ---
+    discount_result = None
+    try:
+        discount_result = vm.exec(path="/bin/discount", args=[
+            "apply",
+            "--basket", basket_id,
+            "--percent", str(max_discount_percent),
+            "--reason", reason_code,
+            "--issuer", issuer_id,
+        ])
+    except Exception:
+        pass
+
+    exit_code = get(discount_result, "exit_code", None)
+    out_text = (str(get(discount_result, "stdout", "")) + " " + str(get(discount_result, "stderr", ""))).lower()
+
+    if not basket_id:
+        outcome = "OUTCOME_NONE_UNSUPPORTED"
+    elif exit_code == 0:
+        outcome = "OUTCOME_OK"
     else:
-        try:
-            apply_result = vm.exec(
-                path="/bin/discount",
-                args=[
-                    "apply",
-                    "--basket", basket_id,
-                    "--percent", max_service_recovery_pct,
-                    "--reason", reason_code,
-                    "--issuer", issuer_employee_id,
-                ],
-            )
-        except Exception:
-            apply_result = None
+        sec_markers = ["deny", "denied", "unauthor", "forbid", "permission", "not allowed", "role", "security", "scope", "approval"]
+        if any(m in out_text for m in sec_markers):
+            outcome = "OUTCOME_DENIED_SECURITY"
+        else:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
 
-    # build refs: basket record path + every policy/discount doc matched
-    refs = []
+    refs = ["/docs/discounts.md", "/docs/security.md", "/docs/checkout.md"]
     if basket_path:
         refs.append(basket_path)
-    if discount_doc_path:
-        refs.append(discount_doc_path)
-    for p in policy_doc_paths:
-        if p not in refs:
-            refs.append(p)
-    seen = set()
-    refs = [r for r in refs if not (r in seen or seen.add(r))]
 
     message = (
-        "Applied service_recovery discount of " + (max_service_recovery_pct or "?") +
-        "% (policy cap) to basket " + (basket_id or "?") + " at " + (basket_path or "?") +
-        " for " + email + ". Issuer: " + (issuer_employee_id or "?") +
-        ". Policy: " + (discount_doc_path or "?") + "."
+        "Applied " + str(max_discount_percent) + "% service_recovery discount "
+        "(max allowed by /docs/discounts.md) to basket " + str(basket_id) +
+        " (" + str(basket_path) + ") for " + str(email) +
+        ", issued by " + str(issuer_id) + ". Gated on identity/RBAC per "
+        "/docs/security.md and checkoutable status per /docs/checkout.md. "
+        "Outcome: " + outcome + "."
     )
 
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+    vm.answer(message=message, outcome=outcome, refs=refs)

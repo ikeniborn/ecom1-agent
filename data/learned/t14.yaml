@@ -195,9 +195,104 @@ entries:
   submitted_message: No store matched the requested name.
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
+- agents_md_anchor: null
+  content: When the plan includes a discovery RPC that enumerates the actual property_key
+    vocabulary (or value column types) for the target families, parse that discovery
+    output and reconcile every property predicate in the ops/match query against it
+    before issuing the query — map each plan-supplied property name to an existing
+    discovered key and select the value column the data actually uses (property_value_text
+    vs property_value_number); transcribing the plan's hardcoded property keys/columns
+    verbatim when the discovery probe reveals a different key or a numeric-vs-text
+    column mismatch makes every EXISTS predicate fail, so the whole match query returns
+    zero rows and refs end up empty.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$available_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column; check
+    `:name` bindings on /bin/sql and the SELECT columns". Root cause: the ops match
+    CTE returned ZERO rows (observed final RPC output = header `pnum,record_path`
+    only), so avail is empty, paths=[], refs empty. The script transcribed the plan''s
+    per-property EXISTS predicates verbatim while ignoring its own discovery probe
+    (prop_keys), which returned the real vocabulary: the actual key is `lumen`, NOT
+    the plan''s hardcoded `luminous_flux_lm`, and numeric properties (voltage_v, wattage_w,
+    disc_diameter_mm) live in property_value_number, not the text column the predicates
+    compared. Failing fragment: `EXISTS (... x.property_key = ''luminous_flux_lm''
+    AND x.property_value_text = :p4_luminous_flux_lm)` plus numeric `property_value_text
+    = ''18''/''125''/''10''` — each fails, matched CTE empties, `SELECT pnum, record_path
+    FROM avail` yields header-only, parse_rows produces no data rows, refs=[]. Rule
+    linkage: r006 enforces predicate/typed-column consistency BETWEEN the count and
+    projection queries but assumes both already use a correct existing key; r001/r004
+    assume the match query returns rows. None cover validating the predicates themselves
+    against the discovery vocabulary probe before issuing, so this is a new, complementary
+    CODEGEN technique — not a superset of r006.'
+  status: active
+- agents_md_anchor: '#important-things > availability'
+  content: When qualifying variants by property_value_text equality to task-supplied
+    literal values, normalize both sides (LOWER()/TRIM()) or first probe the distinct
+    stored property_value_text per (family, property_key) and map each task literal
+    to the actual stored token — never transcribe the task's literal casing/format
+    into a raw text-equality predicate, because case-, whitespace-, or format-different
+    text fails exact equality, silently drops the EXISTS, and collapses the whole
+    match (and thus refs) to zero rows.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$available_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". OBSERVED
+    final ops query returned header-only (''pnum,record_path'' with no data rows).
+    Upstream links all verified working: store resolved (store_vienna_praterstern
+    via record_path LIKE ''%praterstern%'' since real store_name is ''PowerTool Vienna
+    Praterstern''); family names matched (prop_keys discovery returned a non-empty
+    key list for the IN(...) families); property KEYS and value-COLUMN types reconciled
+    — script emits typed OR predicates e.g. (x.property_value_text=''18'' OR x.property_value_number=18);
+    stdout parse is correct (header skipped, no data rows → qty=0, refs=[]). The only
+    unverified link is exact property_value_text equality to the task literals on
+    text-only keys (tool_type=''pruning saw'', product_type=''metal paint'', color_family=''White'',
+    battery_platform=''18v-system'', kit_contents=''case'', size=''M''), where the
+    predicate is raw equality with no numeric fallback. Failing fragment: prop_predicate''s
+    text_pred = ''x.property_value_text = '' + q(val), substituting the literal verbatim;
+    any case/whitespace/format divergence from the stored token makes every such EXISTS
+    false, so matched→avail yields zero rows and refs empties. Rule linkage: extends
+    [in-session]/r006 (which reconcile KEYS and value COLUMNS / predicate parity)
+    to the still-uncovered dimension of VALUE casing/format reconciliation.'
+  status: active
+- agents_md_anchor: '#important-things > references'
+  content: When a discovery RPC enumerates the actual property_key vocabulary, validate
+    every plan-supplied property_key against the parsed discovered set before building
+    its EXISTS predicate; for any plan key absent from the vocabulary, substitute
+    the closest discovered key by normalized token/substring overlap, and only if
+    no candidate exists relax that single predicate so the variant still qualifies
+    on family name plus its remaining valid distinguishing properties — never emit
+    a verbatim EXISTS on a key the discovery never returned, because a dead predicate
+    can never match and silently zeroes that product's UNION ALL branch, dropping
+    its record_path from refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Verbatim error: ''template/constraints require runtime refs ([$available_paths])
+    but actual refs [] contain only static template entries [] — SQL likely returned
+    no rows''. The final result query returned only the header line `pnum,record_path`
+    with zero data rows. Root cause: the prop_keys discovery returned the real property_key
+    vocabulary (base_type, battery_platform, color_family, ..., lumen, ..., power_w,
+    ..., wattage_w, ...), which does NOT contain `luminous_flux_lm` — the actual luminous-flux
+    key is `lumen`. The script transcribed the plan''s product-4 predicate verbatim
+    via exists_clause(''luminous_flux_lm'', params[''p4_luminous_flux_lm'']), emitting
+    `LOWER(TRIM(x.property_key)) = ''luminous_flux_lm''`, a dead EXISTS that can never
+    match, which drops the Philips LED bulb''s UNION ALL branch and its record_path.
+    Failing fragment: the line4 spec entry (''luminous_flux_lm'', params[''p4_luminous_flux_lm''])
+    fed into the EXISTS builder despite the discovery output proving the key is absent.
+    Linkage: the existing in-session reconcile rule warns to map plan keys to discovered
+    keys but is silent on the fallback when a key is absent from a flat merged vocabulary
+    that lacks family attribution; this rule adds the concrete detect→substitute→relax
+    technique so an unknown key never zeroes a product branch and never drops its
+    required catalog reference.'
+  status: active
 last_run:
-  cycles_used: 2
+  cycles_used: 10
   date: '2026-06-06'
-  outcome: OUTCOME_NONE_CLARIFICATION
-  status: failure
+  outcome: OUTCOME_OK
+  status: success
 task_id: t14

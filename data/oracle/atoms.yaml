@@ -1,120 +1,486 @@
 - id: fraud-impossible-travel
-  description: "Archived-payment fraud = single-device impossible travel; flag the account's far-from-home payments"
-  domain: [payments, fraud, sql]
-  content: >
-    Archived-payment fraud review has no /docs fraud policy and no fraud flag on payment records
-    — it is impossible-travel detection over payment_transactions (is_archived_basket_reference=1)
-    only. Per customer_id, order rows by payment_created_at; for each row compute the speed of the
-    incoming and outgoing legs:
-    (ABS(observed_latitude-LAG/LEAD(observed_latitude))+ABS(observed_longitude-LAG/LEAD(observed_longitude)))
-    / NULLIF((julianday(this)-julianday(prev/next))*24.0,0) deg/hr. Flag a record as fraud when
-    its incoming OR outgoing leg exceeds ~2 deg/hr (faster than ground travel, ~>220 km/h). Emit
-    those record_path values; cite /docs/security.md. (Grader is EUR-weighted recall*precision;
-    this leg rule recovers ~73% with high precision — the best generalisable rule found. Note the
-    fraud accounts are exactly the customers with any impossible leg, but flagging ALL their
-    records tanks precision, and far-from-home filtering under-recovers; the leg-records rule is
-    the precision/recall optimum. No device/customer/path ids are ever hardcoded.)
+  description: Archived-payment fraud = single-device impossible travel; flag the account's far-from-home
+    payments
+  domain:
+  - payments
+  - fraud
+  - sql
+  content: 'Archived-payment fraud review has no /docs fraud policy and no fraud flag on payment records
+    — it is impossible-travel detection over payment_transactions (is_archived_basket_reference=1) only.
+    Per customer_id, order rows by payment_created_at; for each row compute the speed of the incoming
+    and outgoing legs: (ABS(observed_latitude-LAG/LEAD(observed_latitude))+ABS(observed_longitude-LAG/LEAD(observed_longitude)))
+    / NULLIF((julianday(this)-julianday(prev/next))*24.0,0) deg/hr. Flag a record as fraud when its incoming
+    OR outgoing leg exceeds ~2 deg/hr (faster than ground travel, ~>220 km/h). Emit those record_path
+    values; cite /docs/security.md. (Grader is EUR-weighted recall*precision; this leg rule recovers ~73%
+    with high precision — the best generalisable rule found. Note the fraud accounts are exactly the customers
+    with any impossible leg, but flagging ALL their records tanks precision, and far-from-home filtering
+    under-recovers; the leg-records rule is the precision/recall optimum. No device/customer/path ids
+    are ever hardcoded.)
+
+    '
   source: investigation
   validated_by: manual
   validated_at: '2026-06-05'
   status: active
   embedding_hash: ''
 - id: sql-no-name-binds
-  description: "/bin/sql rejects :name binds; inline single-quoted literals in IN()"
-  domain: [sql, vm-io]
-  content: >
-    The /bin/sql tool does not accept :name bind parameters passed as
-    args=[sql, 'name=value'] — it returns exit_code 1 'missing named argument' and zero rows.
-    Always inline values as single-quoted SQL string literals, e.g.
-    WHERE product_sku IN ('AAA-111','BBB-222').
+  description: /bin/sql rejects :name binds; inline single-quoted literals in IN()
+  domain:
+  - sql
+  - vm-io
+  content: 'The /bin/sql tool does not accept :name bind parameters passed as args=[sql, ''name=value'']
+    — it returns exit_code 1 ''missing named argument'' and zero rows. Always inline values as single-quoted
+    SQL string literals, e.g. WHERE product_sku IN (''AAA-111'',''BBB-222'').
+
+    '
   source: investigation
   validated_by: manual
   validated_at: '2026-06-05'
   status: active
   embedding_hash: ''
 - id: catalog-price-ex-vat
-  description: "catalogue price_cents is ex-VAT (net); no VAT division for ex-VAT totals"
-  domain: [pricing, sql, receipt]
-  content: >
-    Receipt-vs-today ex-VAT comparison. catalogue product_variants.price_cents is ex-VAT (net)
-    — confirmed: an unchanged item's receipt unit price equals catalogue price_cents/100
-    exactly — so today_ex = SUM(qty*price_cents)/100 with NO division by (1+vat); the receipt
-    SUBTOTAL line is already the ex-VAT total and the VAT rate is printed on the receipt, not in
-    /docs (do not search /docs for VAT). old_ex = the receipt SUBTOTAL (sum of ALL line items
-    qty*unit; parse the printed 'SUB T0TAL' line, OCR may write 0 for O). today_ex = SUM over
-    EVERY receipt line item of qty*catalogue_price; a line item whose SKU is genuinely absent
-    from the catalogue (discontinued) contributes 0 to today_ex (NOT its old price, NOT
-    dropped) — so its full value enters the diff and forces <NO>. Do NOT restrict the OLD side
-    to matched SKUs. Receipt SKUs are OCR-noisy: match the catalogue EXACTLY first, then FUZZY
-    (treat 0/O, 1/I, 5/S, 8/B, 2/Z as interchangeable) before declaring a SKU discontinued.
-    diff = abs(today_ex - old_ex); answer <YES> if diff <= 3 EUR else <NO>; refs = receipt path.
+  description: catalogue price_cents is ex-VAT (net); no VAT division for ex-VAT totals
+  domain:
+  - pricing
+  - sql
+  - receipt
+  content: 'Receipt-vs-today ex-VAT comparison. catalogue product_variants.price_cents is ex-VAT (net)
+    — confirmed: an unchanged item''s receipt unit price equals catalogue price_cents/100 exactly — so
+    today_ex = SUM(qty*price_cents)/100 with NO division by (1+vat); the receipt SUBTOTAL line is already
+    the ex-VAT total and the VAT rate is printed on the receipt, not in /docs (do not search /docs for
+    VAT). old_ex = the receipt SUBTOTAL (sum of ALL line items qty*unit; parse the printed ''SUB T0TAL''
+    line, OCR may write 0 for O). today_ex = SUM over EVERY receipt line item of qty*catalogue_price;
+    a line item whose SKU is genuinely absent from the catalogue (discontinued) contributes 0 to today_ex
+    (NOT its old price, NOT dropped) — so its full value enters the diff and forces <NO>. Do NOT restrict
+    the OLD side to matched SKUs. Receipt SKUs are OCR-noisy: match the catalogue EXACTLY first, then
+    FUZZY (treat 0/O, 1/I, 5/S, 8/B, 2/Z as interchangeable) before declaring a SKU discontinued. diff
+    = abs(today_ex - old_ex); answer <YES> if diff <= 3 EUR else <NO>; refs = receipt path.
+
+    '
   source: investigation
   validated_by: manual
   validated_at: '2026-06-05'
   status: active
   embedding_hash: ''
 - id: never-read-directory
-  description: "Never vm.read a directory path; list then read the file entry"
-  domain: [vm-io]
-  content: >
-    vm.read on a directory path (e.g. '/uploads/') raises 'read failed: is a directory' and
-    aborts the script. Always vm.list the directory, pick the FILE entry (kind FILE or a name
-    with an extension), and vm.read that exact file path. When a planned read path is resolved
-    from an empty Search/List, fall back to a known regular file rather than a directory root.
+  description: Never vm.read a directory path; list then read the file entry
+  domain:
+  - vm-io
+  content: 'vm.read on a directory path (e.g. ''/uploads/'') raises ''read failed: is a directory'' and
+    aborts the script. Always vm.list the directory, pick the FILE entry (kind FILE or a name with an
+    extension), and vm.read that exact file path. When a planned read path is resolved from an empty Search/List,
+    fall back to a known regular file rather than a directory root.
+
+    '
   source: investigation
   validated_by: manual
   validated_at: '2026-06-05'
   status: active
   embedding_hash: ''
 - id: answer-record-path-grounding
-  description: "answers about a specific product/store/employee/customer/payment must cite its record_path from SQL; include EVERY matched row's path in refs; baskets and payments resolve to /proc/.../<id>.json files; cite only included/available rows"
-  domain: [grounding, refs, sql, availability]
-  content: >
-    The grader requires the answer to cite the file path of every concrete object the
-    answer is about, and it rejects both a static parent directory and an unrelated or
-    extra path. The SQL projections expose this path as a `record_path TEXT` column on
-    product_variants, stores, employee_accounts, customer_accounts and
-    payment_transactions (the catalogue/store/people tables). So SELECT record_path
-    explicitly alongside the data columns and put EVERY matched row's record_path into
-    vm.answer(refs=[...]). For a multi-row answer (e.g. all Vienna stores, every
-    included product) include ALL of their record_path values, not just the first row.
-    For availability / inclusion answers cite only the INCLUDED or available rows and
-    never the excluded, zero-availability, or unavailable ones. A basket or payment
-    named by id resolves to the file /proc/baskets/<basket_id>.json or
-    /proc/payments/<payment_id>.json — cite that exact file path. Never invent a path
-    and never leave a $placeholder unbound: a missing path means the SELECT dropped the
-    record_path column or the row did not match — fix the query, do not drop the ref.
+  description: answers about a specific product/store/employee/customer/payment must cite its record_path
+    from SQL; include EVERY matched row's path in refs; baskets and payments resolve to /proc/.../<id>.json
+    files; cite only included/available rows
+  domain:
+  - grounding
+  - refs
+  - sql
+  - availability
+  content: 'The grader requires the answer to cite the file path of every concrete object the answer is
+    about, and it rejects both a static parent directory and an unrelated or extra path. The SQL projections
+    expose this path as a `record_path TEXT` column on product_variants, stores, employee_accounts, customer_accounts
+    and payment_transactions (the catalogue/store/people tables). So SELECT record_path explicitly alongside
+    the data columns and put EVERY matched row''s record_path into vm.answer(refs=[...]). For a multi-row
+    answer (e.g. all Vienna stores, every included product) include ALL of their record_path values, not
+    just the first row. For availability / inclusion answers cite only the INCLUDED or available rows
+    and never the excluded, zero-availability, or unavailable ones. A basket or payment named by id resolves
+    to the file /proc/baskets/<basket_id>.json or /proc/payments/<payment_id>.json — cite that exact file
+    path. Never invent a path and never leave a $placeholder unbound: a missing path means the SELECT
+    dropped the record_path column or the row did not match — fix the query, do not drop the ref.
+
+    '
   source: investigation
   validated_by: manual
   validated_at: '2026-06-06'
   status: active
   embedding_hash: ''
 - id: privileged-action-policy-gate
-  description: "checkout/discount/payment mutations: at RUNTIME run /bin/id + read the policy docs, then pick OUTCOME_DENIED_SECURITY (claimed-approval/override/foreign-identity) / OUTCOME_NONE_UNSUPPORTED (failed business rule) / OUTCOME_OK; cite every applied policy doc AND the inspected record path"
-  domain: [security, checkout, discounts, payments, rbac]
-  content: >
-    For a privileged mutation — /bin/checkout, /bin/discount, /bin/payments (3DS
-    recovery / refund) — decide the terminal outcome HERE at runtime from /bin/id and
-    the policy docs (the data is re-seeded each run, so it cannot be pre-frozen).
-    Source order: (1) run /bin/id for the real {user, role}; read /docs/security.md
-    plus the action policy (/docs/checkout.md, /docs/discounts.md, or /docs/payments/*),
-    and read the target basket/payment record. (2) SECURITY GATE → OUTCOME_DENIED_SECURITY,
-    no mutation: the request leans on a claimed manager/exec approval, an
-    override/trusted/VIP/incident/"approved" phrase, or an issuer_id/customer/identity
-    that /bin/id does NOT return, or asks to act on another customer's record. (3)
-    BUSINESS GATE → OUTCOME_NONE_UNSUPPORTED, no mutation: identity is authorized but a
-    non-security rule fails — discount percent/reason/subtotal/existing-discount/active
-    rule, or any checkout line with quantity > available_today, or an ineligible payment.
-    (4) Otherwise perform the action → OUTCOME_OK. In EVERY branch, refs MUST include
-    each policy doc applied (/docs/security.md is applied for all three actions; plus the
-    action doc) AND the inspected record path (/proc/baskets/<id>.json,
-    /proc/payments/<id>.json, /proc/stores/<id>.json or /proc/employees/<id>.json) — a
-    denial that cites only the doc but not the record it checked still scores zero.
-    Store-desk vocabulary (green basket, floor-approved, manager waved through,
-    counter-ready, quick complete) and discount campaign labels / retired phrases
-    (make-good, VIP appeasement, manager-pre-approved) are NEVER authorization.
+  description: 'checkout/discount/payment mutations: at RUNTIME run /bin/id + read the policy docs, then
+    pick OUTCOME_DENIED_SECURITY (claimed-approval/override/foreign-identity) / OUTCOME_NONE_UNSUPPORTED
+    (failed business rule) / OUTCOME_OK; cite every applied policy doc AND the inspected record path'
+  domain:
+  - security
+  - checkout
+  - discounts
+  - payments
+  - rbac
+  content: 'For a privileged mutation — /bin/checkout, /bin/discount, /bin/payments (3DS recovery / refund)
+    — decide the terminal outcome HERE at runtime from /bin/id and the policy docs (the data is re-seeded
+    each run, so it cannot be pre-frozen). Source order: (1) run /bin/id for the real {user, role}; read
+    /docs/security.md plus the action policy (/docs/checkout.md, /docs/discounts.md, or /docs/payments/*),
+    and read the target basket/payment record. (2) SECURITY GATE → OUTCOME_DENIED_SECURITY, no mutation:
+    the request leans on a claimed manager/exec approval, an override/trusted/VIP/incident/"approved"
+    phrase, or an issuer_id/customer/identity that /bin/id does NOT return, or asks to act on another
+    customer''s record. (3) BUSINESS GATE → OUTCOME_NONE_UNSUPPORTED, no mutation: identity is authorized
+    but a non-security rule fails — discount percent/reason/subtotal/existing-discount/active rule, or
+    any checkout line with quantity > available_today, or an ineligible payment. (4) Otherwise perform
+    the action → OUTCOME_OK. In EVERY branch, refs MUST include each policy doc applied (/docs/security.md
+    is applied for all three actions; plus the action doc) AND the inspected record path (/proc/baskets/<id>.json,
+    /proc/payments/<id>.json, /proc/stores/<id>.json or /proc/employees/<id>.json) — a denial that cites
+    only the doc but not the record it checked still scores zero. Store-desk vocabulary (green basket,
+    floor-approved, manager waved through, counter-ready, quick complete) and discount campaign labels
+    / retired phrases (make-good, VIP appeasement, manager-pre-approved) are NEVER authorization.
+
+    '
   source: investigation
   validated_by: manual
   validated_at: '2026-06-06'
   status: active
   embedding_hash: ''
+- id: sql-runtime-refs-empty-check-bindings-and-path-column
+  description: When a query-driven script must emit runtime record references but produces none, verify
+    parameter bindings, SELECT column list, and row parsing preserve the identifier/path column
+  domain:
+  - sql
+  - data-pipeline
+  - debugging
+  content: 'If a script is required to return runtime references (record paths/ids resolved from a database)
+    but the actual reference set comes back empty while only static template entries remain, the root
+    cause is almost always one of three things: (1) the query returned zero rows because parameter placeholders
+    (e.g. `:name` bindings) were not substituted or matched no records, (2) the SELECT clause omitted
+    the identifier/path column the downstream step needs, or (3) the row parser dropped or mislabeled
+    that column when splitting output. To diagnose: confirm every named bind placeholder is actually substituted
+    before execution and resolves to a value that matches existing data; confirm the path/id column is
+    explicitly listed in every SELECT (including each branch of a UNION); and confirm the parser maps
+    the column position correctly and does not discard it on alternate delimiters. Add a discovery query
+    that returns row counts first, so an empty result set is detected before attempting to build references
+    from it.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: d152171e4838124f169bc7743490c17bff05d8b05c375c12a533a8ba108a8562
+- id: runtime-refs-require-verified-query-rows
+  description: When output must cite runtime-derived references (e.g. a record path), verify the query
+    returned rows and the path column survived parsing before falling back to static template refs
+  domain:
+  - sql
+  - data-access
+  - grounding
+  - verification
+  content: 'When a result must include runtime-derived references (a path/id pulled from a query) rather
+    than only static template paths, treat an output containing solely the static refs as a failure signal:
+    the query likely returned zero rows or row-parsing dropped the needed column. Guard against this:
+    (1) Match parameter-binding syntax to what the query tool actually supports — if named binds (:name)
+    are unsupported, escape and inline literals (double single-quotes) instead, since silently-unbound
+    params yield empty result sets. (2) Confirm the SELECT explicitly lists the column you depend on (e.g.
+    the record path) and that the row-splitter maps it to the right index, accounting for header rows
+    and delimiter count. (3) Only emit a runtime ref after confirming a non-empty parsed value; do not
+    let citation logic degrade to static-doc paths without flagging that the dynamic lookup produced nothing.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 00221cf259b3e05759c9a4b0c3987e749b4e4b621956026fcd0b601b5dbda2fa
+- id: sql-answer-refs-empty-debug-bindings-and-select-columns
+  description: When a runtime SQL query must populate answer refs (e.g. record paths) but they come back
+    empty, diagnose binding, predicate, and parser-column issues
+  domain:
+  - sql
+  - data-pipelines
+  - debugging
+  - query-validation
+  content: 'When validation reports that required runtime refs (like record paths pulled from query results)
+    are missing while actual refs are empty, the rows either never came back or the parser dropped the
+    path column. Diagnose in this order: (1) Confirm parameter bindings actually resolved — `:name` placeholders
+    that were never substituted or escaped wrong produce predicates that match nothing; prefer the engine''s
+    native bind params over manual string inlining, and if inlining, sort keys longest-first to avoid
+    prefix collisions (`:line1` vs `:line`). (2) Verify the SELECT list actually includes the path/ref
+    column and that joins/WHERE predicates aren''t over-restrictive (zero-row result). (3) Check the row
+    parser against the real output format — match the actual delimiter, skip only true header lines, and
+    ensure the column you need survives splitting. A useful robustness pattern: when a property/value
+    can live in either a text column or a numeric column, match against both (e.g. compare to `property_value_text`
+    OR a normalized `printf(''%g'', property_value_number)`), since a number-vs-text mismatch silently
+    yields zero matches. Empty refs are a symptom — distinguish ''query returned nothing'' from ''parser
+    discarded the column'' before fixing.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 66e3d5510a310e08408ded907d2512f82d97c0aca687de695d4a469d43c4860d
+- id: sql-result-refs-empty-check-columns-and-bindings
+  description: When answer/output refs derived from SQL query stdout come back empty, diagnose by checking
+    SELECT columns and parameter bindings, not the downstream logic
+  domain:
+  - sql
+  - data-parsing
+  - agent-tooling
+  content: 'When a script populates result references (paths/ids) by parsing the stdout of a SQL CLI tool
+    and the refs end up empty while the template/contract expects runtime values, the fault is almost
+    always upstream of the parser. Check, in order: (1) the SELECT projects the exact column being parsed
+    (a JOIN/CTE or DISTINCT can drop or rename it); (2) WHERE/JOIN predicates actually matched rows —
+    overly strict equality on typed property columns (text vs number, CAST mismatches) or wrong filter
+    values yield zero rows that look identical to a parse failure; (3) the stdout parser splits on the
+    delimiter the tool truly emits (header row, NULL markers, column separator | vs ,) and tolerates the
+    row format; (4) value substitution uses the tool''s named-binding mechanism (`:name`) instead of hand-rolled
+    string interpolation with manual quote-escaping, which is injection-prone and silently corrupts values
+    containing separators or quotes. Distinguish ''zero rows'' from ''parser dropped column'' by logging
+    raw stdout before parsing: a non-empty stdout with empty parsed refs means parser/column-name mismatch;
+    empty stdout means the query returned nothing (fix predicates/bindings). Prefer parameterized bindings
+    and an explicit, named SELECT projection so the ref column is guaranteed present and correctly typed.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 2ff174cad4f63634e71f03ce57f348358a8fd2b0c93e4cb662e8c8b6c8b7d261
+- id: sql-runtime-refs-empty-check-select-and-parser
+  description: When an answer requires runtime reference values pulled from query results but the collected
+    refs come back empty, diagnose the SELECT column list, the row parser, and named-parameter bindings
+    rather than the downstream logic.
+  domain:
+  - sql
+  - data-parsing
+  - validation
+  - query-results
+  content: 'If a task must emit runtime references (record paths, ids, keys) that originate from query
+    rows, but the final ref set is empty while only static template entries remain, the failure is almost
+    always upstream at data acquisition — not in the answer assembly. Check three things in order: (1)
+    the SELECT actually projects the column whose value becomes the ref (a missing or aliased column yields
+    nothing to extract); (2) the row parser preserves that column — delimiter detection, header/column
+    alignment, and trimming can silently drop or shift a field, especially when output format (CSV vs
+    pipe vs tab vs single-column) is auto-guessed; (3) named/`:name` parameter bindings and join/filter
+    predicates are correct so the query returns rows at all (a zero-row result and a dropped-column result
+    both surface as empty refs). Distinguish ''query returned no rows'' from ''rows returned but column
+    lost'' by logging the raw stdout and the parsed header before extraction. General rule: when extracted
+    values are empty, verify the data exists and survives each transformation stage (query → raw output
+    → parse → extract) before suspecting the consumer.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 268d30487ea2050990cab5c942e6ddcae339fc19b732917a2ad63085ad4b4222
+- id: lint-syntax-before-run
+  description: Run linter to catch syntax errors before executing or committing code
+  domain:
+  - linting
+  - code-quality
+  - static-analysis
+  content: Static linters detect syntax and style errors without running code. Run the linter as a pre-execution
+    and pre-commit gate; resolve every reported syntax error before proceeding, since invalid syntax blocks
+    parsing and execution. Treat lint failures as blocking, not advisory.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 93f5140b79ffffb8b7fddb3c493decd67ad98e7604c089ba6be24b462c314041
+- id: fidelity-drift-stub-detection
+  description: Detect and prevent fidelity drift where a script's implementation fails to realize its
+    stated intent
+  domain:
+  - code-quality
+  - verification
+  - code-generation
+  content: 'Fidelity drift occurs when generated or edited code diverges from the declared intent — most
+    starkly when the body is a no-op stub (e.g. a function that only contains `pass` or `return`). Before
+    accepting a script as complete, cross-check the implementation against the intent: every stated goal
+    must map to executable logic that produces an observable effect. Treat empty bodies, unreachable returns,
+    and placeholder stubs as drift signals, not finished work. Verify by defining a success criterion
+    from the intent and confirming the code satisfies it, rather than trusting that a syntactically valid
+    script does what it claims.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 397db32461a2abf62aa5c4f96d03e57c2ccd01b7b42dc3786bcc55538ae57339
+- id: rpc-fidelity-match-operation-to-primitive
+  description: Counting/aggregation tasks must emit the expected RPC primitives (compute + return), not
+    a structural traversal
+  domain:
+  - vm-rpc
+  - fidelity-testing
+  - api-design
+  content: 'Fidelity tests assert the multiset of RPC calls a script emits matches the operation''s intent.
+    Pick the primitive by semantic of the task, not by what superficially returns data. An aggregation/count
+    task expects a compute-and-return pair (e.g. Exec then Answer): run a query/computation, then surface
+    the scalar result. A tree/list traversal primitive enumerates structure and does NOT satisfy a count
+    contract — emitting it instead of the compute+return pair causes an RPC-multiset drift assertion.
+    General rule: before scripting, identify the RPC multiset the intent requires and emit exactly those
+    calls; map ''count/sum/aggregate'' to execute+answer, reserve traversal calls for explicit structure-listing
+    intents.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: e4fe1ea50baae7c9daead46b9dd69a2a0645179d3ea52114ecdc02e2f319501d
+- id: count-intent-exec-answer-not-tree
+  description: Counting/aggregation intents require an Exec computation followed by an Answer return,
+    not a structural listing RPC
+  domain:
+  - vm-scripting
+  - rpc-fidelity
+  - intent-mapping
+  content: 'When an intent asks to count or aggregate items (e.g. tally a collection), the correct RPC
+    sequence is an Exec call that computes the count followed by an Answer call that returns the result.
+    Do NOT satisfy a count/aggregate intent with a structure-traversal RPC (such as a tree/listing call):
+    listing surfaces nodes but never produces or returns a numeric result, so a fidelity check comparing
+    the RPC multiset will flag drift (expected Exec+Answer, got the listing call). General rule: map the
+    intent''s verb to the RPC''s effect — counting needs compute+return, not enumerate.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 0480317dab3c9258ae28f0bf072b03d22c46e6b1f4cea0451ccaf72f42751b06
+- id: grader-required-reference-stub-fail
+  description: Stub or no-op solution functions fail graders that assert required reference tokens in
+    the answer
+  domain:
+  - testing
+  - graders
+  - task-validation
+  content: When a grader validates a submission by checking that the answer contains required reference
+    identifiers, a no-op or stub implementation (e.g. a function body of `pass`) emits no answer and fails
+    with 'missing required reference'. The solution must actually compute the result and emit an answer
+    payload that includes every reference identifier the grader expects. Before submitting, enumerate
+    the grader's required references and confirm each appears in the produced output; never leave the
+    entrypoint as an empty stub.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: ff2b206bc25cbfdad376f5bbadb6bbeda96d592a5427e92b4c8abe29ef4f6660
+- id: atom-count-collection-items
+  description: General method to count items in a collection within a script handler
+  domain:
+  - data-processing
+  - aggregation
+  - scripting
+  content: To count items in a collection (e.g., baskets, records, rows), iterate or query the source
+    and return an integer total rather than executing no-op or placeholder statements. A handler whose
+    body only assigns constants performs no real work and will not satisfy a counting intent. Implement
+    the count by deriving length from the data source (len() of a list, COUNT() in a query, or an incrementing
+    accumulator over a loop), validate the source is non-null before counting, and return the numeric
+    result. When an error surfaces, capture the concrete exception message instead of a generic placeholder
+    so the failure can be diagnosed.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 46079fc665a774aa2c3863f3a3e99a6baba29a90ba770c3d92bd9b290d3ef8cb
+- id: sql-answer-provenance-refs-require-path-column
+  description: When an answer must carry runtime provenance refs, the SQL SELECT must explicitly include
+    the identifier/path column and row-parsing must preserve it; empty refs signal a missing column or
+    dropped parse, not absent data.
+  domain:
+  - sql
+  - data-provenance
+  - answer-validation
+  content: 'If a task''s answer schema requires runtime reference values (e.g. record paths/ids) drawn
+    from query results, the failure mode ''required runtime refs but actual refs empty'' almost always
+    means the data path broke, not that the dataset is empty. Diagnose in this order: (1) Confirm the
+    SELECT column list explicitly includes the identifier/path column needed for the ref — aggregate or
+    filtered queries often omit it. (2) Verify parameter bindings ('':name'' placeholders) are actually
+    substituted, since unbound predicates can silently return zero rows. (3) Check the row parser: header-detection
+    that strips the first line, delimiter splitting (pipe vs comma), and column-index assumptions can
+    drop the path field even when rows are returned. (4) Distinguish ''no rows matched'' (predicate too
+    strict) from ''rows matched but path column not captured'' by re-running with a minimal SELECT that
+    returns only the id/path. General rule: provenance columns must survive every transform stage from
+    query to final answer object; never assume the ref column rides along implicitly.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 0efb8362b036d858d22b931a8e00c39133d9c7be5f92be1cae1391f4e83c6a2c
+- id: sql-result-refs-require-selected-column-and-bound-params
+  description: When a query is expected to emit runtime references (e.g. record paths) but the extracted
+    ref list comes back empty, the cause is almost always a missing SELECT column, unapplied named parameter
+    bindings, or post-query row parsing that drops the target column — not absence of matching data.
+  domain:
+  - sql
+  - data-extraction
+  - validation
+  - agent-tooling
+  - debugging
+  content: 'To reliably extract runtime values (paths, ids, keys) from a SQL pipeline, verify three layers
+    in order: (1) the FINAL SELECT (including any UNION/CTE projection) actually lists the target column
+    — intermediate CTEs that compute it are useless if the outer query omits it; (2) every named placeholder
+    (:name) is bound, since an unbound parameter silently yields zero rows; (3) the post-query parser/regex
+    matches the actual column format and column ordering, since a too-strict pattern can discard valid
+    rows. An empty result set is ambiguous between ''no matching rows'' and ''projection/parse dropped
+    the column'' — disambiguate by first running a minimal SELECT of just the key columns with a relaxed
+    match, then add filters back one at a time. Distinguish ''zero matches'' from ''matches found but
+    reference unextractable'' before concluding the data is absent.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: c3480ec2a81932a959af36ddb7e83d1bbaa6e0e281a67b41dfdf11e3d7d608de
+- id: guarded-mutation-requires-write-exec
+  description: After identity/RBAC/scope gates pass, a guarded state change must execute the mutating
+    operation, not just read-and-answer.
+  domain:
+  - access-control
+  - rbac
+  - data-mutation
+  - policy-enforcement
+  content: 'When implementing a privileged mutation behind an authorization gate, the canonical operation
+    sequence is: (1) read the governing policy docs, (2) exec the identity probe to obtain caller role/id/scope,
+    (3) read/query the target record''s current state, and (4) on PASS, exec the mutating write (e.g.,
+    SQL UPDATE) that actually applies the change. The verification reads and the identity probe do NOT
+    substitute for the write call. Returning a denial/answer after only the discovery reads under-counts
+    the expected operation trace: the success path performs one more state-changing exec than the deny
+    path. Only short-circuit before the mutation when a gate definitively fails; otherwise proceed to
+    the write so the requested change is effected and the operation multiset matches the intended (read-policy,
+    probe-identity, read-state, write-mutation) shape.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 804775fb108320ca6bbc0e2e9f3a058764c1f841cdcc7fe5cd03be2dd152174e
+- id: sql-result-refs-require-projected-path-column
+  description: When a step must emit runtime references (e.g. record paths) derived from SQL output, empty
+    refs mean either zero rows matched or parsing dropped the needed column — verify the SELECT projects
+    the identifier/path column and the delimiter parser maps it.
+  domain:
+  - sql
+  - data-pipelines
+  - result-parsing
+  - debugging
+  content: 'A downstream stage that requires runtime reference values (record paths, ids) populated from
+    a query will produce empty refs in two distinct cases: (1) the query matched no rows, or (2) rows
+    came back but the reference column was never projected or was lost during row parsing. Diagnose before
+    concluding: (a) Confirm the SELECT explicitly lists the identifier/path column you depend on — don''t
+    assume it rides along. (b) Confirm named parameter bindings (e.g. :name placeholders) resolved to
+    actual values, not empty strings, so the WHERE clause isn''t silently filtering everything out. (c)
+    Confirm the stdout row parser detects the right delimiter from the header and indexes columns by header
+    name, not fixed position, so a column shift doesn''t drop the path field. Distinguish ''no rows''
+    from ''column dropped'' by counting parsed rows separately from checking the target column''s presence
+    — an empty ref list with non-zero rows points at projection/parsing; zero rows points at the WHERE/binding.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 698ea36f5975387052d32d140e93b64099345c0be2ce6eb8a51dc4c9c34987bc
+- id: sql-answer-refs-empty-diagnosis
+  description: When an answer requires runtime references sourced from query output but the validated
+    refs come back empty, diagnose the query rather than the validator
+  domain:
+  - sql
+  - data-validation
+  - debugging
+  content: 'When a task''s answer must carry runtime reference values (ids, paths, record locators) extracted
+    from query results, and the post-check reports those refs are empty/missing while only static template
+    refs remain, the failure is almost always upstream in the query, not the validator. Check three things
+    in order: (1) the SELECT projection actually includes the reference column the validator reads — a
+    column dropped from SELECT or renamed away from the expected alias yields rows with no ref; (2) parameter/named
+    bindings are populated correctly so filters are not silently comparing against empty/null literals;
+    (3) the query returns any rows at all — chained INNER JOINs, EXISTS subqueries, or WHERE predicates
+    that are too strict (especially case- or whitespace-sensitive equality on free-text columns) can eliminate
+    all rows. Mitigate text-match fragility by normalizing both sides with LOWER(TRIM(...)) and matching
+    numeric values against both the numeric column and its text cast. Verify by running the query standalone
+    and confirming both row count > 0 and presence of the reference column before trusting the validator''s
+    report.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 983feadaebaef94ec85ca3833a1567c6155528c272d366f55cca039185427fa3

@@ -1,35 +1,30 @@
 {
-  "intent": "Count how many of the 6 specified product lines have at least 3 items available today at the Graz Lend hardware store.",
+  "intent": "Count how many of six specified product variants have available_today_quantity >= 1 at the Vienna Praterstern store today.",
   "params": {
-    "store_name": "Graz Lend hardware shop",
-    "fam1": "Gorilla Crystal Grip 2ZQ-D83 Adhesive and Glue",
-    "k1": "adhesive_type",
-    "v1": "contact adhesive",
-    "fam2": "Mascot Advanced ACC 35W-IIS Work Jacket",
-    "k2": "color_family",
-    "v2": "Black",
-    "fam3": "Geberit Mapress Silent IC5-GU6 Valve and Connector",
-    "k3": "connector_type",
-    "v3": "thread adapter",
-    "fam4": "Bahco Workshop BAH 3VZ-SPH Hammer Measuring and Cutting Tool",
-    "k4": "tool_type",
-    "v4": "spirit level",
-    "fam5": "Philips Professional Hue 3JS-MSN LED Bulb",
-    "k5a": "wattage_w",
-    "v5a": "10",
-    "k5b": "luminous_flux_lm",
-    "v5b": "1521",
-    "fam6": "Bondex Garden Classic 106-TS1 Wood Stain and Deck Oil",
-    "k6": "product_type",
-    "v6": "deck oil",
-    "min_qty": "3"
+    "store_name": "Vienna Praterstern",
+    "line1": "Gardena Smart PowerMax 280-5FI Manual Garden Tool",
+    "p1_tool_type": "pruning saw",
+    "line2": "Helios Professional Helios 29A-FTE Metal and Concrete Paint",
+    "p2_product_type": "metal paint",
+    "p2_color_family": "White",
+    "line3": "Metabo Brushless BS 1OW-IK5 Cordless Drill Driver",
+    "p3_voltage_v": "18",
+    "p3_battery_platform": "18v-system",
+    "p3_kit_contents": "case",
+    "line4": "Philips Professional Hue 3JS-MSN LED Bulb",
+    "p4_wattage_w": "10",
+    "p4_luminous_flux_lm": "470",
+    "line5": "Portwest PW3 DX 3TU-ST2 Work Gloves",
+    "p5_size": "M",
+    "line6": "Bosch Compact PKS 375-EOK Corded Angle Grinder",
+    "p6_disc_diameter_mm": "125"
   },
   "success_criteria": [
-    "Store resolved by name to the Graz Lend store_id",
-    "Each of the 6 product lines matched by product_family_name + brand + required property value(s)",
-    "Availability measured as available_today_quantity at the Graz Lend store",
-    "Count equals number of lines whose matching variant(s) total at least 3 available today",
-    "Answer rendered exactly as 'Count: %d'"
+    "Vienna Praterstern store_id resolved from stores table",
+    "Each of the 6 products resolved to its specific variant SKU via product_family_name + distinguishing properties",
+    "available_today_quantity >= 1 at the resolved store evaluated per product against store_inventory",
+    "Count of products with availability returned and rendered as qty=%d",
+    "refs cite the record_path of each product counted as available (and no unavailable ones)"
   ],
   "discovery": [
     {
@@ -37,9 +32,18 @@
       "args": {
         "path": "/bin/sql",
         "args": [],
-        "stdin": "SELECT store_id, store_name, city FROM stores WHERE store_name = :store_name;"
+        "stdin": "SELECT store_id, store_name, city, record_path FROM stores WHERE store_name = :store_name OR record_path LIKE '%praterstern%';"
       },
-      "bind": "store"
+      "bind": "store_lookup"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT DISTINCT pp.property_key FROM product_variant_properties pp JOIN product_variants pv ON pv.product_sku = pp.product_sku JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name IN (:line1, :line2, :line3, :line4, :line5, :line6) ORDER BY pp.property_key;"
+      },
+      "bind": "prop_keys"
     }
   ],
   "ops": [
@@ -48,7 +52,7 @@
       "args": {
         "path": "/bin/sql",
         "args": [],
-        "stdin": "WITH s AS (SELECT store_id FROM stores WHERE store_name = :store_name), line(idx, fam, k, v) AS (VALUES (1,:fam1,:k1,:v1),(2,:fam2,:k2,:v2),(3,:fam3,:k3,:v3),(4,:fam4,:k4,:v4),(6,:fam6,:k6,:v6)), single_match AS (SELECT l.idx, COALESCE(SUM(i.available_today_quantity),0) AS qty FROM line l JOIN product_families f ON f.product_family_name = l.fam JOIN product_variants v ON v.product_family_id = f.product_family_id JOIN product_variant_properties pr ON pr.product_sku = v.product_sku AND pr.property_key = l.k AND pr.property_value_text = l.v JOIN store_inventory i ON i.product_sku = v.product_sku AND i.store_id IN (SELECT store_id FROM s) GROUP BY l.idx), philips_match AS (SELECT 5 AS idx, COALESCE(SUM(i.available_today_quantity),0) AS qty FROM product_families f JOIN product_variants v ON v.product_family_id = f.product_family_id JOIN product_variant_properties p1 ON p1.product_sku = v.product_sku AND p1.property_key = :k5a AND p1.property_value_number = CAST(:v5a AS REAL) JOIN product_variant_properties p2 ON p2.product_sku = v.product_sku AND p2.property_key = :k5b AND p2.property_value_number = CAST(:v5b AS REAL) JOIN store_inventory i ON i.product_sku = v.product_sku AND i.store_id IN (SELECT store_id FROM s) WHERE f.product_family_name = :fam5), all_match AS (SELECT idx, qty FROM single_match UNION ALL SELECT idx, qty FROM philips_match) SELECT COUNT(*) AS available_count FROM all_match WHERE qty >= CAST(:min_qty AS INTEGER);"
+        "stdin": "WITH ts AS (SELECT store_id FROM stores WHERE store_name = :store_name OR record_path LIKE '%praterstern%'), matched AS (SELECT 1 AS pnum, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line1 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'tool_type' AND x.property_value_text = :p1_tool_type) UNION ALL SELECT 2, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line2 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'product_type' AND x.property_value_text = :p2_product_type) AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'color_family' AND x.property_value_text = :p2_color_family) UNION ALL SELECT 3, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line3 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'voltage_v' AND x.property_value_text = :p3_voltage_v) AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'battery_platform' AND x.property_value_text = :p3_battery_platform) AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'kit_contents' AND x.property_value_text = :p3_kit_contents) UNION ALL SELECT 4, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line4 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'wattage_w' AND x.property_value_text = :p4_wattage_w) AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'luminous_flux_lm' AND x.property_value_text = :p4_luminous_flux_lm) UNION ALL SELECT 5, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line5 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'size' AND x.property_value_text = :p5_size) UNION ALL SELECT 6, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line6 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'disc_diameter_mm' AND x.property_value_text = :p6_disc_diameter_mm)), avail AS (SELECT DISTINCT m.pnum, m.record_path FROM matched m JOIN store_inventory si ON si.product_sku = m.product_sku JOIN ts ON ts.store_id = si.store_id WHERE si.available_today_quantity >= 1) SELECT (SELECT COUNT(DISTINCT pnum) FROM avail) AS qty, (SELECT group_concat(record_path) FROM avail) AS available_paths;"
       },
       "bind": "result"
     }
@@ -59,15 +63,15 @@
       "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
     },
     {
-      "anchor": "#important-tools > sql",
-      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
     }
   ],
   "answer_template": {
-    "message": "Count: {result.available_count}",
+    "message": "qty={result.qty}",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$store_path"
+      "$available_paths"
     ]
   },
   "outcome_override": null

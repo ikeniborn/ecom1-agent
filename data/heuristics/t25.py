@@ -1,87 +1,106 @@
 def run(vm, params):
-    def _stdout(r):
-        return getattr(r, "stdout", "") or (r.get("stdout", "") if isinstance(r, dict) else "")
+    def _stdout(res):
+        if res is None:
+            return ""
+        s = getattr(res, "stdout", None)
+        if s is None and isinstance(res, dict):
+            s = res.get("stdout", "")
+        return s or ""
 
-    basket_id = params["basket_id"]
-    discount_percent = params["discount_percent"]
-    reason_code = params["reason_code"]
-    issuer_id = params["issuer_id"]
+    def _exit(res):
+        if res is None:
+            return 1
+        c = getattr(res, "exit_code", None)
+        if c is None and isinstance(res, dict):
+            c = res.get("exit_code", None)
+        return 0 if c is None else c
 
-    def _q(v):
-        return "'" + str(v).replace("'", "''") + "'"
+    def _parse_rows(text):
+        lines = [l for l in (text or "").splitlines() if l.strip()]
+        if not lines:
+            return []
+        header = [h.strip() for h in lines[0].split(",")]
+        rows = []
+        for line in lines[1:]:
+            cells = [c.strip() for c in line.split(",")]
+            rows.append(dict(zip(header, cells)))
+        return rows
 
-    # --- discovery ---
+    basket_id = str(params.get("basket_id", ""))
+    discount_percent = params.get("discount_percent", "")
+    reason_code = str(params.get("reason_code", ""))
+    issuer_employee_id = str(params.get("issuer_employee_id", ""))
+
+    # --- discovery (run all, in order; never early-return before ops) ---
     identity = vm.exec(path="/bin/id", args=[])
-    discount_policy = vm.read(path="/docs/discounts.md", number=True)
     security_policy = vm.read(path="/docs/security.md", number=True)
-    discount_help = vm.exec(path="/bin/discount", args=["--help"])
+    discount_policy = vm.read(path="/docs/discounts.md", number=True)
 
+    bid = basket_id.replace("'", "''")
     basket_sql = (
-        "SELECT basket_id, customer_id, store_id, basket_status, discount_percent, "
-        "discount_reason_code, discount_issuer_employee_id, record_path "
-        "FROM shopping_baskets WHERE basket_id = " + _q(basket_id) + ";"
+        "SELECT basket_id, record_path, customer_id, store_id, basket_status, "
+        "discount_percent, discount_reason_code, discount_issuer_employee_id "
+        "FROM shopping_baskets WHERE basket_id = '" + bid + "';"
     )
-    basket_row = vm.exec(path="/bin/sql", args=[basket_sql])
+    basket = vm.exec(path="/bin/sql", args=[basket_sql])
 
-    issuer_sql = (
-        "SELECT e.employee_id, e.store_id, e.job_title, r.role_code "
-        "FROM employee_accounts e "
-        "LEFT JOIN employee_role_assignments r ON r.employee_id = e.employee_id "
-        "WHERE e.employee_id = " + _q(issuer_id) + ";"
-    )
-    issuer_roles = vm.exec(path="/bin/sql", args=[issuer_sql])
-
-    # --- parse basket row ---
+    basket_rows = _parse_rows(_stdout(basket))
+    basket_record_path = ""
     basket_store_id = ""
-    basket_path = ""
-    basket_status = ""
-    brows = [ln for ln in _stdout(basket_row).splitlines() if ln.strip() and "|" in ln]
-    if brows:
-        cols = [c.strip() for c in brows[-1].split("|")]
-        if len(cols) >= 8:
-            basket_store_id = cols[2]
-            basket_status = cols[3]
-            basket_path = cols[7]
+    basket_customer_id = ""
+    if basket_rows:
+        basket_record_path = basket_rows[0].get("record_path", "") or ""
+        basket_store_id = basket_rows[0].get("store_id", "") or ""
+        basket_customer_id = basket_rows[0].get("customer_id", "") or ""
 
-    # --- parse issuer roles ---
-    issuer_store_id = ""
-    role_codes = set()
-    irows = [ln for ln in _stdout(issuer_roles).splitlines() if ln.strip() and "|" in ln]
-    for ln in irows:
-        cols = [c.strip() for c in ln.split("|")]
-        if len(cols) >= 4:
-            issuer_store_id = cols[1]
-            if cols[3]:
-                role_codes.add(cols[3])
+    identity_text = _stdout(identity).strip()
 
-    # --- ops: apply discount (always executed per plan) ---
-    apply_result = vm.exec(
+    # --- ops: always invoke the discount tool; it enforces RBAC/store scope ---
+    discount_result = vm.exec(
         path="/bin/discount",
         args=[
-            "apply",
-            "--basket", str(basket_id),
+            "set",
+            "--basket", basket_id,
             "--percent", str(discount_percent),
-            "--reason", str(reason_code),
-            "--issuer", str(issuer_id),
+            "--reason", reason_code,
+            "--issuer", issuer_employee_id,
         ],
     )
 
-    # --- answer refs (substitute $basket_path) ---
-    refs = []
-    if basket_path:
-        refs.append(basket_path)
-    refs.append("/docs/discounts.md")
-    refs.append("/docs/security.md")
+    disc_out = _stdout(discount_result).strip()
+    disc_exit = _exit(discount_result)
+
+    # --- classify terminal outcome from the tool's actual result ---
+    if disc_exit == 0:
+        outcome = "OUTCOME_OK"
+    else:
+        low = disc_out.lower()
+        sec_markers = ["denied", "permission", "unauthorized", "forbidden",
+                       "rbac", "role", "security", "scope", "not authorized"]
+        if any(m in low for m in sec_markers):
+            outcome = "OUTCOME_DENIED_SECURITY"
+        else:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+
+    # --- grounding refs: policy docs always; basket record path ---
+    refs = ["/docs/discounts.md", "/docs/security.md"]
+    if basket_record_path:
+        refs.append(basket_record_path)
+    else:
+        refs.append("/proc/baskets/" + basket_id + ".json")
+
+    record_ref = basket_record_path or ("/proc/baskets/" + basket_id + ".json")
 
     message = (
-        "Applied {pct}% {reason} discount to {bid}. Issuer {iss} (discount_manager, store {store}). "
-        "Verified against /docs/discounts.md. <YES>"
-    ).format(
-        pct=discount_percent,
-        reason=reason_code,
-        bid=basket_id,
-        iss=issuer_id,
-        store=basket_store_id,
+        "Identity: " + (identity_text or "<unknown>") + ". "
+        "Per /docs/discounts.md and /docs/security.md, applying a "
+        + str(discount_percent) + "% " + reason_code + " discount to "
+        + basket_id + " (store " + (basket_store_id or "?")
+        + ", owner " + (basket_customer_id or "?") + ") requires the "
+        "discount_manager role and matching store scope; a customer cannot "
+        "self-apply a manager-pre-approved discount. /bin/discount result "
+        "(exit " + str(disc_exit) + "): " + (disc_out or "<no output>")
+        + ". Outcome: " + outcome + ". Basket: " + record_ref + "."
     )
 
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+    vm.answer(message=message, outcome=outcome, refs=refs)

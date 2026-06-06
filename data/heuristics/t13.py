@@ -2,96 +2,85 @@ import csv
 import io
 
 
-def _q(v):
-    if isinstance(v, bool):
-        return str(int(v))
-    if isinstance(v, (int, float)):
-        return str(v)
-    return "'" + str(v).replace("'", "''") + "'"
-
-
-def _inline(sql, params):
-    # Replace :name placeholders with inlined SQL literals (longest name first).
-    for name in sorted(params.keys(), key=len, reverse=True):
-        sql = sql.replace(":" + name, _q(params[name]))
-    return sql
-
-
-def _stdout(result):
-    return getattr(result, "stdout", "") or (
-        result.get("stdout", "") if isinstance(result, dict) else ""
-    )
-
-
-def _rows(stdout):
-    text = (stdout or "").strip()
-    if not text:
-        return []
-    reader = csv.reader(io.StringIO(text))
-    all_rows = list(reader)
-    if not all_rows:
-        return []
-    header = all_rows[0]
-    out = []
-    for r in all_rows[1:]:
-        if not r:
-            continue
-        out.append({header[i]: (r[i] if i < len(r) else "") for i in range(len(header))})
-    return out
-
-
 def run(vm, params):
-    # Discovery 1: resolve store_id / record_path
-    store_sql = _inline(
-        "SELECT store_id, store_name, record_path FROM stores WHERE store_name LIKE :store;",
-        params,
-    )
-    store = vm.exec(path="/bin/sql", args=[], stdin=store_sql)
-    store_rows = _rows(_stdout(store))
-    store_path = store_rows[0].get("record_path", "") if store_rows else ""
+    def q(v):
+        return "'" + str(v).replace("'", "''") + "'"
 
-    # Discovery 2: qualifying product variant record_paths
-    paths_sql = _inline(
-        "WITH s AS (SELECT store_id FROM stores WHERE store_name LIKE :store) "
-        "SELECT DISTINCT pv.record_path FROM product_variants pv "
-        "JOIN product_families pf ON pf.product_family_id=pv.product_family_id "
-        "JOIN store_inventory si ON si.product_sku=pv.product_sku "
-        "JOIN s ON s.store_id=si.store_id "
-        "LEFT JOIN product_variant_properties pft ON pft.product_sku=pv.product_sku AND pft.property_key='fastener_type' "
-        "LEFT JOIN product_variant_properties pct ON pct.product_sku=pv.product_sku AND pct.property_key='cleaner_type' "
-        "LEFT JOIN product_variant_properties pst ON pst.product_sku=pv.product_sku AND pst.property_key='storage_type' "
-        "LEFT JOIN product_variant_properties psc ON psc.product_sku=pv.product_sku AND psc.property_key='screw_type' "
-        "LEFT JOIN product_variant_properties pdi ON pdi.product_sku=pv.product_sku AND pdi.property_key='diameter_mm' "
-        "WHERE si.available_today_quantity >= :min_qty AND ( "
-        "(pf.product_family_name=:line_nbw AND pft.property_value_text=:ft_rod) OR "
-        "(pf.product_family_name=:line_clean AND pct.property_value_text=:ct_floor) OR "
-        "(pf.product_family_name=:line_box AND pst.property_value_text=:st_bag) OR "
-        "(pf.product_family_name=:line_screw AND psc.property_value_text=:sc_wood AND pdi.property_value_number=:dia6) OR "
-        "(pf.product_family_name=:line_clean AND pct.property_value_text=:ct_deg) OR "
-        "(pf.product_family_name=:line_nbw AND pft.property_value_text=:ft_bolt AND pdi.property_value_number=:dia10) );",
-        params,
-    )
-    paths_res = vm.exec(path="/bin/sql", args=[], stdin=paths_sql)
-    path_rows = _rows(_stdout(paths_res))
-    product_paths = [r.get("record_path", "") for r in path_rows if r.get("record_path", "")]
+    def _stdout(r):
+        s = getattr(r, "stdout", None)
+        if s is None and isinstance(r, dict):
+            s = r.get("stdout", "")
+        return s or ""
 
-    # Ops: count qualifying specs
-    count_sql = _inline(
-        "WITH s AS (SELECT store_id FROM stores WHERE store_name LIKE :store) SELECT "
-        "(CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='fastener_type' AND p.property_value_text=:ft_rod WHERE pf.product_family_name=:line_nbw AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + "
-        "(CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='cleaner_type' AND p.property_value_text=:ct_floor WHERE pf.product_family_name=:line_clean AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + "
-        "(CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='storage_type' AND p.property_value_text=:st_bag WHERE pf.product_family_name=:line_box AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + "
-        "(CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='screw_type' AND p.property_value_text=:sc_wood JOIN product_variant_properties d ON d.product_sku=pv.product_sku AND d.property_key='diameter_mm' AND d.property_value_number=:dia6 WHERE pf.product_family_name=:line_screw AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + "
-        "(CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='cleaner_type' AND p.property_value_text=:ct_deg WHERE pf.product_family_name=:line_clean AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) + "
-        "(CASE WHEN EXISTS (SELECT 1 FROM product_variants pv JOIN product_families pf ON pf.product_family_id=pv.product_family_id JOIN store_inventory si ON si.product_sku=pv.product_sku JOIN s ON s.store_id=si.store_id JOIN product_variant_properties p ON p.product_sku=pv.product_sku AND p.property_key='fastener_type' AND p.property_value_text=:ft_bolt JOIN product_variant_properties d ON d.product_sku=pv.product_sku AND d.property_key='diameter_mm' AND d.property_value_number=:dia10 WHERE pf.product_family_name=:line_nbw AND si.available_today_quantity>=:min_qty) THEN 1 ELSE 0 END) AS products;",
-        params,
-    )
-    count_res = vm.exec(path="/bin/sql", args=[], stdin=count_sql)
-    count_rows = _rows(_stdout(count_res))
-    count = count_rows[0].get("products", "0") if count_rows else "0"
+    def parse_csv(text):
+        text = (text or "").strip()
+        if not text:
+            return []
+        return list(csv.DictReader(io.StringIO(text)))
 
-    refs = list(product_paths)
+    district = params["district"]
+    min_qty = int(params["min_qty"])
+
+    # discovery: resolve the Lend district store
+    disc_sql = (
+        "SELECT store_id, record_path, store_name, city FROM stores "
+        "WHERE city = " + q(district) +
+        " OR store_name LIKE '%' || " + q(district) + " || '%' LIMIT 1;"
+    )
+    store = vm.exec(path="/bin/sql", args=[disc_sql])
+    store_rows = parse_csv(_stdout(store))
+    store_path = ""
+    if store_rows:
+        store_path = store_rows[0].get("record_path", "") or ""
+
+    specs = [
+        (1, params["spec1_family"], params["spec1_brand"], params["spec1_prop_key"], params["spec1_prop_val"]),
+        (2, params["spec2_family"], params["spec2_brand"], params["spec2_prop_key"], params["spec2_prop_val"]),
+        (3, params["spec3_family"], params["spec3_brand"], params["spec3_prop_key"], params["spec3_prop_val"]),
+        (4, params["spec4_family"], params["spec4_brand"], params["spec4_prop_key"], params["spec4_prop_val"]),
+        (5, params["spec5_family"], params["spec5_brand"], params["spec5_prop_key"], params["spec5_prop_val"]),
+    ]
+    values_clause = ", ".join(
+        "({}, {}, {}, {}, {})".format(n, q(f), q(b), q(pk), q(pv))
+        for (n, f, b, pk, pv) in specs
+    )
+
+    ops_sql = (
+        "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = " + q(district) +
+        " OR store_name LIKE '%' || " + q(district) + " || '%' LIMIT 1), "
+        "specs(spec_no, family_name, brand, prop_key, prop_val) AS (VALUES " + values_clause + ") "
+        "SELECT s.spec_no, s.family_name, s.prop_val, pv.product_sku, pv.record_path, "
+        "COALESCE(si.available_today_quantity, 0) AS avail "
+        "FROM specs s "
+        "JOIN product_families pf ON pf.product_family_name = s.family_name AND pf.brand = s.brand "
+        "JOIN product_variants pv ON pv.product_family_id = pf.product_family_id "
+        "JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku "
+        "AND pvp.property_key = s.prop_key AND pvp.property_value_text = s.prop_val "
+        "LEFT JOIN store_inventory si ON si.product_sku = pv.product_sku "
+        "AND si.store_id = (SELECT store_id FROM store) "
+        "ORDER BY s.spec_no;"
+    )
+    rows_res = vm.exec(path="/bin/sql", args=[ops_sql])
+    rows = parse_csv(_stdout(rows_res))
+
+    count = 0
+    available_paths = []
+    for row in rows:
+        try:
+            avail = int(float(row.get("avail", "0") or 0))
+        except (ValueError, TypeError):
+            avail = 0
+        if avail >= min_qty:
+            count += 1
+            rp = row.get("record_path", "") or ""
+            if rp:
+                available_paths.append(rp)
+
+    refs = []
     if store_path:
         refs.append(store_path)
+    for p in available_paths:
+        if p not in refs:
+            refs.append(p)
 
     vm.answer(message="{} products".format(count), outcome="OUTCOME_OK", refs=refs)

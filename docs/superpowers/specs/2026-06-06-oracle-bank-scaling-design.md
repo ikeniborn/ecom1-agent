@@ -1,3 +1,24 @@
+---
+review:
+  spec_hash: b4e02fe299932549
+  last_run: 2026-06-06
+  phases:
+    structure:   { status: passed }
+    coverage:    { status: passed }
+    clarity:     { status: passed }
+    consistency: { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: WARNING
+      section: "A3. top-N and cosine floor"
+      section_hash: 20458651d84d9022
+      text: "ORACLE_TOPN tuning deferred ('default unchanged for now (10); tune after growth') with no trigger/DoD. At current bank=6, top-N=10 ≥ bank, so ORACLE_FLOOR is inert until bank grows past 10 — no criterion states when/who lowers top-N."
+      verdict: fixed
+      verdict_at: 2026-06-06
+chain:
+  intent: docs/superpowers/intents/2026-06-06-oracle-bank-scaling-intent.md
+---
 # Design: knowledge-oracle bank scaling
 
 **Date:** 2026-06-06
@@ -45,7 +66,10 @@ already-green task regresses. Priority trade-off: **trust** — atom quality ove
 
 ### A3. top-N and cosine floor
 - `ORACLE_TOPN` stays env-controlled; intent is to keep it below bank size so cosine filters
-  once the bank grows. Default unchanged for now (10); tune after growth.
+  once the bank grows. Default stays 10 while bank ≤ 10 (current bank=6, floor inert by design).
+  **Trigger (DoD):** when `_active()` count first exceeds 10, set `ORACLE_TOPN = ceil(active * 0.5)`
+  (floor 10), committed in the same PR that promotes the atom crossing the threshold. Owner: the
+  promote pass — it logs `active=N` each run; crossing N>10 without a top-N bump is a gate warning.
 - New env `ORACLE_FLOOR` (cosine minimum, default 0.5): an atom scoring below the floor is not
   injected even if it lands in top-n. Discards are logged.
 

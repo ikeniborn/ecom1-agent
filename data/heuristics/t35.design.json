@@ -1,17 +1,14 @@
 {
-  "intent": "Safely resume/recover the 3DS verification for payment pay_017 on basket_217 only if it is eligible per payment-security policy, using the payments tool without bypassing 3DS safety.",
+  "intent": "Inspect payment pay_015 (basket_215) and its 3DS state, then recover/resume the 3DS flow via /bin/payments only if the running identity owns it and policy eligibility holds — never bypassing payment safety.",
   "params": {
-    "basket_id": "basket_217",
-    "payment_id": "pay_017",
-    "caller_id": "$id_subject"
+    "payment_id": "pay_015",
+    "basket_id": "basket_215"
   },
   "success_criteria": [
-    "Current identity resolved via id tool and confirmed as owner/authorized actor on pay_017",
-    "pay_017 confirmed linked to basket_217 and its three_ds_status/attempts/max_attempts/failure_reason read",
-    "Eligibility decided strictly from payment-security policy (attempts < max_attempts, status == requires_3ds_action, not a terminal abandon/lock)",
-    "If eligible: 3DS flow re-issued via /bin/payments (no bypass, no status forcing to paid)",
-    "If ineligible: no state change; reason returned with policy grounding",
-    "Answer references pay_017 record path and the payment-security policy document"
+    "Running identity resolved via /bin/id and confirmed as owner of payment pay_015 / basket_215",
+    "Payment pay_015 confirmed to reference basket_215 and to be in a 3DS-resumable status (requires_3ds_action) with three_ds_attempts < three_ds_max_attempts",
+    "3DS recovery performed via /bin/payments ONLY when eligible; no force/bypass of 3DS or payment-safety controls",
+    "Answer grounds verdict in /docs/security.md, the payments 3DS policy doc, and the inspected payment record path"
   ],
   "discovery": [
     {
@@ -20,7 +17,7 @@
         "path": "/bin/id",
         "args": []
       },
-      "bind": "caller"
+      "bind": "identity"
     },
     {
       "rpc": "Exec",
@@ -33,51 +30,53 @@
       "bind": "payments_help"
     },
     {
-      "rpc": "Exec",
+      "rpc": "Tree",
       "args": {
-        "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT payment_id, record_path, basket_id, customer_id, store_id, payment_status, three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts FROM payment_transactions WHERE payment_id = :payment_id AND basket_id = :basket_id;"
-      },
-      "bind": "pay_row"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT basket_id, customer_id, basket_status, record_path FROM shopping_baskets WHERE basket_id = :basket_id;"
-      },
-      "bind": "basket_row"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sh",
-        "args": [
-          "-c",
-          "tree -L 2 /docs"
-        ]
+        "root": "/docs",
+        "level": 2
       },
       "bind": "docs_tree"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_policy"
     },
     {
       "rpc": "Find",
       "args": {
         "root": "/docs",
-        "name": "payment",
+        "name": "payments",
         "kind": "file",
         "limit": 10
       },
-      "bind": "policy_files"
+      "bind": "payments_doc_path"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "$policy_path",
-        "number": true
+        "path": "/docs/payments.md"
       },
       "bind": "payments_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "SELECT payment_id, record_path, basket_id, is_archived_basket_reference, customer_id, store_id, payment_status, three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts FROM payment_transactions WHERE payment_id = :payment_id AND basket_id = :basket_id;"
+        ]
+      },
+      "bind": "payment_row"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$payment_path"
+      },
+      "bind": "payment_record"
     }
   ],
   "ops": [
@@ -88,9 +87,7 @@
         "args": [
           "recover-3ds",
           "--payment",
-          ":payment_id",
-          "--basket",
-          ":basket_id"
+          ":payment_id"
         ]
       },
       "bind": "recover_result"
@@ -98,36 +95,29 @@
   ],
   "agents_md_constraints": [
     {
-      "anchor": "#important-tools > payments",
-      "rule": "use payments tool to manage payment workflow state and supported refund approval/finalization"
-    },
-    {
-      "anchor": "#important-tools > id",
+      "anchor": "#Important tools > id",
       "rule": "id tool returns identity of the user/customer/guest under which we are running current request."
     },
     {
-      "anchor": "#important-things > policy-grounding",
+      "anchor": "#Important tools > payments",
+      "rule": "use payments tool to manage payment workflow state and supported refund approval/finalization"
+    },
+    {
+      "anchor": "#Important things > apply policy",
       "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
     },
     {
-      "anchor": "#important-things > full-path-reference",
+      "anchor": "#Important things > reference path",
       "rule": "When responding with reference - provide full path in the repo to the object."
-    },
-    {
-      "anchor": "#important-things > yes-no-token",
-      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
-    },
-    {
-      "anchor": "#important-things > start-context",
-      "rule": "When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context"
     }
   ],
   "answer_template": {
-    "message": "Identity: {caller}. Payment pay_017 on basket_217: status={pay_row.payment_status}, 3DS={pay_row.three_ds_status}, attempts={pay_row.three_ds_attempts}/{pay_row.three_ds_max_attempts}, failure_reason={pay_row.three_ds_failure_reason}. Per payment-security policy {policy_path}: eligibility <YES_OR_NO>. {if eligible: '3DS flow re-issued safely via payments tool — no safety bypass, status not forced. Result: {recover_result}.' else: 'Not eligible to recover (attempts exhausted / terminal abandon / wrong status). No state changed; complete a fresh verification per policy.'}",
+    "message": "Identity {identity}. Payment pay_015 -> basket_215, status {payment_row.payment_status}, 3DS {payment_row.three_ds_status} attempts {payment_row.three_ds_attempts}/{payment_row.three_ds_max_attempts}. If eligible (owner match + requires_3ds_action + attempts < max): 3DS flow resumed via /bin/payments, result {recover_result}. If not eligible (attempts exhausted / not owner / wrong status): NOT recovered — payment safety not bypassed, per policy. Record: $payment_path",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$pay_row.record_path",
-      "$policy_path"
+      "/docs/security.md",
+      "/docs/payments.md",
+      "$payment_path"
     ]
   },
   "outcome_override": null
