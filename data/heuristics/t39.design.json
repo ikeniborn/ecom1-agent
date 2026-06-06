@@ -1,31 +1,26 @@
 {
-  "intent": "Identify the fraudulent payment record(s) among archived payments by applying the payments/security fraud policy read-only, citing each flagged payment record path.",
+  "intent": "Identify archived-payment fraud via impossible-travel leg detection over payment_transactions and cite each flagged payment record path, modifying nothing.",
   "params": {
-    "archived_flag": 1
+    "archived_flag": 1,
+    "leg_speed_threshold_deg_per_hr": 2.0
   },
   "success_criteria": [
-    "Archived payments (is_archived_basket_reference = 1) are evaluated against the documented fraud-detection policy",
-    "Exactly the fraudulent payment record(s) are identified and cited by full record_path",
-    "No files are written or deleted (read-only investigation)",
-    "Applied fraud/security policy document is cited as grounding reference"
+    "Only archived payments (is_archived_basket_reference=1) are considered",
+    "Per customer_id, rows ordered by payment_created_at; incoming and outgoing leg speeds computed via LAG/LEAD",
+    "A record is flagged when its incoming OR outgoing leg speed exceeds ~2 deg/hr",
+    "Answer cites the record_path of every flagged payment and no others",
+    "No files are written or deleted (read-only)",
+    "/docs/security.md cited as policy grounding"
   ],
   "discovery": [
     {
-      "rpc": "Tree",
+      "rpc": "Exec",
       "args": {
-        "root": "/docs",
-        "level": 2
+        "path": "/bin/id",
+        "args": [],
+        "stdin": ""
       },
-      "bind": "docs_tree"
-    },
-    {
-      "rpc": "Search",
-      "args": {
-        "root": "/docs",
-        "pattern": "(?i)fraud|3ds|device.?fingerprint|velocity|chargeback",
-        "limit": 50
-      },
-      "bind": "fraud_policy_hits"
+      "bind": "identity"
     },
     {
       "rpc": "Read",
@@ -40,32 +35,28 @@
       "args": {
         "path": "/bin/sql",
         "args": [],
-        "stdin": "WITH archived AS (SELECT p.payment_id, p.record_path, p.basket_id, p.customer_id, p.store_id, p.payment_amount_cents, p.payment_currency, p.payment_status, p.payment_created_at, p.payment_method_fingerprint, p.device_fingerprint, p.observed_latitude, p.observed_longitude, p.three_ds_status, p.three_ds_failure_reason, p.three_ds_attempts, p.three_ds_max_attempts, c.home_latitude AS cust_home_lat, c.home_longitude AS cust_home_lon, c.home_city AS cust_home_city, s.latitude AS store_lat, s.longitude AS store_lon, s.city AS store_city FROM payment_transactions p JOIN customer_accounts c ON c.customer_id = p.customer_id JOIN stores s ON s.store_id = p.store_id WHERE p.is_archived_basket_reference = :archived_flag) SELECT a.*, (SELECT COUNT(*) FROM payment_transactions x WHERE x.device_fingerprint = a.device_fingerprint AND x.customer_id <> a.customer_id) AS device_shared_other_customers, (SELECT COUNT(*) FROM payment_transactions y WHERE y.payment_method_fingerprint = a.payment_method_fingerprint AND y.customer_id <> a.customer_id) AS method_shared_other_customers FROM archived a ORDER BY a.payment_created_at;"
+        "stdin": "WITH archived AS (\n  SELECT payment_id, record_path, customer_id, payment_created_at,\n         observed_latitude AS lat, observed_longitude AS lon\n  FROM payment_transactions\n  WHERE is_archived_basket_reference = 1\n),\nlegs AS (\n  SELECT a.*,\n    LAG(lat)  OVER w AS prev_lat,\n    LAG(lon)  OVER w AS prev_lon,\n    LAG(payment_created_at)  OVER w AS prev_ts,\n    LEAD(lat) OVER w AS next_lat,\n    LEAD(lon) OVER w AS next_lon,\n    LEAD(payment_created_at) OVER w AS next_ts\n  FROM archived a\n  WINDOW w AS (PARTITION BY customer_id ORDER BY payment_created_at)\n),\nspeeds AS (\n  SELECT *,\n    (ABS(lat - prev_lat) + ABS(lon - prev_lon)) /\n      NULLIF((julianday(payment_created_at) - julianday(prev_ts)) * 24.0, 0) AS in_speed,\n    (ABS(next_lat - lat) + ABS(next_lon - lon)) /\n      NULLIF((julianday(next_ts) - julianday(payment_created_at)) * 24.0, 0) AS out_speed\n  FROM legs\n)\nSELECT payment_id, record_path, customer_id, payment_created_at, in_speed, out_speed\nFROM speeds\nWHERE (in_speed IS NOT NULL AND in_speed > 2.0)\n   OR (out_speed IS NOT NULL AND out_speed > 2.0)\nORDER BY customer_id, payment_created_at;"
       },
-      "bind": "archived_payments"
+      "bind": "flagged"
     }
   ],
   "ops": [],
   "agents_md_constraints": [
     {
-      "anchor": "#important-things > reference",
+      "anchor": "#important-things > references",
       "rule": "When responding with reference - provide full path in the repo to the object."
     },
     {
-      "anchor": "#important-things > policy",
+      "anchor": "#important-things > policy-grounding",
       "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
-    },
-    {
-      "anchor": "#important-things > tree",
-      "rule": "When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context"
     }
   ],
   "answer_template": {
-    "message": "Fraud review: scanned archived payments (is_archived_basket_reference=1) against {policy_doc}. Flagged fraudulent payment record(s): {flagged_payment_ids} at {flagged_record_paths}. Reason: {fraud_signal}. Files unchanged (read-only).",
+    "message": "Fraud review (archived payments, impossible-travel leg rule >~2 deg/hr): flagged {flagged.row_count} payment record(s): {flagged.payment_id_list}. Detection: per customer, ordered by payment_created_at, a record is marked when its incoming or outgoing travel leg exceeds ground-travel speed. Files left unchanged.",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$flagged_record_path",
-      "$policy_doc"
+      "/docs/security.md",
+      "$flagged.record_path"
     ]
   },
   "outcome_override": null

@@ -1,34 +1,30 @@
 {
-  "intent": "Count catalogue product variants whose product kind is 'Cordless Saw and Sander'.",
+  "intent": "Count catalogue product variants whose product kind is 'Hammer Measuring and Cutting Tool'.",
   "params": {
-    "kind_name": "Cordless Saw and Sander"
+    "product_kind_name": "Hammer Measuring and Cutting Tool"
   },
   "success_criteria": [
-    "Returns integer count of product_variants joined to product_kinds where product_kind_name = 'Cordless Saw and Sander'",
-    "Answer formatted exactly as <COUNT:%d>"
+    "Returns a single integer count of product_variants joined to product_kinds matching the kind name",
+    "Answer is bare integer in '%d' format with no surrounding text"
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT COUNT(*) AS cnt FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pk.product_kind_name = :kind_name;"
+        "stdin": "SELECT COUNT(*) AS product_count FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pk.product_kind_name = :product_kind_name"
       },
       "bind": "count_result"
     }
   ],
   "ops": [],
-  "agents_md_constraints": [
-    {
-      "anchor": "#Important tools > sql",
-      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session."
-    }
-  ],
+  "agents_md_constraints": [],
   "answer_template": {
-    "message": "<COUNT:{count_result.cnt}>",
+    "message": "{count_result}",
     "outcome": "OUTCOME_OK",
-    "refs": []
+    "refs": [
+      "/proc/catalog"
+    ]
   },
   "outcome_override": null
 }

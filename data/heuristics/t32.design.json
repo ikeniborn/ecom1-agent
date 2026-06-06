@@ -1,50 +1,43 @@
 {
-  "intent": "Verify whether the Scheppach Workshop HS 1OA-DTT compressor variant (machine type compressor, 230 V, 2200 W) exists and whether it supports voice control; answer NO with the checked SKU if the base product exists but voice control is absent.",
+  "intent": "Verify whether the Sika acrylic-sealant variant in the 'Sika Weatherproof Sikaflex 1JG-02A Sealant' line is wifi-enabled, and if the base product exists without that capability answer <NO> citing the checked SKU.",
   "params": {
-    "brand": "Scheppach",
-    "model": "HS 1OA-DTT",
-    "machine_type": "compressor",
-    "voltage_v": "230",
-    "power_w": "2200",
-    "capability_key": "voice_control"
+    "brand": "Sika",
+    "line": "%Sika Weatherproof Sikaflex 1JG-02A%",
+    "sealant_type": "acrylic sealant",
+    "capability": "wifi-enabled"
   },
   "success_criteria": [
-    "Base product matching brand Scheppach, model HS 1OA-DTT, machine_type=compressor, voltage=230, power=2200 is resolved to an exact product_sku and record_path",
-    "Presence/absence of the voice_control capability on that SKU is determined from product_variant_properties",
-    "If base exists but voice_control absent, answer contains <NO> token and the checked SKU",
-    "Answer cites the exact product record path"
+    "Resolve the base product variant in the Sika Weatherproof Sikaflex 1JG-02A Sealant line whose sealant_type property is 'acrylic sealant'",
+    "Determine whether that variant has any wifi-enabled / wifi capability property",
+    "If base product exists but wifi capability is absent, emit <NO> and include the checked product_sku",
+    "Answer cites the exact matched product_variants.record_path"
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "WITH base AS (\n  SELECT v.product_sku, v.record_path, v.product_name, v.brand, v.model\n  FROM product_variants v\n  JOIN product_variant_properties mt\n    ON mt.product_sku = v.product_sku AND mt.property_key = 'machine_type'\n  JOIN product_variant_properties pv\n    ON pv.product_sku = v.product_sku AND pv.property_key = 'voltage'\n  JOIN product_variant_properties pw\n    ON pw.product_sku = v.product_sku AND pw.property_key = 'power'\n  WHERE v.brand = :brand\n    AND v.model = :model\n    AND lower(mt.property_value_text) = lower(:machine_type)\n    AND CAST(pv.property_value_number AS INTEGER) = CAST(:voltage_v AS INTEGER)\n    AND CAST(pw.property_value_number AS INTEGER) = CAST(:power_w AS INTEGER)\n)\nSELECT b.product_sku, b.record_path, b.product_name,\n       (SELECT COUNT(*) FROM product_variant_properties cap\n        WHERE cap.product_sku = b.product_sku\n          AND cap.property_key = :capability_key) AS has_voice_control\nFROM base b;"
+        "stdin": "SELECT pv.product_sku, pv.record_path, pv.product_name, pv.brand, MAX(CASE WHEN p.property_key = 'sealant_type' THEN p.property_value_text END) AS sealant_type, MAX(CASE WHEN p.property_key LIKE '%wifi%' OR p.property_value_text LIKE '%wifi%' THEN p.property_key || '=' || p.property_value_text END) AS wifi_capability FROM product_variants pv JOIN product_variant_properties p ON p.product_sku = pv.product_sku WHERE pv.brand = :brand AND pv.product_name LIKE :line GROUP BY pv.product_sku, pv.record_path, pv.product_name, pv.brand HAVING sealant_type = :sealant_type;"
       },
-      "bind": "match"
+      "bind": "product_match"
     }
   ],
   "ops": [],
   "agents_md_constraints": [
     {
-      "anchor": "#important-things > yes-no",
-      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
-    },
-    {
       "anchor": "#important-things > reference",
       "rule": "When responding with reference - provide full path in the repo to the object."
     },
     {
-      "anchor": "#important-tools > sql",
-      "rule": "Note that inventory lives only in SQL projections"
+      "anchor": "#important-things > yes-no",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
     }
   ],
   "answer_template": {
-    "message": "<NO> Base product Scheppach Workshop HS 1OA-DTT Compressor (machine type compressor, 230 V, 2200 W) exists as SKU {match.product_sku}, but the catalogue record has no voice_control capability. Checked SKU: {match.product_sku} ({match.record_path}).",
+    "message": "<NO> The base product exists — {product_match.product_name} (SKU {product_match.product_sku}) in the Sika Weatherproof Sikaflex 1JG-02A Sealant line has sealant_type '{product_match.sealant_type}', but no wifi-enabled capability is present on the catalogue record. Checked SKU: {product_match.product_sku}.",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$match.record_path"
+      "$product_match.record_path"
     ]
   },
   "outcome_override": null

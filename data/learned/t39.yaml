@@ -130,13 +130,14 @@ entries:
   status: active
 - content: null
   created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
   id: v003
   score: 0.7667549848556519
   score_detail:
   - payment fraud refs recovered ~90% EUR from fraud amount, and also marked a few
     payments as false positives.
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Fraud review: scanned archived payments (is_archived_basket_reference=1)
     against /docs/security.md. Flagged fraudulent payment record(s): /proc/payments/pay_20240329T000942Z_KVkXWvg8mB.json,
     /proc/payments/pay_20240329T002247Z_3L6ofVswx6.json, /proc/payments/pay_20240329T003148Z_Bmfk2mCgm1.json,
@@ -172,8 +173,66 @@ entries:
   - /proc/payments/pay_20240418T135612Z_7LtDrh2HHb.json
   - /proc/payments/pay_20240418T140221Z_4JoPETukFq.json
   - /docs/security.md
+- agents_md_anchor: '#important-things > references'
+  content: When parsing /bin/sql (or any tabular RPC) stdout to extract column values
+    for refs, match the tool's actual delimiter and header format — /bin/sql emits
+    comma-separated CSV with a leading header row, so split each data row on ',' and
+    skip the header by name, never assume pipe ('|') delimiting; a delimiter mismatch
+    makes every row fail the guard and silently drops all runtime refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$flagged.record_path'']) but actual refs [''/docs/security.md''] contain only
+    static template entries [''/docs/security.md''] — SQL likely returned no rows
+    or row parsing dropped the path column". Root cause: SQL did return rows — OBSERVED_RPC_OUTPUTS
+    shows /bin/sql produced CSV with header `payment_id,record_path,customer_id,...`
+    and comma-separated data rows (e.g. `pay_...,/proc/payments/pay_...json,cust_032,...`).
+    But the parse loop assumes pipe-delimited output. Failing fragment: `if not line
+    or "|" not in line: continue` followed by `parts = [p.strip() for p in line.split("|")]`
+    — no data row contains ''|'', so every row is skipped, record_paths stays empty,
+    and refs collapse to the static [''/docs/security.md'']. Linkage: existing rules
+    r001/r002 (RPC emission/verbatim args) and r003 (refs subset narrowing) cover
+    plan fidelity and ref scoping but none address output-parsing delimiter fidelity;
+    this is a distinct CODEGEN technique gap — translating the SQL result into refs
+    requires matching the actual CSV delimiter.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v004
+  score: 0.7667549848556519
+  score_detail:
+  - payment fraud refs recovered ~90% EUR from fraud amount, and also marked a few
+    payments as false positives.
+  source: verdict
+  status: active
+  submitted_message: 'Fraud review (archived payments, impossible-travel leg rule
+    >~2 deg/hr): flagged 14 payment record(s): pay_20240418T130512Z_R6zkTv7LkE, pay_20240418T131422Z_6JmHRkVcZ8,
+    pay_20240418T132112Z_86qN5BXRgc, pay_20240418T132854Z_LkFkrd3T4n, pay_20240418T133912Z_NCGVoFZMFB,
+    pay_20240418T134629Z_LfgaG9XoCQ, pay_20240418T135612Z_7LtDrh2HHb, pay_20240418T140221Z_4JoPETukFq,
+    pay_20240413T160425Z_7L6cWqg9zk, pay_20240413T160429Z_XaWPmP9Vad, pay_20240329T000942Z_KVkXWvg8mB,
+    pay_20240329T002247Z_3L6ofVswx6, pay_20240329T003148Z_Bmfk2mCgm1, pay_20240329T004252Z_R2cyKpyZ9W.
+    Detection: per customer, ordered by payment_created_at, a record is marked when
+    its incoming or outgoing travel leg exceeds ground-travel speed. Files left unchanged.'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/security.md
+  - /proc/payments/pay_20240418T130512Z_R6zkTv7LkE.json
+  - /proc/payments/pay_20240418T131422Z_6JmHRkVcZ8.json
+  - /proc/payments/pay_20240418T132112Z_86qN5BXRgc.json
+  - /proc/payments/pay_20240418T132854Z_LkFkrd3T4n.json
+  - /proc/payments/pay_20240418T133912Z_NCGVoFZMFB.json
+  - /proc/payments/pay_20240418T134629Z_LfgaG9XoCQ.json
+  - /proc/payments/pay_20240418T135612Z_7LtDrh2HHb.json
+  - /proc/payments/pay_20240418T140221Z_4JoPETukFq.json
+  - /proc/payments/pay_20240413T160425Z_7L6cWqg9zk.json
+  - /proc/payments/pay_20240413T160429Z_XaWPmP9Vad.json
+  - /proc/payments/pay_20240329T000942Z_KVkXWvg8mB.json
+  - /proc/payments/pay_20240329T002247Z_3L6ofVswx6.json
+  - /proc/payments/pay_20240329T003148Z_Bmfk2mCgm1.json
+  - /proc/payments/pay_20240329T004252Z_R2cyKpyZ9W.json
 last_run:
-  cycles_used: 1
+  cycles_used: 2
   date: '2026-06-06'
   outcome: OUTCOME_OK
   status: failure

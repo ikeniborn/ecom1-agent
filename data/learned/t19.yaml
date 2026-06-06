@@ -21,9 +21,42 @@ entries:
     (single-cell ''7'' coincidentally int-castable). Rule linkage: corrective rule
     fixes the delimiter assumption that severed path extraction.'
   status: active
+- agents_md_anchor: '#important-things > references'
+  content: When a discovery query must resolve required runtime refs and its result
+    is CROSS JOINed into the ops query, verify it returned at least one data row before
+    proceeding — a zero-row CTE annihilates the CROSS JOIN to empty, so short-circuit
+    to a not-found/failure outcome instead of emitting OUTCOME_OK with empty refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$store_paths'', ''$product_path'']) but actual refs [] contain only static
+    template entries []". Root cause: /bin/id discovery returned `user: anonymous,
+    roles: GUEST`; the product-resolution SQL returned header-only `product_sku,record_path,product_name`
+    with zero data rows, so the prod CTE was empty and the ops query''s `CROSS JOIN
+    prod` annihilated to empty (`store_id,store_path,product_path,available_today,total_available`
+    header only). Failing fragment: `return vm.answer(message=..., outcome="OUTCOME_OK",
+    refs=refs)` with refs=[] — no guard checks that discovery resolved exactly one
+    variant before building the answer, and the fetched `identity` result is never
+    used. Parsing is correct (csv.reader, per r001), so this is genuinely a zero-row
+    result, not a delimiter drop. New rule adds a zero-row / empty-CTE guard before
+    emitting success, complementary to r001 (which covers delimiter parsing).'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: No matching Hansgrohe Compact Logis 1ZN-TEP shower waste 50mm
+    shower-waste variant found in Graz.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
   cycles_used: 2
   date: '2026-06-06'
-  outcome: OUTCOME_OK
-  status: success
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
 task_id: t19

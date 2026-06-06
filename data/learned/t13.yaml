@@ -39,12 +39,13 @@ entries:
   status: active
 - content: null
   created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
   id: v001
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/stores/store_linz_hauptplatz.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 3 products
   submitted_outcome: OUTCOME_OK
   submitted_refs:
@@ -70,9 +71,79 @@ entries:
     composition for scoped store/location objects, so a new technique rule is needed
     to make CODEGEN select and include the scope record_path.'
   status: active
+- agents_md_anchor: null
+  content: When the tool_plan specifies a /bin/sql RPC with its query in `stdin` and
+    `:name` parameter bindings, CODEGEN must execute it the same shape — write the
+    SQL to stdin and supply each named binding separately — and never relocate the
+    query into the `args` array with interpolated literals; /bin/sql reads its statement
+    from stdin, so an args-only invocation returns the SELECT column header with zero
+    data rows, which collapses every result-derived ref list to empty.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$available_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column; check
+    `:name` bindings on /bin/sql and the SELECT columns". Root cause: tool_plan declared
+    both Exec RPCs as {path:''/bin/sql'', args:[], stdin:''<SQL with :city/:store_pattern/...
+    bindings>''}, but CODEGEN ignored the stdin+binding shape and instead string-interpolated
+    literals into one SQL string passed via vm.exec(path=''/bin/sql'', args=[discovery_sql]).
+    OBSERVED outputs confirm the failure signature: BOTH queries returned only their
+    header line (`store_id,record_path,store_name,city,is_open` and `product_sku,record_path,available_today_quantity`)
+    with zero data rows. Identical header-only output on two independent queries —
+    including the trivial store lookup — is not a data/no-match artifact; it is /bin/sql
+    parsing the statement (hence correct headers) but not executing it because the
+    query was delivered through args rather than stdin. Failing fragment: `vm.exec(path="/bin/sql",
+    args=[discovery_sql])` and `vm.exec(path="/bin/sql", args=[ops_sql])`. With zero
+    rows, store_paths=[] and product_paths=[] → refs=[] → $available_paths empty →
+    validator rejects. Rule linkage: distinct from r002 (CSV stdout parsing — parsing
+    was correct, there was simply nothing past the header) and from r003 (which appends
+    store record_path but cannot help when the scope query itself returns no rows);
+    no existing rule covers preserving the plan''s stdin+`:name` invocation shape
+    for /bin/sql.'
+  status: active
+- agents_md_anchor: null
+  content: Always keep the tool_plan's `:name` parameter placeholders intact inside
+    the /bin/sql statement sent via stdin and pass each value through the RPC's separate
+    named-binding channel; never replace a `:name` with an inlined single-quoted string
+    or numeric literal, and never emit a comment claiming `:name` bindings are unsupported
+    — even when the SQL stays in stdin, stripping the placeholders yields a header-only,
+    zero-row result that empties every result-derived ref list.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$available_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". OBSERVED_RPC_OUTPUTS
+    confirm both /bin/sql calls returned ONLY the CSV header with zero data rows (''store_id,record_path,store_name,city,is_open''
+    and ''product_sku,record_path,available_today_quantity''), so available_paths/store_paths
+    were empty and refs collapsed to []. Root cause: CODEGEN stripped the plan''s
+    `:name` bindings (:city, :store_pattern, :fam_*, :storage_type, :diameter, :min_available)
+    and inlined them as literals via _q()/str(), keeping SQL in stdin but dropping
+    the named-binding channel. Failing fragment: `"... WHERE city = " + _q(city) +
+    " AND store_name LIKE " + _q(store_pattern)` plus the hallucinated comment "/bin/sql
+    does not accept :name bindings (verified: missing named argument)". Rule linkage:
+    the [in-session] rule already mandates preserving `:name` bindings but frames
+    the zero-row failure narrowly as an args-relocation problem; this cycle proves
+    the identical zero-row collapse also occurs when the statement stays in stdin
+    yet the placeholders are inlined, so the new rule generalizes the prohibition
+    to forbid literal substitution regardless of stdin/args placement and rebuts the
+    false ''bindings unsupported'' justification.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/CLN-GEF2EYP9.json'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
+  cycles_used: 3
   date: '2026-06-06'
-  outcome: OUTCOME_OK
-  status: success
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
 task_id: t13

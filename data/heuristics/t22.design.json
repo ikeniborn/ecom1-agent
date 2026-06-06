@@ -1,14 +1,15 @@
 {
-  "intent": "Identify the current customer, locate their active shopping basket, apply the checkout policy, and complete checkout via the payments tool.",
+  "intent": "Check out the basket belonging to the current customer after verifying identity, checkout policy, and per-line availability.",
   "params": {
-    "customer_id": "$customer_id"
+    "customer_id": "$agent_customer_id",
+    "basket_id": "$basket_id"
   },
   "success_criteria": [
-    "Current request identity resolved to a customer via the id tool",
-    "The customer's active (non-checked-out) basket is uniquely identified; if multiple candidates exist, all are surfaced for clarification",
-    "Checkout policy from docs read and its preconditions (inventory availability, basket status, payment/3DS requirements) satisfied",
-    "Checkout completed through the payments tool producing a payment_transaction for the basket",
-    "Answer references the basket record path, the resulting payment record path, and the checkout policy document"
+    "Identity resolved via /bin/id and matches the basket owner (no cross-customer checkout)",
+    "Checkout policy (/docs/checkout.md) and security policy (/docs/security.md) read and applied",
+    "Every basket line has requested_quantity <= available_today_quantity, else OUTCOME_NONE_UNSUPPORTED with no mutation",
+    "If authorized and all lines available, /bin/checkout completes the basket",
+    "Answer references the basket record path plus every applied policy doc"
   ],
   "discovery": [
     {
@@ -20,19 +21,17 @@
       "bind": "identity"
     },
     {
-      "rpc": "Find",
+      "rpc": "Read",
       "args": {
-        "root": "/docs",
-        "name": "checkout",
-        "kind": "file",
-        "limit": 5
+        "path": "/docs/security.md",
+        "number": true
       },
-      "bind": "checkout_policy_path"
+      "bind": "security_policy"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "$checkout_policy_path",
+        "path": "/docs/checkout.md",
         "number": true
       },
       "bind": "checkout_policy"
@@ -40,35 +39,39 @@
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/payments",
+        "path": "/bin/checkout",
         "args": [
           "--help"
         ]
       },
-      "bind": "payments_help"
+      "bind": "checkout_help"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
         "args": [
-          "WITH b AS (SELECT basket_id, record_path, store_id, basket_status, basket_created_at FROM shopping_baskets WHERE customer_id = :customer_id) SELECT b.basket_id, b.record_path, b.store_id, b.basket_status, b.basket_created_at, bi.line_number, bi.product_sku, bi.requested_quantity, pv.price_cents, pv.price_currency, inv.available_today_quantity FROM b JOIN shopping_basket_items bi ON bi.basket_id = b.basket_id JOIN product_variants pv ON pv.product_sku = bi.product_sku LEFT JOIN store_inventory inv ON inv.store_id = b.store_id AND inv.product_sku = bi.product_sku ORDER BY b.basket_created_at DESC, bi.line_number;"
+          "SELECT b.basket_id, b.record_path AS basket_path, b.basket_status, b.store_id, b.customer_id, i.line_number, i.product_sku, i.requested_quantity, inv.available_today_quantity, v.product_name, v.price_cents FROM shopping_baskets b JOIN shopping_basket_items i ON i.basket_id = b.basket_id JOIN product_variants v ON v.product_sku = i.product_sku LEFT JOIN store_inventory inv ON inv.store_id = b.store_id AND inv.product_sku = i.product_sku WHERE b.customer_id = :customer_id AND b.basket_status = 'open' ORDER BY i.line_number;"
         ]
       },
-      "bind": "basket"
+      "bind": "basket_lines"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$basket_path",
+        "number": true
+      },
+      "bind": "basket_record"
     }
   ],
   "ops": [
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/payments",
+        "path": "/bin/checkout",
         "args": [
-          "checkout",
-          "--basket",
-          "$basket_id",
-          "--customer",
-          "$customer_id"
+          ":basket_id"
         ]
       },
       "bind": "checkout_result"
@@ -77,32 +80,32 @@
   "agents_md_constraints": [
     {
       "anchor": "#Important tools > id",
-      "rule": "- id tool returns identity of the user/customer/guest under which we are running current request."
+      "rule": "id tool returns identity of the user/customer/guest under which we are running current request."
     },
     {
-      "anchor": "#Important tools > payments",
-      "rule": "- use payments tool to manage payment workflow state and supported refund approval/finalization"
+      "anchor": "#Key locations > policies",
+      "rule": "Commerce policies are in `docs`, including checkout, discounts, payments, returns, and security"
     },
     {
-      "anchor": "#Important things > policy grounding",
-      "rule": "- When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+      "anchor": "#Important things > grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
     },
     {
-      "anchor": "#Important things > reference full path",
-      "rule": "- When responding with reference - provide full path in the repo to the object."
+      "anchor": "#Important things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
     },
     {
-      "anchor": "#Important things > ambiguity",
-      "rule": "- When a request is ambiguous and you ask for clarification, reference all concrete candidate objects that make it ambiguous."
+      "anchor": "#Important things > availability",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products."
     }
   ],
   "answer_template": {
-    "message": "Checkout completed for basket $basket_id ($basket_path). Payment $payment_id created with status $payment_status. Checkout policy applied per $checkout_policy_path.",
+    "message": "Identity from /bin/id: {identity}. Basket {basket_id} ({basket_path}) for the current customer. Per /docs/checkout.md and /docs/security.md: if identity matches the basket owner and every line's requested_quantity <= available_today_quantity, checkout completed -> {checkout_result}. If a non-security checkout rule fails (any line over availability) -> NONE_UNSUPPORTED, no mutation. If the request leans on another customer's basket or an unverified identity -> DENIED_SECURITY, no mutation.",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$basket_path",
-      "$payment_path",
-      "$checkout_policy_path"
+      "/docs/security.md",
+      "/docs/checkout.md",
+      "$basket_path"
     ]
   },
   "outcome_override": null

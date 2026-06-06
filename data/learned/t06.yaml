@@ -117,9 +117,37 @@ entries:
   - /proc/catalog/Bondex/PNT-2ANVO7V6.json
   - /proc/catalog/Bondex/PNT-2RHJYR74.json
   - /proc/catalog/Bondex/PNT-3APVSF7J.json
+- agents_md_anchor: '#important-things > references'
+  content: When a discovery lookup filters by exact equality on identifying params
+    (e.g. brand AND model) and the /bin/sql result is header-only with zero data rows,
+    do not emit a final answer that asserts the object exists with placeholder '(unknown)'
+    SKU and empty refs; treat the empty result as a broaden-and-retry signal and re-run
+    the lookup with relaxed predicates (case-insensitive LIKE on model/product_name,
+    or split a compound model/kind token) so the base product and its record_path
+    are actually located before producing the verdict and refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$base_product.record_path'']) but actual refs [] contain only static template
+    entries [] — SQL likely returned no rows or row parsing dropped the path column".
+    Root cause is NOT parsing or :name bindings: the script correctly inlined literals
+    (the :brand/:model binds were dropped) and CSV parsing was sound, but OBSERVED_RPC_OUTPUTS
+    shows /bin/sql returned only the header line `product_sku,record_path,...` with
+    no data row — the exact-equality predicate `WHERE pv.brand = ''Raaco'' AND pv.model
+    = ''3CS-7A9''` matched zero records. The grader (v003) expected SKU ''PNT-2RHJYR74'',
+    so the base product exists under a different stored brand/model spelling than
+    the literal params. Failing fragment: `skus = [r[''product_sku''] for r in rows
+    if ...]` and `paths = [r[''record_path''] for r in rows if ...]` both resolve
+    empty, then `sku_str = skus[0] if skus else ''(unknown)''` and `vm.answer(...,
+    refs=paths)` emit a confident ''<NO> ... exists as SKU (unknown)'' with refs=[].
+    Rule linkage: CODEGEN must detect the header-only/zero-row case and broaden the
+    query instead of fabricating a placeholder verdict with empty refs, which is exactly
+    what produced the empty-refs failure and the missing grader SKU.'
+  status: active
 last_run:
-  cycles_used: 1
+  cycles_used: 2
   date: '2026-06-06'
   outcome: OUTCOME_OK
-  status: failure
+  status: success
 task_id: t06

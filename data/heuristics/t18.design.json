@@ -1,24 +1,26 @@
 {
-  "intent": "Sum available_today units of the Fischer SX 7UY-G03 cavity-fixing anchor/wall-plug across every open PowerTool branch in Graz (including 0-availability branches) and cite all Graz store records plus the product record.",
+  "intent": "Sum available-today units of the Bondex Garden Classic 106-TS1 deck-oil variant across every Graz PowerTool store (including zero-availability stores) and report as \"qty %d\".",
   "params": {
-    "brand": "Fischer",
-    "series": "SX",
-    "model": "SX 7UY-G03",
-    "anchor_type": "cavity fixing",
+    "brand": "Bondex",
+    "series": "Garden Classic",
+    "model": "106-TS1",
+    "kind_name": "Wood Stain and Deck Oil",
+    "product_type": "deck oil",
     "city": "Graz"
   },
   "success_criteria": [
-    "Resolves exactly one product SKU matching brand=Fischer, model=SX 7UY-G03, anchor_type=cavity fixing",
-    "Total = SUM(available_today_quantity) over all open Graz stores (0-availability branches contribute 0 but are still enumerated)",
-    "Answer string is exactly 'answer=%d'",
-    "refs include the product record path and every open Graz city store record path"
+    "Resolve the SKU(s) in the Bondex Garden Classic 106-TS1 Wood Stain and Deck Oil family whose variant product_type is 'deck oil'.",
+    "Enumerate ALL stores with city='Graz' via LEFT JOIN to store_inventory so branches with 0 availability are still counted.",
+    "Total = SUM(COALESCE(available_today_quantity,0)) over every Graz store for the matched SKU(s).",
+    "Final message is exactly 'qty %d' with the integer total.",
+    "refs cite every Graz store record_path plus the matched product record_path(s)."
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT v.product_sku, v.record_path FROM product_variants v JOIN product_variant_properties p ON p.product_sku = v.product_sku WHERE v.brand = :brand AND v.series = :series AND v.model = :model AND p.property_key = 'anchor_type' AND p.property_value_text = :anchor_type;"
+        "stdin": "SELECT pv.product_sku, pv.record_path, pk.product_kind_name, pv.product_name, pvp.property_value_text AS product_type FROM product_variants pv JOIN product_kinds pk ON pk.product_kind_id = pv.product_kind_id JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku WHERE pv.brand = :brand AND pv.product_name LIKE '%' || :model || '%' AND pvp.property_key = 'product_type' AND lower(pvp.property_value_text) = lower(:product_type);"
       },
       "bind": "product"
     },
@@ -26,7 +28,7 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT store_id, record_path FROM stores WHERE city = :city AND is_open = 1 ORDER BY store_id;"
+        "stdin": "SELECT store_id, record_path, store_name FROM stores WHERE city = :city ORDER BY store_id;"
       },
       "bind": "graz_stores"
     }
@@ -36,9 +38,9 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total FROM stores s LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = :sku WHERE s.city = :city AND s.is_open = 1;"
+        "stdin": "WITH target AS (SELECT pv.product_sku, pv.record_path AS product_record_path FROM product_variants pv JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku WHERE pv.brand = :brand AND pv.product_name LIKE '%' || :model || '%' AND pvp.property_key = 'product_type' AND lower(pvp.property_value_text) = lower(:product_type)) SELECT s.store_id, s.record_path AS store_record_path, t.product_sku, t.product_record_path, COALESCE(si.available_today_quantity, 0) AS available_today FROM stores s CROSS JOIN target t LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = t.product_sku WHERE s.city = :city ORDER BY s.store_id;"
       },
-      "bind": "total"
+      "bind": "availability"
     }
   ],
   "agents_md_constraints": [
@@ -52,11 +54,11 @@
     }
   ],
   "answer_template": {
-    "message": "answer={total}",
+    "message": "qty {total_available_today}",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$product_path",
-      "$graz_store_paths"
+      "$store_record_paths",
+      "$product_record_paths"
     ]
   },
   "outcome_override": null

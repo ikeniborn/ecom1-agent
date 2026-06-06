@@ -1,153 +1,205 @@
-import csv as _csv
-
+import json, re
 
 def run(vm, params):
-    OUTCOME_OK = "OUTCOME_OK"
-    OUTCOME_DENIED = "OUTCOME_DENIED_SECURITY"
-    OUTCOME_UNSUPPORTED = "OUTCOME_NONE_UNSUPPORTED"
+    payment_id = params.get("payment_id", "pay_033")
+    basket_id = params.get("basket_id", "basket_233")
+    payment_path = "/proc/payments/%s.json" % payment_id
+    basket_path = "/proc/baskets/%s.json" % basket_id
 
-    def _stdout(r):
-        if r is None:
+    def txt(resp):
+        if resp is None:
             return ""
-        if isinstance(r, str):
-            return r
-        v = getattr(r, "stdout", None)
-        if v is None and isinstance(r, dict):
-            v = r.get("stdout", "")
-        return v or ""
+        if isinstance(resp, str):
+            return resp
+        if isinstance(resp, dict):
+            for k in ("content", "text", "stdout", "data", "body"):
+                v = resp.get(k)
+                if v:
+                    return v
+            return ""
+        for k in ("content", "text", "stdout", "data", "body"):
+            v = getattr(resp, k, None)
+            if v:
+                return v
+        return ""
 
-    payment_id = params.get("payment_id", "")
-    basket_id = params.get("basket_id", "")
+    def exit_code(resp):
+        if isinstance(resp, dict):
+            return resp.get("exit_code")
+        return getattr(resp, "exit_code", None)
 
-    # ---- discovery (every RPC wrapped; always executes) ----
-    try:
-        identity = vm.exec(path="/bin/id", args=[])
-    except Exception as e:
-        identity = "error: %s" % e
-    identity_str = _stdout(identity)
-
-    try:
-        payments_help = vm.exec(path="/bin/payments", args=["--help"])
-    except Exception as e:
-        payments_help = "error: %s" % e
-    help_str = _stdout(payments_help)
-
-    try:
-        docs_tree = vm.tree(root="/docs", level=2)
-    except Exception as e:
-        docs_tree = "error: %s" % e
-
-    try:
-        security_policy = vm.read(path="/docs/security.md")
-    except Exception as e:
-        security_policy = "error: %s" % e
-
-    try:
-        payments_doc_path = vm.find(root="/docs", name="payments", kind="file", limit=10)
-    except Exception as e:
-        payments_doc_path = "error: %s" % e
-
-    try:
-        payments_policy = vm.read(path="/docs/payments.md")
-    except Exception as e:
-        payments_policy = "error: %s" % e
-
-    # ---- SQL: inline single-quoted literals (verified: /bin/sql rejects :name binds) ----
-    pid = str(payment_id).replace("'", "''")
-    bid = str(basket_id).replace("'", "''")
-    sql = (
-        "SELECT payment_id, record_path, basket_id, is_archived_basket_reference, "
-        "customer_id, store_id, payment_status, three_ds_status, three_ds_failure_reason, "
-        "three_ds_attempts, three_ds_max_attempts FROM payment_transactions "
-        "WHERE payment_id = '%s' AND basket_id = '%s';" % (pid, bid)
-    )
-    try:
-        payment_row = vm.exec(path="/bin/sql", args=[sql])
-    except Exception as e:
-        payment_row = "error: %s" % e
-    sql_out = _stdout(payment_row)
-
-    # ---- parse CSV (header row + data rows) ----
-    row = {}
-    try:
-        lines = [ln for ln in sql_out.splitlines() if ln.strip() != ""]
-        if len(lines) >= 2:
-            reader = list(_csv.reader(lines))
-            header = [h.strip() for h in reader[0]]
-            data = reader[1]
-            for i, h in enumerate(header):
-                row[h] = data[i].strip() if i < len(data) else ""
-    except Exception:
-        row = {}
-
-    record_path = row.get("record_path", "") or ("/proc/payments/%s.json" % payment_id)
-
-    try:
-        payment_record = vm.read(path=record_path)
-    except Exception as e:
-        payment_record = "error: %s" % e
-
-    payments_ref = "/docs/payments.md"
-
-    # ---- eligibility evaluation ----
-    customer_id = row.get("customer_id", "")
-    three_ds_status = row.get("three_ds_status", "")
-    payment_status = row.get("payment_status", "")
-    archived = row.get("is_archived_basket_reference", "").strip().lower() in ("1", "true", "t", "yes")
-
-    def _int(x):
+    def safe(fn, **kw):
         try:
-            return int(str(x).strip())
+            return fn(**kw)
+        except Exception as e:
+            return {"error": str(e)}
+
+    # ---- discovery (in order) ----
+    identity = safe(vm.exec, path="/bin/id", args=[])
+    docs_tree = safe(vm.tree, root="/docs", level=2)
+    security_policy = safe(vm.read, path="/docs/security.md")
+    threeds_policy = safe(vm.read, path="/docs/payments/3ds.md")
+    payments_help = safe(vm.exec, path="/bin/payments", args=["--help"])
+    payment_record = safe(vm.read, path=payment_path)
+    basket_record = safe(vm.read, path=basket_path)
+    sql = ("SELECT p.payment_id, p.record_path, p.basket_id, p.customer_id, "
+           "p.store_id, p.payment_status, p.three_ds_status, p.three_ds_failure_reason, "
+           "p.three_ds_attempts, p.three_ds_max_attempts, b.record_path AS basket_record_path, "
+           "b.customer_id AS basket_customer_id, b.basket_status "
+           "FROM payment_transactions p LEFT JOIN shopping_baskets b "
+           "ON b.basket_id = p.basket_id WHERE p.payment_id = '%s';" % payment_id)
+    payment_row = safe(vm.exec, path="/bin/sql", args=[sql])
+
+    # ---- parse identity ----
+    id_text = txt(identity)
+    id_json = {}
+    try:
+        parsed = json.loads(id_text)
+        if isinstance(parsed, dict):
+            id_json = {str(k).lower(): v for k, v in parsed.items()}
+    except Exception:
+        id_json = {}
+    if not id_json and id_text:
+        for tok in re.split(r"[\s,;]+", id_text.strip()):
+            m = re.match(r"([A-Za-z_]+)\s*[:=]\s*(.+)", tok)
+            if m:
+                id_json[m.group(1).lower()] = m.group(2).strip().strip('"')
+
+    def gi(*keys):
+        for k in keys:
+            v = id_json.get(k)
+            if v not in (None, ""):
+                return str(v)
+        return ""
+    caller_customer = gi("customer_id", "customer", "cust_id")
+    caller_user = gi("user", "username", "name", "id")
+    caller_role = gi("role", "type", "kind").lower()
+
+    # ---- parse records ----
+    try:
+        pay_json = json.loads(txt(payment_record))
+        if not isinstance(pay_json, dict):
+            pay_json = {}
+    except Exception:
+        pay_json = {}
+    try:
+        bask_json = json.loads(txt(basket_record))
+        if not isinstance(bask_json, dict):
+            bask_json = {}
+    except Exception:
+        bask_json = {}
+
+    # ---- parse sql CSV (header-keyed, delimiter-detected) ----
+    def parse_row(s):
+        lines = [l for l in s.splitlines() if l.strip() != ""]
+        if len(lines) < 2:
+            return {}
+        header = lines[0]
+        delim = "," if header.count(",") >= header.count("|") else "|"
+        cols = [c.strip() for c in header.split(delim)]
+        vals = [c.strip() for c in lines[1].split(delim)]
+        return dict(zip(cols, vals))
+    row = parse_row(txt(payment_row))
+
+    def pf(*keys):
+        for src in (pay_json, row):
+            for k in keys:
+                if isinstance(src, dict) and src.get(k) not in (None, ""):
+                    return src.get(k)
+        return None
+
+    def to_int(v):
+        try:
+            return int(str(v).strip())
         except Exception:
             return None
 
-    attempts = _int(row.get("three_ds_attempts", ""))
-    max_attempts = _int(row.get("three_ds_max_attempts", ""))
+    payment_status = str(pf("payment_status") or "")
+    three_ds_status = str(pf("three_ds_status") or "")
+    failure_reason = str(pf("three_ds_failure_reason", "failure_reason") or "")
+    attempts = to_int(pf("three_ds_attempts"))
+    max_attempts = to_int(pf("three_ds_max_attempts"))
+    pay_customer = str(pf("customer_id") or "")
+    bask_customer = str((bask_json.get("customer_id") if isinstance(bask_json, dict) else "") or row.get("basket_customer_id", "") or "")
 
-    owner = bool(customer_id) and (customer_id in (identity_str or ""))
-    recover_supported = "recover-3ds" in (help_str or "")
-    resumable = three_ds_status.strip().lower() == "requires_3ds_action"
-    attempts_left = (attempts is not None and max_attempts is not None and attempts < max_attempts)
-    basket_ref_ok = (row.get("basket_id", "") == basket_id) and (not archived)
+    # ---- record paths (prefer SQL record_path, fallback to constructed) ----
+    payment_record_path = (row.get("record_path") or "").strip() or payment_path
+    basket_record_path = (row.get("basket_record_path") or "").strip() or basket_path
 
-    # ---- ops: always emit recover-3ds (fidelity); /bin/payments enforces 3DS safety ----
-    try:
-        recover_result = vm.exec(path="/bin/payments", args=["recover-3ds", "--payment", payment_id])
-    except Exception as e:
-        recover_result = "error: %s" % e
-    recover_str = _stdout(recover_result)
+    # ---- gates ----
+    outcome = None
+    deny_reason = ""
+    staff_roles = {"admin", "staff", "employee", "manager", "agent", "support", "operator", "system", "payments"}
 
-    # ---- terminal outcome ----
-    if not owner:
-        outcome = OUTCOME_DENIED
-        verdict = "NOT recovered \u2014 running identity is not the owner of pay_015/basket_215; payment safety not bypassed."
-    elif not recover_supported:
-        outcome = OUTCOME_UNSUPPORTED
-        verdict = "NOT recovered \u2014 /bin/payments does not support 3DS recovery."
-    elif not (resumable and attempts_left and basket_ref_ok):
-        outcome = OUTCOME_UNSUPPORTED
-        verdict = "NOT recovered \u2014 payment not in a resumable 3DS state (requires_3ds_action with attempts<max, live basket ref); payment safety not bypassed."
+    # SECURITY GATE (no mutation)
+    if caller_customer and pay_customer and caller_customer != pay_customer:
+        outcome = "OUTCOME_DENIED_SECURITY"
+        deny_reason = "caller customer %s != payment customer %s (acting on another customer's record)" % (caller_customer, pay_customer)
+    elif pay_customer and bask_customer and pay_customer != bask_customer:
+        outcome = "OUTCOME_DENIED_SECURITY"
+        deny_reason = "basket customer %s != payment customer %s (ownership mismatch)" % (bask_customer, pay_customer)
+    elif id_json and not caller_customer and caller_role in {"guest", "anonymous", "none", "unauthenticated", ""} and pay_customer:
+        outcome = "OUTCOME_DENIED_SECURITY"
+        deny_reason = "unauthenticated/guest caller cannot recover customer %s payment" % pay_customer
+
+    # BUSINESS GATE (3DS payment-safety; no mutation)
+    recoverable_status = {"failed", "requires_action", "challenge_required", "pending", "attempts_remaining", "recoverable", "retry", "retryable", "challenge_failed", "authentication_failed", "declined"}
+    nonrecoverable_status = {"succeeded", "success", "passed", "authenticated", "completed", "approved", "locked", "blocked", "abandoned", "expired", "final_failure", "failed_final", "max_attempts_reached"}
+    final_payment = {"paid", "captured", "completed", "refunded", "cancelled", "canceled", "voided", "settled", "succeeded"}
+
+    if outcome is None:
+        ts = three_ds_status.lower()
+        ps = payment_status.lower()
+        bypass = ("bypass" in failure_reason.lower()) or ("bypass" in ts)
+        attempts_exhausted = (attempts is not None and max_attempts is not None and attempts >= max_attempts)
+        nonrecoverable = ts in nonrecoverable_status
+        final = ps in final_payment
+        help_text = txt(payments_help).lower()
+        supported = ("recover-3ds" in help_text) or ("recover" in help_text) or (help_text == "")
+        if not supported:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+            deny_reason = "/bin/payments does not support recover-3ds"
+        elif attempts_exhausted:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+            deny_reason = "3DS attempts exhausted (%s/%s)" % (attempts, max_attempts)
+        elif nonrecoverable:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+            deny_reason = "3DS status '%s' is not recoverable" % three_ds_status
+        elif final:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+            deny_reason = "payment status '%s' is final" % payment_status
+        elif bypass:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+            deny_reason = "recovery would require a 3DS safety bypass"
+
+    # ---- ops: mutate only when identity authorized AND payment-safety eligible ----
+    recovery_result = None
+    if outcome is None:
+        recovery_result = safe(vm.exec, path="/bin/payments", args=["recover-3ds", "--payment", payment_id])
+        rc = exit_code(recovery_result)
+        rr_text = txt(recovery_result)
+        if rc not in (0, None):
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+            deny_reason = "recovery rejected by tool: %s" % (rr_text or rc)
+        else:
+            outcome = "OUTCOME_OK"
+
+    rr_text = txt(recovery_result) if recovery_result is not None else ""
+
+    # ---- refs: policies always + inspected record paths ----
+    refs = ["/docs/security.md", "/docs/payments/3ds.md"]
+    if payment_record_path and payment_record_path not in refs:
+        refs.append(payment_record_path)
+    if basket_record_path and basket_record_path not in refs:
+        refs.append(basket_record_path)
+
+    caller_disp = caller_user or caller_customer or (id_text.strip() or "unknown")
+    if outcome == "OUTCOME_OK":
+        tail = "recovered via /bin/payments: %s" % (rr_text.strip() or "ok")
     else:
-        outcome = OUTCOME_OK
-        verdict = "3DS flow resumed via /bin/payments; no 3DS bypass."
+        tail = "no mutation (%s)" % (deny_reason or "ineligible")
+    message = ("3DS recovery for %s (%s): caller=%s. Payment status=%s, 3ds=%s, attempts=%s/%s. "
+               "Decision=%s. %s" % (payment_id, basket_id, caller_disp, payment_status or "?",
+               three_ds_status or "?", attempts, max_attempts, outcome, tail))
 
-    a_str = "?" if attempts is None else str(attempts)
-    m_str = "?" if max_attempts is None else str(max_attempts)
-    message = (
-        "Identity %s. Payment %s -> %s, status %s, 3DS %s attempts %s/%s. %s result: %s. Record: %s"
-        % (
-            (identity_str or "").strip(),
-            payment_id,
-            basket_id,
-            payment_status,
-            three_ds_status,
-            a_str,
-            m_str,
-            verdict,
-            (recover_str or "").strip(),
-            record_path,
-        )
-    )
-
-    refs = ["/docs/security.md", payments_ref, record_path]
     vm.answer(message=message, outcome=outcome, refs=refs)

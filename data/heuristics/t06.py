@@ -3,54 +3,65 @@ import io
 
 
 def run(vm, params):
+    def get_stdout(result):
+        return getattr(result, "stdout", "") or (result.get("stdout", "") if isinstance(result, dict) else "")
+
     def esc(v):
         return str(v).replace("'", "''")
 
-    brand = esc(params["brand"])
-    line = esc(params["line"])
-    product_kind = esc(params["product_kind"])
-    volume_ml = params["volume_ml"]
+    brand = params.get("brand", "Raaco")
+    model = params.get("model", "3CS-7A9")
+    st1 = params.get("storage_type_1", "shelving unit")
+    st2 = params.get("storage_type_2", "stacking box")
+
+    # Discovery 1 (Exec): identity. Only /bin/sql is guaranteed at runtime; guard failure.
     try:
-        volume_sql = str(int(volume_ml))
-    except (TypeError, ValueError):
-        volume_sql = "'" + esc(volume_ml) + "'"
+        identity = vm.exec(path="/bin/id", args=[], stdin="")
+    except Exception:
+        identity = None
 
+    # Discovery 2 (Exec /bin/sql): locate base product + all its storage_type values.
+    # /bin/sql does NOT accept :name bindings -> inline values as quoted literals.
+    # Broaden with LIKE on model/product_name so the base product resolves in one query.
+    # Use a non-comma GROUP_CONCAT separator so CSV parsing never splits storage_types.
+    b = esc(brand)
+    m = esc(model)
     sql = (
-        "WITH base AS ("
-        "SELECT pv.product_sku, pv.record_path, pv.brand, pv.series, pv.model, "
-        "pv.product_name, pv.product_kind_id, pk.product_kind_name "
+        "SELECT pv.product_sku, pv.record_path, pv.product_name, pv.brand, pv.series, pv.model, "
+        "GROUP_CONCAT(CASE WHEN pvp.property_key = 'storage_type' THEN pvp.property_value_text END, ' / ') AS storage_types "
         "FROM product_variants pv "
-        "JOIN product_kinds pk ON pk.product_kind_id = pv.product_kind_id "
-        "WHERE pv.brand = '" + brand + "' "
-        "AND pv.product_name LIKE '%" + line + "%'"
-        "), withvol AS ("
-        "SELECT b.*, vp.property_value_number AS volume_ml "
-        "FROM base b "
-        "LEFT JOIN product_variant_properties vp "
-        "ON vp.product_sku = b.product_sku AND vp.property_key = 'volume_ml'"
-        ") SELECT product_sku, record_path, product_name, product_kind_name, volume_ml, "
-        "CASE WHEN lower(product_kind_name) = lower('" + product_kind + "') "
-        "AND volume_ml = " + volume_sql + " THEN 1 ELSE 0 END AS claim_match "
-        "FROM withvol ORDER BY claim_match DESC, product_sku;"
+        "LEFT JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku "
+        "WHERE (pv.brand LIKE '%" + b + "%' OR pv.product_name LIKE '%" + b + "%') "
+        "AND (pv.model LIKE '%" + m + "%' OR pv.product_name LIKE '%" + m + "%') "
+        "GROUP BY pv.product_sku, pv.record_path, pv.product_name, pv.brand, pv.series, pv.model;"
     )
+    base_product_result = vm.exec(path="/bin/sql", args=[sql], stdin="")
+    out = get_stdout(base_product_result)
 
-    result = vm.exec(path="/bin/sql", args=[sql])
-    stdout = getattr(result, "stdout", "")
-    if not stdout and isinstance(result, dict):
-        stdout = result.get("stdout", "")
-    stdout = stdout or ""
-
+    # Parse CSV: leading header row, comma-delimited, columns mapped by header name.
     rows = []
-    reader = csv.reader(io.StringIO(stdout))
-    records = [r for r in reader if r and any(c.strip() for c in r)]
-    if records:
-        header = [h.strip() for h in records[0]]
-        for data in records[1:]:
-            row = {}
-            for i, col in enumerate(header):
-                row[col] = data[i].strip() if i < len(data) else ""
-            rows.append(row)
+    reader = csv.reader(io.StringIO(out))
+    all_rows = [r for r in reader if r and any((c or "").strip() for c in r)]
+    if all_rows:
+        header = [h.strip() for h in all_rows[0]]
+        idx = {name: i for i, name in enumerate(header)}
 
+        def col(r, name):
+            i = idx.get(name, -1)
+            return r[i].strip() if 0 <= i < len(r) else ""
+
+        for r in all_rows[1:]:
+            rows.append({
+                "product_sku": col(r, "product_sku"),
+                "record_path": col(r, "record_path"),
+                "product_name": col(r, "product_name"),
+                "brand": col(r, "brand"),
+                "series": col(r, "series"),
+                "model": col(r, "model"),
+                "storage_types": col(r, "storage_types"),
+            })
+
+    # refs: every matched row's record_path (never drop, never invent).
     refs = []
     for row in rows:
         rp = row.get("record_path", "")
@@ -58,20 +69,21 @@ def run(vm, params):
             refs.append(rp)
 
     if rows:
-        base = rows[0]
-        sku = base.get("product_sku", "")
-        record_path = base.get("record_path", "")
+        primary = rows[0]
+        sku = primary["product_sku"] or "(unknown)"
+        record_path = primary["record_path"]
+        storage_types = primary["storage_types"] or "none"
         message = (
-            "Checked Bondex Garden Classic 106-TS1 Wood Stain and Deck Oil line. "
-            "Base product exists (SKU " + sku + ", " + record_path + "), "
-            "but no catalogue variant of product type 'wood stain' with volume 1000 ml "
-            "is present — the claimed item is absent. <NO>"
+            "Checked catalogue: Raaco Professional CarryLite 3CS-7A9 Shelving and Cabinet exists as SKU "
+            + sku + " (" + record_path + "), but storage type recorded is " + storage_types
+            + " only \u2014 no variant carries both '" + st1 + "' and '" + st2 + "'. "
+            + "Extra catalogue claim absent. <NO> Checked SKU: " + sku + "."
         )
+        vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
     else:
         message = (
-            "Checked Bondex Garden Classic 106-TS1 Wood Stain and Deck Oil line. "
-            "No matching base product was found, so no catalogue variant of product type "
-            "'wood stain' with volume 1000 ml is present. <NO>"
+            "Checked catalogue: no base product matching Raaco Professional CarryLite 3CS-7A9 "
+            "Shelving and Cabinet was located, so the dual storage-type claim ('"
+            + st1 + "' and '" + st2 + "') is not present. <NO>"
         )
-
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+        vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)

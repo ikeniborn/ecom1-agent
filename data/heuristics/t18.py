@@ -1,73 +1,82 @@
+import csv
+import io
+
+
 def run(vm, params):
-    def esc(v):
+    brand = params["brand"]
+    model = params["model"]
+    product_type = params["product_type"]
+    city = params["city"]
+
+    def q(v):
         return str(v).replace("'", "''")
 
-    def sql_exec(sql):
-        result = vm.exec(path="/bin/sql", args=[sql])
-        stdout = getattr(result, "stdout", "")
-        if not stdout and isinstance(result, dict):
-            stdout = result.get("stdout", "")
-        return stdout or ""
+    def stdout_of(result):
+        return getattr(result, "stdout", "") or (result.get("stdout", "") if isinstance(result, dict) else "")
 
-    def parse_rows(stdout):
-        lines = [l for l in stdout.splitlines() if l.strip() != ""]
-        if len(lines) <= 1:
+    def parse_rows(text):
+        text = (text or "").strip()
+        if not text:
             return []
-        rows = []
-        for line in lines[1:]:
-            rows.append([c.strip() for c in line.split(",")])
-        return rows
+        reader = list(csv.reader(io.StringIO(text)))
+        if not reader:
+            return []
+        return reader[1:]
 
-    brand = esc(params["brand"])
-    series = esc(params["series"])
-    model = esc(params["model"])
-    anchor = esc(params["anchor_type"])
-    city = esc(params["city"])
-
-    # Discovery 1: resolve product SKU + record path
+    # discovery 1: resolve product SKU(s) + record_path for the deck-oil variant
     product_sql = (
-        "SELECT v.product_sku, v.record_path FROM product_variants v "
-        "JOIN product_variant_properties p ON p.product_sku = v.product_sku "
-        "WHERE v.brand = '%s' AND v.series = '%s' AND v.model = '%s' "
-        "AND p.property_key = 'anchor_type' AND p.property_value_text = '%s';"
-    ) % (brand, series, model, anchor)
-    product_rows = parse_rows(sql_exec(product_sql))
-    product_sku = ""
-    product_path = ""
-    if product_rows:
-        first = product_rows[0]
-        if len(first) >= 1:
-            product_sku = first[0]
-        if len(first) >= 2:
-            product_path = first[1]
+        "SELECT pv.product_sku, pv.record_path, pk.product_kind_name, pv.product_name, "
+        "pvp.property_value_text AS product_type FROM product_variants pv "
+        "JOIN product_kinds pk ON pk.product_kind_id = pv.product_kind_id "
+        "JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku "
+        "WHERE pv.brand = '" + q(brand) + "' AND pv.product_name LIKE '%" + q(model) + "%' "
+        "AND pvp.property_key = 'product_type' AND lower(pvp.property_value_text) = lower('" + q(product_type) + "');"
+    )
+    product = vm.exec(path="/bin/sql", args=[product_sql])
+    product_rows = parse_rows(stdout_of(product))
 
-    # Discovery 2: enumerate every open Graz store (incl. 0-availability)
+    # discovery 2: enumerate ALL Graz stores
     stores_sql = (
-        "SELECT store_id, record_path FROM stores "
-        "WHERE city = '%s' AND is_open = 1 ORDER BY store_id;"
-    ) % city
-    stores_rows = parse_rows(sql_exec(stores_sql))
-    graz_store_paths = [r[1] for r in stores_rows if len(r) >= 2 and r[1]]
+        "SELECT store_id, record_path, store_name FROM stores WHERE city = '" + q(city) + "' ORDER BY store_id;"
+    )
+    graz_stores = vm.exec(path="/bin/sql", args=[stores_sql])
+    graz_store_rows = parse_rows(stdout_of(graz_stores))
 
-    # Op: sum available_today across all open Graz stores for this SKU
-    sku_esc = esc(product_sku)
-    total_sql = (
-        "SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total FROM stores s "
-        "LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = '%s' "
-        "WHERE s.city = '%s' AND s.is_open = 1;"
-    ) % (sku_esc, city)
-    total_rows = parse_rows(sql_exec(total_sql))
+    # ops: LEFT JOIN availability over every Graz store (zero-availability included)
+    availability_sql = (
+        "WITH target AS (SELECT pv.product_sku, pv.record_path AS product_record_path FROM product_variants pv "
+        "JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku "
+        "WHERE pv.brand = '" + q(brand) + "' AND pv.product_name LIKE '%" + q(model) + "%' "
+        "AND pvp.property_key = 'product_type' AND lower(pvp.property_value_text) = lower('" + q(product_type) + "')) "
+        "SELECT s.store_id, s.record_path AS store_record_path, t.product_sku, t.product_record_path, "
+        "COALESCE(si.available_today_quantity, 0) AS available_today FROM stores s CROSS JOIN target t "
+        "LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = t.product_sku "
+        "WHERE s.city = '" + q(city) + "' ORDER BY s.store_id;"
+    )
+    availability = vm.exec(path="/bin/sql", args=[availability_sql])
+    avail_rows = parse_rows(stdout_of(availability))
+
+    # Total = SUM over every Graz store (zeros included via COALESCE).
+    # Constraint (availability): cite only AVAILABLE stores/products (qty>0),
+    # never zero-availability rows. Constraint (references): cite full record_path.
     total = 0
-    if total_rows and total_rows[0]:
+    store_refs = []
+    product_refs = []
+    for row in avail_rows:
+        if len(row) < 5:
+            continue
+        store_record_path = row[1].strip()
+        product_record_path = row[3].strip()
         try:
-            total = int(float(total_rows[0][0]))
-        except (ValueError, IndexError):
-            total = 0
+            qty = int(float(row[4].strip() or 0))
+        except ValueError:
+            qty = 0
+        total += qty
+        if qty > 0:
+            if store_record_path and store_record_path not in store_refs:
+                store_refs.append(store_record_path)
+            if product_record_path and product_record_path not in product_refs:
+                product_refs.append(product_record_path)
 
-    refs = []
-    if product_path:
-        refs.append(product_path)
-    refs.extend(graz_store_paths)
-
-    message = "answer=%d" % total
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+    refs = store_refs + product_refs
+    vm.answer(message="qty %d" % total, outcome="OUTCOME_OK", refs=refs)

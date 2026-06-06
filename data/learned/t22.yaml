@@ -77,7 +77,12 @@ entries:
     of forwarding the unresolved tool_plan placeholder (e.g. $agent_customer_id) verbatim
     into the query.
   created: '2026-06-06'
-  deactivated_reason: null
+  deactivated_reason: r003 only required parsing the identity RPC and not forwarding
+    the placeholder verbatim; the script satisfied its letter (it ran a regex) yet
+    still forwarded the placeholder via a fallback because r003 omitted both matching
+    the tool's actual `user:` field and forbidding the placeholder-defaulting fallback.
+    The new rule strictly supersedes r003 by covering correct field extraction plus
+    the fallback prohibition.
   id: r003
   reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/baskets/basket_043.json''".
     Root cause: script resolves identity via vm.exec(''/bin/id'') into identity_out
@@ -92,7 +97,7 @@ entries:
     dependent discovery RPCs. Linkage: r001/r002 cover RPC-multiset emission and outcome
     gating, not parsing one RPC''s output into another''s params — this rule fills
     that gap.'
-  status: active
+  status: inactive
 - agents_md_anchor: null
   content: Never default a Read RPC's path to a directory (such as the Find search
     root) when its binding comes from a prior Find result that returned no match;
@@ -113,17 +118,53 @@ entries:
   status: active
 - content: null
   created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
   id: v003
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/baskets/basket_015.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#Important tools > id'
+  content: 'When parsing an identity RPC''s stdout (e.g. /bin/id) to resolve the actor
+    id, match the field the tool actually emits (the `user:` line) instead of assuming
+    a `customer_id`-keyed token, and never fall back to the unresolved tool_plan placeholder
+    when extraction misses; a placeholder-defaulting fallback silently re-forwards
+    an unbound value (e.g. $agent_customer_id) into downstream SQL filters and constructed
+    Read paths, yielding zero rows and ''read failed: not found'' errors.'
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''real_vm_exec: read failed: not found''. Root cause:
+    /bin/id emitted ''user: cust_022\nroles: customer'', but the resolver regex re.search(r"customer[_
+    ]?id...", identity_out) keyed on a ''customer_id'' label that the tool never prints,
+    so it did not match. Failing fragment: on miss the script ran `resolved_customer
+    = str(customer_id)` which is the unresolved param ''$agent_customer_id''. That
+    placeholder went into the SQL (OBSERVED: WHERE b.customer_id = ''$agent_customer_id''),
+    returning only the header row -> rows=[] -> basket_path constructed as ''/proc/baskets/$basket_id.json''
+    -> vm.read on that bogus path threw ''not found''. Verdict v003 confirms the answer
+    omitted the real basket ''/proc/baskets/basket_015.json'' (cust_022''s basket).
+    r003 already mandated parse-and-bind, but the script obeyed it superficially (it
+    parsed) yet still failed: r003 did not specify matching the tool''s actual output
+    field or forbidding the placeholder fallback. New rule subsumes r003 and adds
+    the missing field-label + no-fallback specificity.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v004
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/baskets/basket_043.json'
   source: verdict
   status: active
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 last_run:
-  cycles_used: 3
+  cycles_used: 2
   date: '2026-06-06'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure

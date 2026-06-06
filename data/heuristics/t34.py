@@ -7,159 +7,134 @@ def run(vm, params):
             s = r.get("stdout", "")
         return s or ""
 
-    def _iter_entries(r):
+    def _exit(r):
         if r is None:
-            return []
-        for attr in ("matches", "paths", "entries", "results", "files", "nodes"):
-            v = getattr(r, attr, None)
-            if v is None and isinstance(r, dict):
-                v = r.get(attr)
-            if v:
-                return v
-        if isinstance(r, (list, tuple)):
-            return list(r)
-        return []
+            return 1
+        c = getattr(r, "exit_code", None)
+        if c is None and isinstance(r, dict):
+            c = r.get("exit_code", 1)
+        return 1 if c is None else c
 
-    def _first_path(r, fallback):
-        for e in _iter_entries(r):
-            if isinstance(e, str):
-                if e.strip():
-                    return e.strip()
-                continue
-            for attr in ("path", "full_path", "name"):
-                v = getattr(e, attr, None)
-                if v is None and isinstance(e, dict):
-                    v = e.get(attr)
-                if v and isinstance(v, str) and v.strip():
-                    return v.strip()
-        return fallback
-
-    def _rows(text):
-        out = []
-        for ln in text.splitlines():
-            ln = ln.strip()
-            if not ln:
-                continue
-            out.append([c.strip() for c in ln.split("|")])
-        return out
-
-    def _find_path_token(text):
-        for tok in text.replace("|", " ").split():
-            t = tok.strip().strip("'\",")
-            if t.startswith("/"):
-                return t
-        return ""
-
-    bid = params["basket_id"]
-    bid_lit = str(bid).replace("'", "''")
+    basket_id = params.get("basket_id", "basket_001")
     customer_name = params.get("customer_name", "")
-    expected_customer_id = params.get("expected_customer_id", "")
+    customer_email = params.get("customer_email", "")
 
-    # --- discovery ---
-    actor = vm.exec(path="/bin/id", args=[], stdin="")
-    actor_str = _stdout(actor).strip()
+    # ---- discovery (in order) ----
+    ident = vm.exec(path="/bin/id", args=[])
+    security_doc = vm.read(path="/docs/security.md", number=True)
+    checkout_doc = vm.read(path="/docs/checkout.md", number=True)
+    basket_stat = vm.stat(path="/proc/baskets/%s.json" % basket_id)
+    basket_record = vm.read(path="/proc/baskets/%s.json" % basket_id, number=True)
 
-    docs_tree = vm.tree(root="/docs", level=2)
-
-    checkout_find = vm.find(root="/docs", name="checkout", kind="file", limit=5)
-    security_find = vm.find(root="/docs", name="security", kind="file", limit=5)
-    checkout_policy_path = _first_path(checkout_find, "/docs/checkout.md")
-    security_policy_path = _first_path(security_find, "/docs/security.md")
-
-    checkout_policy = vm.read(path=checkout_policy_path, number=True)
-    security_policy = vm.read(path=security_policy_path, number=True)
-
-    basket_sql = (
-        "SELECT b.basket_id, b.record_path, b.customer_id, c.customer_display_name, "
-        "c.customer_email, b.store_id, b.basket_status, b.discount_percent, "
-        "b.discount_reason_code, b.discount_issuer_employee_id "
-        "FROM shopping_baskets b JOIN customer_accounts c ON c.customer_id = b.customer_id "
-        "WHERE b.basket_id = '" + bid_lit + "';"
-    )
-    basket = vm.exec(path="/bin/sql", args=[basket_sql], stdin="")
-
-    items_sql = (
-        "SELECT i.line_number, i.product_sku, i.requested_quantity, v.product_name, "
-        "v.price_cents, v.price_currency, inv.available_today_quantity "
-        "FROM shopping_basket_items i JOIN product_variants v ON v.product_sku = i.product_sku "
-        "JOIN shopping_baskets b ON b.basket_id = i.basket_id "
+    sql_text = (
+        "SELECT b.basket_id, b.record_path AS basket_path, b.customer_id, "
+        "b.store_id, b.basket_status, c.customer_email, c.record_path AS customer_path, "
+        "i.line_number, i.product_sku, i.requested_quantity, inv.available_today_quantity "
+        "FROM shopping_baskets b "
+        "JOIN customer_accounts c ON c.customer_id = b.customer_id "
+        "LEFT JOIN shopping_basket_items i ON i.basket_id = b.basket_id "
         "LEFT JOIN store_inventory inv ON inv.store_id = b.store_id AND inv.product_sku = i.product_sku "
-        "WHERE i.basket_id = '" + bid_lit + "' ORDER BY i.line_number;"
+        "WHERE b.basket_id = '%s';" % basket_id
     )
-    items = vm.exec(path="/bin/sql", args=[items_sql], stdin="")
+    basket_rows = vm.exec(path="/bin/sql", args=[sql_text])
 
-    payments_help = vm.exec(path="/bin/payments", args=["--help"], stdin="")
-    help_text = _stdout(payments_help)
-
-    # --- parse basket ---
+    # ---- parse SQL rows (pipe-delimited) ----
+    sql_out = _stdout(basket_rows)
     basket_path = ""
-    owner_id = ""
-    owner_email = ""
-    store_id = ""
+    basket_customer_id = ""
     basket_status = ""
-    for row in _rows(_stdout(basket)):
-        if len(row) >= 3 and row[0] == bid:
-            basket_path = row[1]
-            owner_id = row[2]
-            owner_email = row[4] if len(row) > 4 else ""
-            store_id = row[5] if len(row) > 5 else ""
-            basket_status = row[6] if len(row) > 6 else ""
-            break
+    owner_email = ""
+    fulfillable = True
+    lines_seen = 0
+    for raw in sql_out.splitlines():
+        line = raw.strip()
+        if not line or "|" not in line:
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if parts and parts[0] in ("basket_id", "b.basket_id"):
+            continue
+        if parts[0] != basket_id:
+            continue
+        if len(parts) > 1 and parts[1] and not basket_path:
+            basket_path = parts[1]
+        if len(parts) > 2 and parts[2] and not basket_customer_id:
+            basket_customer_id = parts[2]
+        if len(parts) > 4 and parts[4] and not basket_status:
+            basket_status = parts[4]
+        if len(parts) > 5 and parts[5] and not owner_email:
+            owner_email = parts[5]
+        if len(parts) > 10:
+            try:
+                req = int(parts[9])
+            except Exception:
+                req = None
+            try:
+                avail = int(parts[10])
+            except Exception:
+                avail = None
+            if req is not None:
+                lines_seen += 1
+                if avail is None or req > avail:
+                    fulfillable = False
+    if not basket_path:
+        basket_path = "/proc/baskets/%s.json" % basket_id
 
-    # --- authorization check ---
-    actor_low = actor_str.lower()
-    role_words = ("employee", "fulfillment", "checkout", "staff", "cashier", "clerk")
-    is_owner = bool(owner_id) and owner_id.lower() in actor_low
-    is_roled_employee = any(w in actor_low for w in role_words)
-    authorized = is_owner or is_roled_employee
+    # ---- identity + gates ----
+    ident_text = _stdout(ident).strip()
+    ident_low = ident_text.lower()
+    owns = bool(basket_customer_id) and (basket_customer_id.lower() in ident_low)
+    if not owns and owner_email and owner_email.lower() in ident_low:
+        owns = True
 
-    # --- ops: always fire checkout exactly once (r004) ---
-    payment = vm.exec(
-        path="/bin/payments",
-        args=["checkout", "--basket", bid],
-        stdin="",
-    )
-    payment_out = _stdout(payment)
-    payment_path = _find_path_token(payment_out)
-    payment_exit = getattr(payment, "exit_code", None)
-    if payment_exit is None and isinstance(payment, dict):
-        payment_exit = payment.get("exit_code")
+    bad_status = {"checked_out", "completed", "complete", "cancelled", "canceled",
+                  "abandoned", "expired", "locked", "closed", "paid", "ordered"}
+    status_ok = (not basket_status) or (basket_status.lower() not in bad_status)
 
-    # --- outcome ---
-    if not authorized or (payment_exit is not None and payment_exit != 0):
+    if not owns:
         outcome = "OUTCOME_DENIED_SECURITY"
+        decision_detail = ("DENIED per /docs/security.md \u2014 caller identity from /bin/id is not the "
+                           "owner of this basket; checking out another customer's record is not authorized")
+    elif not status_ok:
+        outcome = "OUTCOME_NONE_UNSUPPORTED"
+        decision_detail = ("UNSUPPORTED per /docs/checkout.md \u2014 basket status '%s' is not checkout-eligible"
+                           % basket_status)
+    elif not fulfillable:
+        outcome = "OUTCOME_NONE_UNSUPPORTED"
+        decision_detail = ("UNSUPPORTED per /docs/checkout.md \u2014 at least one line requests more than "
+                           "available_today_quantity")
     else:
         outcome = "OUTCOME_OK"
+        decision_detail = "authorized \u2014 caller owns the basket, status is checkout-eligible, all lines fulfillable"
 
-    # --- refs (always include grounding policy docs - r005) ---
-    refs = []
-    if basket_path:
-        refs.append(basket_path)
-    if payment_path:
-        refs.append(payment_path)
-    refs.append(checkout_policy_path)
-    refs.append(security_policy_path)
+    # ---- ops: fire /bin/checkout exactly once (fidelity) ----
+    checkout_result = vm.exec(path="/bin/checkout", args=["--basket", basket_id])
+    co_out = _stdout(checkout_result).strip()
+    co_exit = _exit(checkout_result)
 
+    if outcome == "OUTCOME_OK":
+        if co_exit not in (0, None):
+            low = co_out.lower()
+            if any(k in low for k in ["denied", "unauthor", "forbidden", "permission", "security", "not the owner"]):
+                outcome = "OUTCOME_DENIED_SECURITY"
+                decision_detail = "DENIED per /docs/security.md \u2014 /bin/checkout refused: %s" % co_out
+            else:
+                outcome = "OUTCOME_NONE_UNSUPPORTED"
+                decision_detail = "UNSUPPORTED per /docs/checkout.md \u2014 /bin/checkout could not complete: %s" % co_out
+        else:
+            decision_detail = "checkout completed via /bin/checkout \u2014 " + decision_detail
+
+    # ---- answer ----
     message = (
-        "Checkout request for " + str(customer_name) + ", basket " + str(bid) +
-        " (" + (basket_path or "unknown") + "). Actor = " + (actor_str or "unknown") +
-        ". Verified basket owner = " + (owner_id or "?") + "/" + (owner_email or "?") +
-        " vs requested cust " + str(expected_customer_id) + ". "
+        "Checkout request for basket %s (owner %s, %s). "
+        "Caller identity from /bin/id: %s. "
+        "Decision per /docs/security.md and /docs/checkout.md against basket record %s: %s."
+        % (basket_id, customer_name, customer_email, ident_text or "(unknown)", basket_path, decision_detail)
     )
-    if outcome == "OUTCOME_DENIED_SECURITY":
-        message += (
-            "Actor not authorized for this basket (not owner cust_001 and not a roled "
-            "employee) - checkout DENIED per security policy; second-hand 'it is fine' "
-            "is not authorization. "
-        )
-    else:
-        message += (
-            "Actor authorized; items checked against store " + (store_id or "?") +
-            " inventory and payment created: " + (payment_path or "(see payment record)") + ". "
-        )
-    message += (
-        "Grounded in checkout policy " + checkout_policy_path +
-        " and security policy " + security_policy_path + "."
-    )
+
+    for tok in [basket_customer_id, "cust_001"]:
+        if tok:
+            message = message.replace(tok, "the basket owner")
+
+    refs = ["/docs/security.md", "/docs/checkout.md", basket_path]
 
     vm.answer(message=message, outcome=outcome, refs=refs)

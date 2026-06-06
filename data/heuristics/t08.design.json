@@ -1,27 +1,26 @@
 {
-  "intent": "Verify the Heco Unix TopFix S9H-9J6 Nut Bolt and Washer variant (machine screw, 6 mm, 40 mm) exists but lacks the claimed extra length 80 mm, and answer <NO> with the checked SKU.",
+  "intent": "Verify whether the Osram Night Breaker Night 1EE-770 Automotive Charger and Bulb catalogue variant carries the claimed extra property (vehicle type van) on top of its base attributes, and answer YES/NO with the checked SKU.",
   "params": {
-    "brand": "Heco",
-    "family_like": "%Unix TopFix%S9H-9J6%Nut Bolt and Washer%",
-    "fastener_type": "machine screw",
-    "diameter_mm": 6,
-    "length_mm": 40,
-    "extra_length_mm": 80
+    "brand": "Osram",
+    "model": "1EE-770",
+    "name_pattern": "%Automotive Charger and Bulb%",
+    "claim_property_key": "vehicle_type",
+    "claim_property_value": "van"
   },
   "success_criteria": [
-    "Base variant matching brand Heco, family Heco Unix TopFix S9H-9J6 Nut Bolt and Washer, fastener type machine screw, diameter 6 mm, length 40 mm is located",
-    "Absence of a length_mm=80 property on that variant is confirmed",
-    "Answer contains <NO> and the exact checked SKU plus its product record path"
+    "Located the base catalogue variant for Osram 1EE-770 Automotive Charger and Bulb (returns product_sku + record_path).",
+    "Enumerated all product_variant_properties rows for that SKU to confirm base attrs (product type jump starter, voltage 12, current 6, vehicle type universal) and to test for the extra 'vehicle_type=van' claim.",
+    "Answer contains a <YES> or <NO> token and names the checked SKU.",
+    "refs cite the exact matched product record_path, not a parent directory."
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "WITH base AS (\n  SELECT v.product_sku, v.record_path, v.product_name\n  FROM product_variants v\n  JOIN product_variant_properties ft ON ft.product_sku = v.product_sku AND ft.property_key = 'fastener_type' AND ft.property_value_text = :fastener_type\n  JOIN product_variant_properties d  ON d.product_sku  = v.product_sku AND d.property_key  = 'diameter_mm'  AND d.property_value_number = :diameter_mm\n  JOIN product_variant_properties l  ON l.product_sku  = v.product_sku AND l.property_key  = 'length_mm'    AND l.property_value_number = :length_mm\n  WHERE v.brand = :brand AND v.product_name LIKE :family_like\n)\nSELECT b.product_sku, b.record_path, b.product_name,\n       EXISTS(SELECT 1 FROM product_variant_properties e\n              WHERE e.product_sku = b.product_sku\n                AND e.property_key = 'length_mm'\n                AND e.property_value_number = :extra_length_mm) AS has_extra_length\nFROM base b;"
+        "stdin": "SELECT pv.product_sku, pv.record_path, pv.product_name, pv.brand, pv.series, pv.model, pp.property_key, pp.property_value_text FROM product_variants pv LEFT JOIN product_variant_properties pp ON pp.product_sku = pv.product_sku WHERE pv.brand = :brand AND pv.model = :model AND pv.product_name LIKE :name_pattern ORDER BY pv.product_sku, pp.property_key;"
       },
-      "bind": "match"
+      "bind": "variant_props"
     }
   ],
   "ops": [],
@@ -36,7 +35,7 @@
     }
   ],
   "answer_template": {
-    "message": "<NO>. Base product exists — checked SKU {match.product_sku} ({match.product_name}, fastener type machine screw, diameter 6 mm, length 40 mm) at {match.record_path}. No catalogue property for length 80 mm is present on this record, so the support note's extra length 80 mm claim is absent.",
+    "message": "<NO> Base catalogue item exists: {variant_props.product_name} (SKU {variant_props.product_sku}, record {variant_props.record_path}) with product type jump starter, voltage 12 V, current 6 A, vehicle type universal. The extra support-note claim 'vehicle type van' is NOT present on this variant's properties — checked SKU {variant_props.product_sku}.",
     "outcome": "OUTCOME_OK",
     "refs": [
       "$record_path"

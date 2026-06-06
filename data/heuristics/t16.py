@@ -1,88 +1,111 @@
 def run(vm, params):
-    def lit(v):
-        if v is None:
-            return "NULL"
+    import csv, io
+
+    def q(v):
         return "'" + str(v).replace("'", "''") + "'"
 
-    def _stdout(r):
-        return getattr(r, "stdout", "") or (r.get("stdout", "") if isinstance(r, dict) else "")
+    def _stdout(result):
+        if result is None:
+            return ""
+        val = getattr(result, "stdout", None)
+        if val is None and isinstance(result, dict):
+            val = result.get("stdout", "")
+        return val or ""
 
-    def _rows(text):
-        lines = [l for l in (text or "").splitlines() if l.strip() != ""]
-        if len(lines) <= 1:
-            return []
-        return [l.split(",") for l in lines[1:]]
+    def _parse_csv(text):
+        text = text or ""
+        if not text.strip():
+            return [], []
+        rows = [r for r in csv.reader(io.StringIO(text)) if r]
+        if not rows:
+            return [], []
+        return rows[0], rows[1:]
 
-    # --- Discovery 1: resolve central Salzburg store by city scope ---
-    store_city = params["store_city"]
-    store_sql = "SELECT store_id, store_name, city, record_path FROM stores WHERE city = " + lit(store_city) + ";"
-    store = vm.exec(path="/bin/sql", args=[store_sql])
-    store_rows = _rows(_stdout(store))
+    def cidx(h, name):
+        return h.index(name) if name in h else -1
 
-    store_id = ""
-    store_record_path = ""
-    hint = str(params.get("store_name_hint", "")).lower()
-    if store_rows:
-        chosen = None
-        if len(store_rows) == 1:
-            chosen = store_rows[0]
-        else:
-            for row in store_rows:
-                name = row[1].lower() if len(row) > 1 else ""
-                if hint and hint in name:
-                    chosen = row
-                    break
-            if chosen is None:
-                chosen = store_rows[0]
-        if chosen:
-            store_id = chosen[0].strip() if len(chosen) > 0 else ""
-            store_record_path = chosen[3].strip() if len(chosen) > 3 else ""
+    # discovery: identity
+    try:
+        identity = vm.exec(path="/bin/id", args=[], stdin="")
+    except Exception:
+        identity = None
 
-    # --- Discovery 2: count matched SKUs with available_today_quantity >= min_qty ---
-    min_qty = params["min_qty"]
-    specs = [
-        (1, params["p1_family"], "size", params["p1_size"], "color_family", params["p1_color_family"], None, None),
-        (2, params["p2_family"], "power_source", params["p2_power_source"], "bar_length_cm", params["p2_bar_length_cm"], "battery_platform", params["p2_battery_platform"]),
-        (3, params["p3_family"], "product_type", params["p3_product_type"], "color_family", params["p3_color_family"], None, None),
-        (4, params["p4_family"], "storage_type", params["p4_storage_type"], "color_family", params["p4_color_family"], None, None),
-        (5, params["p5_family"], "size", params["p5_size"], "color_family", params["p5_color_family"], None, None),
-        (6, params["p6_family"], "color_family", params["p6_color_family"], "finish", params["p6_finish"], "volume_ml", params["p6_volume_ml"]),
+    # discovery: stores in the target city
+    city = params["city"]
+    stores_sql = ("SELECT store_id, record_path, store_name, city, is_open "
+                  "FROM stores WHERE city = " + q(city) + ";")
+    salzburg_stores = vm.exec(path="/bin/sql", args=[stores_sql], stdin="")
+    sheader, srows = _parse_csv(_stdout(salzburg_stores))
+
+    sid_i = cidx(sheader, "store_id")
+    name_i = cidx(sheader, "store_name")
+    pattern = str(params.get("store_pattern", "")).strip("%").lower()
+
+    # resolve the central branch from discovery rows (do not re-filter literal in ops)
+    chosen = None
+    if name_i >= 0 and pattern:
+        for r in srows:
+            if len(r) > name_i and pattern in r[name_i].lower():
+                chosen = r
+                break
+    if chosen is None and srows:
+        chosen = srows[0]
+    store_id = chosen[sid_i] if (chosen and sid_i >= 0 and len(chosen) > sid_i) else ""
+
+    # build ops SQL with resolved store_id bound in directly
+    def prop_exists(k, v):
+        return ("EXISTS (SELECT 1 FROM product_variant_properties p "
+                "WHERE p.product_sku=pv.product_sku AND p.property_key=" + q(k) +
+                " AND p.property_value_text=" + q(v) + ")")
+
+    def block(brand, line, props):
+        parts = ["pv.brand=" + q(brand), "pf.product_family_name=" + q(line)]
+        parts += [prop_exists(k, v) for k, v in props]
+        return "(" + " AND ".join(parts) + ")"
+
+    blocks = [
+        block(params["brand1"], params["line1"], [
+            (params["k_machine_type"], params["v_machine_type"]),
+            (params["k_voltage"], params["v_voltage"]),
+            (params["k_power"], params["v_power"]),
+            (params["k_tank"], params["v_tank"]),
+        ]),
+        block(params["brand2"], params["line2"], [
+            (params["k_tool_profile"], params["v_tool_profile2"]),
+            (params["k_piece_count"], params["v_piece_count"]),
+        ]),
+        block(params["brand3"], params["line3"], [
+            (params["k_tool_profile"], params["v_tool_profile3"]),
+        ]),
+        block(params["brand4"], params["line4"], [
+            (params["k_product_type"], params["v_product_type"]),
+        ]),
+        block(params["brand5"], params["line5"], [
+            (params["k_lens_color"], params["v_lens_color"]),
+        ]),
+        block(params["brand6"], params["line6"], [
+            (params["k_power_source"], params["v_power_source"]),
+        ]),
     ]
-    value_rows = []
-    for s in specs:
-        idx, fam, k1, v1, k2, v2, k3, v3 = s
-        value_rows.append("(%d, %s, %s, %s, %s, %s, %s, %s)" % (
-            idx, lit(fam), lit(k1), lit(v1), lit(k2), lit(v2), lit(k3), lit(v3)))
-    values_clause = ", ".join(value_rows)
+    where = " OR ".join(blocks)
+    min_avail = int(params["min_available"])
+    ops_sql = ("WITH matched AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv "
+               "JOIN product_families pf ON pf.product_family_id = pv.product_family_id WHERE " + where + ") "
+               "SELECT m.product_sku, m.record_path AS record_path, si.available_today_quantity "
+               "FROM matched m JOIN store_inventory si ON si.product_sku = m.product_sku "
+               "WHERE si.store_id = " + q(store_id) + " AND si.available_today_quantity >= " + str(min_avail) + ";")
 
-    count_sql = (
-        "WITH specs(idx, family, k1, v1, k2, v2, k3, v3) AS (VALUES " + values_clause + "), "
-        "matched AS ("
-        "SELECT s.idx, pv.product_sku FROM specs s "
-        "JOIN product_families pf ON pf.product_family_name = s.family "
-        "JOIN product_variants pv ON pv.product_family_id = pf.product_family_id "
-        "WHERE EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = s.k1 AND p.property_value_text = s.v1) "
-        "AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = s.k2 AND p.property_value_text = s.v2) "
-        "AND (s.k3 IS NULL OR EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = s.k3 AND p.property_value_text = s.v3))"
-        ") "
-        "SELECT COUNT(*) AS available_count FROM matched m "
-        "JOIN store_inventory si ON si.product_sku = m.product_sku "
-        "WHERE si.store_id = " + lit(store_id) + " AND si.available_today_quantity >= " + str(min_qty) + ";"
-    )
-    count_result = vm.exec(path="/bin/sql", args=[count_sql])
-    count_rows = _rows(_stdout(count_result))
+    available_rows = vm.exec(path="/bin/sql", args=[ops_sql], stdin="")
+    oheader, orows = _parse_csv(_stdout(available_rows))
+    rp_i = cidx(oheader, "record_path")
+    if rp_i < 0:
+        rp_i = 1
 
-    available_count = 0
-    if count_rows and len(count_rows[0]) > 0:
-        cell = count_rows[0][0].strip()
-        try:
-            available_count = int(cell)
-        except (ValueError, TypeError):
-            available_count = 0
+    record_paths = []
+    for r in orows:
+        if len(r) > rp_i and r[rp_i].strip():
+            record_paths.append(r[rp_i].strip())
 
-    refs = []
-    if store_record_path:
-        refs.append(store_record_path)
-
-    message = "Count: %d" % available_count
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+    count = len(orows)
+    message = "result " + str(count)
+    vm.answer(message=message, outcome="OUTCOME_OK", refs=record_paths)

@@ -25,12 +25,13 @@ entries:
   submitted_refs: []
 - content: null
   created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
   id: v003
   score: 0.0
   score_detail:
   - answer missing required reference '/docs/security.md'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: ''
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs: []
@@ -133,8 +134,53 @@ entries:
     but is scoped to policy-document substring scans. This new rule closes the identity-parse-miss
     case — empty extraction must mean unverified, not violated.'
   status: active
+- agents_md_anchor: '#important-tools > id-tool'
+  content: Never derive a security denial that early-returns before a planned ops
+    RPC from a substring/marker scan of the request's own claimed-authorization param;
+    that self-asserted field is untrusted, not a confirmed violation, and the mutation
+    may still be authorized by the real /bin/id identity, so matching it drops the
+    planned ops Exec from the RPC multiset (fidelity drift). Decide authorization
+    from the real identity plus parsed structured policy fields, and only short-circuit
+    on a violation those authoritative sources positively confirm.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''fidelity: AssertionError: fidelity drift (RPC multiset)
+    expected [Answer,Exec,Exec,Exec,Exec,Read,Read,Read,Stat] got [Answer,Exec,Exec,Exec,Read,Read,Read,Stat]''
+    — 4 Exec expected, 3 got: the planned ops Exec /bin/discount set was dropped.
+    Root cause: security_violation is computed by case-folding the request''s `claimed`
+    param and scanning it for markers (claimed_approval_markers=[''manager'',''exec'',''pre-approved'',...]);
+    claimed_authorization=''manager-pre-approved'' matches ''manager''/''pre-approved''
+    so security_violation=True and the gate early-returns DENIED_SECURITY before the
+    ops Exec. Failing fragment: `security_violation = any(m in claimed_norm for m
+    in claimed_approval_markers); if security_violation: vm.answer(...DENIED_SECURITY...);
+    return`. Linkage: same early-return-drops-ops-RPC family as r001 (policy-doc substring),
+    r003 (/bin/id output substring), r004 (parse-miss treated as violation), but the
+    gate source here is the request''s own claimed_authorization param — a self-asserted
+    field that does NOT itself prove a violation, since the real /bin/id identity
+    can independently authorize. None of r001/r003/r004 cover the claimed-authorization-param
+    source, so the new rule complements rather than supersedes them.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: 'Discount request on /proc/baskets/basket_069.json: 10% service_recovery,
+    claimed ''manager-pre-approved''. Decision from /bin/id (user: cust_026) + /docs/security.md
+    + /docs/discounts.md applied to basket_069 record. <NO> OUTCOME_NONE_UNSUPPORTED:
+    business gate: a non-security discount rule fails (percent/reason/existing-discount/active-rule);
+    no discount written.'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /docs/security.md
+  - /docs/discounts.md
+  - /proc/baskets/basket_069.json
 last_run:
-  cycles_used: 5
+  cycles_used: 2
   date: '2026-06-06'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure

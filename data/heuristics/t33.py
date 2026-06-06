@@ -1,100 +1,76 @@
 def run(vm, params):
-    def lit(v):
+    def q(v):
         return "'" + str(v).replace("'", "''") + "'"
 
-    brand = params["brand"]
-    family = params["family"]
-    machine_type = params["machine_type"]
-    voltage = params["voltage"]
-    city = params["city"]
+    brand = q(params["brand"])
+    family = q(params["family_name"])
+    machine_type = q(params["machine_type"])
+    city = q(params["city"])
+    voltage = str(int(params["voltage_v"]))
 
-    def inline(sql):
-        sql = sql.replace(":machine_type", lit(machine_type))
-        sql = sql.replace(":voltage", str(int(voltage)))
-        sql = sql.replace(":brand", lit(brand))
-        sql = sql.replace(":family", lit(family))
-        sql = sql.replace(":city", lit(city))
-        return sql
-
-    detail_sql = (
+    sql = (
         "WITH target AS (\n"
-        "  SELECT pv.product_sku, pv.record_path AS product_path\n"
+        "  SELECT pv.product_sku, pv.record_path\n"
         "  FROM product_variants pv\n"
         "  JOIN product_families pf ON pf.product_family_id = pv.product_family_id\n"
-        "  JOIN product_variant_properties mp ON mp.product_sku = pv.product_sku AND mp.property_key = 'machine_type' AND mp.property_value_text = :machine_type\n"
-        "  JOIN product_variant_properties vp ON vp.product_sku = pv.product_sku AND vp.property_key = 'voltage_v' AND vp.property_value_number = :voltage\n"
-        "  WHERE pv.brand = :brand AND pf.product_family_name = :family\n"
+        "  JOIN product_variant_properties mt ON mt.product_sku = pv.product_sku AND mt.property_key = 'machine_type' AND mt.property_value_text = " + machine_type + "\n"
+        "  JOIN product_variant_properties vv ON vv.product_sku = pv.product_sku AND vv.property_key = 'voltage_v' AND vv.property_value_number = " + voltage + "\n"
+        "  WHERE pv.brand = " + brand + " AND pf.product_family_name = " + family + "\n"
+        "),\n"
+        "vienna AS (\n"
+        "  SELECT store_id, record_path FROM stores WHERE city = " + city + " AND is_open = 1\n"
         ")\n"
-        "SELECT s.store_id, s.record_path AS store_path, t.product_sku, t.product_path, si.available_today_quantity\n"
-        "FROM target t\n"
-        "JOIN store_inventory si ON si.product_sku = t.product_sku\n"
-        "JOIN stores s ON s.store_id = si.store_id\n"
-        "WHERE s.city = :city AND s.is_open = 1 AND si.available_today_quantity > 0\n"
-        "ORDER BY s.store_id;"
+        "SELECT v.store_id,\n"
+        "       v.record_path AS store_record_path,\n"
+        "       t.product_sku,\n"
+        "       t.record_path AS product_record_path,\n"
+        "       si.available_today_quantity\n"
+        "FROM vienna v\n"
+        "JOIN store_inventory si ON si.store_id = v.store_id\n"
+        "JOIN target t ON t.product_sku = si.product_sku\n"
+        "WHERE si.available_today_quantity > 0;"
     )
 
-    agg_sql = (
-        "WITH target AS (\n"
-        "  SELECT pv.product_sku\n"
-        "  FROM product_variants pv\n"
-        "  JOIN product_families pf ON pf.product_family_id = pv.product_family_id\n"
-        "  JOIN product_variant_properties mp ON mp.product_sku = pv.product_sku AND mp.property_key = 'machine_type' AND mp.property_value_text = :machine_type\n"
-        "  JOIN product_variant_properties vp ON vp.product_sku = pv.product_sku AND vp.property_key = 'voltage_v' AND vp.property_value_number = :voltage\n"
-        "  WHERE pv.brand = :brand AND pf.product_family_name = :family\n"
-        ")\n"
-        "SELECT COALESCE(SUM(si.available_today_quantity),0) AS total_units\n"
-        "FROM target t\n"
-        "JOIN store_inventory si ON si.product_sku = t.product_sku\n"
-        "JOIN stores s ON s.store_id = si.store_id\n"
-        "WHERE s.city = :city AND s.is_open = 1;"
-    )
+    result = vm.exec(path="/bin/sql", args=[], stdin=sql)
+    stdout = getattr(result, "stdout", None)
+    if stdout is None:
+        stdout = result.get("stdout", "") if isinstance(result, dict) else ""
+    stdout = stdout or ""
 
-    def stdout_of(result):
-        return getattr(result, "stdout", "") or (result.get("stdout", "") if isinstance(result, dict) else "")
-
-    rows_res = vm.exec(path="/bin/sql", args=[], stdin=inline(detail_sql))
-    rows = stdout_of(rows_res)
-
-    total_res = vm.exec(path="/bin/sql", args=[], stdin=inline(agg_sql))
-    _ = stdout_of(total_res)
-
-    lines = [ln for ln in rows.splitlines() if ln.strip() != ""]
-    data_lines = lines[1:] if lines else []
-
+    lines = [ln for ln in stdout.splitlines() if ln.strip() != ""]
     store_paths = []
     product_path = None
     total = 0
-    for ln in data_lines:
-        cols = ln.split(",")
-        if len(cols) < 5:
-            continue
-        store_path = cols[1].strip()
-        product_path = cols[3].strip()
-        try:
-            qty = int(cols[4].strip())
-        except ValueError:
-            qty = 0
-        store_paths.append(store_path)
-        total += qty
+
+    if len(lines) > 1:
+        header = lines[0]
+        if "," in header:
+            delim = ","
+        elif "|" in header:
+            delim = "|"
+        else:
+            delim = ","
+        for line in lines[1:]:
+            cols = [c.strip() for c in line.split(delim)]
+            if len(cols) < 5:
+                continue
+            store_paths.append(cols[1])
+            product_path = cols[3]
+            try:
+                total += int(cols[4])
+            except (ValueError, TypeError):
+                pass
 
     if not store_paths or product_path is None:
-        vm.answer(
-            message="No available units found for the requested variant in open Vienna stores.",
-            outcome="OUTCOME_NONE_UNSUPPORTED",
-            refs=[],
-        )
+        vm.answer(message="result: 0", outcome="OUTCOME_NONE_UNSUPPORTED", refs=[])
         return
 
-    refs = []
     seen = set()
-    for sp in store_paths:
-        if sp not in seen:
-            seen.add(sp)
-            refs.append(sp)
-    refs.append(product_path)
+    uniq_store_paths = []
+    for p in store_paths:
+        if p and p not in seen:
+            seen.add(p)
+            uniq_store_paths.append(p)
 
-    vm.answer(
-        message="report count %d" % total,
-        outcome="OUTCOME_OK",
-        refs=refs,
-    )
+    refs = uniq_store_paths + [product_path]
+    vm.answer(message="result: %d" % total, outcome="OUTCOME_OK", refs=refs)

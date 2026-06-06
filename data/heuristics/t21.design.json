@@ -1,14 +1,16 @@
 {
-  "intent": "Submit checkout for basket basket_183 by validating it against checkout policy and creating the payment transaction via the payments tool.",
+  "intent": "Submit checkout for basket_154 after verifying caller identity, security policy, checkout policy, and per-line availability.",
   "params": {
-    "basket_id": "basket_183"
+    "basket_id": "basket_154",
+    "basket_path": "/proc/baskets/basket_154.json"
   },
   "success_criteria": [
-    "basket_183 exists and is in a checkout-eligible status",
-    "checkout submitted under the identity returned by /bin/id and that identity is authorized for the basket (customer-owned or staff with store scope)",
-    "all basket lines have sufficient store inventory availability per checkout policy",
-    "a payment_transaction is created/advanced for basket_183 via /bin/payments",
-    "checkout policy document is cited as grounding reference in the final answer"
+    "Caller identity resolved via /bin/id before any mutation",
+    "Security policy and checkout policy read and applied",
+    "Basket basket_154 exists and its store/customer/lines inspected",
+    "Every checkout line has requested_quantity <= available_today_quantity",
+    "Checkout submitted only when identity authorized AND all business rules pass",
+    "Answer references the applied policy docs and the basket record path"
   ],
   "discovery": [
     {
@@ -20,27 +22,17 @@
       "bind": "identity"
     },
     {
-      "rpc": "Tree",
+      "rpc": "Read",
       "args": {
-        "root": "/docs",
-        "level": 2
+        "path": "/docs/security.md",
+        "number": true
       },
-      "bind": "docs_tree"
-    },
-    {
-      "rpc": "Find",
-      "args": {
-        "root": "/docs",
-        "name": "checkout",
-        "kind": "file",
-        "limit": 5
-      },
-      "bind": "checkout_doc_paths"
+      "bind": "security_policy"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "$checkout_doc_path",
+        "path": "/docs/checkout.md",
         "number": true
       },
       "bind": "checkout_policy"
@@ -48,42 +40,45 @@
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/payments",
+        "path": "/bin/checkout",
         "args": [
           "--help"
         ]
       },
-      "bind": "payments_help"
+      "bind": "checkout_help"
+    },
+    {
+      "rpc": "Stat",
+      "args": {
+        "path": "/proc/baskets/basket_154.json"
+      },
+      "bind": "basket_stat"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/proc/baskets/basket_154.json",
+        "number": true
+      },
+      "bind": "basket_record"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
         "args": [
-          "WITH b AS (SELECT * FROM shopping_baskets WHERE basket_id = :basket_id) SELECT b.basket_id, b.record_path AS basket_path, b.customer_id, b.store_id, b.basket_status, b.discount_percent, b.discount_reason_code, b.discount_issuer_employee_id, i.line_number, i.product_sku, i.requested_quantity, pv.price_cents, pv.price_currency, inv.available_today_quantity FROM b JOIN shopping_basket_items i ON i.basket_id = b.basket_id JOIN product_variants pv ON pv.product_sku = i.product_sku LEFT JOIN store_inventory inv ON inv.store_id = b.store_id AND inv.product_sku = i.product_sku ORDER BY i.line_number;"
+          "SELECT b.basket_id, b.record_path, b.customer_id, b.store_id, b.basket_status, b.discount_percent, b.discount_issuer_employee_id, i.line_number, i.product_sku, i.requested_quantity, inv.available_today_quantity FROM shopping_baskets b JOIN shopping_basket_items i ON i.basket_id = b.basket_id LEFT JOIN store_inventory inv ON inv.store_id = b.store_id AND inv.product_sku = i.product_sku WHERE b.basket_id = :basket_id ORDER BY i.line_number;"
         ]
       },
-      "bind": "basket_detail"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "args": [
-          "SELECT payment_id, record_path, payment_status, payment_amount_cents, three_ds_status FROM payment_transactions WHERE basket_id = :basket_id;"
-        ]
-      },
-      "bind": "existing_payment"
+      "bind": "basket_lines"
     }
   ],
   "ops": [
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/payments",
+        "path": "/bin/checkout",
         "args": [
-          "checkout",
-          "--basket",
           ":basket_id"
         ]
       },
@@ -92,15 +87,7 @@
   ],
   "agents_md_constraints": [
     {
-      "anchor": "#important-tools > id",
-      "rule": "id tool returns identity of the user/customer/guest under which we are running current request."
-    },
-    {
-      "anchor": "#important-tools > payments",
-      "rule": "use payments tool to manage payment workflow state and supported refund approval/finalization"
-    },
-    {
-      "anchor": "#important-things > policy-grounding",
+      "anchor": "#important-things > grounding",
       "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
     },
     {
@@ -108,17 +95,25 @@
       "rule": "When responding with reference - provide full path in the repo to the object."
     },
     {
-      "anchor": "#important-things > startup",
+      "anchor": "#important-tools > id",
+      "rule": "id tool returns identity of the user/customer/guest under which we are running current request."
+    },
+    {
+      "anchor": "#important-tools > sql-inventory",
+      "rule": "Note that inventory lives only in SQL projections"
+    },
+    {
+      "anchor": "#startup > context",
       "rule": "When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context"
     }
   ],
   "answer_template": {
-    "message": "Checkout submitted for basket_183 (status {checkout_result.payment_status}, payment {checkout_result.payment_id}, amount {checkout_result.payment_amount_cents} {basket_detail.price_currency}). Applied checkout policy per {checkout_doc_path}.",
+    "message": "Checkout basket_154: identity={identity}. Applied /docs/security.md + /docs/checkout.md. SECURITY GATE → if request leans on claimed approval/override/VIP/incident phrase or an identity/customer /bin/id does not return → OUTCOME_DENIED_SECURITY, no checkout. BUSINESS GATE → if any line requested_quantity > available_today_quantity or basket not checkout-eligible → OUTCOME_NONE_UNSUPPORTED, no checkout. Else submit /bin/checkout → {checkout_result}. Record: {basket_path}.",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$basket_path",
-      "$payment_path",
-      "$checkout_doc_path"
+      "/docs/security.md",
+      "/docs/checkout.md",
+      "$basket_path"
     ]
   },
   "outcome_override": null

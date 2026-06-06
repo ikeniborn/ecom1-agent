@@ -62,9 +62,101 @@ entries:
     refs gating) — both were correctly implemented here; the defect is the stdin-vs-args
     dispatch channel, which neither rule covers.'
   status: active
+- agents_md_anchor: null
+  content: When /bin/sql returns completely empty stdout (not even a header line),
+    do not treat it as a confirmed zero-match NO answer — an executed query that matches
+    nothing still emits its column header row, so totally empty output signals the
+    statement never ran (bindings not applied, stdin not consumed, or read denied
+    under the current identity); detect the missing-header case and surface it as
+    an execution failure to retry, rather than emitting a confident NO with refs=[].
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$record_path'']) but actual refs [] contain only static template entries []
+    — SQL likely returned no rows or row parsing dropped the path column". Root cause:
+    OBSERVED_RPC_OUTPUTS shows /bin/sql produced `<empty>` (not a header-only result)
+    under identity anonymous/GUEST. Existing rules cover the adjacent failures: r003
+    (SQL must go on stdin — script obeyed it), r001 (delimiter detection from header
+    — obeyed), r002 (zero legitimate rows → NO + refs=[] — obeyed). Failing fragment:
+    `lines = [ln for ln in out.splitlines() if ln.strip() != ""]` with empty out yields
+    `lines=[]` → `rows=[]` → `available=[]` → NO branch with refs=[], which the script
+    reported as a confident NO. The distinction these rules miss: an executed-but-empty
+    query still emits its header, so completely empty stdout means the statement did
+    not execute (bindings/permission), not a genuine zero-match. Linkage: refines
+    r002 by requiring header-presence verification before concluding zero rows, so
+    a non-executing query is retried as a failure instead of answered NO. Distinct
+    from r002 (placeholder forwarding) and r003 (stdin vs args) — neither addresses
+    empty-vs-zero-rows discrimination.'
+  status: active
+- agents_md_anchor: null
+  content: When a /bin/sql statement sent through stdin contains :name placeholders,
+    inline the literal, properly-quoted parameter values directly into that SQL string
+    instead of passing them as positional key=value args — /bin/sql ignores positional
+    args, so args-supplied values never bind the named placeholders and the query
+    errors out to completely empty stdout (no header, no rows), which in turn yields
+    empty refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''answer_refs: template/constraints require runtime
+    refs ([\''$record_path\'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows ... check `:name` bindings on /bin/sql and the
+    SELECT columns''. Failing fragment: vm.exec(path=''/bin/sql'', args=[''brand=Pattex'',''line=...'',''sealant_type=acrylic
+    sealant'',''color_family=White''], stdin=<SQL with :sealant_type/:color_family/:brand/:line>).
+    SQL correctly placed in stdin (satisfies r003), yet OBSERVED output is totally
+    empty — not even a header row. r003 establishes /bin/sql ignores positional args;
+    therefore the key=value args could not bind the :name placeholders, leaving them
+    unbound so the statement erred to empty stdout. This is distinct from r003 (query
+    placement), r001 (delimiter parsing), r002 (placeholder gating), and the in-session
+    rule (detect empty output as failure / don''t emit confident NO). Those handle
+    recovery/detection; this is the root-cause fix that prevents the empty output:
+    supply parameter values by inlining them into the stdin SQL since args do not
+    bind.'
+  status: active
+- agents_md_anchor: null
+  content: When the discovery plan binds an identity probe (e.g. /bin/id) and it resolves
+    to an anonymous or guest/low-privilege role, do not translate a zero-data-row
+    SQL result into a confident NO/absence answer — a query can execute and emit its
+    column header while row-level access controls silently filter out every matching
+    row, yielding a false-empty result; gate the confident NO-with-empty-refs branch
+    on a privileged identity and otherwise surface the run as inconclusive to retry
+    under proper credentials, instead of discarding the bound identity result.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$record_path'']) but actual refs [] contain only static template entries []
+    — SQL likely returned no rows or row parsing dropped the path column". Root cause:
+    NOT a parse/binding defect — observed /bin/sql output is a clean header line `product_sku,record_path,...,available_today`
+    with zero data rows, so the inlined literals (r003/in-session) and CSV delimiter
+    detection (r001) all worked and the statement executed. The discovery''s first
+    probe `/bin/id` returned `user: anonymous / roles: GUEST`, but the script binds
+    nothing from it. Failing fragment: `identity = vm.exec(path="/bin/id", ...)` is
+    captured then never read, and the answer branch `token = "<YES>" if (has_available
+    and available_paths) else "<NO>"` emits a confident NO purely from row count.
+    A header-with-zero-rows under an anonymous/GUEST role is the signature of row-level
+    security executing the SELECT (columns returned) while filtering out all matching
+    rows — a false zero, distinct from the in-session ''no header = never ran'' case
+    and from r002''s genuine zero-row case under a normal identity. Linkage: extends
+    r002 (refs gating) and the in-session header-presence rule by adding the identity
+    gate they omit; does not duplicate them since neither consults the bound identity
+    before trusting a zero-row NO.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
+  cycles_used: 3
   date: '2026-06-06'
-  outcome: OUTCOME_OK
-  status: success
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
 task_id: t03

@@ -31,7 +31,12 @@ entries:
     and only then branch on capability presence so every answer path populates the
     required refs.
   created: '2026-06-06'
-  deactivated_reason: null
+  deactivated_reason: r002 prescribes issuing an additional relaxed SQL Exec when
+    the primary property-filtered query returns zero rows; that extra RPC is precisely
+    what produced the fidelity drift (got ['Answer','Exec','Exec'] vs expected ['Answer','Exec']).
+    The new rule forbids any RPC beyond the frozen tool_plan multiset and requires
+    relaxation to be baked into the planned query, making r002's prescription obsolete
+    and actively harmful.
   id: r002
   reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
     ([''$match.record_path'']) but actual refs [] contain only static template entries
@@ -47,9 +52,31 @@ entries:
     from the in-session CSV-parsing rule (parsing worked here); this rule covers the
     zero-row + required-ref case by mandating a relaxed base-only fallback query so
     record_path is always available before answering.'
+  status: inactive
+- agents_md_anchor: null
+  content: Never emit RPC/Exec calls beyond those declared in tool_plan.discovery/ops,
+    including conditional fallback, relaxed-retry, or speculative second queries,
+    because fidelity is checked as an RPC multiset against the frozen plan; handle
+    zero-row or missing-data cases by branching on the single planned query's parsed
+    results, and require any relaxation to live inside the planned query itself rather
+    than an extra CODEGEN-added call.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "fidelity: AssertionError: fidelity drift (RPC multiset)
+    expected: [''Answer'', ''Exec''] got: [''Answer'', ''Exec'', ''Exec'']". Root
+    cause: tool_plan declares exactly one discovery Exec (primary_sql) plus the Answer
+    template, freezing the RPC multiset to [''Answer'',''Exec'']; the script added
+    a speculative second Exec in the zero-row branch. Failing fragment: `result2 =
+    vm.exec(path="/bin/sql", args=[relaxed_sql])` inside `if not rows:`. The fidelity
+    harness compares the actual RPC multiset structurally, so any extra Exec — even
+    conditional — causes drift. Rule linkage: r002 explicitly prescribes issuing this
+    relaxed base-resolution query when the primary returns zero rows; that prescription
+    is the direct cause of the extra Exec, so the new rule strictly supersedes and
+    contradicts r002.'
   status: active
 last_run:
-  cycles_used: 3
+  cycles_used: 2
   date: '2026-06-06'
   outcome: OUTCOME_OK
   status: success

@@ -1,36 +1,25 @@
 {
-  "intent": "Count how many of the 5 specified product variants have available_today_quantity >= 2 in the Lend district PowerTool store.",
+  "intent": "Count how many of the five specified product variants have at least 4 units available today in the downtown Ljubljana PowerTool store.",
   "params": {
-    "district": "Lend",
-    "min_qty": 2,
-    "spec1_family": "Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw",
-    "spec1_brand": "Heco",
-    "spec1_prop_key": "screw_type",
-    "spec1_prop_val": "drywall screw",
-    "spec2_family": "Festool Stackable SYS 3JJ-9LM Tool Box and Bag",
-    "spec2_brand": "Festool",
-    "spec2_prop_key": "storage_type",
-    "spec2_prop_val": "tool bag",
-    "spec3_family": "Ajax Eco Classic 25C-DXE Cleaning Liquid",
-    "spec3_brand": "Ajax",
-    "spec3_prop_key": "cleaner_type",
-    "spec3_prop_val": "floor cleaner",
-    "spec4_family": "Festool Stackable SYS 3JJ-9LM Tool Box and Bag",
-    "spec4_brand": "Festool",
-    "spec4_prop_key": "storage_type",
-    "spec4_prop_val": "parts case",
-    "spec5_family": "Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer",
-    "spec5_brand": "Heco",
-    "spec5_prop_key": "fastener_type",
-    "spec5_prop_val": "threaded rod"
+    "city": "Ljubljana",
+    "store_pattern": "%downtown%",
+    "fam_festool": "Festool Stackable SYS 3JJ-9LM Tool Box and Bag",
+    "fam_heco": "Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer",
+    "fam_ajax": "Ajax Eco Classic 25C-DXE Cleaning Liquid",
+    "storage_type": "tool bag",
+    "fastener_threaded": "threaded rod",
+    "fastener_bolt": "bolt",
+    "diameter": 10,
+    "cleaner_degreaser": "degreaser",
+    "cleaner_floor": "floor cleaner",
+    "min_available": 4
   },
   "success_criteria": [
-    "Lend district PowerTool store resolved to a single store_id + record_path",
-    "Each of the 5 specs resolved to its matching product_sku via family_name+brand and product_variant_properties (property_key/value)",
-    "available_today_quantity in the Lend store fetched per matched SKU",
-    "Count = number of specs whose matched SKU has available_today_quantity >= 2",
-    "Answer string is exactly '<count> products'",
-    "refs cite the store path and only the available (>=2) product paths, not unavailable ones"
+    "Downtown Ljubljana PowerTool store resolved to exactly one store_id",
+    "Each of the five product variants resolved by product_family_name plus its distinguishing variant properties",
+    "Availability filtered to store_inventory.available_today_quantity >= 4 for that store",
+    "Final answer is the count of qualifying variants in exact format 'Count: %d'",
+    "refs cite the record_path of every available (>=4) matched product"
   ],
   "discovery": [
     {
@@ -38,9 +27,9 @@
       "args": {
         "path": "/bin/sql",
         "args": [],
-        "stdin": "SELECT store_id, record_path, store_name, city FROM stores WHERE city = :district OR store_name LIKE '%' || :district || '%' LIMIT 1;"
+        "stdin": "SELECT store_id, record_path, store_name, city, is_open FROM stores WHERE city = :city AND store_name LIKE :store_pattern;"
       },
-      "bind": "store"
+      "bind": "store_rows"
     }
   ],
   "ops": [
@@ -49,27 +38,26 @@
       "args": {
         "path": "/bin/sql",
         "args": [],
-        "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = :district OR store_name LIKE '%' || :district || '%' LIMIT 1), specs(spec_no, family_name, brand, prop_key, prop_val) AS (VALUES (1, :spec1_family, :spec1_brand, :spec1_prop_key, :spec1_prop_val), (2, :spec2_family, :spec2_brand, :spec2_prop_key, :spec2_prop_val), (3, :spec3_family, :spec3_brand, :spec3_prop_key, :spec3_prop_val), (4, :spec4_family, :spec4_brand, :spec4_prop_key, :spec4_prop_val), (5, :spec5_family, :spec5_brand, :spec5_prop_key, :spec5_prop_val)) SELECT s.spec_no, s.family_name, s.prop_val, pv.product_sku, pv.record_path, COALESCE(si.available_today_quantity, 0) AS avail FROM specs s JOIN product_families pf ON pf.product_family_name = s.family_name AND pf.brand = s.brand JOIN product_variants pv ON pv.product_family_id = pf.product_family_id JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku AND pvp.property_key = s.prop_key AND pvp.property_value_text = s.prop_val LEFT JOIN store_inventory si ON si.product_sku = pv.product_sku AND si.store_id = (SELECT store_id FROM store) ORDER BY s.spec_no;"
+        "stdin": "WITH lj_store AS (\n  SELECT store_id FROM stores\n  WHERE city = :city AND store_name LIKE :store_pattern\n),\ntarget_skus AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  WHERE\n    (pf.product_family_name = :fam_festool\n       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'storage_type' AND p.property_value_text = :storage_type))\n    OR (pf.product_family_name = :fam_heco\n       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'fastener_type' AND p.property_value_text = :fastener_threaded))\n    OR (pf.product_family_name = :fam_heco\n       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'fastener_type' AND p.property_value_text = :fastener_bolt)\n       AND EXISTS (SELECT 1 FROM product_variant_properties p2 WHERE p2.product_sku = pv.product_sku AND p2.property_key = 'diameter_mm' AND p2.property_value_number = :diameter))\n    OR (pf.product_family_name = :fam_ajax\n       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'cleaner_type' AND p.property_value_text = :cleaner_degreaser))\n    OR (pf.product_family_name = :fam_ajax\n       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'cleaner_type' AND p.property_value_text = :cleaner_floor))\n)\nSELECT ts.product_sku, ts.record_path, si.available_today_quantity\nFROM target_skus ts\nJOIN store_inventory si ON si.product_sku = ts.product_sku\nJOIN lj_store ls ON ls.store_id = si.store_id\nWHERE si.available_today_quantity >= :min_available;"
       },
-      "bind": "rows"
+      "bind": "available_rows"
     }
   ],
   "agents_md_constraints": [
     {
-      "anchor": "#Important things > availability references",
+      "anchor": "#important-things > availability",
       "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
     },
     {
-      "anchor": "#Important things > full path references",
+      "anchor": "#important-things > references",
       "rule": "When responding with reference - provide full path in the repo to the object."
     }
   ],
   "answer_template": {
-    "message": "{count} products",
+    "message": "Count: {available_count}",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$store_path",
-      "$available_product_paths"
+      "$available_paths"
     ]
   },
   "outcome_override": null

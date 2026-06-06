@@ -1,30 +1,45 @@
 {
-  "intent": "Count catalogue product variants whose product kind is 'Cordless Drill Driver'.",
+  "intent": "Count catalogue product variants whose product kind is 'Workshop Drill Grinder and Sander' and return the count as a bare integer.",
   "params": {
-    "kind_name": "Cordless Drill Driver"
+    "kind_name": "Workshop Drill Grinder and Sander"
   },
   "success_criteria": [
-    "Answer is a single integer count of product_variants joined to product_kinds where product_kind_name = 'Cordless Drill Driver'",
-    "Response formatted exactly as %d"
+    "count equals number of rows in product_variants joined to product_kinds where product_kind_name = 'Workshop Drill Grinder and Sander'",
+    "answer message is the integer count only, matching format \"%d\"",
+    "refs cite the record_path of every counted product variant"
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT COUNT(*) AS n FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pk.product_kind_name = :kind_name;"
+        "stdin": "SELECT product_kind_id, product_kind_name FROM product_kinds WHERE product_kind_name = :kind_name;"
       },
-      "bind": "count_row"
+      "bind": "matched_kinds"
     }
   ],
-  "ops": [],
-  "agents_md_constraints": [],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pk.product_kind_name = :kind_name ORDER BY pv.product_sku;"
+      },
+      "bind": "matched_products"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#Important things > reference path",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    }
+  ],
   "answer_template": {
-    "message": "{count_row.n}",
+    "message": "{matched_products.row_count}",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "/proc/catalog/power_tools/cordless_drill_driver"
+      "/proc/catalog",
+      "$matched_products.record_path"
     ]
   },
   "outcome_override": null

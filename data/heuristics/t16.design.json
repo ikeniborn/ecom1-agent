@@ -1,61 +1,91 @@
 {
-  "intent": "Count how many of the 6 specified product variants have available_today_quantity >= 2 at the central Salzburg PowerTool branch.",
+  "intent": "Count how many of the six specified product variants have available_today_quantity >= 4 at the central Salzburg PowerTool store today.",
   "params": {
-    "store_city": "Salzburg",
-    "store_name_hint": "central",
-    "min_qty": 2,
-    "p1_family": "Delta Plus Panoply Panoply 11V-VHV Work Gloves",
-    "p1_size": "XXL",
-    "p1_color_family": "Red",
-    "p2_family": "Stihl Battery AK 3LQ-DDU Chainsaw",
-    "p2_power_source": "battery",
-    "p2_bar_length_cm": "30",
-    "p2_battery_platform": "18v-system",
-    "p3_family": "Helios Belton Mobihel 34S-TXZ Wood Stain and Deck Oil",
-    "p3_product_type": "wood stain",
-    "p3_color_family": "White",
-    "p4_family": "Stanley Professional SX 3VB-LPP Tool Box and Bag",
-    "p4_storage_type": "tool box",
-    "p4_color_family": "Green",
-    "p5_family": "Delta Plus Panoply Panoply 11V-VHV Work Gloves",
-    "p5_size": "L",
-    "p5_color_family": "Orange",
-    "p6_family": "Jub Jupol Akrilin 296-K0S Wall Paint",
-    "p6_color_family": "Beige",
-    "p6_finish": "matte",
-    "p6_volume_ml": "2500"
+    "city": "Salzburg",
+    "store_pattern": "%entral%",
+    "min_available": 4,
+    "brand1": "Metabo",
+    "line1": "Metabo Silent W 1P3-96C Compressor and Dust Extractor",
+    "k_machine_type": "machine_type",
+    "v_machine_type": "compressor",
+    "k_voltage": "voltage",
+    "v_voltage": "230 V",
+    "k_power": "power",
+    "v_power": "1500 W",
+    "k_tank": "tank_volume",
+    "v_tank": "24 l",
+    "brand2": "Stanley",
+    "line2": "Stanley Classic FM 2AE-LHO Screwdriver and Hex Key Set",
+    "k_tool_profile": "tool_profile",
+    "v_tool_profile2": "hex",
+    "k_piece_count": "piece_count",
+    "v_piece_count": "8 pcs",
+    "brand3": "Hazet",
+    "line3": "Hazet Precision 900 2NG-Q9V Screwdriver and Hex Key Set",
+    "v_tool_profile3": "flat",
+    "brand4": "Varta",
+    "line4": "Varta Workshop Silver 2KH-QZR Automotive Charger and Bulb",
+    "k_product_type": "product_type",
+    "v_product_type": "battery pack",
+    "brand5": "Bolle Safety",
+    "line5": "Bolle Safety Ventilated BOL 8SW-64L Safety Eyewear",
+    "k_lens_color": "lens_color",
+    "v_lens_color": "Clear",
+    "brand6": "Wolf-Garten",
+    "line6": "Wolf-Garten Battery Lycos 2WV-8JX Lawn Mower",
+    "k_power_source": "power_source",
+    "v_power_source": "manual"
   },
   "success_criteria": [
-    "Exactly one store resolved as central Salzburg PowerTool branch",
-    "Each of the 6 specs resolved to its matching product_sku via family + variant properties",
-    "Count = number of those 6 SKUs with available_today_quantity >= 2 at the resolved store",
-    "Answer formatted exactly as 'Count: %d'"
+    "The central Salzburg PowerTool store is resolved by city='Salzburg' and a central-branch name match",
+    "Each of the six lines is matched to its specific variant by brand + product_family_name + distinguishing variant properties",
+    "Only variants with available_today_quantity >= 4 at that store are counted",
+    "Answer is returned exactly as 'result %d'",
+    "refs cite the record_path of only the available (>=4) matched variants, never the excluded ones"
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/sql",
+        "path": "/bin/id",
         "args": [],
-        "stdin": "SELECT store_id, store_name, city FROM stores WHERE city = :store_city AND store_name LIKE '%' || :store_name_hint || '%';"
+        "stdin": ""
       },
-      "bind": "store"
+      "bind": "identity"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "WITH specs(idx, family, k1, v1, k2, v2, k3, v3) AS (VALUES (1, :p1_family, 'size', :p1_size, 'color_family', :p1_color_family, NULL, NULL), (2, :p2_family, 'power_source', :p2_power_source, 'bar_length_cm', :p2_bar_length_cm, 'battery_platform', :p2_battery_platform), (3, :p3_family, 'product_type', :p3_product_type, 'color_family', :p3_color_family, NULL, NULL), (4, :p4_family, 'storage_type', :p4_storage_type, 'color_family', :p4_color_family, NULL, NULL), (5, :p5_family, 'size', :p5_size, 'color_family', :p5_color_family, NULL, NULL), (6, :p6_family, 'color_family', :p6_color_family, 'finish', :p6_finish, 'volume_ml', :p6_volume_ml)), matched AS (SELECT s.idx, pv.product_sku FROM specs s JOIN product_families pf ON pf.product_family_name = s.family JOIN product_variants pv ON pv.product_family_id = pf.product_family_id WHERE EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = s.k1 AND p.property_value_text = s.v1) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = s.k2 AND p.property_value_text = s.v2) AND (s.k3 IS NULL OR EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = s.k3 AND p.property_value_text = s.v3))) SELECT COUNT(*) AS available_count FROM matched m JOIN store_inventory si ON si.product_sku = m.product_sku WHERE si.store_id = (SELECT store_id FROM stores WHERE city = :store_city AND store_name LIKE '%' || :store_name_hint || '%' LIMIT 1) AND si.available_today_quantity >= :min_qty;"
+        "args": [
+          "SELECT store_id, record_path, store_name, city, is_open FROM stores WHERE city = :city;"
+        ],
+        "stdin": ""
       },
-      "bind": "count_result"
+      "bind": "salzburg_stores"
     }
   ],
-  "ops": [],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH store AS (SELECT store_id FROM stores WHERE city = :city AND store_name LIKE :store_pattern), matched AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pf.product_family_id = pv.product_family_id WHERE (pv.brand = :brand1 AND pf.product_family_name = :line1 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_machine_type AND p.property_value_text=:v_machine_type) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_voltage AND p.property_value_text=:v_voltage) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_power AND p.property_value_text=:v_power) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_tank AND p.property_value_text=:v_tank)) OR (pv.brand = :brand2 AND pf.product_family_name = :line2 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_tool_profile AND p.property_value_text=:v_tool_profile2) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_piece_count AND p.property_value_text=:v_piece_count)) OR (pv.brand = :brand3 AND pf.product_family_name = :line3 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_tool_profile AND p.property_value_text=:v_tool_profile3)) OR (pv.brand = :brand4 AND pf.product_family_name = :line4 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_product_type AND p.property_value_text=:v_product_type)) OR (pv.brand = :brand5 AND pf.product_family_name = :line5 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_lens_color AND p.property_value_text=:v_lens_color)) OR (pv.brand = :brand6 AND pf.product_family_name = :line6 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key=:k_power_source AND p.property_value_text=:v_power_source))) SELECT m.product_sku, m.record_path AS record_path, si.available_today_quantity FROM matched m JOIN store_inventory si ON si.product_sku = m.product_sku JOIN store s ON s.store_id = si.store_id WHERE si.available_today_quantity >= :min_available;"
+        ],
+        "stdin": ""
+      },
+      "bind": "available_rows"
+    }
+  ],
   "agents_md_constraints": [
     {
       "anchor": "#important-things > availability",
       "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
+    },
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
     },
     {
       "anchor": "#important-tools > sql",
@@ -63,10 +93,10 @@
     }
   ],
   "answer_template": {
-    "message": "Count: {count_result.available_count}",
+    "message": "result {count}",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$store.record_path"
+      "$record_path"
     ]
   },
   "outcome_override": null

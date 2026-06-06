@@ -1,60 +1,60 @@
 def run(vm, params):
-    brand = str(params["brand"])
-    kind = str(params["kind"])
-    line = str(params["line"])
-    diameter_mm = str(params["diameter_mm"])
+    def q(v):
+        return "'" + str(v).replace("'", "''") + "'"
 
-    def esc(v):
-        return v.replace("'", "''")
+    brand = q(params["brand"])
+    model = q(params["model"])
+    mask_type = q(params["mask_type"])
+    protection_class = q(params["protection_class"])
+    size = q(params["size"])
 
+    # /bin/sql rejects :name bind args -> inline values as single-quoted SQL literals.
+    # Compare properties with LOWER(TRIM()) so case/whitespace drift does not hide a present variant.
     sql = (
-        "SELECT v.product_sku, v.record_path, v.product_name, v.price_cents, v.price_currency "
-        "FROM product_variants v "
-        "JOIN product_families f ON f.product_family_id = v.product_family_id "
-        "JOIN product_variant_properties p ON p.product_sku = v.product_sku "
-        "WHERE v.brand = '" + esc(brand) + "' "
-        "AND v.product_kind_id = '" + esc(kind) + "' "
-        "AND f.product_family_name = '" + esc(line) + "' "
-        "AND p.property_key = 'disc_diameter_mm' "
-        "AND p.property_value_number = " + esc(diameter_mm) + ";"
+        "SELECT pv.product_sku, pv.record_path, pv.product_name, pv.brand, pv.series, pv.model "
+        "FROM product_variants pv "
+        "WHERE LOWER(TRIM(pv.brand)) = LOWER(TRIM(" + brand + ")) "
+        "AND LOWER(TRIM(pv.model)) = LOWER(TRIM(" + model + ")) "
+        "AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku "
+        "AND p.property_key = 'mask_type' AND LOWER(TRIM(p.property_value_text)) = LOWER(TRIM(" + mask_type + "))) "
+        "AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku "
+        "AND p.property_key = 'protection_class' AND LOWER(TRIM(p.property_value_text)) = LOWER(TRIM(" + protection_class + "))) "
+        "AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku "
+        "AND p.property_key = 'size' AND LOWER(TRIM(p.property_value_text)) = LOWER(TRIM(" + size + ")));"
     )
 
     result = vm.exec(path="/bin/sql", args=[sql])
     stdout = getattr(result, "stdout", "") or (result.get("stdout", "") if isinstance(result, dict) else "")
 
-    class Row:
-        def __init__(self, sku, record_path, product_name, price_cents, price_currency):
-            self.product_sku = sku
-            self.record_path = record_path
-            self.product_name = product_name
-            self.price_cents = price_cents
-            self.price_currency = price_currency
+    rows = []
+    lines = [ln for ln in stdout.splitlines() if ln.strip() != ""]
+    if lines:
+        header = lines[0]
+        delim = "|" if "|" in header else ","
+        cols = [c.strip() for c in header.split(delim)]
+        lower_cols = [c.lower() for c in cols]
+        if "record_path" in lower_cols or "product_sku" in lower_cols:
+            path_idx = lower_cols.index("record_path") if "record_path" in lower_cols else None
+            sku_idx = lower_cols.index("product_sku") if "product_sku" in lower_cols else None
+            for ln in lines[1:]:
+                parts = [c.strip() for c in ln.split(delim)]
+                row = {}
+                if path_idx is not None and path_idx < len(parts):
+                    row["record_path"] = parts[path_idx]
+                if sku_idx is not None and sku_idx < len(parts):
+                    row["product_sku"] = parts[sku_idx]
+                rows.append(row)
 
-    match = []
-    header_tokens = {"product_sku", "record_path", "product_name", "price_cents", "price_currency"}
-    for raw in stdout.splitlines():
-        line_str = raw.strip()
-        if not line_str:
-            continue
-        cols = [c.strip() for c in line_str.split(",")]
-        if cols and cols[0] in header_tokens:
-            continue
-        if len(cols) < 5:
-            continue
-        match.append(Row(cols[0], cols[1], cols[2], cols[3], cols[4]))
+    refs = [r["record_path"] for r in rows if r.get("record_path")]
 
-    if match:
+    if rows:
+        match = rows[0]
         message = (
-            "<YES> Ryobi 'Ryobi Precision ONE 21I-JSQ Corded Angle Grinder' Corded Angle Grinder "
-            "with disc diameter 115 mm is in catalogue: "
-            + match[0].product_name + " (" + match[0].product_sku + ") at " + match[0].record_path
+            "<YES> The respiratory protection variant Moldex Pro Classic 9B0-CGL "
+            "(mask type disposable respirator, protection class basic, size one size) is in the catalogue: "
+            + str(match.get("product_sku", "")) + " at " + str(match.get("record_path", "")) + "."
         )
-        refs = [match[0].record_path]
+        vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
     else:
-        message = (
-            "<NO> Ryobi 'Ryobi Precision ONE 21I-JSQ Corded Angle Grinder' Corded Angle Grinder "
-            "with disc diameter 115 mm not found in catalogue."
-        )
-        refs = []
-
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+        message = "<NO> No such variant exists in the catalogue."
+        vm.answer(message=message, outcome="OUTCOME_OK", refs=[])

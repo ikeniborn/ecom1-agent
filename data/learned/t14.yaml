@@ -290,8 +290,73 @@ entries:
     technique so an unknown key never zeroes a product branch and never drops its
     required catalog reference.'
   status: active
+- agents_md_anchor: null
+  content: When resolving an entity (store, city, brand, etc.) through a task-supplied
+    text filter in the discovery/resolution query — whether an equality match (column
+    = literal) or a LIKE substring pattern — make the comparison case- and whitespace-insensitive
+    by wrapping BOTH the column and the literal/pattern in LOWER()/TRIM() (e.g. LOWER(TRIM(store_name))
+    LIKE LOWER(TRIM(:pattern)) and LOWER(TRIM(city)) = LOWER(TRIM(:city))), not only
+    the variant property_value_text predicates; transcribing the task's literal casing
+    into a raw column = literal or column LIKE pattern silently returns zero resolution
+    rows whenever the stored value differs in case/whitespace, and that empty resolution
+    CTE then CROSS JOINs away every downstream matched variant, collapsing the whole
+    result set and emptying refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$store_path'', ''$qualifying_record_paths'']) but actual refs [] contain only
+    static template entries [] — SQL likely returned no rows or row parsing dropped
+    the path column; check `:name` bindings on /bin/sql and the SELECT columns". Root
+    cause: the store discovery query `SELECT ... FROM stores WHERE city = ''Salzburg''
+    AND store_name LIKE ''%central%''` returned ONLY the header line `store_id,record_path,store_name,is_open`
+    with zero data rows — the query executed and emitted correct column headers (so
+    transport via args worked and parsing was fine), meaning the WHERE predicate matched
+    nothing. The failing fragment is the case-sensitive substring filter `store_name
+    LIKE ''%central%''` (lowercase literal) which fails when the stored store_name
+    uses different casing (e.g. ''PowerTool Salzburg Central''). With target_store
+    empty, `matched m CROSS JOIN target_store ts` yields zero rows, so the ops query
+    also returned header-only, store_path stayed None, qualifying_record_paths stayed
+    empty, and refs collapsed to []. Linkage: the script already applies r009''s LOWER(TRIM())
+    normalization to property_value_text predicates (text_eq helper) but does NOT
+    normalize the store-resolution city equality or store_name LIKE pattern; this
+    rule extends case-insensitive matching to the resolution/discovery filters that
+    gate the entire CROSS JOIN, complementing r009 (variant property text) and r006/r004
+    (per-product refs).'
+  status: active
+- agents_md_anchor: null
+  content: When a task supplies a descriptive locator word (e.g., 'central', 'main',
+    'downtown') to resolve an entity through a LIKE substring filter, do not transcribe
+    that descriptor verbatim into the resolution query; first probe the candidate
+    set scoped by the reliable key (e.g., SELECT store_name FROM stores WHERE city
+    = :city) and map the descriptor to the actual stored token via synonym/translation/abbreviation,
+    because a verbatim substring the data expresses with a different word returns
+    zero resolution rows whose empty CTE then CROSS JOINs away every downstream matched
+    row and empties refs — case/whitespace normalization alone cannot fix a semantic
+    token mismatch.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Verbatim ERROR: "answer_refs: template/constraints require runtime refs
+    ([''$store_path'', ''$qualifying_record_paths'']) but actual refs [] contain only
+    static template entries [] — SQL likely returned no rows or row parsing dropped
+    the path column". Root cause: both /bin/sql RPCs returned header-only output (store
+    query: ''store_id,record_path,store_name,is_open'' with no data rows; match query:
+    header with no data rows). The script already applied LOWER(TRIM(...)) to city
+    and store_name (per the in-session normalization rule), yet the store still failed
+    to resolve — so this is NOT a case/whitespace problem. Failing fragment: `AND
+    LOWER(TRIM(store_name)) LIKE LOWER(TRIM(''%central%''))` — the task''s descriptor
+    ''central'' does not appear verbatim in the stored store_name (likely a synonym/German
+    token e.g. ''Zentral''/''Mitte''/''Hauptbahnhof''). The empty target_store CTE
+    CROSS JOINs away all matched variants, collapsing the whole result and emptying
+    refs. Rule linkage: existing in-session rule and r009/r010 cover case/whitespace
+    and property_value/property_key reconciliation, but none covers a task-supplied
+    DESCRIPTIVE locator used as an entity-name LIKE substring that the stored data
+    expresses with a different lexical token; the new rule adds the probe-and-map
+    technique for descriptor synonyms in entity resolution.'
+  status: active
 last_run:
-  cycles_used: 10
+  cycles_used: 3
   date: '2026-06-06'
   outcome: OUTCOME_OK
   status: success

@@ -1,60 +1,46 @@
 {
-  "intent": "Sum available-today units of the specified Makita drill-press 230V variant across all open Vienna PowerTool branches and report the total with store and product record citations.",
+  "intent": "Sum available-today units of the specified Makita Workshop Drill Grinder and Sander (drill press, 230 V) across all open Vienna PowerTool branches and cite each included store record plus the product record.",
   "params": {
     "brand": "Makita",
-    "family": "Makita Workshop DDF OIE-YYP Workshop Drill Grinder and Sander",
+    "family_name": "Makita Workshop DDF OIE-YYP Workshop Drill Grinder and Sander",
     "machine_type": "drill press",
-    "voltage": 230,
+    "voltage_v": 230,
     "city": "Vienna"
   },
   "success_criteria": [
-    "Resolve exactly one product_sku matching brand=Makita, family name, machine_type='drill press', voltage_v=230",
-    "Only open (is_open=1) Vienna stores considered",
-    "Total = SUM(available_today_quantity) across those stores for the SKU",
-    "Answer string is exactly 'report count %d' with the integer total",
-    "refs cite each included store record path plus the product record path"
+    "Product variant resolved by brand=Makita, product_family_name=the named line, property machine_type='drill press', property voltage_v=230",
+    "Inventory scoped to stores where city='Vienna' (branches visitable today)",
+    "Total = SUM(available_today_quantity) over matched Vienna stores having available_today_quantity > 0",
+    "Answer formatted exactly as 'result: %d'",
+    "refs cite the record_path of every included (available) Vienna store plus the matched product record_path; no zero/unavailable store or unrelated path"
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "WITH target AS (\n  SELECT pv.product_sku, pv.record_path AS product_path\n  FROM product_variants pv\n  JOIN product_families pf ON pf.product_family_id = pv.product_family_id\n  JOIN product_variant_properties mp ON mp.product_sku = pv.product_sku AND mp.property_key = 'machine_type' AND mp.property_value_text = :machine_type\n  JOIN product_variant_properties vp ON vp.product_sku = pv.product_sku AND vp.property_key = 'voltage_v' AND vp.property_value_number = :voltage\n  WHERE pv.brand = :brand AND pf.product_family_name = :family\n)\nSELECT s.store_id, s.record_path AS store_path, t.product_sku, t.product_path, si.available_today_quantity\nFROM target t\nJOIN store_inventory si ON si.product_sku = t.product_sku\nJOIN stores s ON s.store_id = si.store_id\nWHERE s.city = :city AND s.is_open = 1 AND si.available_today_quantity > 0\nORDER BY s.store_id;"
+        "stdin": "WITH target AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  JOIN product_families pf ON pf.product_family_id = pv.product_family_id\n  JOIN product_variant_properties mt ON mt.product_sku = pv.product_sku AND mt.property_key = 'machine_type' AND mt.property_value_text = :machine_type\n  JOIN product_variant_properties vv ON vv.product_sku = pv.product_sku AND vv.property_key = 'voltage_v' AND vv.property_value_number = :voltage_v\n  WHERE pv.brand = :brand AND pf.product_family_name = :family_name\n),\nvienna AS (\n  SELECT store_id, record_path FROM stores WHERE city = :city AND is_open = 1\n)\nSELECT v.store_id,\n       v.record_path AS store_record_path,\n       t.product_sku,\n       t.record_path AS product_record_path,\n       si.available_today_quantity,\n       (SELECT COALESCE(SUM(si2.available_today_quantity),0)\n          FROM store_inventory si2\n          JOIN vienna v2 ON v2.store_id = si2.store_id\n          JOIN target t2 ON t2.product_sku = si2.product_sku\n         WHERE si2.available_today_quantity > 0) AS total_units\nFROM vienna v\nJOIN store_inventory si ON si.store_id = v.store_id\nJOIN target t ON t.product_sku = si.product_sku\nWHERE si.available_today_quantity > 0;"
       },
       "bind": "rows"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "args": [],
-        "stdin": "WITH target AS (\n  SELECT pv.product_sku\n  FROM product_variants pv\n  JOIN product_families pf ON pf.product_family_id = pv.product_family_id\n  JOIN product_variant_properties mp ON mp.product_sku = pv.product_sku AND mp.property_key = 'machine_type' AND mp.property_value_text = :machine_type\n  JOIN product_variant_properties vp ON vp.product_sku = pv.product_sku AND vp.property_key = 'voltage_v' AND vp.property_value_number = :voltage\n  WHERE pv.brand = :brand AND pf.product_family_name = :family\n)\nSELECT COALESCE(SUM(si.available_today_quantity),0) AS total_units\nFROM target t\nJOIN store_inventory si ON si.product_sku = t.product_sku\nJOIN stores s ON s.store_id = si.store_id\nWHERE s.city = :city AND s.is_open = 1;"
-      },
-      "bind": "total"
     }
   ],
   "ops": [],
   "agents_md_constraints": [
     {
-      "anchor": "#important-things > availability",
-      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
-    },
-    {
-      "anchor": "#important-things > references",
+      "anchor": "#important-things > reference full path",
       "rule": "When responding with reference - provide full path in the repo to the object."
     },
     {
-      "anchor": "#important-tools > sql",
-      "rule": "Note that inventory lives only in SQL projections"
+      "anchor": "#important-things > availability references",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
     }
   ],
   "answer_template": {
-    "message": "report count {total.total_units}",
+    "message": "result: {rows.total_units}",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$store_path",
-      "$product_path"
+      "$store_record_paths",
+      "$product_record_path"
     ]
   },
   "outcome_override": null

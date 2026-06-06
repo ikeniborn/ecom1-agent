@@ -1,148 +1,135 @@
 def run(vm, params):
-    def lit(v):
+    def q(v):
         return "'" + str(v).replace("'", "''") + "'"
 
-    def is_num(v):
-        try:
-            float(str(v).strip())
-            return True
-        except Exception:
-            return False
-
-    def get_stdout(r):
+    def stdout_of(r):
+        if r is None:
+            return ""
         s = getattr(r, "stdout", None)
         if s is None and isinstance(r, dict):
             s = r.get("stdout", "")
         return s or ""
 
-    HDR = {"store_id", "store_name", "city", "record_path", "pnum", "qty",
-           "available_paths", "property_key", "product_sku"}
+    def safe_exec(path, args=None, stdin=""):
+        try:
+            return vm.exec(path=path, args=args or [], stdin=stdin)
+        except Exception:
+            return None
 
-    def parse_rows(out):
-        lines = [l for l in out.splitlines() if l.strip() != ""]
+    def parse(text):
+        lines = [l for l in text.splitlines() if l.strip() != ""]
         if not lines:
             return []
-        delim = "|" if "|" in lines[0] else ","
+        first = lines[0]
+        delim = "|" if "|" in first else ("," if "," in first else None)
+        if delim is None:
+            return []
+        header = [h.strip() for h in first.split(delim)]
         rows = []
-        for l in lines:
-            cells = [c.strip() for c in l.split(delim)]
-            if any(c.lower() in HDR for c in cells):
-                continue
-            rows.append(cells)
+        for line in lines[1:]:
+            parts = [p.strip() for p in line.split(delim)]
+            if len(parts) < len(header):
+                parts += [""] * (len(header) - len(parts))
+        rows = []
+        for line in lines[1:]:
+            parts = [p.strip() for p in line.split(delim)]
+            if len(parts) < len(header):
+                parts += [""] * (len(header) - len(parts))
+            rows.append(dict(zip(header, parts)))
         return rows
 
-    store_name = params["store_name"]
-    toks = [t for t in str(store_name).replace(",", " ").split() if t]
-    like_tok = toks[-1].lower() if toks else str(store_name).lower()
-    store_filter = ("LOWER(TRIM(store_name)) = LOWER(TRIM(" + lit(store_name) + ")) "
-                    "OR LOWER(record_path) LIKE " + lit("%" + like_tok + "%"))
+    def is_open_val(v):
+        return str(v).strip().lower() not in ("0", "false", "f", "no", "", "none")
 
-    # ---- discovery 1: resolve Vienna Praterstern store ----
-    store_sql = ("SELECT store_id, store_name, city, record_path FROM stores "
-                 "WHERE " + store_filter + ";")
-    store_lookup = vm.exec(path="/bin/sql", args=[], stdin=store_sql)
-    _ = get_stdout(store_lookup)
+    city = params["city"]
+    fam = [params["fam1"], params["fam2"], params["fam3"], params["fam4"], params["fam5"], params["fam6"]]
+    brand = [params["brand1"], params["brand2"], params["brand3"], params["brand4"], params["brand5"], params["brand6"]]
+    min_qty = params["min_qty"]
 
-    specs = [
-        (1, params["line1"], [("tool_type", params["p1_tool_type"])]),
-        (2, params["line2"], [("product_type", params["p2_product_type"]),
-                              ("color_family", params["p2_color_family"])]),
-        (3, params["line3"], [("voltage_v", params["p3_voltage_v"]),
-                              ("battery_platform", params["p3_battery_platform"]),
-                              ("kit_contents", params["p3_kit_contents"])]),
-        (4, params["line4"], [("wattage_w", params["p4_wattage_w"]),
-                              ("luminous_flux_lm", params["p4_luminous_flux_lm"])]),
-        (5, params["line5"], [("size", params["p5_size"])]),
-        (6, params["line6"], [("disc_diameter_mm", params["p6_disc_diameter_mm"])]),
+    def prop_text(key, val):
+        return ("EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku "
+                "AND p.property_key=" + q(key) + " AND LOWER(TRIM(p.property_value_text))=LOWER(TRIM(" + q(val) + ")))")
+
+    def prop_num(key, val):
+        return ("EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku "
+                "AND p.property_key=" + q(key) + " AND p.property_value_number=" + str(val) + ")")
+
+    def branch(fam_name, brand_name, preds):
+        cond = ("LOWER(TRIM(pf.product_family_name))=LOWER(TRIM(" + q(fam_name) + ")) "
+                "AND LOWER(TRIM(pv.brand))=LOWER(TRIM(" + q(brand_name) + "))")
+        for pr in preds:
+            cond += " AND " + pr
+        return ("SELECT pv.product_sku, pv.record_path FROM product_variants pv "
+                "JOIN product_families pf ON pv.product_family_id=pf.product_family_id WHERE " + cond)
+
+    identity = safe_exec("/bin/id")
+
+    store_sql = ("SELECT store_id, record_path, store_name, is_open FROM stores "
+                 "WHERE LOWER(TRIM(city))=LOWER(TRIM(" + q(city) + "));")
+    store_res = safe_exec("/bin/sql", args=[store_sql])
+    store_rows = parse(stdout_of(store_res))
+
+    open_rows = [r for r in store_rows if is_open_val(r.get("is_open", ""))]
+    central = [r for r in open_rows if "central" in str(r.get("store_name", "")).lower()]
+    if central:
+        chosen = central[0]
+    elif len(open_rows) == 1:
+        chosen = open_rows[0]
+    elif open_rows:
+        chosen = open_rows[0]
+    else:
+        chosen = None
+
+    store_id = chosen.get("store_id") if chosen else None
+    store_path = chosen.get("record_path") if chosen else None
+
+    if store_id is not None and str(store_id).strip() != "":
+        target_cte = "SELECT store_id, record_path AS store_path FROM stores WHERE store_id=" + q(store_id)
+    else:
+        target_cte = ("SELECT store_id, record_path AS store_path FROM stores "
+                      "WHERE LOWER(TRIM(city))=LOWER(TRIM(" + q(city) + ")) "
+                      "AND LOWER(TRIM(store_name)) LIKE '%central%' AND is_open=1")
+
+    branches = [
+        branch(fam[0], brand[0], [prop_text("fitting_type", params["p1_fitting"]), prop_num("diameter_mm", params["p1_diam"])]),
+        branch(fam[1], brand[1], [prop_num("voltage_v", params["p2_volt"]), prop_text("battery_platform", params["p2_batt"]), prop_text("kit_contents", params["p2_kit"])]),
+        branch(fam[2], brand[2], [prop_text("tool_type", params["p3_tool"])]),
+        branch(fam[3], brand[3], [prop_text("screw_type", params["p4_screw"]), prop_num("diameter_mm", params["p4_diam"])]),
+        branch(fam[4], brand[4], [prop_text("machine_type", params["p5_machine"]), prop_num("voltage_v", params["p5_volt"]), prop_num("power_w", params["p5_power"])]),
+        branch(fam[5], brand[5], [prop_num("volume_ml", params["p6_vol"]), prop_text("viscosity", params["p6_visc"])]),
     ]
-    families = [s[1] for s in specs]
+    matched_cte = " UNION ALL ".join(branches)
 
-    # ---- discovery 2: property_key vocabulary for the target families ----
-    fam_list = ", ".join(lit(f) for f in families)
-    keys_sql = ("SELECT DISTINCT pp.property_key FROM product_variant_properties pp "
-                "JOIN product_variants pv ON pv.product_sku = pp.product_sku "
-                "JOIN product_families pf ON pv.product_family_id = pf.product_family_id "
-                "WHERE pf.product_family_name IN (" + fam_list + ") "
-                "ORDER BY pp.property_key;")
-    prop_keys = vm.exec(path="/bin/sql", args=[], stdin=keys_sql)
+    matches_sql = ("WITH target_store AS (" + target_cte + "), matched AS (" + matched_cte + ") "
+                   "SELECT m.product_sku, m.record_path, ts.store_path, "
+                   "COALESCE(si.available_today_quantity,0) AS available_today_quantity, "
+                   "CASE WHEN COALESCE(si.available_today_quantity,0) >= " + str(min_qty) + " THEN 1 ELSE 0 END AS qualifies "
+                   "FROM matched m CROSS JOIN target_store ts "
+                   "LEFT JOIN store_inventory si ON si.store_id=ts.store_id AND si.product_sku=m.product_sku "
+                   "ORDER BY m.product_sku;")
 
-    avail_lower = {}
-    for r in parse_rows(get_stdout(prop_keys)):
-        if r and r[0]:
-            avail_lower[r[0].lower()] = r[0]
+    matches_res = safe_exec("/bin/sql", args=[matches_sql])
+    match_rows = parse(stdout_of(matches_res))
 
-    def resolve_key(key):
-        if not avail_lower:
-            return key
-        kl = key.lower()
-        if kl in avail_lower:
-            return avail_lower[kl]
-        ktoks = set(kl.replace("-", "_").split("_"))
-        best = None
-        best_score = 0
-        for lk, orig in avail_lower.items():
-            ltoks = set(lk.replace("-", "_").split("_"))
-            sc = len(ktoks & ltoks)
-            if sc > best_score:
-                best_score = sc
-                best = orig
-        return best if best_score > 0 else None
-
-    def predicate(key, val):
-        rk = resolve_key(key)
-        if rk is None:
-            return None
-        opts = ["LOWER(TRIM(x.property_value_text)) = LOWER(TRIM(" + lit(val) + "))"]
-        if is_num(val):
-            opts.append("x.property_value_number = " + str(float(val)))
-        cond = "(" + " OR ".join(opts) + ")"
-        return ("EXISTS (SELECT 1 FROM product_variant_properties x "
-                "WHERE x.product_sku = pv.product_sku AND x.property_key = "
-                + lit(rk) + " AND " + cond + ")")
-
-    branches = []
-    for pnum, fam, props in specs:
-        conds = ["LOWER(TRIM(pf.product_family_name)) = LOWER(TRIM(" + lit(fam) + "))"]
-        for k, v in props:
-            p = predicate(k, v)
-            if p is not None:
-                conds.append(p)
-        branch = ("SELECT " + str(pnum) + " AS pnum, pv.product_sku AS product_sku, "
-                  "pv.record_path AS record_path FROM product_variants pv "
-                  "JOIN product_families pf ON pv.product_family_id = pf.product_family_id "
-                  "WHERE " + " AND ".join(conds))
-        branches.append(branch)
-    matched_sql = " UNION ALL ".join(branches)
-
-    # ---- op: count of the 6 variants available today (qty>=1) at the store ----
-    op_sql = ("WITH ts AS (SELECT store_id FROM stores WHERE " + store_filter + "), "
-              "matched AS (" + matched_sql + "), "
-              "avail AS (SELECT DISTINCT m.pnum AS pnum, m.record_path AS record_path "
-              "FROM matched m JOIN store_inventory si ON si.product_sku = m.product_sku "
-              "JOIN ts ON ts.store_id = si.store_id "
-              "WHERE si.available_today_quantity >= 1) "
-              "SELECT pnum, record_path FROM avail ORDER BY pnum;")
-    result = vm.exec(path="/bin/sql", args=[], stdin=op_sql)
-
-    rows = parse_rows(get_stdout(result))
-    pnums = set()
-    refs = []
+    qualifying_paths = []
     seen = set()
-    for r in rows:
-        if not r:
-            continue
-        path = r[-1].strip()
-        pn = r[0].strip()
-        if pn:
-            pnums.add(pn)
-        # availability constraint: cite only available product paths, full repo path
-        if path and path.startswith("/") and path not in seen:
-            seen.add(path)
-            refs.append(path)
+    for r in match_rows:
+        if str(r.get("qualifies", "")).strip() in ("1", "1.0", "true", "True"):
+            rp = r.get("record_path", "")
+            if rp and rp not in seen:
+                seen.add(rp)
+                qualifying_paths.append(rp)
+        if not store_path:
+            sp = r.get("store_path", "")
+            if sp:
+                store_path = sp
 
-    qty = len(pnums)
-    if qty == 0:
-        qty = len(refs)
+    qualifying_count = len(qualifying_paths)
 
-    message = "qty=%d" % qty
+    refs = []
+    if store_path:
+        refs.append(store_path)
+    refs.extend(qualifying_paths)
+
+    message = str(qualifying_count) + " products"
     vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)

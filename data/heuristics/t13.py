@@ -4,83 +4,110 @@ import io
 
 def run(vm, params):
     def q(v):
-        return "'" + str(v).replace("'", "''") + "'"
+        s = str(v)
+        return "'" + s.replace("'", "''") + "'"
 
-    def _stdout(r):
-        s = getattr(r, "stdout", None)
-        if s is None and isinstance(r, dict):
-            s = r.get("stdout", "")
-        return s or ""
+    def get_stdout(result):
+        out = getattr(result, "stdout", None)
+        if out is None and isinstance(result, dict):
+            out = result.get("stdout", "")
+        return out or ""
 
     def parse_csv(text):
-        text = (text or "").strip()
-        if not text:
-            return []
-        return list(csv.DictReader(io.StringIO(text)))
+        text = text or ""
+        if not text.strip():
+            return [], []
+        rows = list(csv.reader(io.StringIO(text)))
+        if not rows:
+            return [], []
+        return rows[0], rows[1:]
 
-    district = params["district"]
-    min_qty = int(params["min_qty"])
-
-    # discovery: resolve the Lend district store
-    disc_sql = (
-        "SELECT store_id, record_path, store_name, city FROM stores "
-        "WHERE city = " + q(district) +
-        " OR store_name LIKE '%' || " + q(district) + " || '%' LIMIT 1;"
-    )
-    store = vm.exec(path="/bin/sql", args=[disc_sql])
-    store_rows = parse_csv(_stdout(store))
-    store_path = ""
-    if store_rows:
-        store_path = store_rows[0].get("record_path", "") or ""
-
-    specs = [
-        (1, params["spec1_family"], params["spec1_brand"], params["spec1_prop_key"], params["spec1_prop_val"]),
-        (2, params["spec2_family"], params["spec2_brand"], params["spec2_prop_key"], params["spec2_prop_val"]),
-        (3, params["spec3_family"], params["spec3_brand"], params["spec3_prop_key"], params["spec3_prop_val"]),
-        (4, params["spec4_family"], params["spec4_brand"], params["spec4_prop_key"], params["spec4_prop_val"]),
-        (5, params["spec5_family"], params["spec5_brand"], params["spec5_prop_key"], params["spec5_prop_val"]),
-    ]
-    values_clause = ", ".join(
-        "({}, {}, {}, {}, {})".format(n, q(f), q(b), q(pk), q(pv))
-        for (n, f, b, pk, pv) in specs
-    )
-
-    ops_sql = (
-        "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = " + q(district) +
-        " OR store_name LIKE '%' || " + q(district) + " || '%' LIMIT 1), "
-        "specs(spec_no, family_name, brand, prop_key, prop_val) AS (VALUES " + values_clause + ") "
-        "SELECT s.spec_no, s.family_name, s.prop_val, pv.product_sku, pv.record_path, "
-        "COALESCE(si.available_today_quantity, 0) AS avail "
-        "FROM specs s "
-        "JOIN product_families pf ON pf.product_family_name = s.family_name AND pf.brand = s.brand "
-        "JOIN product_variants pv ON pv.product_family_id = pf.product_family_id "
-        "JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku "
-        "AND pvp.property_key = s.prop_key AND pvp.property_value_text = s.prop_val "
-        "LEFT JOIN store_inventory si ON si.product_sku = pv.product_sku "
-        "AND si.store_id = (SELECT store_id FROM store) "
-        "ORDER BY s.spec_no;"
-    )
-    rows_res = vm.exec(path="/bin/sql", args=[ops_sql])
-    rows = parse_csv(_stdout(rows_res))
-
-    count = 0
-    available_paths = []
-    for row in rows:
+    def col_index(header, name, default):
         try:
-            avail = int(float(row.get("avail", "0") or 0))
-        except (ValueError, TypeError):
-            avail = 0
-        if avail >= min_qty:
-            count += 1
-            rp = row.get("record_path", "") or ""
-            if rp:
-                available_paths.append(rp)
+            return header.index(name)
+        except (ValueError, AttributeError):
+            return default
+
+    city = params["city"]
+    store_pattern = params["store_pattern"]
+    fam_festool = params["fam_festool"]
+    fam_heco = params["fam_heco"]
+    fam_ajax = params["fam_ajax"]
+    storage_type = params["storage_type"]
+    fastener_threaded = params["fastener_threaded"]
+    fastener_bolt = params["fastener_bolt"]
+    diameter = params["diameter"]
+    cleaner_degreaser = params["cleaner_degreaser"]
+    cleaner_floor = params["cleaner_floor"]
+    min_available = params["min_available"]
+
+    # --- discovery: resolve downtown store ---
+    discovery_sql = (
+        "SELECT store_id, record_path, store_name, city, is_open "
+        "FROM stores WHERE city = " + q(city) +
+        " AND store_name LIKE " + q(store_pattern) + ";"
+    )
+    store_res = vm.exec(path="/bin/sql", args=[discovery_sql], stdin="")
+    store_header, store_data = parse_csv(get_stdout(store_res))
+    store_rp_idx = col_index(store_header, "record_path", 1)
+    store_paths = []
+    for r in store_data:
+        if len(r) > store_rp_idx and r[store_rp_idx].strip():
+            store_paths.append(r[store_rp_idx].strip())
+
+    # --- ops: qualifying variants with availability >= min_available ---
+    ops_sql = (
+        "WITH lj_store AS (\n"
+        "  SELECT store_id FROM stores\n"
+        "  WHERE city = " + q(city) + " AND store_name LIKE " + q(store_pattern) + "\n"
+        "),\n"
+        "target_skus AS (\n"
+        "  SELECT pv.product_sku, pv.record_path\n"
+        "  FROM product_variants pv\n"
+        "  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n"
+        "  WHERE\n"
+        "    (pf.product_family_name = " + q(fam_festool) + "\n"
+        "       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'storage_type' AND p.property_value_text = " + q(storage_type) + "))\n"
+        "    OR (pf.product_family_name = " + q(fam_heco) + "\n"
+        "       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'fastener_type' AND p.property_value_text = " + q(fastener_threaded) + "))\n"
+        "    OR (pf.product_family_name = " + q(fam_heco) + "\n"
+        "       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'fastener_type' AND p.property_value_text = " + q(fastener_bolt) + ")\n"
+        "       AND EXISTS (SELECT 1 FROM product_variant_properties p2 WHERE p2.product_sku = pv.product_sku AND p2.property_key = 'diameter_mm' AND p2.property_value_number = " + str(diameter) + "))\n"
+        "    OR (pf.product_family_name = " + q(fam_ajax) + "\n"
+        "       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'cleaner_type' AND p.property_value_text = " + q(cleaner_degreaser) + "))\n"
+        "    OR (pf.product_family_name = " + q(fam_ajax) + "\n"
+        "       AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'cleaner_type' AND p.property_value_text = " + q(cleaner_floor) + "))\n"
+        ")\n"
+        "SELECT ts.product_sku, ts.record_path, si.available_today_quantity\n"
+        "FROM target_skus ts\n"
+        "JOIN store_inventory si ON si.product_sku = ts.product_sku\n"
+        "JOIN lj_store ls ON ls.store_id = si.store_id\n"
+        "WHERE si.available_today_quantity >= " + str(min_available) + ";"
+    )
+    avail_res = vm.exec(path="/bin/sql", args=[ops_sql], stdin="")
+    avail_header, avail_data = parse_csv(get_stdout(avail_res))
+    avail_rp_idx = col_index(avail_header, "record_path", 1)
+    avail_sku_idx = col_index(avail_header, "product_sku", 0)
+
+    available_paths = []
+    distinct_skus = set()
+    for r in avail_data:
+        if len(r) > avail_rp_idx and r[avail_rp_idx].strip():
+            p = r[avail_rp_idx].strip()
+            if p not in available_paths:
+                available_paths.append(p)
+        if len(r) > avail_sku_idx and r[avail_sku_idx].strip():
+            distinct_skus.add(r[avail_sku_idx].strip())
+
+    available_count = len(distinct_skus) if distinct_skus else len(avail_data)
 
     refs = []
-    if store_path:
-        refs.append(store_path)
+    for p in store_paths:
+        if p not in refs:
+            refs.append(p)
     for p in available_paths:
         if p not in refs:
             refs.append(p)
 
-    vm.answer(message="{} products".format(count), outcome="OUTCOME_OK", refs=refs)
+    message = "Count: " + str(available_count)
+    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)

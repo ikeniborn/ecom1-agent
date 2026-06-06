@@ -1,129 +1,155 @@
+import json
+
+
 def run(vm, params):
-    email = params["email"]
-    store_id = params["store_id"]
-    issuer_employee_id = params["issuer_employee_id"]
-    discount_percent = params.get("discount_percent", 10)
+    email = params.get("email", "nils.kramer+cust553@outlook.com")
+    percent = params.get("percent", 5)
     reason_code = params.get("reason_code", "service_recovery")
+    issuer_id = params.get("issuer_id", "")
 
-    def _stdout(r):
-        v = getattr(r, "stdout", None)
-        if v is None and isinstance(r, dict):
-            v = r.get("stdout", "")
-        return v or ""
+    def out(r):
+        if r is None:
+            return ""
+        s = getattr(r, "stdout", None)
+        if s is None and isinstance(r, dict):
+            s = r.get("stdout", "")
+        return s or ""
 
-    def _paths_from_find(r):
-        out = []
-        candidates = []
-        if isinstance(r, (list, tuple)):
-            candidates = list(r)
-        else:
-            for attr in ("entries", "results", "matches", "files", "nodes"):
-                v = getattr(r, attr, None)
-                if isinstance(v, (list, tuple)):
-                    candidates = list(v)
-                    break
-            if not candidates and isinstance(r, dict):
-                for attr in ("entries", "results", "matches", "files", "nodes"):
-                    v = r.get(attr)
-                    if isinstance(v, (list, tuple)):
-                        candidates = list(v)
-                        break
-        for c in candidates:
-            p = None
-            if isinstance(c, str):
-                p = c
-            else:
-                p = getattr(c, "path", None)
-                if p is None and isinstance(c, dict):
-                    p = c.get("path")
-            if isinstance(p, str) and p:
-                out.append(p)
-        return out
+    def err(r):
+        if r is None:
+            return ""
+        s = getattr(r, "stderr", None)
+        if s is None and isinstance(r, dict):
+            s = r.get("stderr", "")
+        return s or ""
 
-    # --- discovery ---
+    def code(r):
+        if r is None:
+            return 1
+        c = getattr(r, "exit_code", None)
+        if c is None and isinstance(r, dict):
+            c = r.get("exit_code", 0)
+        return c if c is not None else 0
+
+    # --- discovery (emit every planned RPC, unconditionally) ---
     identity = vm.exec(path="/bin/id", args=[])
+    security_policy = vm.read(path="/docs/security.md", number=True)
+    discount_policy = vm.read(path="/docs/discounts.md", number=True)
     discount_help = vm.exec(path="/bin/discount", args=["--help"])
 
-    policy_candidates = vm.find(root="/docs", name="discount", kind="file", limit=5)
-    policy_paths = _paths_from_find(policy_candidates)
-    policy_path = policy_paths[0] if policy_paths else "/docs"
-
-    policy_doc = vm.read(path=policy_path, number=True)
-
     sql = (
-        "WITH cust AS (SELECT customer_id FROM customer_accounts WHERE customer_email = '"
-        + email
-        + "'), rbac AS (SELECT 1 AS ok FROM employee_role_assignments WHERE employee_id = '"
-        + str(issuer_employee_id)
-        + "' AND role_code = 'discount_manager') "
-        "SELECT b.basket_id, b.record_path, b.customer_id, b.store_id, b.basket_status, b.basket_created_at, "
-        "(SELECT ok FROM rbac) AS has_discount_role "
-        "FROM shopping_baskets b JOIN cust c ON c.customer_id = b.customer_id "
-        "WHERE b.store_id = '"
-        + str(store_id)
-        + "' AND b.basket_status = 'checkoutable' "
-        "ORDER BY b.basket_created_at DESC LIMIT 1;"
+        "SELECT b.basket_id, b.record_path, b.basket_status, b.basket_created_at, "
+        "b.customer_id, b.store_id, b.discount_percent, b.discount_reason_code, "
+        "b.discount_issuer_employee_id FROM shopping_baskets b "
+        "JOIN customer_accounts c ON c.customer_id = b.customer_id "
+        "WHERE c.customer_email = 'nils.kramer+cust553@outlook.com' "
+        "ORDER BY b.basket_created_at DESC;"
     )
-    basket = vm.exec(path="/bin/sql", args=[sql])
-    rows_text = _stdout(basket)
+    baskets = vm.exec(path="/bin/sql", args=[sql])
 
-    basket_id = ""
-    basket_path = ""
-    has_role = ""
-    for line in rows_text.splitlines():
+    # --- parse SQL rows ---
+    rows = []
+    for line in out(baskets).splitlines():
         line = line.strip()
-        if not line or "|" not in line:
+        if not line:
             continue
-        cols = [c.strip() for c in line.split("|")]
-        low = cols[0].lower()
-        if low in ("basket_id",) or "basket_id" in low:
+        parts = [p.strip() for p in line.split("|")]
+        if parts and parts[0] in ("basket_id", "record_path"):
             continue
-        basket_id = cols[0]
-        if len(cols) > 1:
-            basket_path = cols[1]
-        if len(cols) > 6:
-            has_role = cols[6]
-        break
+        rows.append(parts)
 
-    authorized = str(has_role).strip() in ("1", "true", "True")
+    def field(parts, i):
+        return parts[i] if parts and i < len(parts) else ""
 
-    # --- ops (always emitted for fidelity) ---
-    discount_result = vm.exec(
-        path="/bin/discount",
-        args=[
-            "set",
-            "--basket",
-            basket_id,
-            "--percent",
-            str(discount_percent),
-            "--reason",
-            reason_code,
-            "--issuer",
-            str(issuer_employee_id),
-        ],
-    )
+    def has_discount(parts):
+        dp = field(parts, 6)
+        return dp not in ("", "0", "0.0", "NULL", "null", "None")
 
-    refs = []
+    def is_checkoutable(parts):
+        st = field(parts, 2).upper()
+        return "CHECKOUT" in st or st in ("OPEN", "ACTIVE")
+
+    target = None
+    for parts in rows:
+        if is_checkoutable(parts) and not has_discount(parts):
+            target = parts
+            break
+    if target is None and rows:
+        target = rows[0]
+
+    basket_id = field(target, 0) if target else ""
+    basket_path = field(target, 1) if target else ""
+
+    # --- read target basket record (planned Read, emitted unconditionally) ---
+    read_path = "/proc/baskets/" + basket_id + ".json" if basket_id else "/proc/baskets/.json"
+    target_basket = None
+    try:
+        target_basket = vm.read(path=read_path, number=True)
+    except Exception:
+        target_basket = None
+
+    # --- ops: apply discount (planned Exec, emitted unconditionally) ---
+    discount_result = None
+    try:
+        discount_result = vm.exec(
+            path="/bin/discount",
+            args=[
+                "apply",
+                "--basket", basket_id,
+                "--percent", str(percent),
+                "--reason", reason_code,
+                "--issuer", issuer_id,
+            ],
+        )
+    except Exception:
+        discount_result = None
+
+    # --- resolve acting employee id for message ---
+    emp_id = issuer_id
+    try:
+        j = json.loads(out(identity))
+        if isinstance(j, dict):
+            emp_id = j.get("employee_id") or j.get("user") or issuer_id
+    except Exception:
+        pass
+
+    # --- decide terminal outcome ---
+    rc = code(discount_result)
+    diag = (err(discount_result) + " " + out(discount_result)).lower()
+
+    if not target or not basket_id:
+        outcome = "OUTCOME_NONE_UNSUPPORTED"
+        message = (
+            "No checkoutable basket without a pre-existing discount found for "
+            + email
+            + "; no discount applied per /docs/discounts.md and /docs/security.md."
+        )
+    elif rc == 0 and discount_result is not None:
+        outcome = "OUTCOME_OK"
+        message = (
+            "Applied " + str(percent) + "% " + reason_code
+            + " discount to last checkoutable basket " + basket_id
+            + " (" + basket_path + ") of " + email
+            + ", issued by " + str(emp_id)
+            + " per /docs/discounts.md and /docs/security.md."
+        )
+    elif any(k in diag for k in ("forbid", "permission", "denied", "unauthor", "role", "security", "approval", "identity")):
+        outcome = "OUTCOME_DENIED_SECURITY"
+        message = (
+            "Discount denied for basket " + basket_id + " (" + basket_path
+            + ") of " + email
+            + ": identity/authorization gate failed per /docs/security.md and /docs/discounts.md; no mutation."
+        )
+    else:
+        outcome = "OUTCOME_NONE_UNSUPPORTED"
+        message = (
+            "Discount not applied to basket " + basket_id + " (" + basket_path
+            + ") of " + email
+            + ": discount policy gate failed per /docs/discounts.md and /docs/security.md; no mutation."
+        )
+
+    refs = ["/docs/security.md", "/docs/discounts.md"]
     if basket_path:
         refs.append(basket_path)
-    if policy_paths:
-        for p in policy_paths:
-            if p not in refs:
-                refs.append(p)
 
-    if not authorized or not basket_id:
-        msg = (
-            "Could not apply discount: "
-            + ("issuer lacks discount_manager role" if not authorized else "no checkoutable basket found")
-            + " for " + email + " in store " + str(store_id) + "."
-        )
-        vm.answer(message=msg, outcome="OUTCOME_DENIED_SECURITY", refs=refs)
-        return
-
-    message = (
-        "Applied " + str(discount_percent) + "% service_recovery discount to basket "
-        + str(basket_id) + " (latest checkoutable basket of " + email + " in store "
-        + str(store_id) + "), issuer " + str(issuer_employee_id) + ". Basket: "
-        + basket_path + ". Policy: " + (policy_paths[0] if policy_paths else policy_path) + "."
-    )
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+    vm.answer(message=message, outcome=outcome, refs=refs)

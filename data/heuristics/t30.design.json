@@ -1,23 +1,22 @@
 {
-  "intent": "Safely recover the checkout for basket_266 / payment pay_066 by re-initiating 3-DS via the payments tool only if attempts remain, without bypassing payment safety.",
+  "intent": "Restart the 3DS recovery flow on payment pay_056 / basket basket_256, gating the privileged mutation on runtime identity and payment policy.",
   "params": {
-    "basket": "basket_266",
-    "payment": "pay_066"
+    "payment_id": "pay_056",
+    "basket_id": "basket_256"
   },
   "success_criteria": [
-    "Payment pay_066 row inspected for payment_status, three_ds_status, three_ds_attempts, three_ds_max_attempts",
-    "Recovery performed strictly via /bin/payments workflow state (no direct status mutation, no 3DS bypass)",
-    "3-DS only retried when three_ds_attempts < three_ds_max_attempts; otherwise checkout cannot be safely recovered and is reported as such",
-    "Applied payments/security policy doc included as grounding reference",
-    "Answer references the pay_066 record_path"
+    "Real caller identity resolved via /bin/id before any mutation",
+    "Security gate evaluated against /docs/security.md and the 3DS/payments policy doc",
+    "Payment pay_056 record inspected for customer_id, payment_status, three_ds_status, three_ds_attempts, three_ds_max_attempts",
+    "3DS recovery restarted via /bin/payments ONLY if identity is authorized and the payment is 3DS-eligible (attempts < max, recoverable status, caller owns/is permitted on the record)",
+    "Answer references each applied policy doc plus the inspected payment record path"
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/id",
-        "args": [],
-        "stdin": ""
+        "args": []
       },
       "bind": "identity"
     },
@@ -30,22 +29,27 @@
       "bind": "docs_tree"
     },
     {
-      "rpc": "Find",
+      "rpc": "Read",
       "args": {
-        "root": "/docs",
-        "name": "payment",
-        "kind": "file",
-        "limit": 10
+        "path": "/docs/security.md",
+        "number": true
       },
-      "bind": "payment_policy_paths"
+      "bind": "security_policy"
+    },
+    {
+      "rpc": "List",
+      "args": {
+        "path": "/docs/payments"
+      },
+      "bind": "payments_docs"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "$payment_policy_paths[0]",
+        "path": "/docs/payments/3ds.md",
         "number": true
       },
-      "bind": "payment_policy"
+      "bind": "threeds_policy"
     },
     {
       "rpc": "Exec",
@@ -53,8 +57,7 @@
         "path": "/bin/payments",
         "args": [
           "--help"
-        ],
-        "stdin": ""
+        ]
       },
       "bind": "payments_help"
     },
@@ -63,11 +66,10 @@
       "args": {
         "path": "/bin/sql",
         "args": [
-          "SELECT p.payment_id, p.record_path, p.basket_id, p.customer_id, p.store_id, p.payment_status, p.three_ds_status, p.three_ds_failure_reason, p.three_ds_attempts, p.three_ds_max_attempts, b.basket_status FROM payment_transactions p LEFT JOIN shopping_baskets b ON b.basket_id = :basket WHERE p.payment_id = :payment AND p.basket_id = :basket;"
-        ],
-        "stdin": ""
+          "SELECT p.payment_id, p.record_path, p.basket_id, p.customer_id, p.store_id, p.payment_status, p.three_ds_status, p.three_ds_failure_reason, p.three_ds_attempts, p.three_ds_max_attempts, b.record_path AS basket_record_path, b.basket_status, b.customer_id AS basket_customer_id FROM payment_transactions p LEFT JOIN shopping_baskets b ON b.basket_id = p.basket_id WHERE p.payment_id = 'pay_056' AND p.basket_id = 'basket_256';"
+        ]
       },
-      "bind": "pay_row"
+      "bind": "payment_record"
     }
   ],
   "ops": [
@@ -76,39 +78,44 @@
       "args": {
         "path": "/bin/payments",
         "args": [
-          "retry-3ds",
+          "restart-3ds",
           "--payment",
-          ":payment"
-        ],
-        "stdin": ""
+          "pay_056"
+        ]
       },
-      "bind": "recovery_result"
+      "bind": "restart_result"
     }
   ],
   "agents_md_constraints": [
     {
-      "anchor": "#important-things > policy-grounding",
+      "anchor": "#important-things > grounding",
       "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
     },
     {
-      "anchor": "#important-things > full-path-reference",
+      "anchor": "#important-things > reference-path",
       "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-tools > id",
+      "rule": "id tool returns identity of the user/customer/guest under which we are running current request."
     },
     {
       "anchor": "#important-tools > payments",
       "rule": "use payments tool to manage payment workflow state and supported refund approval/finalization"
     },
     {
-      "anchor": "#important-things > start-context",
+      "anchor": "#important-things > startup",
       "rule": "When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context"
     }
   ],
   "answer_template": {
-    "message": "Checkout recovery for basket_266 / pay_066. 3-DS status={pay_row.three_ds_status} failure={pay_row.three_ds_failure_reason} attempts={pay_row.three_ds_attempts}/{pay_row.three_ds_max_attempts}. Recovery done via /bin/payments workflow only (no safety bypass): {recovery_result}. If attempts exhausted, checkout cannot be safely recovered and customer must restart payment. Policy applied: see grounding refs.",
+    "message": "Resolved caller via /bin/id ({identity}). Checked 3DS policy + security against payment {payment_record.payment_id} (status={payment_record.payment_status}, 3ds={payment_record.three_ds_status}, attempts {payment_record.three_ds_attempts}/{payment_record.three_ds_max_attempts}). {decision}",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$pay_row.record_path",
-      "$payment_policy_paths[0]"
+      "/docs/security.md",
+      "/docs/payments/3ds.md",
+      "$payment_path",
+      "$basket_path"
     ]
   },
   "outcome_override": null

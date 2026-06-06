@@ -1,24 +1,35 @@
 {
-  "intent": "Verify whether Greta Engel is the store manager of PowerTool Innsbruck Wilten and, if so, return her contact email.",
+  "intent": "Verify whether employee Tobias Hartmann is the manager of store PowerTool Graz Jakomini and, if so, return his contact email.",
   "params": {
-    "name": "Greta Engel",
-    "store": "%Innsbruck Wilten%",
+    "employee_name": "Tobias Hartmann",
+    "store_name_fragment": "Graz Jakomini",
     "manager_role": "store_manager"
   },
   "success_criteria": [
-    "Determine if an employee named Greta Engel is assigned to the store whose name matches 'Innsbruck Wilten' AND holds the store_manager role",
-    "If confirmed, the answer includes her employee_email and a <YES> token",
-    "If not confirmed, the answer includes a <NO> token and does not disclose an email for a non-matching manager",
-    "Answer references the matched employee record full path"
+    "Determine whether an employee named Tobias Hartmann is assigned to the PowerTool Graz Jakomini store with the store_manager role.",
+    "If he manages it, answer with <YES> and provide his employee_email, citing both his employee record_path and the store record_path.",
+    "If he does not manage it (no match, different store, or no manager role), answer with <NO> and do not expose an email; cite the matched store record_path."
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT e.employee_id, e.employee_display_name, e.employee_email, e.job_title, e.record_path AS employee_path, s.store_id, s.store_name, s.record_path AS store_path, MAX(CASE WHEN r.role_code = :manager_role THEN 1 ELSE 0 END) AS is_store_manager FROM employee_accounts e JOIN stores s ON e.store_id = s.store_id LEFT JOIN employee_role_assignments r ON r.employee_id = e.employee_id WHERE e.employee_display_name = :name AND s.store_name LIKE :store GROUP BY e.employee_id;"
+        "path": "/bin/id",
+        "args": [],
+        "stdin": ""
       },
-      "bind": "match"
+      "bind": "identity"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH target_store AS (SELECT store_id, store_name, record_path AS store_path FROM stores WHERE store_name LIKE '%Graz Jakomini%') SELECT e.employee_id, e.record_path AS employee_path, e.employee_display_name, e.employee_email, e.job_title, e.store_id, ts.store_name, ts.store_path, CASE WHEN r.role_code IS NOT NULL THEN 1 ELSE 0 END AS is_store_manager FROM target_store ts LEFT JOIN employee_accounts e ON e.store_id = ts.store_id AND e.employee_display_name = 'Tobias Hartmann' LEFT JOIN employee_role_assignments r ON r.employee_id = e.employee_id AND r.role_code = 'store_manager';"
+        ],
+        "stdin": ""
+      },
+      "bind": "manager_check"
     }
   ],
   "ops": [],
@@ -28,20 +39,16 @@
       "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
     },
     {
-      "anchor": "#important-things > references",
+      "anchor": "#important-things > full path reference",
       "rule": "When responding with reference - provide full path in the repo to the object."
-    },
-    {
-      "anchor": "#important-things > ambiguity",
-      "rule": "When a request is ambiguous and you ask for clarification, reference all concrete candidate objects that make it ambiguous."
     }
   ],
   "answer_template": {
-    "message": "{match.is_store_manager and match.employee_display_name and '<YES> Greta Engel manages '+match.store_name+' (role store_manager). Contact email: '+match.employee_email+'.' or '<NO> Greta Engel is not the store_manager of PowerTool Innsbruck Wilten; no manager email disclosed.'}",
+    "message": "Tobias Hartmann + PowerTool Graz Jakomini check: if is_store_manager=1 for the matched row → '<YES> Tobias Hartmann manages PowerTool Graz Jakomini ({store_name}). Contact email: {employee_email}.' Otherwise → '<NO> Tobias Hartmann does not manage PowerTool Graz Jakomini (no matching store_manager assignment found); no manager email provided.'",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$employee_path",
-      "$store_path"
+      "$store_path",
+      "$employee_path"
     ]
   },
   "outcome_override": null

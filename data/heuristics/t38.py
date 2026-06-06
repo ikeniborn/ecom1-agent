@@ -1,112 +1,102 @@
 def run(vm, params):
-    is_archived = params.get("is_archived", 1)
-    refs = []
+    refs = ["/docs/security.md"]
+    payment_ids = []
+    record_paths = []
 
-    # start-of-work constraint: tree -L 2 on docs
+    def _stdout(r):
+        if r is None:
+            return ""
+        s = getattr(r, "stdout", None)
+        if s is None and isinstance(r, dict):
+            s = r.get("stdout", "")
+        return s or ""
+
+    # discovery 1: identity context
     try:
-        docs_tree = vm.exec(path="/bin/tree", args=["-L", "2", "/docs"])
+        identity = vm.exec(path="/bin/id", args=[])
     except Exception:
-        docs_tree = None
+        identity = None
 
-    # locate fraud/security policy doc
-    security_doc = None
+    # discovery 2: stat policy doc
     try:
-        found = vm.find(root="/docs", name="security", limit=10)
-        entries = getattr(found, "entries", None)
-        if entries is None and isinstance(found, dict):
-            entries = found.get("entries")
-        if entries:
-            for e in entries:
-                p = getattr(e, "path", None)
-                if p is None and isinstance(e, dict):
-                    p = e.get("path")
-                if p:
-                    security_doc = p
-                    break
+        sec_stat = vm.stat(path="/docs/security.md")
     except Exception:
-        security_doc = None
+        sec_stat = None
 
-    if security_doc:
-        refs.append(security_doc)
-
-    # read policy doc (always issue the Read RPC, never on a directory)
-    read_path = security_doc if security_doc else "/docs/security.md"
+    # discovery 3: read policy doc (drop number kwarg to avoid TypeError)
     try:
-        security_policy = vm.read(path=read_path)
+        security_policy = vm.read(path="/docs/security.md")
     except Exception:
         security_policy = None
 
-    # discovery: archived payment transactions (inline value, no bind params)
-    arch_sql = (
-        "select payment_id, record_path, basket_id, customer_id, store_id, "
-        "payment_amount_cents, payment_currency, payment_status, payment_created_at, "
-        "payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude, "
-        "three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts "
-        "from payment_transactions where is_archived_basket_reference = " + str(is_archived) +
-        " order by payment_created_at;"
+    # discovery 4: impossible-travel leg-speed detection over archived payments
+    sql = (
+        "WITH archived AS (\n"
+        "  SELECT payment_id, record_path, customer_id, payment_created_at,\n"
+        "         observed_latitude AS lat, observed_longitude AS lon\n"
+        "  FROM payment_transactions\n"
+        "  WHERE is_archived_basket_reference = 1\n"
+        "),\n"
+        "legs AS (\n"
+        "  SELECT a.*,\n"
+        "    LAG(lat)  OVER w AS prev_lat,\n"
+        "    LAG(lon)  OVER w AS prev_lon,\n"
+        "    LAG(payment_created_at)  OVER w AS prev_t,\n"
+        "    LEAD(lat) OVER w AS next_lat,\n"
+        "    LEAD(lon) OVER w AS next_lon,\n"
+        "    LEAD(payment_created_at) OVER w AS next_t\n"
+        "  FROM archived a\n"
+        "  WINDOW w AS (PARTITION BY customer_id ORDER BY payment_created_at)\n"
+        "),\n"
+        "speeds AS (\n"
+        "  SELECT *,\n"
+        "    (ABS(lat-prev_lat)+ABS(lon-prev_lon)) / NULLIF((julianday(payment_created_at)-julianday(prev_t))*24.0,0) AS in_speed,\n"
+        "    (ABS(next_lat-lat)+ABS(next_lon-lon)) / NULLIF((julianday(next_t)-julianday(payment_created_at))*24.0,0) AS out_speed\n"
+        "  FROM legs\n"
+        ")\n"
+        "SELECT record_path, payment_id, customer_id, payment_created_at, in_speed, out_speed\n"
+        "FROM speeds\n"
+        "WHERE in_speed > 2.0 OR out_speed > 2.0\n"
+        "ORDER BY customer_id, payment_created_at;"
     )
     try:
-        archived_payments = vm.exec(path="/bin/sql", args=[arch_sql])
+        fraud_records = vm.exec(path="/bin/sql", args=[], stdin=sql)
     except Exception:
-        archived_payments = None
+        fraud_records = None
 
-    # ops: impossible-travel leg rule over archived payments per customer
-    fraud_sql = (
-        "with arch as ("
-        "select payment_id, record_path, customer_id, observed_latitude as lat, "
-        "observed_longitude as lon, payment_created_at as t "
-        "from payment_transactions where is_archived_basket_reference = " + str(is_archived) + "), "
-        "legs as (select payment_id, record_path, customer_id, lat, lon, t, "
-        "lag(lat) over w as plat, lag(lon) over w as plon, lag(t) over w as pt, "
-        "lead(lat) over w as nlat, lead(lon) over w as nlon, lead(t) over w as nt "
-        "from arch window w as (partition by customer_id order by t)), "
-        "sp as (select payment_id, record_path, customer_id, t, "
-        "case when pt is not null then (abs(lat-plat)+abs(lon-plon))/nullif((julianday(t)-julianday(pt))*24.0,0) else 0 end as in_speed, "
-        "case when nt is not null then (abs(lat-nlat)+abs(lon-nlon))/nullif((julianday(nt)-julianday(t))*24.0,0) else 0 end as out_speed "
-        "from legs) "
-        "select record_path, payment_id, customer_id from sp "
-        "where abs(in_speed) > 2 or abs(out_speed) > 2 order by t;"
-    )
-    fraud_stdout = ""
-    try:
-        fraud_candidates = vm.exec(path="/bin/sql", args=[fraud_sql])
-        fraud_stdout = getattr(fraud_candidates, "stdout", "") or (
-            fraud_candidates.get("stdout", "") if isinstance(fraud_candidates, dict) else "")
-    except Exception:
-        fraud_stdout = ""
-
-    record_paths = []
-    payment_ids = []
-    lines = [l for l in fraud_stdout.splitlines() if l.strip()]
+    out = _stdout(fraud_records)
+    lines = [ln for ln in out.splitlines() if ln.strip()]
     if lines:
         header = lines[0]
         delim = "|" if "|" in header else ","
-        cols = [c.strip() for c in header.split(delim)]
-        rp_idx = cols.index("record_path") if "record_path" in cols else 0
-        pid_idx = cols.index("payment_id") if "payment_id" in cols else None
-        for row in lines[1:]:
-            parts = [c.strip() for c in row.split(delim)]
-            if len(parts) > rp_idx:
-                rp = parts[rp_idx]
-                if rp and rp not in record_paths:
-                    record_paths.append(rp)
-            if pid_idx is not None and len(parts) > pid_idx:
-                payment_ids.append(parts[pid_idx])
+        hdr_cols = [c.strip() for c in header.split(delim)]
+        start = 1 if "record_path" in hdr_cols else 0
+        for ln in lines[start:]:
+            cols = [c.strip() for c in ln.split(delim)]
+            if not cols or not cols[0]:
+                continue
+            rp = cols[0]
+            if rp and rp.startswith("/"):
+                record_paths.append(rp)
+                if len(cols) > 1 and cols[1]:
+                    payment_ids.append(cols[1])
 
     for rp in record_paths:
-        if rp not in refs:
+        if rp and rp not in refs:
             refs.append(rp)
 
-    summary = ", ".join(record_paths) if record_paths else "none"
+    count = len(record_paths)
+    ids_str = ", ".join(payment_ids) if payment_ids else "none"
     message = (
-        "Fraudulent archived payment(s) identified per the fraud/security policy "
-        "(impossible-travel leg rule over archived payment_transactions, "
-        "is_archived_basket_reference=1): " + str(len(record_paths)) +
-        " record(s) -> " + summary + ". Files left unchanged."
-    )
-    result = {"message": message, "outcome": "OUTCOME_OK", "refs": refs}
+        "Fraud review over archived payments (is_archived_basket_reference=1): "
+        "impossible-travel detection per customer ordered by payment_created_at. "
+        "Flagged {count} payment record(s) whose incoming OR outgoing leg speed "
+        "exceeds ~2 deg/hr (faster than ground travel): {ids}. Files left unchanged. "
+        "Applied policy: /docs/security.md."
+    ).format(count=count, ids=ids_str)
+
     try:
         vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
     except Exception:
         pass
-    return result
+    return {"message": message, "outcome": "OUTCOME_OK", "refs": refs}

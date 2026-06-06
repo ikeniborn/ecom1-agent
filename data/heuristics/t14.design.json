@@ -1,49 +1,63 @@
 {
-  "intent": "Count how many of six specified product variants have available_today_quantity >= 1 at the Vienna Praterstern store today.",
+  "intent": "Count how many of the 6 specified product lines have available_today_quantity >= 4 in the central Salzburg PowerTool store today.",
   "params": {
-    "store_name": "Vienna Praterstern",
-    "line1": "Gardena Smart PowerMax 280-5FI Manual Garden Tool",
-    "p1_tool_type": "pruning saw",
-    "line2": "Helios Professional Helios 29A-FTE Metal and Concrete Paint",
-    "p2_product_type": "metal paint",
-    "p2_color_family": "White",
-    "line3": "Metabo Brushless BS 1OW-IK5 Cordless Drill Driver",
-    "p3_voltage_v": "18",
-    "p3_battery_platform": "18v-system",
-    "p3_kit_contents": "case",
-    "line4": "Philips Professional Hue 3JS-MSN LED Bulb",
-    "p4_wattage_w": "10",
-    "p4_luminous_flux_lm": "470",
-    "line5": "Portwest PW3 DX 3TU-ST2 Work Gloves",
-    "p5_size": "M",
-    "line6": "Bosch Compact PKS 375-EOK Corded Angle Grinder",
-    "p6_disc_diameter_mm": "125"
+    "city": "Salzburg",
+    "store_like": "%central%",
+    "brand1": "Viega",
+    "fam1": "Viega Professional Sanpress 2OG-ENN Pipe Fitting",
+    "p1_fitting": "compression coupler",
+    "p1_diam": 12,
+    "brand2": "Metabo",
+    "fam2": "Metabo Brushless BS 1OW-IK5 Cordless Drill Driver",
+    "p2_volt": 12,
+    "p2_batt": "12v-system",
+    "p2_kit": "starter kit",
+    "brand3": "Gardena",
+    "fam3": "Gardena Smart PowerMax 280-5FI Manual Garden Tool",
+    "p3_tool": "pruning saw",
+    "brand4": "Dresselhaus",
+    "fam4": "Dresselhaus Outdoor Pro 1VG-P5G Wood and Drywall Screw",
+    "p4_screw": "wood screw",
+    "p4_diam": 8,
+    "brand5": "Holzmann",
+    "fam5": "Holzmann Compact D 327-RR0 Compressor and Dust Extractor",
+    "p5_machine": "compressor",
+    "p5_volt": 230,
+    "p5_power": 1500,
+    "brand6": "Mobil",
+    "fam6": "Mobil All Season Super 1ZE-TCR Engine Oil",
+    "p6_vol": 5000,
+    "p6_visc": "10W-40",
+    "min_qty": 4
   },
   "success_criteria": [
-    "Vienna Praterstern store_id resolved from stores table",
-    "Each of the 6 products resolved to its specific variant SKU via product_family_name + distinguishing properties",
-    "available_today_quantity >= 1 at the resolved store evaluated per product against store_inventory",
-    "Count of products with availability returned and rendered as qty=%d",
-    "refs cite the record_path of each product counted as available (and no unavailable ones)"
+    "The central Salzburg PowerTool store resolves to exactly one open store_id.",
+    "Each of the 6 product lines resolves to its variant SKU via product_family_name + brand + the stated variant properties.",
+    "available_today_quantity for that store is joined per matched SKU (missing inventory row treated as 0).",
+    "Count = number of matched SKUs whose available_today_quantity >= 4.",
+    "Answer formatted exactly as '%d products'.",
+    "refs include the record_path of every qualifying (available>=4) product and the store record_path; no unavailable product is referenced."
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/sql",
+        "path": "/bin/id",
         "args": [],
-        "stdin": "SELECT store_id, store_name, city, record_path FROM stores WHERE store_name = :store_name OR record_path LIKE '%praterstern%';"
+        "stdin": ""
       },
-      "bind": "store_lookup"
+      "bind": "identity"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT DISTINCT pp.property_key FROM product_variant_properties pp JOIN product_variants pv ON pv.product_sku = pp.product_sku JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name IN (:line1, :line2, :line3, :line4, :line5, :line6) ORDER BY pp.property_key;"
+        "args": [
+          "SELECT store_id, record_path, store_name, is_open FROM stores WHERE city = :city AND store_name LIKE :store_like;"
+        ],
+        "stdin": ""
       },
-      "bind": "prop_keys"
+      "bind": "store"
     }
   ],
   "ops": [
@@ -51,27 +65,34 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "WITH ts AS (SELECT store_id FROM stores WHERE store_name = :store_name OR record_path LIKE '%praterstern%'), matched AS (SELECT 1 AS pnum, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line1 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'tool_type' AND x.property_value_text = :p1_tool_type) UNION ALL SELECT 2, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line2 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'product_type' AND x.property_value_text = :p2_product_type) AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'color_family' AND x.property_value_text = :p2_color_family) UNION ALL SELECT 3, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line3 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'voltage_v' AND x.property_value_text = :p3_voltage_v) AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'battery_platform' AND x.property_value_text = :p3_battery_platform) AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'kit_contents' AND x.property_value_text = :p3_kit_contents) UNION ALL SELECT 4, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line4 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'wattage_w' AND x.property_value_text = :p4_wattage_w) AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'luminous_flux_lm' AND x.property_value_text = :p4_luminous_flux_lm) UNION ALL SELECT 5, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line5 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'size' AND x.property_value_text = :p5_size) UNION ALL SELECT 6, pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :line6 AND EXISTS (SELECT 1 FROM product_variant_properties x WHERE x.product_sku = pv.product_sku AND x.property_key = 'disc_diameter_mm' AND x.property_value_text = :p6_disc_diameter_mm)), avail AS (SELECT DISTINCT m.pnum, m.record_path FROM matched m JOIN store_inventory si ON si.product_sku = m.product_sku JOIN ts ON ts.store_id = si.store_id WHERE si.available_today_quantity >= 1) SELECT (SELECT COUNT(DISTINCT pnum) FROM avail) AS qty, (SELECT group_concat(record_path) FROM avail) AS available_paths;"
+        "args": [
+          "WITH target_store AS (SELECT store_id, record_path AS store_path FROM stores WHERE city = :city AND store_name LIKE :store_like AND is_open = 1), matched AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :fam1 AND pv.brand = :brand1 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='fitting_type' AND p.property_value_text=:p1_fitting) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='diameter_mm' AND p.property_value_number=:p1_diam) UNION ALL SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :fam2 AND pv.brand = :brand2 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='voltage_v' AND p.property_value_number=:p2_volt) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='battery_platform' AND p.property_value_text=:p2_batt) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='kit_contents' AND p.property_value_text=:p2_kit) UNION ALL SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :fam3 AND pv.brand = :brand3 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='tool_type' AND p.property_value_text=:p3_tool) UNION ALL SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :fam4 AND pv.brand = :brand4 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='screw_type' AND p.property_value_text=:p4_screw) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='diameter_mm' AND p.property_value_number=:p4_diam) UNION ALL SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :fam5 AND pv.brand = :brand5 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='machine_type' AND p.property_value_text=:p5_machine) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='voltage_v' AND p.property_value_number=:p5_volt) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='power_w' AND p.property_value_number=:p5_power) UNION ALL SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = :fam6 AND pv.brand = :brand6 AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='volume_ml' AND p.property_value_number=:p6_vol) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=pv.product_sku AND p.property_key='viscosity' AND p.property_value_text=:p6_visc)) SELECT m.product_sku, m.record_path, ts.store_path, COALESCE(si.available_today_quantity,0) AS available_today_quantity, CASE WHEN COALESCE(si.available_today_quantity,0) >= :min_qty THEN 1 ELSE 0 END AS qualifies FROM matched m CROSS JOIN target_store ts LEFT JOIN store_inventory si ON si.store_id = ts.store_id AND si.product_sku = m.product_sku ORDER BY m.product_sku;"
+        ],
+        "stdin": ""
       },
-      "bind": "result"
+      "bind": "matches"
     }
   ],
   "agents_md_constraints": [
     {
-      "anchor": "#important-things > availability",
+      "anchor": "#Important things > availability references",
       "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
     },
     {
-      "anchor": "#important-things > references",
+      "anchor": "#Important things > full path reference",
       "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#Important tools > inventory",
+      "rule": "Note that inventory lives only in SQL projections"
     }
   ],
   "answer_template": {
-    "message": "qty={result.qty}",
+    "message": "{qualifying_count} products",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$available_paths"
+      "$store_path",
+      "$qualifying_record_paths"
     ]
   },
   "outcome_override": null

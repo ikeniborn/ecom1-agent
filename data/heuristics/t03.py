@@ -1,59 +1,105 @@
 def run(vm, params):
+    # discovery 1: identity
+    identity = vm.exec(path="/bin/id", args=[])
+
+    sql = (
+        "WITH matches AS (SELECT pv.product_sku, pv.record_path, pv.product_name, "
+        "pf.product_family_name, st.property_value_text AS sealant_type, "
+        "cf.property_value_text AS color_family FROM product_variants pv "
+        "JOIN product_families pf ON pf.product_family_id = pv.product_family_id "
+        "JOIN product_variant_properties st ON st.product_sku = pv.product_sku "
+        "AND st.property_key = 'sealant_type' AND st.property_value_text = :sealant_type "
+        "JOIN product_variant_properties cf ON cf.product_sku = pv.product_sku "
+        "AND cf.property_key = 'color_family' AND cf.property_value_text = :color_family "
+        "WHERE pv.brand = :brand AND pf.product_family_name = :line) "
+        "SELECT m.product_sku, m.record_path, m.product_name, m.product_family_name, "
+        "m.sealant_type, m.color_family, COALESCE(SUM(si.available_today_quantity), 0) AS available_today "
+        "FROM matches m LEFT JOIN store_inventory si ON si.product_sku = m.product_sku "
+        "GROUP BY m.product_sku, m.record_path, m.product_name, m.product_family_name, "
+        "m.sealant_type, m.color_family;"
+    )
+
     def q(v):
         return "'" + str(v).replace("'", "''") + "'"
 
-    brand = params["brand"]
-    family_name = params["family_name"]
-    anchor_type_key = params["anchor_type_key"]
-    anchor_type_value = params["anchor_type_value"]
+    # Inline literal, quoted parameter values directly into the SQL string;
+    # /bin/sql ignores positional args for :name binding (learned rules r003/in-session).
+    sql = sql.replace(":sealant_type", q(params["sealant_type"]))
+    sql = sql.replace(":color_family", q(params["color_family"]))
+    sql = sql.replace(":brand", q(params["brand"]))
+    sql = sql.replace(":line", q(params["line"]))
 
-    sql = (
-        "WITH match AS ("
-        "SELECT pv.product_sku, pv.record_path, pv.product_name "
-        "FROM product_variants pv "
-        "JOIN product_families pf ON pv.product_family_id = pf.product_family_id "
-        "JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku "
-        "WHERE pv.brand = " + q(brand) + " "
-        "AND pf.product_family_name = " + q(family_name) + " "
-        "AND pvp.property_key = " + q(anchor_type_key) + " "
-        "AND lower(pvp.property_value_text) = lower(" + q(anchor_type_value) + ")"
-        ") SELECT product_sku, record_path, product_name FROM match;"
-    )
-
-    result = vm.exec(path="/bin/sql", args=[sql])
-    stdout = getattr(result, "stdout", "") or (result.get("stdout", "") if isinstance(result, dict) else "")
+    # discovery 2: run query via stdin (statement read from stdin)
+    matches = vm.exec(path="/bin/sql", args=[], stdin=sql)
+    stdout = getattr(matches, "stdout", "") or (matches.get("stdout", "") if isinstance(matches, dict) else "")
 
     lines = [ln for ln in stdout.splitlines() if ln.strip() != ""]
-    match = []
-    if len(lines) >= 2:
-        header = lines[0]
-        delim = "," if "," in header else ("|" if "|" in header else "\t")
-        cols = [c.strip() for c in header.split(delim)]
-        for ln in lines[1:]:
-            vals = [c.strip() for c in ln.split(delim)]
-            if len(vals) < len(cols):
-                continue
-            row = {}
-            for i, c in enumerate(cols):
-                row[c] = vals[i]
-            match.append(row)
 
-    if match:
-        rec_path = match[0].get("record_path", "")
-        product_name = match[0].get("product_name", "")
+    available_paths = []
+    has_available = False
+
+    if len(lines) >= 1:
+        header = lines[0]
+        if "|" in header:
+            delim = "|"
+        elif "," in header:
+            delim = ","
+        elif "\t" in header:
+            delim = "\t"
+        else:
+            delim = None
+
+        def split_row(line):
+            if delim is None:
+                return [c.strip() for c in line.split()]
+            return [c.strip() for c in line.split(delim)]
+
+        cols = split_row(header)
+        try:
+            rp_idx = cols.index("record_path")
+        except ValueError:
+            rp_idx = 1
+        try:
+            av_idx = cols.index("available_today")
+        except ValueError:
+            av_idx = len(cols) - 1
+
+        for line in lines[1:]:
+            fields = split_row(line)
+            if len(fields) <= max(rp_idx, av_idx):
+                continue
+            rp = fields[rp_idx]
+            av_raw = fields[av_idx]
+            try:
+                av = float(av_raw)
+            except (ValueError, TypeError):
+                av = 0
+            if av > 0:
+                has_available = True
+                if rp:
+                    available_paths.append(rp)
+
+    # dedupe preserving order
+    available_paths = list(dict.fromkeys(available_paths))
+
+    token = "<YES>" if (has_available and available_paths) else "<NO>"
+
+    if has_available and available_paths:
         message = (
-            "<YES> The " + product_name + " (concrete anchor) from the "
-            "Wurth Universal WU XLL-87U Anchor and Wall Plug line is in the "
-            "catalogue at " + rec_path + "."
+            token + " Catalog carries an available Pattex sealant in the '"
+            + str(params["line"]) + "' line with sealant type '"
+            + str(params["sealant_type"]) + "' and color family '"
+            + str(params["color_family"]) + "'. Available match(es) at full repo path: "
+            + ", ".join(available_paths) + "."
         )
-        refs = ["/proc/catalog"]
-        if rec_path:
-            refs.append(rec_path)
+        refs = available_paths
     else:
         message = (
-            "<NO> No Wurth Universal WU XLL-87U Anchor and Wall Plug with "
-            "anchor type concrete anchor exists in the catalogue."
+            token + " No available Pattex sealant in the '"
+            + str(params["line"]) + "' line with sealant type '"
+            + str(params["sealant_type"]) + "' and color family '"
+            + str(params["color_family"]) + "' is carried; no available match to reference."
         )
-        refs = ["/proc/catalog"]
+        refs = []
 
     vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)

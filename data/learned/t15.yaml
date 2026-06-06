@@ -118,7 +118,12 @@ entries:
     from the plan params, so exact equality silently drops every matching variant,
     returning no rows and leaving the count at 0 with refs empty.
   created: '2026-06-06'
-  deactivated_reason: null
+  deactivated_reason: r005 only mandated case/whitespace-insensitive matching for
+    property_value_text rows; the new rule strictly supersedes it by extending that
+    requirement to every string-equality matching predicate (brand, product_family_name,
+    and other discriminator columns) and adding the requirement to only filter on
+    columns confirmed populated in discovery — which is precisely the gap (strict
+    pv.brand=) that r005 left uncovered.
   id: r005
   reasoning: 'Verbatim error: ''answer_refs: template/constraints require runtime
     refs ([\''$available_paths\'']) but actual refs [] contain only static template
@@ -134,24 +139,104 @@ entries:
     typing and parsing are already handled correctly here, so the residual silent-drop
     cause is strict text equality. Rule links failing fragment → root cause (case-sensitive
     text match) → fix (COLLATE NOCASE / LOWER+TRIM).'
-  status: active
+  status: inactive
 - content: null
   created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
   id: v003
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/stores/store_graz_lend.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: qty=3
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /proc/catalog/plumbing/pipe_fittings/PLB-XU8P72YI.json
   - /proc/catalog/garden_tools/lawn_mowers/GRD-2RMRJIFM.json
   - /proc/catalog/storage/bins_organizers/STO-VCT0NRRC.json
+- agents_md_anchor: null
+  content: When resolving a variant in /bin/sql, apply case- and whitespace-insensitive
+    comparison (LOWER(TRIM(col)) = LOWER(TRIM(:v)) or COLLATE NOCASE) to EVERY string-equality
+    matching predicate — not only property_value_text rows, but also the brand, product_family_name
+    and any other text discriminator column on the variant/family tables — and only
+    filter on columns confirmed present and populated during discovery; a strict `pv.brand
+    = 'X'` predicate (or any column that is NULL on the queried table because the
+    attribute actually lives on a related table) silently matches nothing and drops
+    every UNION branch, returning zero rows and leaving refs empty even though the
+    variant resolves on its other properties.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$available_record_paths'']) but actual refs [] contain only static template
+    entries [] — SQL likely returned no rows ... check `:name` bindings on /bin/sql
+    and the SELECT columns". Root cause: the ops query returned only the header line
+    (zero data rows), yet the props_meta discovery proves at least the Ajax variant
+    (CLN-11NJQOZI: cleaner_type=glass cleaner, surface=glass, volume_ml=750) satisfies
+    all property predicates, and the ops query executed cleanly (no column error →
+    pv.brand/pv.record_path exist). The only resolution predicate present in the ops
+    query but ABSENT from the successful props_meta query is the strict, case-sensitive
+    `pv.brand=''<Brand>''` filter on every UNION branch. Failing fragment: `... WHERE
+    pv.brand=''Hager'' AND pf.product_family_name=''...'' AND EXISTS(... LOWER(TRIM(p.property_value_text))=LOWER(TRIM(''Gray''))
+    ...)` — prior fix r005 normalized the property VALUE comparisons with LOWER(TRIM()),
+    but the brand (and family-name) column comparisons stayed exact-equality. If brand
+    casing/whitespace differs from the plan param, or brand is NULL on product_variants
+    because it lives on product_families, `pv.brand=''Ajax''` evaluates false/NULL
+    for all six branches → 0 rows → empty refs → answer_refs validation fails. Rule
+    linkage: extends r005 (which only covered property_value_text) to cover ALL string-equality
+    match predicates including brand/family columns, and adds the discovery-validation
+    guard.'
+  status: active
+- agents_md_anchor: '#important-tools > inventory in SQL projections'
+  content: When the answer depends on an inventory/availability projection, sample
+    that projection in the discovery step (its rows for the resolved store and a known
+    matching SKU) to confirm its join-key columns (store_id, product_sku) share the
+    exact format used by the stores/product_variants tables and that the availability
+    column name is correct, before the ops query inner-joins it; an unverified inventory
+    join key silently drops every row, so fusing variant resolution with an unchecked
+    inventory inner-join plus threshold yields a false zero count with empty refs
+    and cannot be distinguished from genuine unavailability.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$available_record_paths'']) but actual refs [] contain only static template
+    entries [] — SQL likely returned no rows or row parsing dropped the path column".
+    Failing fragment: the ops query `SELECT t.product_sku, t.record_path, si.available_today_quantity
+    FROM t JOIN store_inventory si ON si.product_sku=t.product_sku JOIN s ON s.store_id=si.store_id
+    WHERE si.available_today_quantity >= 4;` returned only the header line and ZERO
+    data rows. Root cause: discovery (props_meta) confirms resolution works — Ajax
+    SKU CLN-11NJQOZI matches cleaner_type=glass cleaner, surface=glass, volume_ml=750
+    — so the `t` CTE produces rows, yet the combined query collapses to empty. The
+    script never sampled store_inventory in discovery, so the inventory-projection
+    join keys (si.store_id vs stores.store_id = ''store_vienna_praterstern'', si.product_sku)
+    and the availability column were assumed unverified; fusing resolution + inventory
+    inner-join + >=4 threshold into one statement makes zero rows ambiguous between
+    failed resolution, key-format mismatch, and genuine unavailability. Since grader
+    requires non-empty refs and resolution is confirmed, the inventory inner-join
+    is the dropping point — most likely an unverified store_id key on the projection
+    matching nothing. Rule linkage: r001 (CSV comma parse), r002 (extract refs not
+    empty), r003 (select SKUs not COUNT), r004 (numeric column), r005/in-session (case-insensitive
+    text predicates) are all ALREADY applied in this script (commas used, refs extracted,
+    SKUs selected, COLLATE NOCASE everywhere) yet the failure persists; none cover
+    verifying the inventory projection''s join keys/columns during discovery before
+    the ops inner-join. New rule fills that gap.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 2
+  cycles_used: 3
   date: '2026-06-06'
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t15

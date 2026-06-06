@@ -61,18 +61,76 @@ entries:
   submitted_refs: []
 - content: null
   created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
   id: v003
   score: 0.0
   score_detail:
   - answer missing required reference '/docs/policy-updates/2024-07-17-catalogue-reporting-cordless-drill-driver.md'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: '30'
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /proc/catalog/power_tools/cordless_drill_driver
+- agents_md_anchor: null
+  content: When parsing /bin/sql stdout into rows, split each line on comma because
+    /bin/sql emits CSV — splitting on '|' collapses every row to a single column,
+    so the len(cols) >= 2 guard never fires and runtime ref columns like record_path
+    are silently dropped from refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matched_products.record_path'']) but actual refs [''/proc/catalog''] contain
+    only static template entries [''/proc/catalog''] — SQL likely returned no rows
+    or row parsing dropped the path column". Root cause: SQL DID return rows — OBSERVED_RPC_OUTPUTS
+    shows comma-delimited CSV (header ''product_sku,record_path'' then ''MAC-13QQL55G,/proc/catalog/.../MAC-13QQL55G.json'').
+    But the failing fragment `cols = [c.strip() for c in line.split("|")]` splits
+    on pipe, which is absent in CSV output. Result: cols becomes a one-element list
+    holding the whole line, the `if len(cols) >= 2 and cols[-1]` guard is False for
+    every data row, so record_paths stays empty and refs degrades to just [''/proc/catalog''].
+    (The header-skip `cols[0].lower() == "product_sku"` also misfires since cols[0]
+    is the entire ''product_sku,record_path'' string.) Rule linkage: the new rule
+    fixes the delimiter assumption at the parse layer so runtime ref columns are recovered
+    — not covered by r001 (RPC multiset emission), r002 (addenda/doc ref discovery),
+    or v003 (a verdict, not a rule).'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v004
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/current-updates/catalogue-counting-2024-07-17-drill-grinders-sanders-vienna.md'
+  source: verdict
+  status: active
+  submitted_message: '22'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-13QQL55G.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-164MO9BK.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-1HO25SG8.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-1KPRCFDN.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-1NZ1WHSL.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-1O4Z4KLB.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-1PISREE5.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-1YZFSL1N.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-24AGJNG5.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-2URYXMWT.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-2VWHEX6T.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-2Z02T21I.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-37VRH7VP.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-39Y86MME.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-3BYEW7CA.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-3EHVON69.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-8P64PPDI.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-B4IPSJV1.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-E1310KRY.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-HBUH24IL.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-NSB6NPCD.json
+  - /proc/catalog/workshop_machines/drill_grinders_sanders/MAC-YI1RLUST.json
 last_run:
-  cycles_used: 1
+  cycles_used: 2
   date: '2026-06-06'
   outcome: OUTCOME_OK
   status: failure
