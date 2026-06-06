@@ -1,6 +1,7 @@
 """Knowledge oracle: validated atom bank + two-stage semantic retrieval."""
 from __future__ import annotations
 
+import json
 import math
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ from . import llm
 from .llm import call_llm_json
 
 _DEFAULT_ATOMS = Path(__file__).resolve().parent.parent / "data" / "oracle" / "atoms.yaml"
+_DEFAULT_EMBEDDINGS = Path(__file__).resolve().parent.parent / "data" / "oracle" / "embeddings.json"
 
 
 def _cosine(a, b):
@@ -22,12 +24,29 @@ def _cosine(a, b):
 
 
 class KnowledgeOracle:
-    def __init__(self, atoms=None, atoms_path=None, embed_fn=None):
+    def __init__(self, atoms=None, atoms_path=None, embed_fn=None, embeddings_path=None):
         self._path = Path(atoms_path or _DEFAULT_ATOMS)
         self.atoms = atoms if atoms is not None else load_atoms(self._path)
         self._embed = embed_fn or llm.embed_texts
         self._model = os.environ.get("EMBED_MODEL", "nomic-embed-text")
-        self._vec_cache: dict[str, list[float]] = {}
+        self._emb_path = Path(embeddings_path or _DEFAULT_EMBEDDINGS)
+        self._vec_cache: dict[str, list[float]] = self._load_vec_cache()
+
+    def _load_vec_cache(self) -> dict:
+        """Load persisted atom vectors. Corrupt/missing file → empty (rebuild)."""
+        try:
+            data = json.loads(self._emb_path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _save_vec_cache(self) -> None:
+        """Persist atom vectors. Non-critical — failure is silently ignored."""
+        try:
+            self._emb_path.parent.mkdir(parents=True, exist_ok=True)
+            self._emb_path.write_text(json.dumps(self._vec_cache), encoding="utf-8")
+        except Exception:
+            pass
 
     def _active(self):
         return [a for a in self.atoms if a.status == "active"]
@@ -38,6 +57,7 @@ class KnowledgeOracle:
             return self._vec_cache[h]
         vec = self._embed([a.content], model=self._model, prefix="search_document")[0]
         self._vec_cache[h] = vec
+        self._save_vec_cache()
         return vec
 
     def _cosine_topn(self, query: str, n: int):
