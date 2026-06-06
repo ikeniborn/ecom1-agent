@@ -67,7 +67,15 @@ class KnowledgeOracle:
             sv = self._embed_atom(a)
             scored.append((_cosine(qv, sv), a))
         scored.sort(key=lambda t: t[0], reverse=True)
-        return [a for _, a in scored[:n]]
+        floor = float(os.environ.get("ORACLE_FLOOR", "0.5"))
+        kept = []
+        for score, a in scored[:n]:
+            if score < floor:
+                if os.environ.get("LOG_LEVEL") == "DEBUG":
+                    print(f"[oracle] discard {a.id} cosine={score:.3f} < floor {floor}")
+                continue
+            kept.append(a)
+        return kept
 
     def _tag_fallback(self, query: str, n: int):
         q = query.lower()

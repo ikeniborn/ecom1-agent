@@ -43,6 +43,7 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `EMBED_BASE_URL` | Embeddings endpoint; falls back to `OLLAMA_BASE_URL` |
 | `ORACLE_TOPN` | Stage-1 cosine candidate count (default 10) |
 | `ORACLE_K` | Final atoms injected into CODEGEN after re-rank (default 4) |
+| `ORACLE_FLOOR` | Minimum cosine similarity for a retrieved atom to be injected; below-floor atoms discarded (default 0.5) |
 | `MODEL_RANK` | Model for stage-2 re-rank; falls back to `MODEL` |
 | `ORACLE_RANK_ENABLED` | `0` → skip LLM re-rank, use cosine top-k (default 1) |
 | `ORACLE_DISTILL` | `1` → auto-distill candidate atoms after LEARN (default 0) |

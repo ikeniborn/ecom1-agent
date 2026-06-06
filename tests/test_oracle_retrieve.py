@@ -55,3 +55,17 @@ def test_oracle_passes_nomic_prefixes():
     prefixes = {p for _, p in calls}
     assert "search_query" in prefixes
     assert "search_document" in prefixes
+
+
+def test_cosine_floor_discards_subthreshold(monkeypatch):
+    monkeypatch.setenv("ORACLE_FLOOR", "0.5")
+    atoms = [_atom("hi", "high sim", ["sql"]),
+             _atom("lo", "low sim", ["pricing"])]
+    emap = {"C:high sim": [1.0, 0.0], "C:low sim": [0.0, 1.0]}
+
+    def fake_embed(texts, model, base_url=None, prefix=None):
+        return [emap.get(t, [1.0, 0.0]) for t in texts]  # query -> [1,0] (high)
+
+    o = KnowledgeOracle(atoms=atoms, embed_fn=fake_embed)
+    out = o._cosine_topn("query", n=2)
+    assert [a.id for a in out] == ["hi"]   # "lo" (cosine 0.0) discarded by floor
