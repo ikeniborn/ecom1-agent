@@ -66,3 +66,26 @@
   validated_at: '2026-06-05'
   status: active
   embedding_hash: ''
+- id: answer-record-path-grounding
+  description: "answers about a specific product/store/employee/customer/payment must cite its record_path from SQL; include EVERY matched row's path in refs; baskets and payments resolve to /proc/.../<id>.json files; cite only included/available rows"
+  domain: [grounding, refs, sql, availability]
+  content: >
+    The grader requires the answer to cite the file path of every concrete object the
+    answer is about, and it rejects both a static parent directory and an unrelated or
+    extra path. The SQL projections expose this path as a `record_path TEXT` column on
+    product_variants, stores, employee_accounts, customer_accounts and
+    payment_transactions (the catalogue/store/people tables). So SELECT record_path
+    explicitly alongside the data columns and put EVERY matched row's record_path into
+    vm.answer(refs=[...]). For a multi-row answer (e.g. all Vienna stores, every
+    included product) include ALL of their record_path values, not just the first row.
+    For availability / inclusion answers cite only the INCLUDED or available rows and
+    never the excluded, zero-availability, or unavailable ones. A basket or payment
+    named by id resolves to the file /proc/baskets/<basket_id>.json or
+    /proc/payments/<payment_id>.json — cite that exact file path. Never invent a path
+    and never leave a $placeholder unbound: a missing path means the SELECT dropped the
+    record_path column or the row did not match — fix the query, do not drop the ref.
+  source: investigation
+  validated_by: manual
+  validated_at: '2026-06-06'
+  status: active
+  embedding_hash: ''
