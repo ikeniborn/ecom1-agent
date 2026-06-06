@@ -19,6 +19,7 @@ class Atom:
     validated_at: str
     status: str            # active | candidate
     embedding_hash: str = ""
+    source_task: str = ""   # task_id the candidate was distilled from (promote gate)
     extra: dict = field(default_factory=dict)
 
 
@@ -38,6 +39,7 @@ def load_atoms(path: str | Path) -> list[Atom]:
             "validated_at", "status")}
         known["domain"] = list(d.get("domain") or [])
         known["embedding_hash"] = d.get("embedding_hash") or ""
+        known["source_task"] = d.get("source_task") or ""
         atoms.append(Atom(**known))
     return atoms
 

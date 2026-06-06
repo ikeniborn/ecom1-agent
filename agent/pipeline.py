@@ -152,6 +152,7 @@ def _learn_consolidate(
                 design_intent=getattr(design, "intent", ""),
                 error=error or "",
                 script_code=script_code or "",
+                source_task=task_id,
             )
         except Exception as e:
             print(f"{CLI_YELLOW}[pipeline] oracle distill skipped: {e}{CLI_CLR}")
