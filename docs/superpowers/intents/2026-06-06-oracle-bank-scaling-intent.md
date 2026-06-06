@@ -1,7 +1,7 @@
 # Intent: knowledge-oracle bank scaling
 
 **Date:** 2026-06-06
-**Status:** draft
+**Status:** approved
 
 ## Objective
 At the current scale (6 atoms, `ORACLE_TOPN=10`), the embedding machinery is dead weight:
