@@ -472,7 +472,8 @@ def run_pipeline(
     for _design_attempt in range(_DESIGN_MAX_ATTEMPTS):
         _tk = {}
         try:
-            design = run_design(instruction, agents_md_text, token_out=_tk)
+            design = run_design(instruction, agents_md_text, token_out=_tk,
+                                oracle_atoms=oracle_atoms)
             _accum(_tk)
             break
         except DesignError as e:

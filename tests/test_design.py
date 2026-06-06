@@ -75,3 +75,44 @@ def test_unparseable_response_raises():
     with patch("agent.pipeline.call_llm_raw", return_value="not json"):
         with pytest.raises(DesignError):
             run_design("x", "y")
+
+
+def test_oracle_atoms_param_preserves_signature():
+    """F-001: oracle_atoms is allowed but must not be positional and must not
+    re-introduce learn_ctx."""
+    sig = inspect.signature(run_design)
+    params = list(sig.parameters.keys())
+    assert "learn_ctx" not in params, params
+    assert params[:2] == ["instruction", "agents_md_text"], params
+    assert "oracle_atoms" in params, params
+
+
+def test_oracle_block_rendered_into_design_prompt():
+    from agent.oracle_atoms import Atom
+    atoms = [Atom(id="sql-no-name-binds", description="d", domain=["sql"],
+                  content="inline quoted literals in IN()", source="s",
+                  validated_by="grader", validated_at="d", status="active",
+                  embedding_hash="")]
+    captured = {}
+
+    def _fake(system, user_msg, model, cfg, **kw):
+        captured["user_msg"] = user_msg
+        return _GOOD_DESIGN_JSON
+
+    with patch("agent.pipeline.call_llm_raw", side_effect=_fake):
+        run_design("How many baskets?", "AGENTS.MD body", oracle_atoms=atoms)
+    assert "VALIDATED KNOWLEDGE" in captured["user_msg"]
+    assert "inline quoted literals" in captured["user_msg"]
+
+
+def test_design_without_oracle_atoms_unchanged():
+    captured = {}
+
+    def _fake(system, user_msg, model, cfg, **kw):
+        captured["user_msg"] = user_msg
+        return _GOOD_DESIGN_JSON
+
+    with patch("agent.pipeline.call_llm_raw", side_effect=_fake):
+        run_design("How many baskets?", "AGENTS.MD body")
+    assert "VALIDATED KNOWLEDGE" not in captured["user_msg"]
+    assert captured["user_msg"].startswith("INSTRUCTION:")
