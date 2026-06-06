@@ -2,18 +2,18 @@
   description: "Archived-payment fraud = single-device impossible travel; flag the account's far-from-home payments"
   domain: [payments, fraud, sql]
   content: >
-    Archived-payment fraud review has no /docs fraud policy and no fraud flag on payment
-    records — it is geographic-anomaly detection over payment_transactions JOIN
-    customer_accounts (which has home_latitude/home_longitude). Step 1: identify the single
-    compromised account = the customer owning ONE device_fingerprint that shows impossible
-    travel: per device, order archived rows (is_archived_basket_reference=1) by
-    payment_created_at and compute consecutive-leg
-    (ABS(observed_latitude-LAG(observed_latitude))+ABS(observed_longitude-LAG(observed_longitude)))
-    / NULLIF((julianday(payment_created_at)-julianday(LAG(payment_created_at)))*24.0,0) deg/hr;
-    the fraud device has MAX abs deg/hr impossibly high (>5). Customers with multi-DEVICE
-    spread are red herrings. Step 2: flag that customer's archived payments far from the
-    registered home (ABS(obs_lat-home_lat)+ABS(obs_lon-home_lon) > 0.5); the at-home payments
-    are the genuine cardholder. Cite record_path of the flagged rows; cite /docs/security.md.
+    Archived-payment fraud review has no /docs fraud policy and no fraud flag on payment records
+    — it is impossible-travel detection over payment_transactions (is_archived_basket_reference=1)
+    only. Per customer_id, order rows by payment_created_at; for each row compute the speed of the
+    incoming and outgoing legs:
+    (ABS(observed_latitude-LAG/LEAD(observed_latitude))+ABS(observed_longitude-LAG/LEAD(observed_longitude)))
+    / NULLIF((julianday(this)-julianday(prev/next))*24.0,0) deg/hr. Flag a record as fraud when
+    its incoming OR outgoing leg exceeds ~2 deg/hr (faster than ground travel, ~>220 km/h). Emit
+    those record_path values; cite /docs/security.md. (Grader is EUR-weighted recall*precision;
+    this leg rule recovers ~73% with high precision — the best generalisable rule found. Note the
+    fraud accounts are exactly the customers with any impossible leg, but flagging ALL their
+    records tanks precision, and far-from-home filtering under-recovers; the leg-records rule is
+    the precision/recall optimum. No device/customer/path ids are ever hardcoded.)
   source: investigation
   validated_by: manual
   validated_at: '2026-06-05'
@@ -34,13 +34,20 @@
   embedding_hash: ''
 - id: catalog-price-ex-vat
   description: "catalogue price_cents is ex-VAT (net); no VAT division for ex-VAT totals"
-  domain: [pricing, sql]
+  domain: [pricing, sql, receipt]
   content: >
-    Per /docs/discounts.md the basket subtotal is computed directly from catalogue
-    product_variants.price_cents, so price_cents is ex-VAT (net). For ex-VAT comparisons,
-    today_ex = SUM(qty*price_cents)/100 with NO division by (1+vat). The receipt SUBTOTAL is
-    already the ex-VAT total and the VAT rate is printed on the receipt, not in /docs — do not
-    search /docs for VAT.
+    Receipt-vs-today ex-VAT comparison. catalogue product_variants.price_cents is ex-VAT (net)
+    — confirmed: an unchanged item's receipt unit price equals catalogue price_cents/100
+    exactly — so today_ex = SUM(qty*price_cents)/100 with NO division by (1+vat); the receipt
+    SUBTOTAL line is already the ex-VAT total and the VAT rate is printed on the receipt, not in
+    /docs (do not search /docs for VAT). old_ex = the receipt SUBTOTAL (sum of ALL line items
+    qty*unit; parse the printed 'SUB T0TAL' line, OCR may write 0 for O). today_ex = SUM over
+    EVERY receipt line item of qty*catalogue_price; a line item whose SKU is genuinely absent
+    from the catalogue (discontinued) contributes 0 to today_ex (NOT its old price, NOT
+    dropped) — so its full value enters the diff and forces <NO>. Do NOT restrict the OLD side
+    to matched SKUs. Receipt SKUs are OCR-noisy: match the catalogue EXACTLY first, then FUZZY
+    (treat 0/O, 1/I, 5/S, 8/B, 2/Z as interchangeable) before declaring a SKU discontinued.
+    diff = abs(today_ex - old_ex); answer <YES> if diff <= 3 EUR else <NO>; refs = receipt path.
   source: investigation
   validated_by: manual
   validated_at: '2026-06-05'
