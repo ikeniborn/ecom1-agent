@@ -398,5 +398,51 @@ def _settle_scores(submit_result, pending: dict) -> list:
     return rows
 
 
+def _promote_entry() -> None:
+    """Offline promote gate. Activates each candidate atom on disk for the
+    duration of a pass over `source ∪ green-suite`, then promotes or reverts.
+
+    Run via `make promote` (sets argv to ['--promote']).
+    """
+    import datetime as _dt
+    from agent.oracle import KnowledgeOracle
+    from agent.oracle_atoms import save_atoms
+    from agent.promote import load_green_suite, run_promote
+
+    oracle = KnowledgeOracle()
+    try:
+        green_suite = load_green_suite()
+    except FileNotFoundError as e:
+        print(f"{CLI_RED}[promote] {e} — aborting (no silent promote){CLI_CLR}")
+        return
+
+    client = HarnessServiceClientSync(BITGN_URL)
+
+    def run_fn(task_ids, active_atom_id):
+        # Activation must be visible to the per-task pipeline, which reads
+        # atoms.yaml from disk — so toggle on disk, run, then revert.
+        original = {a.id: a.status for a in oracle.atoms}
+        try:
+            for a in oracle.atoms:
+                if a.id == active_atom_id and a.status == "candidate":
+                    a.status = "active"
+            save_atoms(oracle._path, oracle.atoms)
+            scores, _ = _run_one_pass(client, list(task_ids), train_cycle=1)
+            return {tid: score for tid, score, *_ in scores}
+        finally:
+            for a in oracle.atoms:
+                a.status = original.get(a.id, a.status)
+            save_atoms(oracle._path, oracle.atoms)
+
+    results = run_promote(
+        oracle, green_suite, run_fn,
+        validated_at=_dt.date.today().isoformat(),
+    )
+    print(f"{CLI_BLUE}[promote] results: {results}{CLI_CLR}")
+
+
 if __name__ == "__main__":
-    main()
+    if "--promote" in sys.argv[1:]:
+        _promote_entry()
+    else:
+        main()
