@@ -1,0 +1,110 @@
+{
+  "intent": "Apply highest policy-allowed service_recovery discount to the most recent checkoutable basket of the given customer.",
+  "params": {
+    "email": "holger.arnold+cust917@yahoo.com",
+    "reason_code": "service_recovery"
+  },
+  "success_criteria": [
+    "Customer resolved from email to a customer_id",
+    "Last checkoutable basket selected by max basket_created_at",
+    "Discount percent equals the service_recovery cap stated in the discount policy doc",
+    "Discount applied via /bin/discount with issuer = current identity employee_id",
+    "Answer references the basket record path and the discount policy doc"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id",
+        "args": []
+      },
+      "bind": "identity"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/discount",
+        "args": [
+          "--help"
+        ]
+      },
+      "bind": "discount_help"
+    },
+    {
+      "rpc": "Find",
+      "args": {
+        "root": "/docs",
+        "name": "discount",
+        "kind": "file",
+        "limit": 5
+      },
+      "bind": "discount_doc_path"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/docs",
+        "pattern": "service_recovery",
+        "limit": 20
+      },
+      "bind": "service_recovery_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "SELECT b.basket_id, b.record_path, b.basket_status, b.basket_created_at, b.customer_id FROM shopping_baskets b JOIN customer_accounts c ON c.customer_id = b.customer_id WHERE c.customer_email = :email AND b.basket_status IN ('open','active','checkoutable') ORDER BY b.basket_created_at DESC LIMIT 1;"
+        ]
+      },
+      "bind": "basket"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/discount",
+        "args": [
+          "apply",
+          "--basket",
+          "$basket_id",
+          "--percent",
+          "$max_service_recovery_pct",
+          "--reason",
+          "service_recovery",
+          "--issuer",
+          "$issuer_employee_id"
+        ]
+      },
+      "bind": "apply_result"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-tools > discount",
+      "rule": "use discount tool to manage basket discounts"
+    },
+    {
+      "anchor": "#important-tools > id",
+      "rule": "id tool returns identity of the user/customer/guest under which we are running current request."
+    },
+    {
+      "anchor": "#important-things > policy-grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#important-things > reference-path",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    }
+  ],
+  "answer_template": {
+    "message": "Applied service_recovery discount of $max_service_recovery_pct% (policy cap) to basket $basket_id at $basket_path for holger.arnold+cust917@yahoo.com. Issuer: $issuer_employee_id. Policy: $discount_doc_path.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$basket_path",
+      "$discount_doc_path"
+    ]
+  },
+  "outcome_override": null
+}

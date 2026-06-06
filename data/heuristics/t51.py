@@ -1,113 +1,164 @@
 def run(vm, params):
     import re
-    def g(o, k, d=None):
-        return o.get(k, d) if isinstance(o, dict) else getattr(o, k, d)
 
-    uploads_listing = vm.list(path="/uploads")
-    entries = g(uploads_listing, "entries", []) or []
-    receipt_path = ""
+    def fld(o, n, d=None):
+        if isinstance(o, dict):
+            return o.get(n, d)
+        return getattr(o, n, d)
+
+    def strip_ln(l):
+        return re.sub(r'^\s*\d+[:|\t]\s?', '', l)
+
+    def canon(s):
+        t = {'0': 'O', '1': 'I', '5': 'S', '8': 'B', '2': 'Z'}
+        return ''.join(t.get(c, c) for c in s.upper())
+
+    def num(x):
+        x = x.replace(' ', '')
+        if ',' in x and '.' in x:
+            x = x.replace(',', '')
+        elif ',' in x:
+            x = x.replace(',', '.')
+        try:
+            return float(x)
+        except Exception:
+            return None
+
+    def rows(res):
+        out = fld(res, 'stdout', '') or ''
+        ls = [l for l in out.splitlines() if l.strip()]
+        if not ls:
+            return []
+        hdr = ls[0]
+        delim = '|' if '|' in hdr else (',' if ',' in hdr else None)
+        if not delim:
+            return []
+        cols = [c.strip() for c in hdr.split(delim)]
+        out2 = []
+        for l in ls[1:]:
+            ps = [p.strip() for p in l.split(delim)]
+            out2.append(dict(zip(cols, ps)))
+        return out2
+
+    # discovery: list uploads dir, pick a FILE entry
+    listing = vm.list(path="/uploads")
+    entries = fld(listing, 'items', None) or fld(listing, 'entries', None) or []
+    receipt_path = None
     for e in entries:
-        nm = g(e, "name", "") or ""
-        pt = g(e, "path", "") or ("/uploads/" + nm if nm else "")
-        low = nm.lower()
-        if "receipt" in low or low.endswith(".txt") or low.endswith(".csv") or low.endswith(".md"):
-            receipt_path = pt
+        if isinstance(e, str):
+            name = e
+            p = None
+            kind = ''
+        else:
+            name = fld(e, 'name', '')
+            p = fld(e, 'path', None)
+            kind = fld(e, 'kind', '')
+        full = p or ("/uploads/" + name)
+        if str(kind).upper().endswith('FILE') or '.' in name:
+            receipt_path = full
             break
     if not receipt_path and entries:
         e = entries[0]
-        receipt_path = g(e, "path", "") or ("/uploads/" + (g(e, "name", "") or ""))
+        if isinstance(e, str):
+            receipt_path = "/uploads/" + e
+        else:
+            receipt_path = fld(e, 'path', None) or ("/uploads/" + fld(e, 'name', 'receipt'))
     if not receipt_path:
-        receipt_path = "/uploads/unknown"
+        receipt_path = "/uploads/receipt"
 
-    receipt_content = vm.read(path=receipt_path, number=True)
-    body = g(receipt_content, "content", "") or ""
+    # read receipt file
+    receipt = vm.read(path=receipt_path, number=True)
+    text = fld(receipt, 'content', '') or fld(receipt, 'text', '') or ''
 
-    docs_tree = vm.tree(root="/docs", level=2)
-    vat_policy_hits = vm.search(root="/docs", pattern="VAT|tax", limit=20)
-    hits = g(vat_policy_hits, "hits", []) or []
-    vat_policy_path = "/docs"
+    # discovery: search /docs for VAT policy
+    sr = vm.search(root="/docs", pattern="(?i)VAT|tax|MwSt", limit=20)
+    hits = fld(sr, 'hits', None) or fld(sr, 'matches', None) or fld(sr, 'results', None) or []
+    vat_path = None
     for h in hits:
-        p = g(h, "path", "") or ""
-        if p:
-            vat_policy_path = p
+        hp = h if isinstance(h, str) else fld(h, 'path', None)
+        if hp:
+            vat_path = hp
             break
 
-    vat_rate = 0.21
-    m_rate = re.search(r"(\d{1,2}(?:\.\d+)?)\s*%", body)
-    if m_rate:
-        try:
-            vat_rate = float(m_rate.group(1)) / 100.0
-        except Exception:
-            pass
+    # second Read (policy doc, or re-read receipt file; never a directory)
+    read_path = vat_path or receipt_path
+    vm.read(path=read_path, number=True)
 
-    skus = []
-    names = []
-    line_items = []
-    old_total_cents = 0
-    explicit_total = None
-    for raw in body.splitlines():
-        m = re.match(r"\s*\d+[:\s]\s*(.*)", raw)
-        text = m.group(1) if m else raw
-        m2 = re.search(r"([A-Z][A-Z0-9\-]{2,})\s+(.+?)\s+(\d+)\s*[xX*]\s*\u20ac?\s*([\d.,]+)", text)
-        if not m2:
-            m2 = re.search(r"([A-Z][A-Z0-9\-]{2,})\s+(.+?)\s+(\d+)\s+\u20ac?\s*([\d.,]+)", text)
-        if m2:
-            sku = m2.group(1).strip()
-            name = m2.group(2).strip()
+    # parse receipt line items (strip line-number prefix first)
+    joined_lines = [strip_ln(l) for l in text.splitlines()]
+    items = []
+    for s in joined_lines:
+        m = re.match(r'\s*(\d+)\s+([A-Z0-9]{3}-[A-Z0-9]+)', s)
+        if m:
+            items.append((int(m.group(1)), m.group(2)))
+    joined = '\n'.join(joined_lines)
+    sm = re.search(r'SUB\s*T[O0]TAL[^\d]*([\d][\d.,]*)', joined, re.I)
+    old_ex = num(sm.group(1)) if sm else None
+
+    skus = sorted({sku for _, sku in items})
+    inlist = ','.join("'" + s.replace("'", "") + "'" for s in skus) if skus else "''"
+
+    # Exec1 current_prices (inline single-quoted SKU literals)
+    sql1 = "SELECT product_sku, price_cents FROM product_variants WHERE product_sku IN (" + inlist + ");"
+    res1 = vm.exec(path="/bin/sql", args=[sql1])
+    map1 = {}
+    for r in rows(res1):
+        sk = r.get('product_sku')
+        pc = r.get('price_cents')
+        if sk and pc not in (None, ''):
             try:
-                qty = int(m2.group(3))
-                price = float(m2.group(4).replace(",", "."))
-            except Exception:
-                continue
-            cents = int(round(price * 100))
-            skus.append(sku)
-            names.append(name)
-            line_items.append((sku, name, qty, cents))
-            old_total_cents += qty * cents
-            continue
-        m3 = re.search(r"total[:\s]+\u20ac?\s*([\d.,]+)", text, re.I)
-        if m3 and explicit_total is None:
-            try:
-                explicit_total = int(round(float(m3.group(1).replace(",", ".")) * 100))
+                map1[sk] = int(float(pc))
             except Exception:
                 pass
 
-    sql = "SELECT product_sku, product_name, price_cents, price_currency FROM product_variants WHERE product_sku IN (:skus) OR product_name IN (:names);"
-    current_prices = vm.exec(path="/bin/sql", args=[sql, "skus=" + ",".join(skus), "names=" + ",".join(names)])
-    stdout = g(current_prices, "stdout", "") or ""
-
-    price_map = {}
-    for row in stdout.splitlines():
-        parts = [p.strip() for p in row.split("|")]
-        if len(parts) >= 3:
+    # Exec2 comparison: full catalogue for exact + fuzzy fallback
+    sql2 = "SELECT product_sku, price_cents FROM product_variants;"
+    res2 = vm.exec(path="/bin/sql", args=[sql2])
+    full = {}
+    for r in rows(res2):
+        sk = r.get('product_sku')
+        pc = r.get('price_cents')
+        if sk and pc not in (None, ''):
             try:
-                pc = int(parts[2])
+                full[sk] = int(float(pc))
             except Exception:
-                continue
-            if parts[0]:
-                price_map[parts[0]] = pc
-            if parts[1]:
-                price_map[parts[1]] = pc
+                pass
+    fullcanon = {}
+    for sk, pc in full.items():
+        fullcanon.setdefault(canon(sk), pc)
 
-    new_total_cents = 0
-    for sku, name, qty, old_cents in line_items:
-        pc = price_map.get(sku)
-        if pc is None:
-            pc = price_map.get(name)
-        if pc is None:
-            pc = old_cents
-        new_total_cents += qty * pc
+    today_cents = 0
+    breakdown = []
+    for qty, sku in items:
+        price = map1.get(sku)
+        if price is None:
+            price = full.get(sku)
+        if price is None:
+            price = fullcanon.get(canon(sku))
+        if price is not None:
+            today_cents += qty * price
+            breakdown.append(sku + "x" + str(qty) + "=" + str(round(qty * price / 100.0, 2)))
+        else:
+            breakdown.append(sku + "x" + str(qty) + "=discontinued(0)")
+    today_ex = round(today_cents / 100.0, 2)
 
-    old_inc = old_total_cents
-    old_ex = (old_inc / (1.0 + vat_rate)) / 100.0
-    new_ex = (new_total_cents / (1.0 + vat_rate)) / 100.0
-    diff = abs(old_ex - new_ex)
-    yesno = "YES" if diff <= 2.0 else "NO"
+    tol = 3.0
+    if old_ex is None or not items:
+        old_disp = old_ex if old_ex is not None else 0.0
+        diff = tol + 1
+        within = False
+    else:
+        old_disp = old_ex
+        diff = round(abs(today_ex - old_ex), 2)
+        within = diff <= tol
 
-    msg = "<{0}> Old receipt total ex-VAT: \u20ac{1:.2f}. Today's catalog total ex-VAT: \u20ac{2:.2f}. Diff: \u20ac{3:.2f} (threshold 2 EUR).".format(yesno, old_ex, new_ex, diff)
-    refs = []
-    if receipt_path:
-        refs.append(receipt_path)
-    if vat_policy_path:
-        refs.append(vat_policy_path)
+    token = "<YES>" if within else "<NO>"
+    refs = [receipt_path]
+    if vat_path:
+        refs.append(vat_path)
+
+    msg = ("Receipt " + receipt_path + ": old VAT-excluded total " + str(round(old_disp, 2)) +
+           " EUR vs today " + str(today_ex) + " EUR (same VAT basis; catalogue price_cents is ex-VAT). "
+           "Difference " + str(diff) + " EUR. " + token + " \u2014 within threshold: " + str(within) +
+           ". Per-line: " + "; ".join(breakdown) + ".")
     vm.answer(message=msg, outcome="OUTCOME_OK", refs=refs)

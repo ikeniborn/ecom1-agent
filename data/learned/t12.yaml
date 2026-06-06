@@ -1,0 +1,103 @@
+entries:
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/ops-policy-notes/catalogue-count-cleaning-liquids-innsbruck-2021-08-09.md'
+  source: verdict
+  status: inactive
+  submitted_message: '286'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When the answer_template specifies empty refs but the task queries catalogue
+    data governed by ops-policy docs, discover the matching /docs reference path (e.g.
+    ops-policy-notes for a count/query op) via filesystem search and populate the
+    answer's refs instead of emitting the empty refs list verbatim.
+  created: '2026-06-06'
+  deactivated_reason: r001 directs CODEGEN to issue a filesystem Search RPC to discover
+    ref paths, which injects an RPC not present in the frozen tool_plan and deterministically
+    fails the fidelity RPC-multiset check; the new rule strictly supersedes it by
+    forbidding any unplanned RPC and requiring refs be derived from already-planned
+    RPC outputs.
+  id: r001
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/docs/ops-policy-notes/catalogue-count-cleaning-liquids-innsbruck-2021-08-09.md''".
+    Root cause: CODEGEN copied answer_template.refs=[] verbatim into the final call,
+    failing fragment `vm.answer(message="%d" % n, outcome="OUTCOME_OK", refs=[])`.
+    The grader requires the answer cite the ops-policy doc that governs this catalogue
+    count, but the script emitted empty refs. Rule linkage: a task-agnostic CODEGEN
+    technique to resolve provenance refs from /docs rather than trusting the frozen
+    empty refs list. v001 is only a verdict record, not a rule, so no semantic duplicate
+    exists.'
+  status: inactive
+- agents_md_anchor: null
+  content: Never add RPC calls (Search, Exec, or any other) that are not enumerated
+    in the frozen tool_plan in order to discover or populate answer refs; fidelity
+    enforces an exact RPC multiset, so derive ref paths from the outputs of already-planned
+    RPCs (discovery/ops Exec results) or from the answer_template, never by issuing
+    a new search.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''fidelity: AssertionError: fidelity drift (RPC multiset)
+    expected: [Answer, Exec, Exec] got: [Answer, Exec, Exec, Search]''. Root cause:
+    prior rule r001 told CODEGEN to run a filesystem search to discover the ops-policy
+    doc ref and populate answer refs. The failing fragment is `doc_hits = vm.search(root="/docs",
+    pattern=label)` plus `_collect_md_paths`, which injects an extra Search RPC absent
+    from the tool_plan (discovery=1 Exec, ops=1 Exec, answer=1 Answer). Fidelity compares
+    the script''s RPC multiset against the frozen tool_plan exactly, so any unplanned
+    RPC fails regardless of correctness. The new rule supersedes r001: ref paths must
+    be derived from existing planned RPC outputs or the answer_template, never via
+    a newly added search/exec call.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/ops-policy-notes/catalogue-count-respiratory-protection-fam-safety-gear-respiratory-protection-0013-3qrgw7v5-2021-08-09.md'
+  source: verdict
+  status: inactive
+  submitted_message: '[QTY:154]'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog
+- agents_md_anchor: null
+  content: When the grader requires reference paths beyond those literally listed
+    in answer_template, parse every planned RPC stdout (discovery and ops Exec results)
+    for embedded file or document paths and append all discovered refs to the answer's
+    refs list, instead of emitting only the static answer_template refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/docs/ops-policy-notes/catalogue-count-respiratory-protection-...-2021-08-09.md''".
+    Root cause: script hardcoded refs to answer_template value only — failing fragment
+    `vm.answer(message=message, outcome="OUTCOME_OK", refs=["/proc/catalog"])`. The
+    grader demands an additional opaque policy-doc path (random token 3qrgw7v5 + date)
+    that cannot be constructed deterministically and must be harvested from an already-planned
+    RPC''s stdout. CODEGEN never scanned discovery/ops Exec output for such ref paths.
+    Linkage: r002 already forbids adding NEW RPCs to find refs and says derive from
+    existing outputs/template; this rule is the complementary positive technique —
+    actively parse existing RPC outputs for file paths and merge them into refs. Distinct,
+    not duplicate.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/current-updates/catalogue-counting-2021-08-09-cordless-saw-sander-fam-power-tools-cordless-saw-sander-0011-3jw9qkjd.md'
+  source: verdict
+  status: active
+  submitted_message: <COUNT:154>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t12

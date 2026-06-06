@@ -1,0 +1,147 @@
+entries:
+- agents_md_anchor: '#important-tools > sql'
+  content: 'When parsing /bin/sql stdout in CODEGEN, treat output as comma-separated
+    CSV with a leading header line: split each row on '','' (not ''|'') and skip the
+    first header line before extracting columns.'
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$product_path'', ''$store_paths'']) but actual refs [] contain only static
+    template entries [] — SQL likely returned no rows or row parsing dropped the path
+    column". Root cause: /bin/sql emits CSV (OBSERVED output header ''store_id,store_path,product_sku,product_path,available_today_quantity''
+    is comma-delimited), but the failing fragment `cols = [c.strip() for c in line.split("|")]`
+    splits on ''|''. With comma data every row collapses to len(cols)==1, hits `if
+    len(cols) < 5: continue`, so every row (including any data rows) is dropped →
+    product_path stays None, store_paths empty → refs == []. The script also never
+    skips the header line. Rule linkage: codegen must match the /bin/sql CSV output
+    contract (comma delimiter + header row) when parsing stdout into refs.'
+  status: active
+- agents_md_anchor: '#important-tools > sql'
+  content: Always pass the SQL text to /bin/sql through the stdin parameter exactly
+    as the tool_plan declares (e.g. vm.exec(path='/bin/sql', args=[], stdin=query)),
+    never as an argv element, because /bin/sql reads its query from stdin; supplying
+    it via args leaves stdin empty so the tool emits only the header line and zero
+    data rows, collapsing refs to [].
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$product_path'', ''$store_paths'']) but actual refs [] contain only static
+    template entries [] — SQL likely returned no rows or row parsing dropped the path
+    column". OBSERVED_RPC_OUTPUTS confirm both /bin/sql calls returned only the header
+    line (e.g. ''store_id,store_path,product_sku,product_path,available_today_quantity'')
+    with no data rows. Root cause: tool_plan specifies the query in `stdin` with `args:
+    []`, but SCRIPT_CODE invokes `vm.exec(path="/bin/sql", args=[discovery_sql])`
+    and `vm.exec(path="/bin/sql", args=[ops_sql])` — passing the SQL as an argv element
+    while leaving stdin unset. /bin/sql reads from stdin, so the query never executes
+    and only the schema header is printed; the parse loop then iterates lines[1:]
+    (empty), product_path stays None, store_paths stays [], refs=[]. Failing fragment:
+    `vm.exec(path="/bin/sql", args=[discovery_sql])`. Linkage: rule forces CODEGEN
+    to route SQL via stdin per tool_plan, distinct from the existing CSV-parsing rule
+    which only governs how populated stdout is split.'
+  status: active
+- agents_md_anchor: '#important-things > references'
+  content: When the answer_template requires runtime refs sourced from query rows
+    (e.g. $product_path, $store_paths), do not emit vm.answer with OUTCOME_OK if the
+    parsed result set has zero data rows (only the CSV header line); detect the empty
+    rowset and fail instead, so an answer never ships with refs=[] while the template
+    demands row-derived paths.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$product_path'', ''$store_paths'']) but actual refs [] contain only static
+    template entries [] — SQL likely returned no rows or row parsing dropped the path
+    column". Root cause: both /bin/sql calls (discovery + ops) returned only the header
+    line and zero data rows (OBSERVED_RPC_OUTPUTS show `product_sku,record_path,product_name`
+    and `store_id,store_path,...,available_today_quantity` with no following rows).
+    Failing fragment: `data = parse_csv(...)` yields [], so the `for r in data:` loop
+    never runs, leaving `product_path=None` and `store_paths=[]`, hence `refs=[]`;
+    yet the script still calls `vm.answer(message="%d products" % total, outcome="OUTCOME_OK",
+    refs=refs)`. The CODEGEN defect is shipping OUTCOME_OK with empty refs when answer_template
+    lists $product_path/$store_paths. Rule linkage: existing rules cover CSV comma-parsing
+    and stdin query passing but none guard the zero-row → empty-refs case; this rule
+    forces the script to surface an empty rowset as failure rather than emit OUTCOME_OK
+    with refs=[].'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: No available units found for the requested Sika Clear silicone
+    variant in open Graz stores.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Do not silently `continue` past parsed /bin/sql rows whose column count
+    differs from the expected schema; a count mismatch signals a delimiter or parse
+    error, so surface or repair it instead of dropping the row, because dropping every
+    data row leaves store_paths/refs empty and collapses a valid OUTCOME_OK into a
+    false OUTCOME_NONE_UNSUPPORTED.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED''.
+    Root cause: the script only reaches OUTCOME_NONE_UNSUPPORTED via the guard `if
+    not store_paths or not product_path`. store_paths is built only inside the `for
+    cols in rows` loop, which first executes `if len(cols) < 5: continue`. When /bin/sql
+    output is parsed with a naive `l.split('','')` and the actual rows do not split
+    into the 5 expected columns (delimiter/format mismatch or a field-level mismatch),
+    every data row hits the `len(cols) < 5: continue` branch and is silently discarded,
+    leaving store_paths=[] and product_path=None — so the script bails to NONE_UNSUPPORTED
+    even though inventory exists and the grader expected OK. Failing fragment: `if
+    len(cols) < 5:\n    continue` combined with `if not store_paths or not product_path:
+    return vm.answer(... outcome=''OUTCOME_NONE_UNSUPPORTED'' ...)`. Rule linkage:
+    extends r001 (comma-CSV) and r003 (detect truly-empty rowset) by covering the
+    distinct case where rows parse non-empty but mis-column and are silently dropped
+    — the silent skip masks a parse defect and fabricates an unsupported outcome.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: No available matching product found in open Vienna stores.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: '#important-things > availability'
+  content: When the answer_template needs both an aggregate total and row-derived
+    refs, compute the total by summing the parsed detail rows in code and gate OUTCOME
+    solely on the presence of those detail rows; do not issue a separate SQL aggregate
+    (e.g. COALESCE(SUM(...),0)) and fold its rowset into the NONE gate, because a
+    COALESCE aggregate always returns one row while any parse hiccup on the detail
+    query independently empties it, and OR-ing the two emptiness checks collapses
+    a valid OUTCOME_OK into OUTCOME_NONE_UNSUPPORTED.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED''.
+    Root cause: script runs two independent /bin/sql queries (store detail rows +
+    a separate COALESCE(SUM) total) and gates the outcome on `if not store_rows or
+    not total_rows`. Vienna stores with matching available stock exist (grader expected
+    OUTCOME_OK), so the answer must derive a real qty and store/product refs. The
+    total query''s COALESCE(SUM,0) always emits one row, so `not total_rows` is dead;
+    the effective gate is `not store_rows`. Splitting total and detail across two
+    queries means the detail rowset parsing empty (header-only) zeroes the whole answer
+    to NONE even when the aggregate would have data, instead of summing the same detail
+    rows used for refs. Failing fragment: `if not store_rows or not total_rows: return
+    vm.answer(message=..., outcome="OUTCOME_NONE_UNSUPPORTED", refs=[])`. Linkage:
+    extends r003 (empty-rowset false-NONE) and r004 (parse fragility) but targets
+    a distinct technique — single-rowset derivation of total+refs rather than a redundant
+    aggregate query feeding the NONE gate.'
+  status: active
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t33

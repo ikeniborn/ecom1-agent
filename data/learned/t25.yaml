@@ -1,0 +1,114 @@
+entries:
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs: []
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs: []
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a tool_plan guard early-returns before a planned ops RPC, never gate
+    that op behind a brittle case-folded substring scan of a policy document — a false-negative
+    match silently drops the op and produces an RPC-multiset fidelity drift; validate
+    against parsed/structured policy fields (exact reason-code/percent rows) and only
+    short-circuit on a definitively confirmed policy violation.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC
+    multiset) expected: [Answer, Exec, Exec, Exec, Exec, Exec, Read, Read] got: [Answer,
+    Exec, Exec, Exec, Exec, Read, Read]''. Got is missing one Exec — the /bin/discount
+    apply ops RPC never ran. Root cause: a discovery-phase guard early-returned vm.answer
+    before reaching ops. Failing fragment: `pl = policy_text.lower(); if pl and (str(reason_code).lower()
+    not in pl): return vm.answer(... OUTCOME_DENIED_SECURITY ...)`. reason_code ''service_recovery''
+    was not found as a literal substring in the policy text (different formatting/casing/wording
+    in /docs/discounts.md), triggering a false denial. That early return skipped the
+    planned apply Exec, so the executed RPC multiset (4 Exec) diverged from the tool_plan
+    golden trace (5 Exec). Linkage: CODEGEN must not let heuristic substring policy
+    checks drop a planned ops RPC; guard with structured policy parsing so the happy-path
+    op still executes and the multiset matches tool_plan.'
+  status: active
+- agents_md_anchor: null
+  content: Always parse /bin/sql tabular output as CSV — detect the comma-separated
+    header row and split data rows on the same delimiter (skip header by name, map
+    columns by header index), never assume a pipe (`|`) delimiter; a wrong delimiter
+    yields empty parsed columns so runtime values like record paths silently drop
+    out of answer refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'ERROR verbatim: "answer_refs: template/constraints require runtime refs
+    ([''$basket_path'']) but actual refs [''/docs/discounts.md'', ''/docs/security.md'']
+    contain only static template entries — SQL likely returned no rows or row parsing
+    dropped the path column." Root cause: /bin/sql returns CSV (header line `basket_id,customer_id,...,record_path`
+    then `basket_018,cust_070,store_salzburg_elisabeth_vorstadt,active,,,,/proc/baskets/basket_018.json`),
+    but the parser filters and splits on `|`. Failing fragment: `brows = [ln for ln
+    in _stdout(basket_row).splitlines() if ln.strip() and "|" in ln]` and `cols =
+    [c.strip() for c in brows[-1].split("|")]`. No `|` exists in CSV output, so brows
+    is empty, basket_store_id/basket_path stay "", and `$basket_path` never gets appended
+    to refs — leaving only the two static doc paths and tripping the answer_refs check.
+    Linkage: rule fixes the delimiter mismatch that drops runtime refs; distinct from
+    v003 (missing static ref) and the in-session substring-gating rule (op short-circuit
+    logic).'
+  status: active
+- agents_md_anchor: '#important-tools > id'
+  content: Never gate a planned ops RPC behind a Python substring (`in`) containment
+    test against raw /bin/id (or other free-text command) output to decide identity-vs-customer;
+    parse the identity output into structured fields and compare the id with exact
+    equality, because a substring false-positive triggers a spurious security denial
+    that early-returns before the ops Exec and drops it from the RPC multiset (fidelity
+    drift).
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "fidelity: AssertionError: fidelity drift (RPC multiset)
+    expected: [''Answer'',''Exec'',''Exec'',''Exec'',''Exec'',''Exec'',''Read'',''Read'']
+    got: [''Answer'',''Exec'',''Exec'',''Exec'',''Exec'',''Read'',''Read'']". Reference
+    runs 5 Exec (4 discovery + the /bin/discount apply op); script ran only 4 Exec,
+    so the planned ops RPC never fired — the script took an early-return guard before
+    reaching vm.exec(''/bin/discount'',''apply'',...). Root cause: a verification
+    guard produced a false denial. The not-yet-covered brittle guard is the identity
+    check fragment `if customer_id and identity_text and customer_id in identity_text:`
+    — a raw-text substring containment scan of /bin/id stdout. A customer_id appearing
+    as a substring inside the free-text identity output (or any partial match) false-positives,
+    returns OUTCOME_DENIED_SECURITY, and silently drops the apply Exec, yielding the
+    missing-Exec multiset drift. Rule linkage: existing in-session rules already cover
+    brittle case-folded substring scans of a POLICY DOCUMENT and CSV parsing of /bin/sql;
+    neither covers substring containment on /bin/id identity output. This rule extends
+    the same anti-pattern (substring match gating an op) to identity resolution, requiring
+    parsed-field exact-equality comparison instead.'
+  status: active
+last_run:
+  cycles_used: 0
+  date: '2026-06-06'
+  outcome: OUTCOME_DENIED_SECURITY
+  status: failure
+task_id: t25

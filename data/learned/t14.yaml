@@ -1,0 +1,203 @@
+entries:
+- agents_md_anchor: null
+  content: When the answer_template declares a runtime ref token (a value starting
+    with $, e.g. $store_path), the discovery SELECT must project the column backing
+    that ref and the script must bind that column's parsed value into refs; never
+    hardcode refs=[] or drop a template-required runtime ref.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$store_path'']) but actual refs [] contain only static template entries []".
+    Root cause: answer_template.refs = [''$store_path''] is a runtime ref, but (a)
+    the store discovery SELECT projected only store_id, store_name — no path column
+    backing $store_path, and (b) failing fragment `refs = []  # $store_path has no
+    resolvable value ... keep only static refs (none)` hardcoded an empty refs list,
+    silently discarding the required runtime ref. Store query also returned 0 data
+    rows (header only), so even a parse attempt would have found nothing. Both faults
+    trace to CODEGEN not honoring the runtime-ref contract: it must add the backing
+    column to the SELECT and bind the parsed row value, instead of emitting refs=[].
+    Rule links the answer_template ref-token contract to the discovery SELECT projection
+    and refs population technique.'
+  status: active
+- agents_md_anchor: '#important-things > availability'
+  content: When a discovery query that backs a required runtime ref (a $-token in
+    answer_template.refs) returns zero rows, do not call vm.answer with the empty/default
+    value; guard for the empty result and emit the failure outcome instead of producing
+    a placeholder answer with missing refs.
+  created: '2026-06-06'
+  deactivated_reason: r002's prescription to guard-and-vm.answer on empty discovery
+    before the remaining planned ops directly produced the RPC-multiset drift. The
+    new rule subsumes r002's intent (do not emit a placeholder OK answer with missing
+    refs) while requiring all planned Exec RPCs to run first, with the failure-outcome
+    choice deferred to final outcome/refs selection.
+  id: r002
+  reasoning: 'Verbatim error: "template/constraints require runtime refs ([''$store_path''])
+    but actual refs [] contain only static template entries []". Root cause: the store
+    discovery SELECT (city=''Innsbruck'' AND is_open=1 AND store_name LIKE ''%entral%'')
+    returned <empty> — no central open store resolved — so store_path stayed None
+    and refs=[]; the script still proceeded to vm.answer(message=''Total: 0'', refs=[]).
+    Failing fragment: `store_path=None ... refs=[]; if store_path: refs.append(store_path);
+    vm.answer(... refs=refs)` — no guard on the empty store rowset. Distinct from
+    existing in-session rule (which mandates projecting+binding the ref column): here
+    the column WAS projected (path) but the rowset was empty, so the new technique
+    covers the empty-resolution guard before answering rather than the projection
+    itself. No prior rule superseded.'
+  status: inactive
+- agents_md_anchor: '#important-tools > sql'
+  content: Always pass a /bin/sql query to vm.exec through the stdin parameter exactly
+    as declared in tool_plan.discovery[].args.stdin, never relocate it into an args/argv
+    list; /bin/sql reads its query from stdin, so a query placed in args runs with
+    empty input, yields empty stdout that misparses to a false-empty result, and triggers
+    an early-bail branch that skips later planned discovery RPCs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC
+    multiset) expected: [Answer, Exec, Exec] got: [Answer, Exec]''. Root cause: tool_plan.discovery[0].args
+    declares the query via `stdin`, but the script invoked it as `store = vm.exec(path="/bin/sql",
+    args=[store_sql])` — query passed in args, not stdin. /bin/sql got no stdin input,
+    returned empty stdout. Failing fragment: the store-parse loop over `store_out.splitlines()`
+    therefore extracted no store_id, store_id stayed None, and the guard `if not store_id:
+    vm.answer(... OUTCOME_NONE_CLARIFICATION); return` fired — bailing before the
+    second planned Exec. Result: only one Exec ran, dropping an Exec from the RPC
+    multiset and failing the fidelity reference trace which expects both discovery
+    Execs plus Answer. The same mis-invocation appears on the result_sql call. This
+    is distinct from the existing ref-binding/empty-guard rules — those address refs
+    projection and placeholder answers, not the stdin-vs-args invocation channel that
+    caused the empty output and skipped RPC.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Mellerud/CLN-3Q19VP4J.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#important-things > availability'
+  content: When the answer counts or filters products and an agents_md availability
+    constraint requires referencing the available products, project each matched variant's
+    catalog path alongside the aggregate and append every contributing product path
+    to refs; a COUNT-only discovery collapses the rows and drops the per-product catalog
+    references the grader requires.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/catalog/Mellerud/CLN-3Q19VP4J.json''".
+    Root cause: the result discovery returns only COUNT(*) AS total, so the SKUs/catalog
+    paths of the matched-and-available variants never reach the script; the only ref
+    captured is store_path (refs=[store_path]). Failing fragment: "SELECT COUNT(*)
+    AS total FROM m JOIN store_inventory si ..." plus "refs=[]; if store_path: refs.append(store_path)"
+    — no per-product path projected or appended. The agents_md availability constraint
+    (#important-things > availability) demands the answer reference the available
+    products; counting collapses those rows so the contributing Mellerud variant catalog
+    file is absent from refs. Rule linkage: distinct from r001/r002/r003 (those cover
+    $-token runtime refs from answer_template and stdin placement); this covers grader/agents_md-required
+    per-product refs that the count aggregation discards.'
+  status: active
+- agents_md_anchor: null
+  content: When tool_plan declares ops/RPCs after the discovery RPC, never let a discovery-result
+    guard call vm.answer and return before the remaining planned Exec RPCs execute;
+    the fidelity grader compares the full executed RPC multiset against the plan,
+    so issue every planned Exec first and apply empty-result/missing-ref guards only
+    when choosing the final outcome and refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''fidelity: AssertionError: fidelity drift (RPC multiset)
+    expected: [Answer, Exec, Exec, Exec] got: [Answer, Exec]''. Plan declares 3 Exec
+    RPCs (1 discovery + 2 ops: count_row, matched_rows) plus the Answer. Executed
+    multiset shows only 1 Exec then Answer — the script ran the store discovery Exec,
+    hit the empty/short-row guard, and bailed before the two op Execs. Failing fragment:
+    `if not store_rows or len(store_rows[0]) < 4 or not store_rows[0][3]: vm.answer(message=...,
+    outcome=''OUTCOME_NONE_UNSUPPORTED'', refs=[]); return`. This early-return (an
+    over-eager application of r002) short-circuits the two planned op RPCs, dropping
+    the RPC count from 4 to 2 and failing fidelity. Root cause: guard ordering — a
+    failure guard must not gate whether planned RPCs run. r002 mandated the early
+    failure-outcome bail; this new rule supersedes it by folding the missing-ref decision
+    into post-RPC outcome selection so the full planned RPC multiset is always emitted.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Helios/PNT-OYI3I497.json'
+  source: verdict
+  status: inactive
+  submitted_message: Could not resolve the Graz Jakomini store.
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#important-things > references'
+  content: When a spec qualifies through multiple distinguishing properties, build
+    the refs/projection query so it re-derives qualifying variants using the EXACT
+    same per-property predicates as the COUNT query (each property matched as its
+    own EXISTS on product_variant_properties with the correct typed column — property_value_text
+    vs property_value_number — and the same resolved store_id), then bind and append
+    every projected variant record_path to refs; any divergence (relaxed predicate,
+    wrong typed column, OR instead of AND, or a different store binding) between the
+    qualification test and the projection silently drops a qualifying variant and
+    the grader rejects the answer for the missing product reference.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/catalog/Helios/PNT-OYI3I497.json''".
+    Root cause: the qualifying Helios variant counted by op1 was not surfaced into
+    refs by op2''s projection. The Helios spec is the case requiring TWO conjoined
+    text properties (product_type AND color_family); the refs/projection query must
+    re-derive each spec''s qualifying variants under identical predicates and the
+    same store_id as the COUNT query, otherwise the exact contributing variant path
+    is dropped from refs even though the count is correct. Failing fragment: matched_sql
+    Helios branch + the matched_paths collection loop appending r[1] (record_path)
+    — the projected row for PNT-OYI3I497 never reached refs, so refs=[store_path]+matched_paths
+    omitted the required path. Linkage: extends r004 (which mandates a per-variant
+    projection exists) with a parity requirement — the projection''s predicates/typed-columns/store
+    binding must match the qualification test so no qualifying variant is lost; recurrence
+    of v002 shows structural projection alone is insufficient without predicate parity.'
+  status: active
+- agents_md_anchor: '#important-tools > sql'
+  content: When parsing /bin/sql stdout, split each output line on the delimiter the
+    tool actually emits (comma-separated CSV with a leading header row), not on '|';
+    splitting on the wrong delimiter collapses the whole row into parts[0], so the
+    header-skip check, store_id extraction, and the ref/path column parse all fail
+    and yield a false-empty result that drops every runtime ref.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Verbatim ERROR: "answer_refs: template/constraints require runtime refs
+    ([''$store_path'']) but actual refs [] contain only static template entries []
+    — SQL likely returned no rows or row parsing dropped the path column". OBSERVED_RPC_OUTPUTS
+    show /bin/sql emits CSV — header line ''store_id,store_name,city'' uses commas.
+    Failing fragment: parsing loops use `parts = [p.strip() for p in raw.split("|")]`
+    for both the discovery row and the result rows. Root cause: /bin/sql is comma-delimited
+    but the script splits on ''|'', so every column lands in parts[0]; the `parts[0].lower()
+    != "store_id"` header guard and the 4-column result parse never match, store_id
+    stays None and rows[] stays empty, so refs[] is empty and the grader rejects the
+    missing $store_path runtime ref. This is a delimiter-parsing technique distinct
+    from r001 (which covers projecting/binding the ref column) — even a correctly
+    projected path column would be dropped by the wrong split. No existing rule addresses
+    /bin/sql output delimiter parsing.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Bahco/HND-16AK9OEL.json'
+  source: verdict
+  status: active
+  submitted_message: No store matched the requested name.
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+last_run:
+  cycles_used: 2
+  date: '2026-06-06'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t14

@@ -1,0 +1,95 @@
+{
+  "intent": "Count how many of the 6 specified product variants have available_today_quantity >= 1 in the Lend district PowerTool store today.",
+  "params": {
+    "store": "%Lend%",
+    "city": "Lend",
+    "b1": "Liqui Moly",
+    "fam1": "%Liqui Moly Workshop Top Tec LMI-I9R Automotive Cleaner%",
+    "k1a": "cleaner_type",
+    "v1a": "screen wash",
+    "k1b": "volume_ml",
+    "v1b": "250",
+    "b2": "Fiskars",
+    "fam2": "%Fiskars Compact X 2Z7-4OD Chainsaw%",
+    "k2a": "power_source",
+    "v2a": "battery",
+    "k2b": "bar_length_cm",
+    "v2b": "40",
+    "b3": "Karcher",
+    "fam3": "%Karcher Workshop SC 27T-68S Cleaning Machine%",
+    "k3a": "machine_type",
+    "v3a": "wet dry vacuum",
+    "k3b": "power_w",
+    "v3b": "1000",
+    "b4": "Wavin",
+    "fam4": "%Wavin Compact Tigris 2HC-AJD Pipe Fitting%",
+    "k4a": "fitting_type",
+    "v4a": "pipe fitting",
+    "k4b": "diameter_mm",
+    "v4b": "25",
+    "b5": "Wolf-Garten",
+    "fam5": "%Wolf-Garten Silent WG 2IA-DMB Lawn Mower%",
+    "k5a": "power_source",
+    "v5a": "battery",
+    "k5b": "cutting_width_cm",
+    "v5b": "32",
+    "b6": "Raaco",
+    "fam6": "%Raaco Stackable Assorter 20C-L8E Storage Bin and Organizer%",
+    "k6a": "storage_type",
+    "v6a": "storage bin",
+    "k6b": "color_family",
+    "v6b": "Clear",
+    "k6c": "volume_l",
+    "v6c": "25"
+  },
+  "success_criteria": [
+    "Resolve the Lend district PowerTool store_id",
+    "Each of the 6 variants matched by brand + family line + specified properties",
+    "Availability tested via store_inventory.available_today_quantity >= 1 for that store",
+    "Answer is the count of matched-available variants in exact format qty=%d"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT store_id, store_name, city, record_path FROM stores WHERE store_name LIKE :store OR city = :city;"
+      },
+      "bind": "lend_store"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH lend AS (SELECT store_id FROM stores WHERE store_name LIKE :store OR city = :city) SELECT (CASE WHEN EXISTS(SELECT 1 FROM product_variants v JOIN product_families f ON f.product_family_id=v.product_family_id JOIN store_inventory si ON si.product_sku=v.product_sku AND si.store_id IN (SELECT store_id FROM lend) JOIN product_variant_properties pa ON pa.product_sku=v.product_sku AND pa.property_key=:k1a AND pa.property_value_text=:v1a JOIN product_variant_properties pb ON pb.product_sku=v.product_sku AND pb.property_key=:k1b AND pb.property_value_number=:v1b WHERE f.brand=:b1 AND f.product_family_name LIKE :fam1 AND si.available_today_quantity>=1) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS(SELECT 1 FROM product_variants v JOIN product_families f ON f.product_family_id=v.product_family_id JOIN store_inventory si ON si.product_sku=v.product_sku AND si.store_id IN (SELECT store_id FROM lend) JOIN product_variant_properties pa ON pa.product_sku=v.product_sku AND pa.property_key=:k2a AND pa.property_value_text=:v2a JOIN product_variant_properties pb ON pb.product_sku=v.product_sku AND pb.property_key=:k2b AND pb.property_value_number=:v2b WHERE f.brand=:b2 AND f.product_family_name LIKE :fam2 AND si.available_today_quantity>=1) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS(SELECT 1 FROM product_variants v JOIN product_families f ON f.product_family_id=v.product_family_id JOIN store_inventory si ON si.product_sku=v.product_sku AND si.store_id IN (SELECT store_id FROM lend) JOIN product_variant_properties pa ON pa.product_sku=v.product_sku AND pa.property_key=:k3a AND pa.property_value_text=:v3a JOIN product_variant_properties pb ON pb.product_sku=v.product_sku AND pb.property_key=:k3b AND pb.property_value_number=:v3b WHERE f.brand=:b3 AND f.product_family_name LIKE :fam3 AND si.available_today_quantity>=1) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS(SELECT 1 FROM product_variants v JOIN product_families f ON f.product_family_id=v.product_family_id JOIN store_inventory si ON si.product_sku=v.product_sku AND si.store_id IN (SELECT store_id FROM lend) JOIN product_variant_properties pa ON pa.product_sku=v.product_sku AND pa.property_key=:k4a AND pa.property_value_text=:v4a JOIN product_variant_properties pb ON pb.product_sku=v.product_sku AND pb.property_key=:k4b AND pb.property_value_number=:v4b WHERE f.brand=:b4 AND f.product_family_name LIKE :fam4 AND si.available_today_quantity>=1) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS(SELECT 1 FROM product_variants v JOIN product_families f ON f.product_family_id=v.product_family_id JOIN store_inventory si ON si.product_sku=v.product_sku AND si.store_id IN (SELECT store_id FROM lend) JOIN product_variant_properties pa ON pa.product_sku=v.product_sku AND pa.property_key=:k5a AND pa.property_value_text=:v5a JOIN product_variant_properties pb ON pb.product_sku=v.product_sku AND pb.property_key=:k5b AND pb.property_value_number=:v5b WHERE f.brand=:b5 AND f.product_family_name LIKE :fam5 AND si.available_today_quantity>=1) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS(SELECT 1 FROM product_variants v JOIN product_families f ON f.product_family_id=v.product_family_id JOIN store_inventory si ON si.product_sku=v.product_sku AND si.store_id IN (SELECT store_id FROM lend) JOIN product_variant_properties pa ON pa.product_sku=v.product_sku AND pa.property_key=:k6a AND pa.property_value_text=:v6a JOIN product_variant_properties pb ON pb.product_sku=v.product_sku AND pb.property_key=:k6b AND pb.property_value_text=:v6b JOIN product_variant_properties pc ON pc.product_sku=v.product_sku AND pc.property_key=:k6c AND pc.property_value_number=:v6c WHERE f.brand=:b6 AND f.product_family_name LIKE :fam6 AND si.available_today_quantity>=1) THEN 1 ELSE 0 END) AS qty;"
+      },
+      "bind": "count_row"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > availability",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
+    },
+    {
+      "anchor": "#important-things > reference",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-tools > sql",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
+    }
+  ],
+  "answer_template": {
+    "message": "qty={count_row.qty}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$available_paths"
+    ]
+  },
+  "outcome_override": null
+}

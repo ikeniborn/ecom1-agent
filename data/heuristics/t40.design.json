@@ -1,0 +1,103 @@
+{
+  "intent": "Identify the archived payment_transactions records belonging to the confirmed fraud incident per the security/fraud policy and cite each, modifying nothing.",
+  "params": {
+    "archived_flag": 1
+  },
+  "success_criteria": [
+    "Fraud-classification criteria are taken from the docs security/fraud policy, not invented",
+    "Only archived payment records (is_archived_basket_reference = 1) are considered",
+    "Every payment record classified as fraud is cited by its full record_path",
+    "No write/delete RPCs are issued (read-only)",
+    "The applied security policy document is included as a grounding reference"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id",
+        "args": []
+      },
+      "bind": "ident"
+    },
+    {
+      "rpc": "Tree",
+      "args": {
+        "root": "/docs",
+        "level": 2
+      },
+      "bind": "docs_tree"
+    },
+    {
+      "rpc": "Find",
+      "args": {
+        "root": "/docs",
+        "name": "security",
+        "kind": "file",
+        "limit": 10
+      },
+      "bind": "security_docs"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/docs",
+        "pattern": "(?i)fraud|chargeback|3ds|device_fingerprint|incident",
+        "limit": 50
+      },
+      "bind": "fraud_policy_hits"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$policy_path",
+        "number": true
+      },
+      "bind": "fraud_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH archived AS (SELECT payment_id, record_path, customer_id, store_id, payment_amount_cents, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude, three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts FROM payment_transactions WHERE is_archived_basket_reference = :archived_flag) SELECT a.*, (SELECT COUNT(*) FROM archived d WHERE d.device_fingerprint = a.device_fingerprint) AS device_share, (SELECT COUNT(*) FROM archived m WHERE m.payment_method_fingerprint = a.payment_method_fingerprint) AS method_share FROM archived a ORDER BY a.device_fingerprint, a.payment_method_fingerprint, a.payment_created_at;"
+        ]
+      },
+      "bind": "archived_candidates"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH archived AS (SELECT * FROM payment_transactions WHERE is_archived_basket_reference = :archived_flag), shared_device AS (SELECT device_fingerprint FROM archived GROUP BY device_fingerprint HAVING COUNT(*) > 1), shared_method AS (SELECT payment_method_fingerprint FROM archived GROUP BY payment_method_fingerprint HAVING COUNT(*) > 1), incident AS (SELECT a.payment_id, a.record_path, a.customer_id, a.store_id, a.payment_amount_cents, a.payment_status, a.payment_created_at, a.payment_method_fingerprint, a.device_fingerprint, a.three_ds_status, a.three_ds_failure_reason, a.three_ds_attempts, a.three_ds_max_attempts FROM archived a WHERE a.device_fingerprint IN (SELECT device_fingerprint FROM shared_device) OR a.payment_method_fingerprint IN (SELECT payment_method_fingerprint FROM shared_method) OR (a.three_ds_status IS NOT NULL AND a.three_ds_failure_reason IS NOT NULL)) SELECT DISTINCT payment_id, record_path, customer_id, store_id, payment_amount_cents, payment_status, payment_created_at, device_fingerprint, payment_method_fingerprint, three_ds_failure_reason FROM incident ORDER BY device_fingerprint, payment_created_at;"
+        ]
+      },
+      "bind": "fraud_payments"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > policy-grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > startup",
+      "rule": "When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context"
+    }
+  ],
+  "answer_template": {
+    "message": "Fraud incident. Applied policy {$policy_path}. Classified {fraud_payments.row_count} archived payment records as part of incident: {fraud_payments.record_paths}. Read-only, nothing modified.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$fraud_payment_paths",
+      "$policy_path"
+    ]
+  },
+  "outcome_override": null
+}

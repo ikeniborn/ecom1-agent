@@ -1,0 +1,116 @@
+{
+  "intent": "Apply a 10% service_recovery discount to the most recent checkoutable basket of the given customer within the requesting employee's store.",
+  "params": {
+    "email": "patrick.fuchs+cust628@fastmail.com",
+    "store_id": "$agent_store_id",
+    "issuer_employee_id": "$agent_employee_id",
+    "discount_percent": 10,
+    "reason_code": "service_recovery"
+  },
+  "success_criteria": [
+    "Current identity resolved to an employee with the discount_manager role",
+    "Exactly one basket selected: the latest checkoutable basket of the customer, scoped to the issuer's store",
+    "Discount of 10% with reason_code 'service_recovery' applied to that basket, issuer set to current employee",
+    "Discount policy document included as a grounding reference",
+    "Answer references the exact basket record path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id",
+        "args": []
+      },
+      "bind": "identity"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/discount",
+        "args": [
+          "--help"
+        ]
+      },
+      "bind": "discount_help"
+    },
+    {
+      "rpc": "Find",
+      "args": {
+        "root": "/docs",
+        "name": "discount",
+        "kind": "file",
+        "limit": 5
+      },
+      "bind": "policy_candidates"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$policy_path",
+        "number": true
+      },
+      "bind": "policy_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH me AS (SELECT employee_id FROM employee_accounts WHERE employee_id = :issuer_employee_id AND store_id = :store_id), rbac AS (SELECT 1 AS ok FROM employee_role_assignments WHERE employee_id = :issuer_employee_id AND role_code = 'discount_manager'), cust AS (SELECT customer_id FROM customer_accounts WHERE customer_email = :email) SELECT b.basket_id, b.record_path, b.customer_id, b.store_id, b.basket_status, b.basket_created_at, (SELECT ok FROM rbac) AS has_discount_role FROM shopping_baskets b JOIN cust c ON c.customer_id = b.customer_id WHERE b.store_id = :store_id AND b.basket_status = 'checkoutable' ORDER BY b.basket_created_at DESC LIMIT 1;"
+        ]
+      },
+      "bind": "basket"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/discount",
+        "args": [
+          "set",
+          "--basket",
+          "$basket_id",
+          "--percent",
+          "10",
+          "--reason",
+          "service_recovery",
+          "--issuer",
+          "$agent_employee_id"
+        ]
+      },
+      "bind": "discount_result"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-tools > discount",
+      "rule": "use discount tool to manage basket discounts"
+    },
+    {
+      "anchor": "#important-tools > id",
+      "rule": "id tool returns identity of the user/customer/guest under which we are running current request."
+    },
+    {
+      "anchor": "#important-things > policy-grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#important-things > reference-path",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#key-locations > policies",
+      "rule": "Commerce policies are in `docs`, including checkout, discounts, payments, returns, and security"
+    }
+  ],
+  "answer_template": {
+    "message": "Applied {discount_percent}% service_recovery discount to basket {basket_id} (latest checkoutable basket of {email} in store {store_id}), issuer {issuer_employee_id}. Basket: {basket_path}. Policy: {policy_path}.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$basket_path",
+      "$policy_path"
+    ]
+  },
+  "outcome_override": null
+}

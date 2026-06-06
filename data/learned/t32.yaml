@@ -1,0 +1,56 @@
+entries:
+- agents_md_anchor: '#important-tools > sql'
+  content: When parsing /bin/sql stdout, split each row on the actual output delimiter
+    (comma-separated CSV with a header line) instead of assuming pipe-delimited, and
+    detect the header by matching the full first line against the SELECT column-name
+    list before mapping fields by index.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". OBSERVED_RPC_OUTPUTS
+    shows /bin/sql emitted a single comma-delimited header line `product_sku,record_path,product_name,has_voice_control`.
+    Root cause is CODEGEN parsing, not the query: the script splits lines on `"|"`
+    (`cols = [c.strip() for c in line.split("|")]`) and skips the header only when
+    `cols[0].lower() == "product_sku"`. Because the real delimiter is comma, `line.split("|")`
+    yields one cell `"product_sku,record_path,product_name,has_voice_control"`, which
+    never equals `"product_sku"`, so the header row is NOT skipped and is treated
+    as data. `row[1]` (record_path) is then empty → `refs=[]`, yielding OUTCOME_OK
+    with no runtime ref. Failing fragment: `cols = [c.strip() for c in line.split("|")]`
+    plus `if cols[0].lower() == "product_sku"`. Rule linkage: future CODEGEN must
+    match the parse delimiter to the projection''s CSV output and skip the header
+    by full-line column-name comparison, so record_path is extracted and answer_refs
+    are populated.'
+  status: active
+- agents_md_anchor: '#important-things > reference'
+  content: When the answer template requires a runtime ref sourced from a SQL row
+    (e.g. record_path) and the primary property-filtered query returns zero data rows,
+    do not fall back to vm.answer(refs=[]); first issue a relaxed base-resolution
+    query (brand/model identity only, dropping numeric-CAST property filters that
+    silently eliminate rows when property_value_number is NULL/text) to obtain record_path,
+    and only then branch on capability presence so every answer path populates the
+    required refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$match.record_path'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". OBSERVED_RPC_OUTPUTS
+    shows only the header line `product_sku,record_path,product_name,has_voice_control`
+    with zero data rows, so parsing was correct (existing CSV-split rule already applied)
+    — the SQL genuinely matched no row. Root cause: the multi-join filter `CAST(pv.property_value_number
+    AS INTEGER) = CAST(''230'' AS INTEGER)` / power join eliminates the base row when
+    voltage/power are stored as text or NULL in property_value_number, collapsing
+    the result to empty. Failing fragment: `match = rows[0] if rows else None` → `if
+    match is None: ... vm.answer(message=..., refs=[])`, which emits empty refs and
+    violates the answer_template''s `$match.record_path` requirement. Linkage: distinct
+    from the in-session CSV-parsing rule (parsing worked here); this rule covers the
+    zero-row + required-ref case by mandating a relaxed base-only fallback query so
+    record_path is always available before answering.'
+  status: active
+last_run:
+  cycles_used: 3
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t32

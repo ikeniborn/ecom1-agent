@@ -1,0 +1,69 @@
+{
+  "intent": "Read archived TSV, identify fraud-incident payment rows, sum their amounts, and answer with the total formatted as EUR %d.%02d while citing each fraud row.",
+  "params": {
+    "archive_tsv": "/archive/payment_batch_export_ZnZMNJceH3.tsv"
+  },
+  "success_criteria": [
+    "Only rows belonging to fraud incidents are counted",
+    "Message contains exactly 'EUR %d.%02d' total of fraudulent amounts and no row IDs",
+    "Each fraud row is cited in refs as /archive/payment_batch_export_ZnZMNJceH3.tsv#row=<RowID>",
+    "No files are modified"
+  ],
+  "discovery": [
+    {
+      "rpc": "Stat",
+      "args": {
+        "path": "/archive/payment_batch_export_ZnZMNJceH3.tsv"
+      },
+      "bind": "tsv_stat"
+    },
+    {
+      "rpc": "List",
+      "args": {
+        "path": "/archive"
+      },
+      "bind": "archive_listing"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/archive/payment_batch_export_ZnZMNJceH3.tsv",
+        "number": true
+      },
+      "bind": "tsv_content"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/archive",
+        "pattern": "(?i)fraud",
+        "limit": 200
+      },
+      "bind": "fraud_hits"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/archive/payment_batch_export_ZnZMNJceH3.tsv",
+        "number": true
+      },
+      "bind": "fraud_rows"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    }
+  ],
+  "answer_template": {
+    "message": "EUR {total_euros}.{total_cents_2dp}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$fraud_row_refs"
+    ]
+  },
+  "outcome_override": null
+}

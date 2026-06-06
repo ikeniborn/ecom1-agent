@@ -1,0 +1,99 @@
+entries:
+- agents_md_anchor: '#important-tools > sql tool'
+  content: When parsing /bin/sql stdout in CODEGEN, split rows on the delimiter the
+    tool actually emits (CSV/comma) and strip the header by matching the first line's
+    fields against the known SELECT column names; never hardcode a pipe ('|') delimiter
+    or test only the first cell for a single column name, or row parsing silently
+    drops every column (including the path) and refs come back empty.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column; check
+    :name bindings on /bin/sql and the SELECT columns". Root cause: OBSERVED_RPC_OUTPUTS
+    shows /bin/sql emits comma-separated output (`product_sku,record_path,product_name,...`),
+    but the script parses with `ln.split("|")`. Failing fragment: `cols = [c.strip()
+    for c in ln.split("|")]` plus header guard `rows[0][0].lower() in ("product_sku","sku")`.
+    With pipe-split on CSV text, each whole line becomes a single column, so `rows[0][0]`
+    is the entire header string (never equal to ''product_sku''), the header is not
+    dropped, and `record_path = r[1]` is out of range / wrong — refs stays []. Even
+    when data rows exist, the path column is never extracted. Rule linkage: the corrective
+    technique is delimiter-correct CSV parsing and column-name-based header detection,
+    a CODEGEN translation concern, not a domain conclusion.'
+  status: active
+- agents_md_anchor: '#important-tools > sql tool'
+  content: When a CODEGEN answer must cite a base record's SKU and record_path even
+    on a negative or absent-property verdict, never put the discriminating property
+    comparisons in the WHERE clause of a LEFT JOIN query — that collapses the LEFT
+    JOIN into an effective INNER JOIN and returns zero rows whenever a property differs,
+    leaving refs empty; instead select the base record unconditionally and expose
+    each property match as a CASE/boolean SELECT column, then decide the verdict in
+    code so the base path always survives for refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$path'']) but actual refs [] contain only static template entries [] — SQL
+    likely returned no rows or row parsing dropped the path column". OBSERVED_RPC_OUTPUTS
+    shows only the header line `product_sku,record_path,...,volume_number` with zero
+    data rows. Root cause: the failing fragment is the trailing filter `WHERE cf.property_value_text
+    = ''Black'' AND fin.property_value_text = ''eggshell''` applied to the cf/fin/vol
+    LEFT JOINs. Predicating on LEFT-JOINed columns in WHERE turns those joins into
+    INNER joins, so when no base variant carries both color_family=Black and finish=eggshell
+    the entire result set is empty. The script''s no-rows branch then calls vm.answer(refs=[]).
+    But intent explicitly requires answering <NO> while still citing the checked base
+    SKU/record_path — impossible once the property filter drops the base row. Linkage:
+    rule tells CODEGEN to keep the base row unconditional and move property checks
+    into SELECT/CASE columns evaluated in Python, guaranteeing record_path is always
+    available to populate the required $path ref.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/adhesives_sealants/sealants/ADH-2ZDN11UB.json'
+  source: verdict
+  status: active
+  submitted_message: '<NO> Base product exists — Sika Professional Sika 1NG-QLV Sealant
+    acrylic sealant Gray 300ml (SKU ADH-119O2VGA, /proc/catalog/adhesives_sealants/sealants/ADH-119O2VGA.json)
+    — but the catalogue record does not carry both claimed sealant types. Its sealant_type
+    value(s): acrylic sealant. The combined claim of ''sanitary sealant'' AND ''acrylic
+    sealant'' is absent. Checked SKU: ADH-119O2VGA.'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/adhesives_sealants/sealants/ADH-119O2VGA.json
+- agents_md_anchor: '#important-tools > sql'
+  content: When a CODEGEN discovery query must locate a base catalogue record whose
+    path/SKU will be cited as a required reference, do not over-constrain it with
+    an exact-equality conjunction across several human-entered denormalized columns
+    (e.g. brand AND series AND model); one normalized/variant-spelled field yields
+    zero rows and empty refs even though the record exists. Match on the most stable
+    identifier or use relaxed/normalized comparison (LIKE/lower/trim), and confirm
+    at least one row returned before building refs — derive the reference from the
+    catalogue path convention (/proc/catalog/<category>/<subcategory>/<SKU>.json)
+    rather than blindly trusting a record_path column.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: grader: answer missing required reference ''/proc/catalog/adhesives_sealants/sealants/ADH-2ZDN11UB.json''.
+    The required record (SKU ADH-2ZDN11UB) exists in the catalogue, so refs being
+    empty means the discovery query returned no rows — the failing fragment is the
+    base CTE WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model,
+    a strict three-way exact-equality conjunction over denormalized free-text attribute
+    columns. Any single field mismatch (normalization, spacing, variant spelling between
+    ''Sika 1NG-QLV'' and the stored row) collapses the result to zero rows, so the
+    rows[] branch is skipped and refs=[] — distinct from r002 (property comparison
+    in LEFT JOIN WHERE) and r001 (stdout delimiter/header parsing), both of which
+    are correctly applied here yet cannot help when the base SELECT itself matches
+    nothing. Root cause: over-constrained base-record lookup plus reliance on the
+    DB record_path column instead of the canonical catalogue file path. New rule links
+    these into a reusable CODEGEN technique: relax/normalize the base match, assert
+    a row exists, and synthesize the canonical /proc/catalog path from the SKU.'
+  status: active
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t07

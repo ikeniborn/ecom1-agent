@@ -1,0 +1,101 @@
+{
+  "intent": "Apply 10% service_recovery discount to basket_078 with the running operator as issuer, after verifying identity, RBAC, store scope, and discount policy cap.",
+  "params": {
+    "basket_id": "basket_078",
+    "discount_percent": 10,
+    "reason_code": "service_recovery",
+    "store_name": "%Ljubljana%",
+    "issuer_id": "$agent_issuer_id"
+  },
+  "success_criteria": [
+    "Running identity resolved via /bin/id and used as discount_issuer_employee_id",
+    "Issuer holds a discount-granting role (discount_manager) in employee_role_assignments",
+    "Issuer's home store equals basket_078's store and equals the PowerTool Ljubljana Center store",
+    "service_recovery cap of 10% confirmed from the discounts policy document",
+    "discount_percent=10, discount_reason_code=service_recovery, discount_issuer_employee_id=issuer written to basket_078"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id",
+        "args": []
+      },
+      "bind": "identity"
+    },
+    {
+      "rpc": "Find",
+      "args": {
+        "root": "/docs",
+        "name": "discount",
+        "kind": "file",
+        "limit": 5
+      },
+      "bind": "discount_policy_path"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$discount_policy_path",
+        "number": true
+      },
+      "bind": "discount_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH b AS (SELECT basket_id, store_id, customer_id, basket_status, record_path FROM shopping_baskets WHERE basket_id = :basket_id), e AS (SELECT employee_id, store_id, record_path FROM employee_accounts WHERE employee_id = :issuer_id), r AS (SELECT group_concat(role_code) AS roles FROM employee_role_assignments WHERE employee_id = :issuer_id), s AS (SELECT store_id, store_name FROM stores WHERE store_name LIKE :store_name) SELECT b.basket_id, b.store_id AS basket_store, b.record_path AS basket_path, b.basket_status, e.store_id AS issuer_store, (SELECT roles FROM r) AS issuer_roles, (SELECT store_id FROM s) AS named_store FROM b LEFT JOIN e;"
+      },
+      "bind": "verify"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/discount",
+        "args": [
+          "apply",
+          "--basket",
+          ":basket_id",
+          "--percent",
+          ":discount_percent",
+          "--reason",
+          ":reason_code",
+          "--issuer",
+          ":issuer_id"
+        ]
+      },
+      "bind": "discount_result"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-tools > id",
+      "rule": "id tool returns identity of the user/customer/guest under which we are running current request."
+    },
+    {
+      "anchor": "#important-tools > discount",
+      "rule": "use discount tool to manage basket discounts"
+    },
+    {
+      "anchor": "#important-things > policy-grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#important-things > reference-path",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    }
+  ],
+  "answer_template": {
+    "message": "Applied {discount_percent}% service_recovery discount to {basket_id}. Issuer={identity} (verified discount-authorized, store matches basket and PowerTool Ljubljana Center). Cap of 10% confirmed per discounts policy.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$basket_path",
+      "$discount_policy_path"
+    ]
+  },
+  "outcome_override": null
+}

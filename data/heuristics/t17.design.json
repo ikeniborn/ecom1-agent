@@ -1,0 +1,61 @@
+{
+  "intent": "Sum available_today_quantity across all Graz PowerTool stores (including zero-availability) for the Festool SYS 3JJ-9LM tool-bag variant and report as '%d total'.",
+  "params": {
+    "brand": "Festool",
+    "family": "Festool Stackable SYS 3JJ-9LM Tool Box and Bag",
+    "kind": "tool_boxes_bags",
+    "storage_type": "tool bag",
+    "city": "Graz"
+  },
+  "success_criteria": [
+    "Resolve exactly one product variant in family 'Festool Stackable SYS 3JJ-9LM Tool Box and Bag', brand Festool, with storage_type property = 'tool bag'",
+    "Aggregate available_today_quantity over every store with city='Graz', left-joined so 0-availability/missing-inventory branches are still counted",
+    "Answer string is exactly '<total> total'",
+    "refs include the product record path and every Graz store record path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pf.product_family_id = pv.product_family_id JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku WHERE pv.brand = :brand AND pf.product_family_name = :family AND pv.product_kind_id = :kind AND pvp.property_key = 'storage_type' AND pvp.property_value_text = :storage_type;"
+      },
+      "bind": "product"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH target AS (SELECT pv.product_sku FROM product_variants pv JOIN product_families pf ON pf.product_family_id = pv.product_family_id JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku WHERE pv.brand = :brand AND pf.product_family_name = :family AND pv.product_kind_id = :kind AND pvp.property_key = 'storage_type' AND pvp.property_value_text = :storage_type) SELECT s.store_id, s.record_path, COALESCE(si.available_today_quantity, 0) AS available_today FROM stores s LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = (SELECT product_sku FROM target) WHERE s.city = :city ORDER BY s.store_id;"
+      },
+      "bind": "store_rows"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH target AS (SELECT pv.product_sku FROM product_variants pv JOIN product_families pf ON pf.product_family_id = pv.product_family_id JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku WHERE pv.brand = :brand AND pf.product_family_name = :family AND pv.product_kind_id = :kind AND pvp.property_key = 'storage_type' AND pvp.property_value_text = :storage_type) SELECT COALESCE(SUM(COALESCE(si.available_today_quantity, 0)), 0) AS total FROM stores s LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = (SELECT product_sku FROM target) WHERE s.city = :city;"
+      },
+      "bind": "total"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    }
+  ],
+  "answer_template": {
+    "message": "{total} total",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$product_path",
+      "$store_paths"
+    ]
+  },
+  "outcome_override": null
+}

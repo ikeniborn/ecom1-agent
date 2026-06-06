@@ -1,0 +1,63 @@
+{
+  "intent": "Sum available_today units of the Fischer SX 7UY-G03 cavity-fixing anchor/wall-plug across every open PowerTool branch in Graz (including 0-availability branches) and cite all Graz store records plus the product record.",
+  "params": {
+    "brand": "Fischer",
+    "series": "SX",
+    "model": "SX 7UY-G03",
+    "anchor_type": "cavity fixing",
+    "city": "Graz"
+  },
+  "success_criteria": [
+    "Resolves exactly one product SKU matching brand=Fischer, model=SX 7UY-G03, anchor_type=cavity fixing",
+    "Total = SUM(available_today_quantity) over all open Graz stores (0-availability branches contribute 0 but are still enumerated)",
+    "Answer string is exactly 'answer=%d'",
+    "refs include the product record path and every open Graz city store record path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT v.product_sku, v.record_path FROM product_variants v JOIN product_variant_properties p ON p.product_sku = v.product_sku WHERE v.brand = :brand AND v.series = :series AND v.model = :model AND p.property_key = 'anchor_type' AND p.property_value_text = :anchor_type;"
+      },
+      "bind": "product"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT store_id, record_path FROM stores WHERE city = :city AND is_open = 1 ORDER BY store_id;"
+      },
+      "bind": "graz_stores"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total FROM stores s LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = :sku WHERE s.city = :city AND s.is_open = 1;"
+      },
+      "bind": "total"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > availability",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
+    }
+  ],
+  "answer_template": {
+    "message": "answer={total}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$product_path",
+      "$graz_store_paths"
+    ]
+  },
+  "outcome_override": null
+}

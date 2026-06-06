@@ -1,0 +1,72 @@
+{
+  "intent": "Identify the fraudulent payment record(s) among archived payments by applying the payments/security fraud policy read-only, citing each flagged payment record path.",
+  "params": {
+    "archived_flag": 1
+  },
+  "success_criteria": [
+    "Archived payments (is_archived_basket_reference = 1) are evaluated against the documented fraud-detection policy",
+    "Exactly the fraudulent payment record(s) are identified and cited by full record_path",
+    "No files are written or deleted (read-only investigation)",
+    "Applied fraud/security policy document is cited as grounding reference"
+  ],
+  "discovery": [
+    {
+      "rpc": "Tree",
+      "args": {
+        "root": "/docs",
+        "level": 2
+      },
+      "bind": "docs_tree"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/docs",
+        "pattern": "(?i)fraud|3ds|device.?fingerprint|velocity|chargeback",
+        "limit": 50
+      },
+      "bind": "fraud_policy_hits"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md",
+        "number": true
+      },
+      "bind": "security_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH archived AS (SELECT p.payment_id, p.record_path, p.basket_id, p.customer_id, p.store_id, p.payment_amount_cents, p.payment_currency, p.payment_status, p.payment_created_at, p.payment_method_fingerprint, p.device_fingerprint, p.observed_latitude, p.observed_longitude, p.three_ds_status, p.three_ds_failure_reason, p.three_ds_attempts, p.three_ds_max_attempts, c.home_latitude AS cust_home_lat, c.home_longitude AS cust_home_lon, c.home_city AS cust_home_city, s.latitude AS store_lat, s.longitude AS store_lon, s.city AS store_city FROM payment_transactions p JOIN customer_accounts c ON c.customer_id = p.customer_id JOIN stores s ON s.store_id = p.store_id WHERE p.is_archived_basket_reference = :archived_flag) SELECT a.*, (SELECT COUNT(*) FROM payment_transactions x WHERE x.device_fingerprint = a.device_fingerprint AND x.customer_id <> a.customer_id) AS device_shared_other_customers, (SELECT COUNT(*) FROM payment_transactions y WHERE y.payment_method_fingerprint = a.payment_method_fingerprint AND y.customer_id <> a.customer_id) AS method_shared_other_customers FROM archived a ORDER BY a.payment_created_at;"
+      },
+      "bind": "archived_payments"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > reference",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > policy",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#important-things > tree",
+      "rule": "When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context"
+    }
+  ],
+  "answer_template": {
+    "message": "Fraud review: scanned archived payments (is_archived_basket_reference=1) against {policy_doc}. Flagged fraudulent payment record(s): {flagged_payment_ids} at {flagged_record_paths}. Reason: {fraud_signal}. Files unchanged (read-only).",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$flagged_record_path",
+      "$policy_doc"
+    ]
+  },
+  "outcome_override": null
+}

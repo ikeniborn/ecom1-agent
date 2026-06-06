@@ -1,0 +1,74 @@
+{
+  "intent": "Read the old receipt in /uploads/, recompute today's catalog total (excl VAT) for its line items, and answer whether the difference vs the old receipt total stays within 1 EUR.",
+  "params": {
+    "uploads_dir": "/uploads",
+    "vat_excluded": true,
+    "threshold_eur": 1
+  },
+  "success_criteria": [
+    "Receipt file located and read from /uploads/",
+    "Every receipt line item (SKU + quantity + old unit price excl VAT) extracted",
+    "Each SKU resolved to current product_variants.price_cents from the catalog",
+    "Old total (excl VAT) and today's total (excl VAT) summed in same currency",
+    "abs(today_total - old_total) compared against 1 EUR (100 cents)",
+    "Answer includes <YES> or <NO> token per AGENTS.MD"
+  ],
+  "discovery": [
+    {
+      "rpc": "List",
+      "args": {
+        "path": "/uploads"
+      },
+      "bind": "uploads_listing"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$receipt_path",
+        "number": true
+      },
+      "bind": "receipt"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "SELECT product_sku, product_name, price_cents, price_currency FROM product_variants WHERE product_sku IN (:receipt_skus);"
+        ]
+      },
+      "bind": "current_prices"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH receipt(product_sku, qty, old_unit_cents) AS (VALUES :receipt_lines), today AS (SELECT r.product_sku, r.qty, r.old_unit_cents, v.price_cents AS new_unit_cents FROM receipt r JOIN product_variants v ON v.product_sku = r.product_sku) SELECT SUM(qty*old_unit_cents) AS old_total_cents, SUM(qty*new_unit_cents) AS new_total_cents, SUM(qty*new_unit_cents) - SUM(qty*old_unit_cents) AS diff_cents, ABS(SUM(qty*new_unit_cents) - SUM(qty*old_unit_cents)) <= 100 AS within_one_eur FROM today;"
+        ]
+      },
+      "bind": "comparison"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > yes/no token",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+    },
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    }
+  ],
+  "answer_template": {
+    "message": "Old receipt $receipt_path total (excl VAT) = {comparison.old_total_cents/100} EUR; today's catalog total (excl VAT) = {comparison.new_total_cents/100} EUR; difference = {comparison.diff_cents/100} EUR. Within 1 EUR: {within_one_eur ? '<YES>' : '<NO>'}.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$receipt_path",
+      "/proc/catalog"
+    ]
+  },
+  "outcome_override": null
+}

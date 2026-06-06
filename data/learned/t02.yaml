@@ -1,0 +1,73 @@
+entries:
+- agents_md_anchor: null
+  content: When a tool_plan discovery step invokes /bin/sql with :name bindings, pass
+    the SQL statement through stdin exactly as the plan specifies and supply each
+    binding value through the plan's declared bind channel; never move the SQL into
+    argv while routing bindings into stdin, since /bin/sql then parses the binding
+    lines as the query and returns zero rows.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$path'']) but actual refs [] contain only static template entries [] — SQL
+    likely returned no rows or row parsing dropped the path column; check `:name`
+    bindings on /bin/sql and the SELECT columns". Root cause: tool_plan discovery
+    declares args=[] with the SQL in stdin and bind="match"; the script inverted this
+    — failing fragment `result = vm.exec(path="/bin/sql", args=[sql], stdin=bindings)`
+    puts the SQL in argv and the `brand=...\nline=...\nlens_color=...` binding lines
+    in stdin. /bin/sql reads its query from stdin, so it received the binding lines
+    as the statement, executed nothing, and OBSERVED_RPC_OUTPUTS is <empty>. Empty
+    rows → refs=[] → template needs $path → answer_refs failure. Rule linkage: enforce
+    that CODEGEN routes SQL and :name bind values through the exact channels the tool_plan
+    discovery declares.'
+  status: active
+- agents_md_anchor: null
+  content: When a tool_plan /bin/sql discovery step declares an empty argv and relies
+    on :name placeholders resolved from params, keep argv exactly as the plan specifies
+    and do not append name=value binding pairs into argv; let the harness substitute
+    the :name bindings from params so the query returns rows instead of an empty result
+    set.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$path'']) but actual refs [] contain only static template entries [] — SQL
+    likely returned no rows or row parsing dropped the path column; check `:name`
+    bindings on /bin/sql and the SELECT columns". Root cause: the tool_plan discovery
+    step declared `args: []` with SQL in stdin and `:brand/:line/:lens_color` placeholders
+    to be bound from params, but the codegen built `bind_args = ["brand="+brand, "line="+line,
+    "lens_color="+lens_color]` and passed them as argv (OBSERVED_RPC shows args=[''brand=3M'',''line=...'',''lens_color=Yellow'']).
+    Failing fragment: `vm.exec(path="/bin/sql", args=bind_args, stdin=sql)`. /bin/sql
+    received populated argv instead of the plan''s empty argv, so the :name placeholders
+    were never substituted, the query matched zero rows, the <NO> branch ran with
+    refs=[], and the fidelity check failed the required $path runtime ref. Rule linkage:
+    existing in-session rule covers the inverse mistake (SQL moved into argv with
+    bindings in stdin); this run kept SQL correctly in stdin but injected extraneous
+    name=value pairs into argv, a distinct deviation from the plan''s declared empty
+    argv — so a sharper, complementary rule is warranted rather than a skip.'
+  status: active
+- agents_md_anchor: '#important-things > reference'
+  content: When parsing /bin/sql stdout in CODEGEN, split rows on comma (CSV) and
+    discard the first header line whose fields equal the SELECT column names; never
+    split on '|' or treat the header as data, since /bin/sql emits comma-separated
+    output with a leading column-name row and pipe-splitting yields fewer than the
+    expected fields so every data row is dropped and refs come back empty.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "template/constraints require runtime refs ([''$record_path''])
+    but actual refs [] contain only static template entries []". OBSERVED_RPC_OUTPUTS
+    shows /bin/sql returned CSV: header line ''product_sku,product_name,record_path''
+    then data row ''HND-274DRRGP,Bahco Workshop... ,/proc/catalog/Bahco/HND-274DRRGP.json''.
+    Failing fragment: `parts = [p.strip() for p in line.split(''|'')]` then `if len(parts)
+    < 3: continue`. Output is comma-delimited, so split(''|'') yields 1 part per line
+    → every row skipped → match=None → refs=[]. Row existed; parser dropped it. Root
+    cause is output-format mismatch (CSV vs pipe), not binding routing — so r001/r002
+    do not cover this. New rule fixes the CSV parsing technique.'
+  status: active
+last_run:
+  cycles_used: 2
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t02

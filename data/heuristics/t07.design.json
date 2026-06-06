@@ -1,0 +1,49 @@
+{
+  "intent": "Verify whether a Sikkens Professional Rubbol 1EP-LF5 Wall Paint catalogue item exists with color family Clear and water-based base type, citing the exact product record.",
+  "params": {
+    "brand": "Sikkens",
+    "line": "Sikkens Professional Rubbol 1EP-LF5 Wall Paint",
+    "color_family": "Clear",
+    "base_type": "water based"
+  },
+  "success_criteria": [
+    "Base product line 'Sikkens Professional Rubbol 1EP-LF5 Wall Paint' is located by brand+product_name",
+    "Variant properties checked for color_family=Clear AND base_type='water based'",
+    "Answer contains <YES> or <NO> token",
+    "Answer cites the exact checked product record path/SKU"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH base AS (SELECT v.product_sku, v.record_path, v.product_name FROM product_variants v WHERE v.brand = :brand AND v.product_name LIKE '%' || :line || '%'), props AS (SELECT b.product_sku, b.record_path, b.product_name, MAX(CASE WHEN p.property_key IN ('color_family','colour_family','color') THEN p.property_value_text END) AS color_family, MAX(CASE WHEN p.property_key IN ('base_type','base','paint_base') THEN p.property_value_text END) AS base_type FROM base b LEFT JOIN product_variant_properties p ON p.product_sku = b.product_sku GROUP BY b.product_sku, b.record_path, b.product_name) SELECT product_sku, record_path, product_name, color_family, base_type, CASE WHEN LOWER(color_family) = LOWER(:color_family) AND LOWER(base_type) = LOWER(:base_type) THEN 1 ELSE 0 END AS claim_match FROM props ORDER BY claim_match DESC;"
+      },
+      "bind": "rows"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > yes/no token",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+    },
+    {
+      "anchor": "#important-things > reference path",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-tools > sql",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
+    }
+  ],
+  "answer_template": {
+    "message": "<NO> — Base product line '{line}' exists (SKU {rows[0].product_sku}, color_family={rows[0].color_family}, base_type={rows[0].base_type}), but no catalogue item in this line carries the claimed combination color family 'Clear' + water-based base. Checked record: {rows[0].record_path}.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$path"
+    ]
+  },
+  "outcome_override": null
+}

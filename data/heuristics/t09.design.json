@@ -1,0 +1,36 @@
+{
+  "intent": "Count catalogue products whose product kind is 'Nut Bolt and Washer'.",
+  "params": {
+    "kind_name": "Nut Bolt and Washer"
+  },
+  "success_criteria": [
+    "Answer reports exact integer count of product_variants with product_kind_name 'Nut Bolt and Washer'",
+    "Answer formatted as <COUNT:%d>"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT COUNT(*) AS product_count FROM product_variants v JOIN product_kinds k ON v.product_kind_id = k.product_kind_id WHERE k.product_kind_name = :kind_name;"
+      },
+      "bind": "count_result"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-tools > sql",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session."
+    }
+  ],
+  "answer_template": {
+    "message": "<COUNT:{count_result.product_count}>",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "/proc/catalog"
+    ]
+  },
+  "outcome_override": null
+}

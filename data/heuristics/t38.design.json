@@ -1,11 +1,14 @@
 {
-  "intent": "Identify archived payment records belonging to the confirmed fraud incident; read-only.",
-  "params": {},
+  "intent": "Identify the fraudulent payment record(s) among archived payment transactions per the fraud/security policy, read-only, citing each marked payment record path.",
+  "params": {
+    "is_archived": 1
+  },
   "success_criteria": [
-    "Only payments with is_archived_basket_reference=1 considered",
-    "Each cited payment matches the fraud incident criteria documented in /docs",
-    "No writes or mutations performed",
-    "Each fraud payment's record_path appears in refs"
+    "Fraud/security policy in /docs is read and its fraud-signal criteria applied",
+    "Only archived payment transactions (is_archived_basket_reference = 1) are evaluated",
+    "Exactly the fraudulent payment record(s) matching the policy hit are returned",
+    "No files are modified (read-only)",
+    "Every marked payment record_path is cited in refs and the policy doc is grounded"
   ],
   "discovery": [
     {
@@ -21,41 +24,32 @@
       "bind": "docs_tree"
     },
     {
-      "rpc": "Search",
-      "args": {
-        "root": "/docs",
-        "pattern": "(?i)fraud|incident",
-        "limit": 50
-      },
-      "bind": "fraud_hits"
-    },
-    {
       "rpc": "Find",
       "args": {
         "root": "/docs",
-        "name": "fraud",
+        "name": "security",
         "kind": "file",
         "limit": 10
       },
-      "bind": "fraud_docs"
+      "bind": "security_doc"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "$fraud_doc_path",
+        "path": "$security_doc",
         "number": true
       },
-      "bind": "fraud_policy"
+      "bind": "security_policy"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
         "args": [
-          "SELECT name, sql FROM sqlite_schema WHERE name LIKE '%payment%' OR name LIKE '%incident%' OR name LIKE '%fraud%';"
+          "select payment_id, record_path, basket_id, customer_id, store_id, payment_amount_cents, payment_currency, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude, three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts from payment_transactions where is_archived_basket_reference = :is_archived order by payment_created_at;"
         ]
       },
-      "bind": "schema_check"
+      "bind": "archived_payments"
     }
   ],
   "ops": [
@@ -64,32 +58,32 @@
       "args": {
         "path": "/bin/sql",
         "args": [
-          "SELECT payment_id, record_path, basket_id, customer_id, store_id, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, three_ds_status, three_ds_failure_reason FROM payment_transactions WHERE is_archived_basket_reference = 1 ORDER BY payment_created_at;"
+          "with archived as (select pt.*, ca.home_latitude, ca.home_longitude from payment_transactions pt join customer_accounts ca on ca.customer_id = pt.customer_id where pt.is_archived_basket_reference = :is_archived) select payment_id, record_path, basket_id, customer_id, store_id, payment_amount_cents, payment_currency, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude, home_latitude, home_longitude, three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts from archived order by payment_created_at;"
         ]
       },
-      "bind": "archived_payments"
+      "bind": "fraud_candidates"
     }
   ],
   "agents_md_constraints": [
     {
-      "anchor": "#Important things > full path",
-      "rule": "When responding with reference - provide full path in the repo to the object."
-    },
-    {
-      "anchor": "#Important things > policy grounding",
+      "anchor": "#important-things > policy grounding",
       "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
     },
     {
-      "anchor": "#Key locations > payments",
-      "rule": "Customer profiles are in proc/customers, baskets are in proc/baskets, payments are in proc/payments"
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > start-of-work",
+      "rule": "When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context"
     }
   ],
   "answer_template": {
-    "message": "Fraud incident payments (archived): {fraud_payment_list}",
+    "message": "Fraudulent archived payment(s) identified per the fraud/security policy: {fraud_candidates rows matching policy signals} -> {payment_id} at {record_path}. Files left unchanged.",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$fraud_doc_path",
-      "$payment_paths"
+      "$security_doc",
+      "$path"
     ]
   },
   "outcome_override": null

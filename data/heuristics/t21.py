@@ -1,57 +1,143 @@
 def run(vm, params):
-    basket_id = params['basket_id']
-    identity = vm.exec(path='/bin/id', args=[])
-    sql1 = "SELECT basket_id, record_path, customer_id, store_id, basket_status FROM shopping_baskets WHERE basket_id = '" + basket_id + "'"
-    basket_row = vm.exec(path='/bin/sql', args=[], stdin=sql1)
-    payments_help = vm.exec(path='/bin/payments', args=['--help'])
-    sql2 = "SELECT line_number, product_sku, requested_quantity FROM shopping_basket_items WHERE basket_id = '" + basket_id + "' ORDER BY line_number"
-    basket_items = vm.exec(path='/bin/sql', args=[], stdin=sql2)
+    def _stdout(r):
+        if r is None:
+            return ""
+        v = getattr(r, "stdout", None)
+        if v is None and isinstance(r, dict):
+            v = r.get("stdout", "")
+        return v or ""
 
-    basket_path = ''
-    customer_id = ''
-    store_id = ''
-    basket_status = ''
-    stdout1 = getattr(basket_row, 'stdout', '') or ''
-    lines = [l for l in stdout1.splitlines() if l.strip()]
-    if len(lines) >= 2:
-        header = [c.strip() for c in lines[0].split(',')]
-        row = [c.strip() for c in lines[1].split(',')]
-        rec = dict(zip(header, row))
-        basket_path = rec.get('record_path', '')
-        customer_id = rec.get('customer_id', '')
-        store_id = rec.get('store_id', '')
-        basket_status = rec.get('basket_status', '')
+    def _rows(text):
+        rows = []
+        for ln in (text or "").splitlines():
+            ln = ln.strip()
+            if not ln or set(ln) <= set("-+= "):
+                continue
+            if "|" in ln:
+                rows.append([c.strip() for c in ln.split("|")])
+        return rows
 
-    checkout_policy = vm.read(path='/docs/checkout.md', number=True)
+    def _paths_from_find(r):
+        paths = []
+        matches = getattr(r, "matches", None)
+        if matches is None and isinstance(r, dict):
+            matches = r.get("matches")
+        if matches:
+            for m in matches:
+                p = getattr(m, "path", None)
+                if p is None and isinstance(m, dict):
+                    p = m.get("path")
+                if p:
+                    paths.append(p)
+            return paths
+        txt = _stdout(r)
+        for ln in (txt or "").splitlines():
+            ln = ln.strip()
+            if ln.startswith("/"):
+                paths.append(ln)
+        return paths
 
-    checkout_result = vm.exec(path='/bin/payments', args=['checkout', 'submit', '--basket', basket_id])
-    out = getattr(checkout_result, 'stdout', '') or ''
-    err = getattr(checkout_result, 'stderr', '') or ''
-    exit_code = getattr(checkout_result, 'exit_code', 0)
+    basket_id = params["basket_id"]
 
-    payment_path = ''
-    for line in out.splitlines():
-        s = line.strip()
-        if 'payment_path' in s or s.startswith('/records/payments') or '/payments/' in s:
-            for tok in s.replace(',', ' ').replace('=', ' ').replace(':', ' ').split():
-                if tok.startswith('/') and 'payment' in tok:
-                    payment_path = tok
-                    break
-            if payment_path:
-                break
+    # ---- discovery ----
+    identity = vm.exec(path="/bin/id", args=[])
+    docs_tree = vm.tree(root="/docs", level=2)
+    checkout_doc_paths = vm.find(root="/docs", name="checkout", kind="file", limit=5)
 
-    # agents_md scope: payments supports payment workflow state + refund approval/finalization.
-    # 'checkout submit' not enumerated -> r012 downgrade.
-    outcome = 'OUTCOME_NONE_UNSUPPORTED'
+    found_paths = _paths_from_find(checkout_doc_paths)
+    checkout_doc_path = found_paths[0] if found_paths else "/docs/checkout.md"
+
+    try:
+        checkout_policy = vm.read(path=checkout_doc_path, number=True)
+    except Exception as e:
+        checkout_policy = None
+
+    payments_help = vm.exec(path="/bin/payments", args=["--help"])
+
+    basket_detail = vm.exec(
+        path="/bin/sql",
+        args=[
+            "WITH b AS (SELECT * FROM shopping_baskets WHERE basket_id = :basket_id) SELECT b.basket_id, b.record_path AS basket_path, b.customer_id, b.store_id, b.basket_status, b.discount_percent, b.discount_reason_code, b.discount_issuer_employee_id, i.line_number, i.product_sku, i.requested_quantity, pv.price_cents, pv.price_currency, inv.available_today_quantity FROM b JOIN shopping_basket_items i ON i.basket_id = b.basket_id JOIN product_variants pv ON pv.product_sku = i.product_sku LEFT JOIN store_inventory inv ON inv.store_id = b.store_id AND inv.product_sku = i.product_sku ORDER BY i.line_number;",
+            "basket_id=" + str(basket_id),
+        ],
+    )
+
+    existing_payment = vm.exec(
+        path="/bin/sql",
+        args=[
+            "SELECT payment_id, record_path, payment_status, payment_amount_cents, three_ds_status FROM payment_transactions WHERE basket_id = :basket_id;",
+            "basket_id=" + str(basket_id),
+        ],
+    )
+
+    # ---- parse discovery outputs ----
+    bd_rows = _rows(_stdout(basket_detail))
+    basket_path = None
+    price_currency = ""
+    if bd_rows:
+        r0 = bd_rows[0]
+        if len(r0) > 1:
+            basket_path = r0[1]
+        if len(r0) > 12:
+            price_currency = r0[12]
+
+    ep_rows = _rows(_stdout(existing_payment))
+    payment_path = None
+    if ep_rows and len(ep_rows[0]) > 1:
+        payment_path = ep_rows[0][1]
+
+    help_text = _stdout(payments_help).lower()
+    checkout_supported = "checkout" in help_text
+
+    # ---- ops (always fire per no-drop rule) ----
+    checkout_result = vm.exec(
+        path="/bin/payments",
+        args=["checkout", "--basket", str(basket_id)],
+    )
+
+    # ---- outcome decision ----
+    static_refs = [checkout_doc_path] if found_paths else []
+
+    if not checkout_supported:
+        refs = []
+        if basket_path:
+            refs.append(basket_path)
+        for p in static_refs:
+            if p not in refs:
+                refs.append(p)
+        msg = (
+            "Cannot submit checkout for " + str(basket_id) + ": the /bin/payments tool does not "
+            "expose a 'checkout' subcommand in its --help output, so this action lies outside the "
+            "tool's declared capability. Checkout policy referenced: " + checkout_doc_path + "."
+        )
+        vm.answer(message=msg, outcome="OUTCOME_NONE_UNSUPPORTED", refs=refs)
+        return
+
+    cr_rows = _rows(_stdout(checkout_result))
+    cr_status = ""
+    cr_payment_id = ""
+    cr_amount = ""
+    if cr_rows:
+        c0 = cr_rows[0]
+        if len(c0) > 0:
+            cr_payment_id = c0[0]
+        if len(c0) > 1:
+            cr_status = c0[1]
+        if len(c0) > 2:
+            cr_amount = c0[2]
 
     refs = []
     if basket_path:
         refs.append(basket_path)
     if payment_path:
         refs.append(payment_path)
-    refs.append('/docs/checkout.md')
+    for p in static_refs:
+        if p not in refs:
+            refs.append(p)
 
-    summary = (out or err).strip().replace('\n', ' ')[:200]
-    message = 'Checkout submitted for ' + basket_id + '. Result: ' + summary
-    vm.answer(message=message, outcome=outcome, refs=refs)
-    return {'outcome': outcome, 'refs': refs}
+    msg = (
+        "Checkout submitted for " + str(basket_id) + " (status " + str(cr_status) + ", payment "
+        + str(cr_payment_id) + ", amount " + str(cr_amount) + " " + str(price_currency)
+        + "). Applied checkout policy per " + checkout_doc_path + "."
+    )
+    vm.answer(message=msg, outcome="OUTCOME_OK", refs=refs)

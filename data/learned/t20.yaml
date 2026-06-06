@@ -1,0 +1,151 @@
+entries:
+- agents_md_anchor: null
+  content: Always parse /bin/sql stdout as CSV using the comma delimiter and drop
+    the first header row before indexing columns, rather than splitting on a pipe
+    '|' delimiter; otherwise every row collapses into a single field, len(row) checks
+    fail, path columns are dropped, and refs come out empty.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$product_path'', ''$store_paths'']) but actual refs [] contain only static
+    template entries [] — SQL likely returned no rows or row parsing dropped the path
+    column; check `:name` bindings on /bin/sql and the SELECT columns". Root cause:
+    /bin/sql emits CSV — the only non-empty observed output, the schema query, returned
+    comma-separated rows (`name,sql`, `customer_accounts_city_idx,CREATE INDEX...`).
+    Failing fragment: `_rows()` splits each line on ''|'' (`line.split("|")`), so
+    a CSV row like `store_id,store_path,product_path,available_units` becomes one
+    field; the downstream guard `if len(row) < 4: continue` then drops every per_store
+    row, `product_path` stays None, store refs never append, and `final_refs` is [].
+    It also never skips the header line. Even had the discovery rows been present,
+    the pipe-split parser would have produced this exact empty-refs error, so the
+    durable CODEGEN defect is the delimiter/header mismatch when translating tool_plan
+    /bin/sql binds into row parsing — not the frozen SQL. Rule linkage: enforce CSV
+    parsing with header skip so path columns survive into refs.'
+  status: active
+- agents_md_anchor: null
+  content: Always consume the schema-discovery query output to resolve and validate
+    real table/column names (and inspect distinct stored values for equality filters)
+    before building dependent queries; when a parametrized lookup returns zero rows,
+    retry with relaxed/case-insensitive or trimmed matching instead of emitting empty
+    refs from blindly hardcoded tool_plan literals.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$product_path'', ''$store_paths'']) but actual refs [] contain only static
+    template entries [] — SQL likely returned no rows or row parsing dropped the path
+    column". Root cause: script ran the `schema` discovery query (`select name, sql
+    from sqlite_schema ...`) but never used its result — the `schema` variable is
+    discarded. Every dependent query (product lookup, vienna_stores, per_store, total)
+    returned `<empty>`, so product_path and store_paths stayed empty and refs came
+    out []. Failing fragment: `schema = vm.exec(...)` followed by product/store queries
+    using rigid equality literals (`p.product_line = ''Varta Workshop Silver 30Z-3D8...''`,
+    `p.voltage = ''6 V''`, `s.city = ''Vienna''`) with no verification against actual
+    stored values or column names. The CSV-parsing rule already covers stdout decoding,
+    but this is a distinct CODEGEN gap: discovery output must drive name/value resolution,
+    and zero-row lookups must trigger relaxed matching rather than silently producing
+    empty refs.'
+  status: active
+- agents_md_anchor: '#important-things > references'
+  content: When the answer_template declares runtime ref placeholders (e.g. $product_path,
+    $store_paths) and, after parsing every query output, the resolved refs list is
+    empty because upstream SELECTs returned zero rows, do not call vm.answer with
+    OUTCOME_OK and an empty refs list; first re-resolve the schema/value mismatch
+    and retry, or emit a not-found/error outcome, so the run never reports a fabricated
+    count backed by no references.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$product_path'', ''$store_paths'']) but actual refs [] contain only static
+    template entries [] — SQL likely returned no rows or row parsing dropped the path
+    column". Failing fragment: script fetches `schema = vm.exec(...)` but never parses/uses
+    it, then at the end runs `vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)`
+    with refs==[]. Root cause: every dependent query (product, vienna_stores, per_store,
+    total) returned <empty> — hardcoded table names products/stores/inventory do not
+    match the real schema (discovery shows customer_accounts, employee_accounts, payment_transaction_items.product_sku,
+    etc.), so product_path and store_paths stayed empty; the script still emitted
+    OUTCOME_OK with count:0 and no refs. Linkage: existing rule on consuming schema-discovery
+    to validate real table/column names covers WHY the queries returned zero rows;
+    this new rule adds the missing output-gate technique — never emit a successful
+    answer when the template-required runtime refs are empty — which neither existing
+    rule expresses.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#important-things > references'
+  content: 'When an entity lookup filters on multiple ANDed exact-equality predicates
+    built from hardcoded tool_plan literals and returns zero rows, relax the predicates
+    progressively one at a time — starting with the brittlest (unit-bearing values,
+    long free-text columns): normalize whitespace/units, case-fold, or switch to trimmed
+    substring matching — to localize which literal mismatched the stored value, then
+    re-resolve so ref paths populate before answering; never call vm.answer with OUTCOME_OK
+    and an empty refs list, since the harness reclassifies a refless OK as OUTCOME_NONE_CLARIFICATION.'
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION''.
+    Root cause: discovery/ops SELECTs filter on hardcoded exact literals (voltage=''6
+    V'', long product_line string, product_type=''battery charger'') via _bind inlining;
+    if any stored value differs by unit spacing, case, or trailing text, the product/per_store
+    queries return zero rows. Failing fragment: ''product_path'' and ''store_paths''
+    stay empty, yet `vm.answer(message=..., outcome="OUTCOME_OK", refs=refs)` fires
+    with refs=[]. Harness downgrades a refless OUTCOME_OK to OUTCOME_NONE_CLARIFICATION,
+    so grader sees clarification instead of OK. Linkage: extends r002 (relaxed retry)
+    with progressive predicate-by-predicate relaxation to pinpoint the mismatched
+    literal, and reinforces r003 by forbidding the refless OK path that produced the
+    clarification reclassification.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: product variant not found for given brand/family/lens_color/size
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When the answer depends on a variant/entity resolved through multiple ANDed
+    exact-equality predicates (especially EAV property joins on key/value text columns
+    like lens_color/size) that is CROSS JOINed to gate downstream store/inventory
+    enumeration, do not short-circuit to OUTCOME_NONE_CLARIFICATION or any not-found
+    outcome on the first zero-row return; instead run the entity lookup as an independent
+    query and progressively relax/normalize its brittlest hardcoded literals (case-fold,
+    trim whitespace/units, substring match) until it resolves, then proceed, because
+    the harness grades a clarification outcome on a resolvable entity as a failure.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION''.
+    Root cause: discovery query CROSS JOINs target variant; when target lookup (brand
+    + family_name + EAV lens_color + EAV size, all exact-equality on hardcoded literals)
+    returns zero rows, the CROSS JOIN collapses every store row to empty, so product_path
+    stays None. Failing fragment: the guard `if product_path is None: vm.answer(...
+    outcome=''OUTCOME_NONE_CLARIFICATION'')` bails immediately on zero rows instead
+    of relaxing predicates and retrying. r002/r004 cover relaxing predicates to avoid
+    empty-refs OUTCOME_OK, but neither covers the distinct mistake of emitting a premature
+    NONE_CLARIFICATION/not-found outcome before relaxation is exhausted, nor the structural
+    trap of gating store enumeration via CROSS JOIN on a brittle EAV variant lookup.
+    New rule adds: decouple the variant resolution into an independent relaxed lookup
+    and exhaust normalization before ever emitting a clarification outcome.'
+  status: active
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t20

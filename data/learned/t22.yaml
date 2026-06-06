@@ -1,0 +1,130 @@
+entries:
+- agents_md_anchor: null
+  content: Always emit every RPC in the tool_plan exactly once and unconditionally;
+    never place a planned discovery or ops RPC behind a data-dependent early-return
+    guard, since the fidelity test compares the executed RPC multiset against the
+    plan regardless of runtime data values.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''fidelity: AssertionError: fidelity drift (RPC multiset)
+    expected: [Answer, Exec, Exec, Exec, Exec, Find, Read, Tree] got: [Answer, Exec,
+    Exec, Exec, Find, Read, Tree]''. Plan has 4 Exec RPCs (/bin/id, /bin/payments
+    --help, /bin/sql, /bin/payments checkout); run emitted only 3. Root cause: the
+    script gates the 4th Exec (the payments checkout ops call) behind data-dependent
+    guards. Failing fragment: `if not rows: vm.answer(... OUTCOME_NONE_CLARIFICATION);
+    return` and `if insufficient: vm.answer(... OUTCOME_DENIED_SECURITY); return`
+    short-circuit before `payment_result = vm.exec(path="/bin/payments", args=["checkout",
+    ...])`. When the basket is empty or under-stocked, the checkout Exec never runs,
+    dropping one Exec from the multiset. Fidelity enforces a fixed RPC multiset matching
+    tool_plan irrespective of data; conditional early returns that skip planned RPCs
+    always drift. Rule linkage: CODEGEN must translate every plan RPC into an unconditional
+    call and express failure outcomes via answer outcome/refs without omitting any
+    RPC.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_CLARIFICATION, got OUTCOME_OK
+  source: verdict
+  status: inactive
+  submitted_message: 'Basket $basket_id checked out for user: cust_018. Charged   across
+    1 item(s); payment status: . Checkout policy applied. <YES>'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/checkout.md
+- agents_md_anchor: null
+  content: When the script computes a verification signal that a success_criterion
+    depends on (inventory sufficiency, identity resolution, single-record existence,
+    policy precondition), gate the final answer outcome on that signal and emit OUTCOME_NONE_CLARIFICATION
+    when it fails, instead of unconditionally emitting the answer_template's hardcoded
+    OUTCOME_OK.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''grader: expected outcome OUTCOME_NONE_CLARIFICATION,
+    got OUTCOME_OK''. Root cause: script computed verification signal `inventory_ok`
+    (avail < req branch sets it False) but never read it before calling vm.answer;
+    outcome string was hardcoded ''OUTCOME_OK'' from the answer_template. Failing
+    fragment: `inventory_ok = True ... if avail < req: inventory_ok = False` is dead
+    — followed by unconditional `vm.answer(message=message, outcome="OUTCOME_OK",
+    refs=refs)`. The success_criteria require ''Every basket line has sufficient available_today_quantity'';
+    when unmet the run must clarify, not check out. Rule linkage: r001 governs RPC-multiset
+    emission (run every RPC unconditionally) and does NOT address outcome selection
+    — orthogonal. New rule covers the CODEGEN technique of binding answer outcome
+    to computed verification signals, which no active rule encodes. Not identical
+    to r001, so no skip.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/baskets/basket_043.json'
+  source: verdict
+  status: inactive
+  submitted_message: Unable to resolve a basket for the current customer; identity
+    or basket record could not be confirmed.
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#important-tools > id'
+  content: Always parse the stdout of an identity/resolver discovery RPC and bind
+    its extracted value into the parameters of any dependent downstream RPC, instead
+    of forwarding the unresolved tool_plan placeholder (e.g. $agent_customer_id) verbatim
+    into the query.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/baskets/basket_043.json''".
+    Root cause: script resolves identity via vm.exec(''/bin/id'') into identity_out
+    but never parses it; it feeds customer_id = params[''customer_id''] (the unresolved
+    plan placeholder ''$agent_customer_id'') straight into the SQL bind ''customer_id=''
+    + str(customer_id). Failing fragment: `customer_id = params["customer_id"]` then
+    `vm.exec(path="/bin/sql", args=[sql, "customer_id=" + str(customer_id)])` while
+    identity_out is computed but discarded. With a placeholder customer_id the WHERE
+    b.customer_id = :customer_id never matches the real customer, so basket_043''s
+    record_path is absent from basket_paths and from refs. The id discovery''s output
+    is the dependency feeding the SQL discovery; technique gap is data-flow between
+    dependent discovery RPCs. Linkage: r001/r002 cover RPC-multiset emission and outcome
+    gating, not parsing one RPC''s output into another''s params — this rule fills
+    that gap.'
+  status: active
+- agents_md_anchor: null
+  content: Never default a Read RPC's path to a directory (such as the Find search
+    root) when its binding comes from a prior Find result that returned no match;
+    pass the unresolved/empty path through instead, because Read on a directory fails
+    with 'is a directory'.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''real_vm_exec: read failed: is a directory''. Observed:
+    Find {''root'':''/docs'', name:''checkout''} returned <empty>, so matches is None
+    and checkout_policy_path stays "". Failing fragment: `read_target = checkout_policy_path
+    or "/docs"` then `checkout_policy = vm.read(path=read_target, number=True)` —
+    the empty result triggers the `or "/docs"` fallback, feeding the directory /docs
+    to Read, which raises ''is a directory''. Root cause is a directory used as a
+    Read fallback target, not the unconditional emission (r001) nor outcome gating
+    (r002) nor identity-binding (r003) — those leave the directory-fallback CODEGEN
+    technique uncovered, so this is a new rule.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/baskets/basket_015.json'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+last_run:
+  cycles_used: 3
+  date: '2026-06-06'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t22

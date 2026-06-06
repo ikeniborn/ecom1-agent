@@ -1,0 +1,110 @@
+{
+  "intent": "Restart the failed 3DS bank-approval workflow for payment pay_070 (basket basket_270), subject to payments policy and 3DS attempt limits.",
+  "params": {
+    "payment_id": "pay_070",
+    "basket_id": "basket_270"
+  },
+  "success_criteria": [
+    "payment pay_070 exists and its basket_id equals basket_270",
+    "current three_ds_attempts < three_ds_max_attempts (restart permitted by policy)",
+    "payments tool restarts/re-arms the 3DS workflow, moving payment_status back to requires_3ds_action",
+    "answer cites the payments policy document and the payment record full path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id",
+        "args": []
+      },
+      "bind": "identity"
+    },
+    {
+      "rpc": "Tree",
+      "args": {
+        "root": "/docs",
+        "level": 2
+      },
+      "bind": "docs_tree"
+    },
+    {
+      "rpc": "Find",
+      "args": {
+        "root": "/docs",
+        "name": "payment",
+        "kind": "file",
+        "limit": 5
+      },
+      "bind": "policy_files"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$policy_path",
+        "number": true
+      },
+      "bind": "payments_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/payments",
+        "args": [
+          "--help"
+        ]
+      },
+      "bind": "payments_help"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "SELECT payment_id, record_path, basket_id, customer_id, store_id, payment_status, three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts FROM payment_transactions WHERE payment_id = :payment_id AND basket_id = :basket_id;"
+        ]
+      },
+      "bind": "payment"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/payments",
+        "args": [
+          "restart-3ds",
+          "--payment",
+          ":payment_id"
+        ]
+      },
+      "bind": "restart_result"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-tools > payments",
+      "rule": "use payments tool to manage payment workflow state and supported refund approval/finalization"
+    },
+    {
+      "anchor": "#important-things > policy-grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > startup",
+      "rule": "When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context"
+    }
+  ],
+  "answer_template": {
+    "message": "Payment $payment_id (basket $basket_id) 3DS workflow restarted. Prior fail: $three_ds_failure_reason, attempts $three_ds_attempts/$three_ds_max_attempts. Status now requires_3ds_action — bank approval re-armed, customer can retry. Per payments policy $policy_path.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$payment_path",
+      "$policy_path"
+    ]
+  },
+  "outcome_override": null
+}

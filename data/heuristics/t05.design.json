@@ -1,0 +1,56 @@
+{
+  "intent": "Verify whether a Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer variant with fastener_type 'threaded rod' and length 20 mm exists in the catalogue, and cite the exact product record.",
+  "params": {
+    "brand": "Heco",
+    "series": "Zinc Plated",
+    "model": "HECO 3DW-64B",
+    "fastener_type": "threaded rod",
+    "length_mm": 20
+  },
+  "success_criteria": [
+    "Determine if a product_variant in the HECO 3DW-64B family matches BOTH fastener_type='threaded rod' AND length_mm=20",
+    "If base family exists but no variant matches the full claim, answer <NO> and cite a checked SKU/record_path from that family",
+    "Answer cites the exact product_variants.record_path of the matched or checked SKU"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH fam AS (SELECT product_sku, record_path, product_name FROM product_variants WHERE brand=:brand AND series=:series AND model=:model), ft AS (SELECT product_sku FROM product_variant_properties WHERE property_key='fastener_type' AND property_value_text=:fastener_type), ln AS (SELECT product_sku FROM product_variant_properties WHERE property_key='length_mm' AND property_value_number=:length_mm) SELECT f.product_sku, f.record_path, f.product_name FROM fam f JOIN ft ON ft.product_sku=f.product_sku JOIN ln ON ln.product_sku=f.product_sku;"
+      },
+      "bind": "match_rows"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT v.product_sku, v.record_path, v.product_name, p.property_value_text AS fastener_type, q.property_value_number AS length_mm FROM product_variants v LEFT JOIN product_variant_properties p ON p.product_sku=v.product_sku AND p.property_key='fastener_type' LEFT JOIN product_variant_properties q ON q.product_sku=v.product_sku AND q.property_key='length_mm' WHERE v.brand=:brand AND v.series=:series AND v.model=:model ORDER BY v.product_sku;"
+      },
+      "bind": "family_rows"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > yes/no tokens",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+    },
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-tools > sql",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
+    }
+  ],
+  "answer_template": {
+    "message": "<NO> The HECO 3DW-64B Nut Bolt and Washer family ({brand} {series} {model}) exists, but no catalogue variant carries fastener_type 'threaded rod' with length 20 mm. Checked SKU {checked_sku} at {checked_path} does not match that claim.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$checked_path"
+    ]
+  },
+  "outcome_override": null
+}

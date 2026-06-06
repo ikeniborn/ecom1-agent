@@ -1,0 +1,160 @@
+entries:
+- agents_md_anchor: '#important-tools > sql'
+  content: 'Always parse /bin/sql stdout as comma-delimited CSV with a header row:
+    drop the first line, split data rows on '','', and map columns positionally —
+    never split on ''|'' and never gate row selection on a column being numeric (isdigit),
+    since IDs and paths are non-numeric strings.'
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$store_path'', ''$paths'']) but actual refs [] contain only static template
+    entries []". OBSERVED_RPC_OUTPUTS show /bin/sql emits CSV: header line ''store_id,store_name,record_path''
+    then ''store_graz_jakomini,PowerTool Graz Jakomini,/proc/...json'', and ''count,paths''
+    then ''1,/proc/catalog/...AUT-ZMWEKFUZ.json''. Root cause: SCRIPT_CODE parses
+    with `cols = line.split("|")` and gates row capture on `cols[0].strip().isdigit()`.
+    Output is comma-delimited not pipe-delimited, so split(''|'') yields one column
+    = whole line; and store_id ''store_graz_jakomini'' / count line ''1,/proc/...''
+    fail isdigit (count line has comma+path appended). Failing fragments: `cols =
+    line.split("|")` ... `if len(cols) >= 3 and cols[0].strip().isdigit()` and `cols
+    = line.split("|", 1)` ... `if first.isdigit()`. Both store_path and paths_val
+    stay empty → refs []. Rule linkage: corrective technique is to parse SQL output
+    as CSV with header skip and positional columns, removing the pipe-delimiter and
+    numeric-id assumptions.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/paints_finishes/wall_paint/fam_paints_finishes_wall_paint_0002_33m7fvug/PNT-JAXH8ES6.json'
+  source: verdict
+  status: inactive
+  submitted_message: 'Count: 1'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/stores/store_graz_jakomini.json
+  - /proc/catalog/automotive/engine_oil/fam_automotive_engine_oil_0019_259yt93a/AUT-ZMWEKFUZ.json
+- agents_md_anchor: '#important-things > reference'
+  content: When the answer must cite every matching record path, design the query
+    to return one row per record and build refs by iterating all CSV data rows — do
+    not aggregate paths with SQL group_concat into a single delimited cell, since
+    re-splitting that cell is fragile and can drop or mangle required references.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/catalog/paints_finishes/wall_paint/fam_paints_finishes_wall_paint_0002_33m7fvug/PNT-JAXH8ES6.json''"
+    — the available wall-paint variant (spec p4: Sikkens White gloss) never reached
+    refs. Root cause: ops query collapses all matched record_paths into one scalar
+    cell via group_concat(record_path, ''|''), then script re-splits that single CSV
+    cell on ''|'' (paths_str.split(''|'')). This couples ref emission to a fragile
+    in-cell delimiter; any per-variant path lost in aggregation/parse never appears
+    in refs even though the variant is genuinely available. Failing fragment: "(SELECT
+    group_concat(record_path, ''|'') FROM matched) AS paths" plus "paths = [p.strip()
+    for p in paths_str.split(''|'') ...]". Rule linkage: complements r001 (which forbids
+    splitting stdout rows on ''|'') by addressing query SHAPE — emit one matched row
+    per record so refs come from iterating real CSV data rows, not from unpacking
+    a group_concat blob. r001 stays active: it governs row/CSV parsing broadly; this
+    rule governs query design for multi-ref answers.'
+  status: active
+- agents_md_anchor: null
+  content: When the task describes an entity with a qualitative descriptor (central,
+    main, flagship) that may not appear verbatim in the data, do not hard-filter on
+    that literal substring (e.g. store_name LIKE '%central%'); resolve the entity
+    from discovery rows instead — if a city/scope yields exactly one match, select
+    it directly rather than requiring a word match that silently returns zero rows.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'ERROR verbatim: "answer_refs: template/constraints require runtime refs
+    ([''$store_path'', ''$available_paths'']) but actual refs [] contain only static
+    template entries [] — SQL likely returned no rows". Root cause: discovery returned
+    single store ''PowerTool Bratislava Stare Mesto'' (no word ''central''), but both
+    the discovery loop (`if "central" in name.lower()`) and ops CTE `st AS (... WHERE
+    city=%s AND lower(store_name) LIKE ''%%central%%'' LIMIT 1)` filter on literal
+    ''central''. No store_name contains it → st CTE empty → inner JOIN yields zero
+    rows → pid/record_path empty → refs []. store_path also stayed None. Failing fragment:
+    the `LIKE ''%central%''` predicate and matching name.lower() check. Linkage: codegen
+    translated task''s qualitative term ''central'' into a literal text filter; correct
+    technique is to resolve the lone city match from discovery, not constrain on an
+    assumed substring. Distinct from r001 (CSV parsing) and r002 (per-row refs).'
+  status: active
+- agents_md_anchor: null
+  content: Always emit every RPC declared in the tool_plan unconditionally; never
+    add a conditional early-return that issues an Answer and skips a planned Exec
+    when an intermediate (e.g. discovery) result is empty — let the planned query
+    run and return zero rows instead, so the executed RPC multiset matches the plan.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''fidelity: AssertionError: fidelity drift (RPC multiset)
+    expected: [Answer, Exec, Exec] got: [Answer, Exec]''. The plan issues two Execs
+    (discovery store-resolve + ops count) then one Answer. Root cause: the failing
+    fragment `if not store: vm.answer(message="0 products", ...); return` short-circuits
+    after the discovery Exec when no store row resolves, so the second (ops) Exec
+    is never dispatched — producing one Exec instead of two and dropping the multiset
+    to [Answer, Exec]. The CODEGEN technique fault is inserting a guarded early-exit
+    that bypasses a planned RPC; the script must translate each tool_plan op into
+    an unconditional call. Linkage: distinct from r001 (CSV parsing), r002 (per-row
+    refs), and the in-session entity-resolution rule — none constrain unconditional
+    RPC emission / multiset fidelity.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/paints_finishes/wood_stain_oil/fam_paints_finishes_wood_stain_oil_0002_2kprzgwf/PNT-IMO3A7AZ.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#important-things > availability'
+  content: When discovery resolves a unique entity (e.g. a store_id/record_path),
+    bind that resolved identifier into the subsequent ops query and join on it directly,
+    instead of re-deriving the same entity inside the ops SQL with an independent
+    filter plus LIMIT 1; independent re-resolution can pick a different row than discovery
+    did (or none), so downstream inventory/property joins evaluate against the wrong
+    store and silently drop required matches.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/catalog/paints_finishes/wood_stain_oil/fam_paints_finishes_wood_stain_oil_0002_2kprzgwf/PNT-IMO3A7AZ.json''".
+    Only the p4 (Wood Stain and Deck Oil) available variant is missing — 5 of 6 lines
+    resolved fine, so the failure is store-scoped, not a per-line family/property
+    text bug. Root cause: the Python discovery loop resolves store_path by scanning
+    rows for the first name containing ''central'', but the ops SQL re-resolves the
+    store independently via fragment `WITH st AS (SELECT store_id, record_path FROM
+    stores WHERE city = %s AND lower(store_name) LIKE ''%%central%%'' LIMIT 1)`. The
+    discovery-chosen store_id is never threaded into ops; the LIMIT 1 in ops can select
+    a different ''central'' store (different table/order tiebreak) than discovery''s
+    first match. The inventory INNER JOIN (`si.store_id = st.store_id`) then evaluates
+    against the wrong store, so PNT-IMO3A7AZ''s qty>=min_qty row is absent and its
+    record_path never enters refs. r003 covers not hard-filtering on the ''central''
+    literal on the discovery side, and r002 covers not collapsing paths via group_concat
+    (already applied — script returns one row per record), but neither covers threading
+    the discovery-resolved entity id into ops; this new rule closes that gap by requiring
+    the bound store_id from discovery to drive the ops join rather than an independent
+    re-resolution.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/storage/tool_boxes_bags/fam_storage_tool_boxes_bags_0009_3l66dv7t/STO-3EOFECYQ.json'
+  source: verdict
+  status: active
+  submitted_message: 'Count: 0'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/stores/store_salzburg_elisabeth_vorstadt.json
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t16

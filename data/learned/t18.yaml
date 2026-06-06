@@ -1,0 +1,29 @@
+entries:
+- agents_md_anchor: null
+  content: When parsing /bin/sql stdout, split each row on the actual output delimiter
+    (it is comma-separated CSV) instead of assuming pipe-delimited, and always discard
+    the first line as the column header before extracting cell values.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''answer_refs: template/constraints require runtime
+    refs ([\''$product_path\'', \''$graz_store_paths\'']) but actual refs [] contain
+    only static template entries [] — SQL likely returned no rows or row parsing dropped
+    the path column''. Root cause: /bin/sql emits comma-separated CSV with a header
+    line, but parse_rows splits on ''|'' (failing fragment: `cells = [c.strip() for
+    c in line.split("|")]`). For line ''product_sku,record_path'' the pipe-split yields
+    a single cell, the exact header-key match `cells[0].lower() in header_keys` never
+    fires, so the header row is consumed as the first data row: product_sku becomes
+    the literal ''product_sku,record_path'' and product_path becomes empty. That poisoned
+    literal flows into the next queries (`si.product_sku = ''product_sku,record_path''`),
+    so the inventory join matches nothing, total resolves to 0, the availability constraint
+    suppresses the now-empty product_path, and refs end up []. Linkage: the rule forces
+    delimiter-correct CSV parsing plus header-row removal so the SKU and record_path
+    columns resolve correctly and runtime refs populate.'
+  status: active
+last_run:
+  cycles_used: 2
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t18

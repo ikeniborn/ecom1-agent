@@ -1,0 +1,390 @@
+entries:
+- agents_md_anchor: '#important-tools > id'
+  content: When a param value is a placeholder token bound to a discovery RPC (e.g.
+    a $agent_store_id resolved from /bin/id), parse that discovery output and substitute
+    the real value into all dependent queries before building SQL — never emit the
+    literal placeholder token into a WHERE/JOIN predicate.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''answer_refs: template/constraints require runtime
+    refs ([$matched_paths]) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows ... check :name bindings on /bin/sql''. Root
+    cause: discovery exec /bin/id returned user emp_036, but the script discarded
+    it (`_ = getout(identity)`) and passed store_id literally as ''$agent_store_id''
+    into every `si.store_id = ''$agent_store_id''` join. No store_inventory row ever
+    matches that token, so in_stock=COALESCE(...,0)=0 for all rows, match=false for
+    all, and refs (gated on matched && record_path) stays empty even though rows 2
+    and 4 returned real SKUs/paths (AUT-1LA1M77A, MAC-25W652FW). Failing fragment:
+    `store_lit = "''" + esc(store_id) + "''"` where store_id is the unresolved placeholder.
+    Rule linkage: the caller''s home store_id must be derived from the id-tool identity
+    output and substituted before query construction, per #important-tools > id.'
+  status: active
+- agents_md_anchor: '#important-tools > sql'
+  content: When parsing /bin/sql output, split each row on the actual delimiter the
+    tool emits (comma-separated CSV with a header line) and skip the header row before
+    matching by row_id — never assume a pipe ('|') delimiter, because a wrong split
+    collapses every field into one token so product_sku and record_path are silently
+    dropped and refs come back empty.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matched_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". Observed
+    /bin/sql output is comma-delimited CSV with header `row_id,product_sku,record_path,in_stock,qty`
+    (e.g. row2 returned `R2,AUT-1LA1M77A,/proc/catalog/automotive/wiper_blades/AUT-1LA1M77A.json,0,4`).
+    Failing fragment: `parts = [p.strip() for p in line.split("|")]` in parse_row
+    — splitting on ''|'' against comma output yields a single-element list, so `len(parts)
+    >= 5` is never true and parse_row always returns `[rid,'''','''','''','''']`.
+    Result: every SKU/record_path discarded, matched_paths stays empty, refs empty.
+    Even rows that matched real products (R2, R4) were lost. Root cause is a delimiter
+    mismatch between SQL output format and the parser, distinct from the placeholder-substitution
+    rule already on file. Rule linkage: codifies parsing /bin/sql output by its real
+    CSV delimiter so record_path columns survive and refs populate. (Secondary contributing
+    bug — store_id resolved to '''' because /bin/id output carried only `user: emp_036`/roles,
+    not a store_id, so the regex matched nothing and in_stock=0 everywhere; this is
+    parsing-of-output adjacent but the dominant, fully reproducible refs-empty cause
+    is the ''|'' vs '','' split.)'
+  status: active
+- agents_md_anchor: '#important-tools > id'
+  content: 'When a discovery RPC returns only a principal identifier (e.g. /bin/id
+    yields `user: emp_036`, not a home store_id), resolve dependent fields like store_id
+    with a secondary /bin/sql lookup keyed on that identifier — never regex-scrape
+    a field the identity output does not contain, and never default an unresolved
+    binding to an empty string, which silently emits a degenerate predicate (store_id='''')
+    so every inventory join misses and refs come back empty.'
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matched_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". Root
+    cause: store_id param was placeholder $agent_store_id meant to come from the calling
+    employee''s home store, but /bin/id output is `user: emp_036\nroles: employee,
+    store_manager, ...` — it carries NO store_id field. Failing fragment: `m = re.search(r''(?:home_)?store_id...'',
+    ident_out)` finds nothing, then `store_id = resolved or ""` falls back to empty
+    string, so every generated query ran `... si.store_id = ''''`. Result: store_inventory
+    join matched nothing, in_stock=0 for all rows, match=false everywhere, matched_paths=[]
+    → empty refs. Existing rule r-placeholder covers parsing/substituting a value
+    that IS present in discovery output; this failure is the harder case where the
+    field is absent and requires a derived secondary lookup plus a no-empty-fallback
+    guard — semantically distinct, so not a skip.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/storage/bins_organizers/STO-12YF3E97.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#important-things > availability'
+  content: When success criteria require referencing all matched/available products
+    but the output also carries a separate match flag that encodes a quantity-satisfied
+    threshold (in_stock >= requested qty), populate refs from every row whose product
+    variant exists and is available (in_stock > 0) — never gate the reference list
+    on the quantity-met flag, because a product that is available yet falls short
+    of the requested quantity is still a matched, available product and its record_path
+    must appear in refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/catalog/storage/bins_organizers/STO-12YF3E97.json''"
+    — that path is row1 (Raaco storage bin), an exact match that exists and is available.
+    Root cause: refs were gated on the match flag, which folds in a quantity test.
+    Failing fragment: `match = _to_int(in_stock_disp) >= qty` then `if match and path:
+    matched_paths.append(path)`. Row1 product matched and had stock but in_stock <
+    requested qty (4), so match=false, path dropped, refs missed the required available
+    product. Success_criteria explicitly says ''All matched SKU full record paths
+    referenced in refs'' and availability constraint says reference available products
+    — both decouple referencing from quantity sufficiency. Distinct from r001 (placeholder
+    substitution), r002 (CSV delimiter), r003 (identity->store_id lookup); none address
+    conflating availability-for-refs with quantity-for-match.'
+  status: active
+- agents_md_anchor: null
+  content: When tool_plan ops declares a single RPC but the task iterates over N input
+    rows, emit exactly one RPC covering all rows (batch via IN/UNION or fetch the
+    full candidate set once and filter/join in-script) — never call that RPC once
+    per row inside a loop, because per-row fan-out multiplies the executed RPC count
+    and fails the fidelity multiset check that mirrors the frozen tool_plan.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC
+    multiset) expected: [Answer, Exec, Exec, Exec] got: [Answer, Exec, Exec, Exec,
+    Exec, Exec, Exec, Exec]''. Root cause: tool_plan declares 2 discovery Exec (/bin/id,
+    /bin/sql store lookup) + 1 ops Exec + 1 Answer = 3 Exec expected. Failing fragment:
+    the `for ent in entries:` loop calls `res = vm.exec(path=''/bin/sql'', args=[sql],
+    ...)` once per parsed row; 6 non-dup rows produced 6 extra SQL calls (2 discovery
+    + 6 loop = 8 Exec). The single ops RPC in tool_plan was intended to run once,
+    but codegen translated it into per-row fan-out. Rule linkage: existing r001-r004
+    cover placeholder substitution, delimiter parsing, identity resolution, and refs
+    gating — none constrain RPC call cardinality vs. the frozen tool_plan multiset.
+    New rule fills that gap: collapse per-row queries into one batched RPC.'
+  status: active
+- agents_md_anchor: '#important-tools > sql'
+  content: When batching multiple input rows into a single SQL RPC, scope the query
+    to the relevant candidate set by filtering on the union of the rows' key fields
+    (e.g. brand/line IN (...) or a WHERE over the parsed keys) rather than fetching
+    the entire catalogue via a per-variant GROUP_CONCAT cross-join of product_variant_properties
+    and filtering in-script — an unbounded full-table aggregate scan exceeds the VM
+    exec read timeout.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verbatim error: ''real_vm_exec: The read operation timed out''. Discovery
+    RPCs returned fine (id -> emp_026; store lookup ran), so failure is in the ops
+    RPC. Root cause: the single batched query has NO brand/line predicate — it scans
+    every product_variants row, LEFT JOINs product_variant_properties for ALL variants,
+    and GROUP_CONCATs props per SKU with GROUP BY over the whole table. Failing fragment:
+    ''FROM product_variants pv LEFT JOIN store_inventory si ... LEFT JOIN product_variant_properties
+    pvp ON pvp.product_sku = pv.product_sku ... GROUP BY pv.product_sku, ...'' with
+    no WHERE. This full-catalogue aggregate exceeds the exec read timeout. Linkage:
+    complements the in-session ''one RPC for N rows'' rule — that rule says batch
+    into one call; this rule says keep that one call bounded by the rows'' key fields
+    so it stays within the timeout, instead of an unbounded scan-then-filter-in-script.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/workshop_machines/saws_cutters/MAC-267NR4LP.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#important-things > references'
+  content: When success_criteria enumerate the identity dimensions an exact match
+    must satisfy (e.g. brand, series, model/line, product_kind), filter on EVERY listed
+    dimension in the match predicate — never match on a subset (e.g. brand + line
+    + properties while omitting product_kind), because brand and line can be shared
+    across different product kinds, so a subset predicate selects the wrong variant
+    (or the first arbitrary one) and the correct SKU's record_path is dropped from
+    refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/catalog/workshop_machines/saws_cutters/MAC-267NR4LP.json''".
+    Root cause: success_criteria #2 requires an exact match on brand, series, model
+    (line), product_kind AND all property key/values, but the match loop only checks
+    brand (`norm(v.get(''brand'')) != norm(brand)`), line (`if line not in combos`),
+    and properties (`all(p in v[''_pset''] for p in req)`) — product_kind is never
+    compared. Failing fragment: the saw row (iwuuh, Bosch Workshop GSR 3JW-ULH, product_kind
+    ''Workshop Saw and Cutter'') shares brand+line scope with other Bosch variants;
+    `matched = v; break` selects the first brand+line+props candidate regardless of
+    product_kind, so the wrong/incomplete variant is chosen and the saw''s true SKU
+    MAC-267NR4LP (under saws_cutters) never reaches refs. Rule linkage: complements
+    r004 (refs gating) and r006 (query scoping) but addresses an uncovered gap — the
+    match predicate must include all identity dimensions the success_criteria name,
+    not a subset.'
+  status: active
+- agents_md_anchor: '#Important tools > sql'
+  content: 'When success_criteria assert that input rows should resolve to exact catalogue
+    products and the answer''s refs are sourced from those query rows, never treat
+    a header-only (zero data row) /bin/sql response as a valid no-match: a uniform
+    empty result across every row signals an over-constrained match predicate, wrong
+    column/table names, or an unresolved placeholder corrupting the query — detect
+    the header-only case and repair the query instead of silently emitting empty SKU
+    + match=false, which collapses refs to [].'
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matched_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column; check
+    `:name` bindings on /bin/sql and the SELECT columns". OBSERVED outputs show ALL
+    five /bin/sql calls returned only the header line `product_sku,record_path,in_stock`
+    with zero data rows, despite prior verdict v002 confirming a matching catalogue
+    product (MAC-267NR4LP saw) exists. Root cause #1 (covered): the script set `store_id
+    = params[''store_id'']` = literal ''$agent_store_id'' and emitted `si.store_id
+    = ''$agent_store_id''` into the LEFT JOIN, ignoring the `identity` it fetched
+    from /bin/id (user: emp_026) — already governed by r001 (no literal placeholder)
+    and r003 (resolve store_id via secondary lookup). But store_id only feeds the
+    LEFT JOIN''s in_stock column; it cannot drop rows from the `matched` CTE. The
+    decisive failing fact is that the `matched` CTE itself returned zero rows for
+    every input — a systemic match defect, not a store_id artifact. The script''s
+    parse_row() returned None for each header-only response and silently emitted empty
+    SKU + match=false, never surfacing that a success-criteria-required match produced
+    nothing. No existing rule (r001-r007, r004 ref-gating) covers distinguishing a
+    header-only/errored SQL response from a genuine no-match; this new rule adds that
+    detection technique. Rule linkage: complements r002 (delimiter parsing) and r007
+    (match-dimension completeness) by catching the downstream symptom — uniform empty
+    rows — and forcing query repair rather than silent empty refs.'
+  status: active
+- agents_md_anchor: '#Important tools > sql'
+  content: When a query LEFT JOINs an inventory/availability table onto a matched-candidate
+    CTE and the whole result comes back header-only across every input row, localize
+    the fault to the CTE's inner match predicate (identity columns, the product_kind
+    join, or the property_key/property_value EXISTS equality clauses) — never to the
+    store_id/join binding — because a LEFT JOIN cannot drop rows the CTE already produced,
+    so a uniform empty result proves the inner match selected nothing rather than
+    that inventory was missing.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Verbatim error: "template/constraints require runtime refs ([''$matched_paths''])
+    but actual refs [] contain only static template entries [] — SQL likely returned
+    no rows or row parsing dropped the path column". OBSERVED outputs: all 5 /bin/sql
+    calls returned exactly `product_sku,record_path,in_stock` (header only, zero data
+    rows). Failing fragment: each SQL wraps the match in `WITH matched AS (...) SELECT
+    ... FROM matched m LEFT JOIN store_inventory si ... AND si.store_id = ''$agent_store_id''`.
+    The literal `$agent_store_id` placeholder (covered by r001/r003) sits only in
+    the LEFT JOIN predicate, so it CANNOT zero the matched rows — yet matched returned
+    nothing for every row. Root cause is therefore the inner CTE predicate (brand/series/model/product_kind
+    quad plus AND-chained property EXISTS on property_value_text) selecting zero variants,
+    while v002 confirms the target SKU MAC-267NR4LP actually exists. Existing in-session
+    rule names over-constrained-predicate as a cause but does not teach how to LOCALIZE
+    between match-predicate and join-key; this rule adds the join-semantics discriminator
+    (LEFT cannot zero CTE output) so codegen debugs the right clause first instead
+    of re-binding store_id. Complements r007 (match all identity dims) and in-session
+    (don''t accept header-only as no-match).'
+  status: active
+- agents_md_anchor: '#Important tools > id'
+  content: When an identity-bound binding (e.g. $agent_store_id) is unresolved, resolve
+    it via a secondary /bin/sql lookup keyed on the principal id — never prefix-scrape
+    the /bin/id output, because role tokens share the resource prefix (a 'store_manager'
+    role matches a 'store_' heuristic) and get bound as the store_id, corrupting every
+    inventory predicate.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Verbatim ERROR: "answer_refs: template/constraints require runtime refs
+    ([''$matched_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". Root
+    cause: $agent_store_id was not pre-resolved, so the script''s fallback scraped
+    id_out for the first token starting with ''store_'' and bound store_id=''store_manager''
+    — a ROLE from the identity line `roles: employee, store_manager, ...`, not a store
+    id. Failing fragment: `for tok in id_out... if tok.startswith(''store_'') or tok.startswith(''st_''):
+    resolved = tok; break`, producing `AND si.store_id = ''store_manager''`. Secondary
+    fault (header-only across all 5 rows: `product_sku,record_path,in_stock` with
+    no data) proves the inner CTE match predicate selected nothing — a LEFT JOIN cannot
+    drop CTE rows, so inventory binding is not the cause. Rule linkage: r003 already
+    mandates resolving store_id via a secondary /bin/sql lookup and forbids regex-scraping
+    identity for a field it does not contain; the store_manager case is exactly the
+    prefix-collision instance of r003''s anti-pattern. The header-only no-match is
+    covered by the in-session header-only-detection rule and the LEFT-JOIN-localization
+    rule (fault in inner predicate, not store_id). New rule sharpens r003 with the
+    role-prefix-collision mechanism.'
+  status: active
+- agents_md_anchor: null
+  content: 'When an exact-match SQL predicate ANDs many equality conditions (identity
+    columns plus several property EXISTS clauses) and the query returns a header-only
+    zero-row result for every input row even though the target records demonstrably
+    exist, do not accept it as a legitimate no-match: the fault is one over-constraining
+    equality whose stored representation differs from the param literal (case, whitespace,
+    a unit suffix, or a numeric value held in a typed column rather than property_value_text).
+    Isolate the failing dimension by relaxing or probing each condition independently
+    and normalize free-text comparisons (LOWER/TRIM and unit-stripping) instead of
+    forcing verbatim string equality on every dimension.'
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matched_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". OBSERVED_RPC_OUTPUTS
+    show every /bin/sql call returned only the header line `product_sku,record_path,in_stock`
+    with zero data rows, across ALL 5 rows — including the purely text-property rows
+    (KQHmi tool_type=''adjustable wrench'', UUzXw lens_color=''Yellow'', T4swK tool_type=''measuring
+    tape''). Verdict v002 proves FK775 should have matched SKU MAC-267NR4LP, so the
+    records exist; the CTE match predicate selected nothing. Failing fragment: the
+    chained equality predicate `pv.brand=... AND pv.series=... AND pv.model=... AND
+    pk.product_kind_name=... AND EXISTS(... property_value_text = :prop)` — the store_id
+    only appears in a LEFT JOIN so cannot drop CTE rows (per existing in-session localization
+    rule), confirming the inner match equalities, not inventory, returned empty. Because
+    every row failed uniformly the root cause is a representation mismatch in the
+    verbatim equality comparisons (case/whitespace/unit/typed-column), not a single
+    domain miss. Rule linkage: extends the in-session ''detect header-only, repair
+    query'' and r007 ''match every identity dimension'' rules with the concrete repair
+    technique — isolate the over-constraining condition and normalize comparisons
+    rather than re-emitting empty SKU + match=false that collapses refs to [].'
+  status: active
+- agents_md_anchor: '#Important tools > sql'
+  content: When an exact-match SQL pattern is applied per input row and EVERY row
+    returns a header-only zero-row result (not only the rows bearing numeric/unit
+    properties), localize the fault to the dimensions shared by all queries — the
+    brand/series/model identity columns, the product_kind join key, or a mistyped
+    table/column name — never to per-row property_value comparisons, because a representation
+    mismatch on one property could only blank the rows that carry it, so a universal
+    blank proves the shared predicate or join selected nothing; conversely, when only
+    the property-bearing rows blank, isolate that property's stored representation
+    (typed numeric column vs property_value_text, unit suffix).
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matched_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". Failing
+    fragment: every /bin/sql RPC returned only the CSV header line `product_sku,record_path,in_stock`
+    with zero data rows — including the simple text-property rows KQHmi (tool_type=adjustable
+    wrench), UUzXw (lens_color=yellow), T4swK (tool_type=measuring tape), not just
+    the numeric-property rows FK775/WgE71 (voltage_v/power_w). Root cause: the script
+    already applied LOWER/TRIM normalization to all dimensions yet still got a UNIFORM
+    blank across all five rows. A per-property representation mismatch (the failure
+    mode existing rules target) could only blank the voltage/power rows; the fact
+    that even text-only rows blanked proves the fault lies in a dimension shared by
+    every query — the identity columns, the product_kinds join key, or a wrong column/table
+    name — not in property_value_text equality. Rule linkage: existing in-session
+    rules (header-only-detection, over-constraint-normalize, LEFT-JOIN-localize-to-CTE)
+    establish that the CTE selected nothing, but none discriminate universal-blank
+    (shared structure) from partial-blank (per-row property representation); this
+    rule adds that breadth-of-failure discriminator to direct the repair to the correct
+    dimension. r001/r003 separately cover the unresolved `$agent_store_id` placeholder
+    still emitted into the LEFT JOIN, which is a real but secondary defect that cannot
+    drop CTE rows.'
+  status: active
+- agents_md_anchor: null
+  content: Never pre-emptively drop the property EXISTS predicates from an exact-match
+    query out of fear of a stored-representation mismatch; when success_criteria require
+    matching on given properties, keep every property predicate in the match predicate,
+    and only relax/normalize a specific condition after observing an actual zero-row
+    result. Speculatively deleting property filters under-constrains the query, violates
+    the exact-match contract, and can bind the wrong variant whose record_path then
+    poisons refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matched_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". Root
+    cause in SCRIPT_CODE: the codegen author speculatively stripped ALL property_value
+    EXISTS predicates (comment: ''Numeric/text property predicates are intentionally
+    omitted... over-constrains the predicate to header-only zero rows'') BEFORE any
+    evidence of a property mismatch — a pre-emptive relaxation that contradicts success_criteria
+    demanding exact property match. Failing fragment: each per-row SQL only filters
+    pv.brand/series/model + pk.product_kind_name and omits machine_type/voltage_v/power_w/tool_type/lens_color
+    predicates. This is the inverse of the over-constraint failure modes already in
+    EXISTING_RULES: r007 and the in-session normalize/isolate rules tell you to keep
+    every identity dimension and to normalize a failing predicate AFTER a zero-row
+    observation, but none forbid the SPECULATIVE wholesale removal of property predicates
+    that under-specifies the match. (Note: this run also still returned header-only
+    across all rows because store_id was regex-scraped to '''' and identity-dimension
+    representation may mismatch — already covered by r001/r003/in-session rules —
+    so no new rule is filed for those.) New rule links to: complements r007 (match
+    on every dimension) and the in-session normalize-after-zero-row rule by prohibiting
+    the opposite over-correction.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Bosch/MAC-WEJK247H.json'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+last_run:
+  cycles_used: 10
+  date: '2026-06-06'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t47

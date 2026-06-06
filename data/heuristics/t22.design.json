@@ -1,0 +1,109 @@
+{
+  "intent": "Identify the current customer, locate their active shopping basket, apply the checkout policy, and complete checkout via the payments tool.",
+  "params": {
+    "customer_id": "$customer_id"
+  },
+  "success_criteria": [
+    "Current request identity resolved to a customer via the id tool",
+    "The customer's active (non-checked-out) basket is uniquely identified; if multiple candidates exist, all are surfaced for clarification",
+    "Checkout policy from docs read and its preconditions (inventory availability, basket status, payment/3DS requirements) satisfied",
+    "Checkout completed through the payments tool producing a payment_transaction for the basket",
+    "Answer references the basket record path, the resulting payment record path, and the checkout policy document"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id",
+        "args": []
+      },
+      "bind": "identity"
+    },
+    {
+      "rpc": "Find",
+      "args": {
+        "root": "/docs",
+        "name": "checkout",
+        "kind": "file",
+        "limit": 5
+      },
+      "bind": "checkout_policy_path"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$checkout_policy_path",
+        "number": true
+      },
+      "bind": "checkout_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/payments",
+        "args": [
+          "--help"
+        ]
+      },
+      "bind": "payments_help"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH b AS (SELECT basket_id, record_path, store_id, basket_status, basket_created_at FROM shopping_baskets WHERE customer_id = :customer_id) SELECT b.basket_id, b.record_path, b.store_id, b.basket_status, b.basket_created_at, bi.line_number, bi.product_sku, bi.requested_quantity, pv.price_cents, pv.price_currency, inv.available_today_quantity FROM b JOIN shopping_basket_items bi ON bi.basket_id = b.basket_id JOIN product_variants pv ON pv.product_sku = bi.product_sku LEFT JOIN store_inventory inv ON inv.store_id = b.store_id AND inv.product_sku = bi.product_sku ORDER BY b.basket_created_at DESC, bi.line_number;"
+        ]
+      },
+      "bind": "basket"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/payments",
+        "args": [
+          "checkout",
+          "--basket",
+          "$basket_id",
+          "--customer",
+          "$customer_id"
+        ]
+      },
+      "bind": "checkout_result"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#Important tools > id",
+      "rule": "- id tool returns identity of the user/customer/guest under which we are running current request."
+    },
+    {
+      "anchor": "#Important tools > payments",
+      "rule": "- use payments tool to manage payment workflow state and supported refund approval/finalization"
+    },
+    {
+      "anchor": "#Important things > policy grounding",
+      "rule": "- When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#Important things > reference full path",
+      "rule": "- When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#Important things > ambiguity",
+      "rule": "- When a request is ambiguous and you ask for clarification, reference all concrete candidate objects that make it ambiguous."
+    }
+  ],
+  "answer_template": {
+    "message": "Checkout completed for basket $basket_id ($basket_path). Payment $payment_id created with status $payment_status. Checkout policy applied per $checkout_policy_path.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$basket_path",
+      "$payment_path",
+      "$checkout_policy_path"
+    ]
+  },
+  "outcome_override": null
+}

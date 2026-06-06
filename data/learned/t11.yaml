@@ -1,0 +1,79 @@
+entries:
+- agents_md_anchor: null
+  content: Always emit one script RPC call for every tool_plan entry across both discovery
+    and ops, even when entries are byte-identical — fidelity verifies the RPC multiset,
+    so collapsing duplicate calls drops required invocations.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC
+    multiset) expected: [''Answer'', ''Exec'', ''Exec''] got: [''Answer'', ''Exec'']''.
+    Root cause: tool_plan lists Exec twice (one discovery entry + one identical ops
+    entry), each must produce a runtime RPC. Failing fragment: SCRIPT_CODE calls vm.exec
+    exactly once then vm.answer once, yielding multiset [''Exec'',''Answer''] instead
+    of [''Exec'',''Exec'',''Answer''] — CODEGEN deduped the two identical Exec entries
+    into a single call. Rule linkage: translation technique is to map each tool_plan
+    RPC entry 1:1 to a script call without dedup, since the fidelity check compares
+    RPC multisets.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/catalogue-addenda/2024-07-17-reporting-tool-boxes-bags-salzburg.md'
+  source: verdict
+  status: inactive
+  submitted_message: '0'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog
+- agents_md_anchor: null
+  content: When emitting answer refs, do not copy answer_template.refs verbatim —
+    first discover relevant addenda/documentation files for the query's subject (glob
+    or query the docs directory by the entities/kinds in params) and append any matches
+    to the refs list, since the grader fails answers that omit required source addenda
+    references.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/docs/catalogue-addenda/2024-07-17-reporting-tool-boxes-bags-salzburg.md''".
+    Root cause: script emitted refs=["/proc/catalog"] copied directly from answer_template,
+    never discovering subject-area addenda docs. Failing fragment: vm.answer(message=message,
+    outcome="OUTCOME_OK", refs=["/proc/catalog"]). Grader requires the catalogue-addenda
+    reporting doc for the queried product kinds. Rule linkage: CODEGEN must augment
+    answer refs with discovered addenda docs rather than trust answer_template refs
+    as complete. Distinct from r001 (RPC multiset emission) — this targets ref discovery,
+    not call duplication.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/ops-policy-notes/catalogue-count-wiring-devices-graz-2024-07-17.md'
+  source: verdict
+  status: inactive
+  submitted_message: '22'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/policy-updates/2024-07-17-catalogue-reporting-cordless-drill-driver.md'
+  source: verdict
+  status: active
+  submitted_message: '30'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/power_tools/cordless_drill_driver
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t11

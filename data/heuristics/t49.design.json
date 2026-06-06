@@ -1,0 +1,47 @@
+{
+  "intent": "Count DB products of type 'Wood and Drywall Screw' using SQL projection only (catalogue JSON is stale).",
+  "params": {
+    "category": "Wood and Drywall Screw"
+  },
+  "success_criteria": [
+    "Count derived from SQL projection, not catalogue JSON files",
+    "Only products whose category/type matches 'Wood and Drywall Screw' are counted",
+    "Answer rendered as <count:%VALUE%>"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "select name, sql from sqlite_schema where sql is not null order by type, name;"
+      },
+      "bind": "schema"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "select count(*) as cnt from products where category = :category;"
+      },
+      "bind": "count_row"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-tools > sql",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
+    }
+  ],
+  "answer_template": {
+    "message": "<count:{count_row.cnt}>",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "/bin/sql"
+    ]
+  },
+  "outcome_override": null
+}

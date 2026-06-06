@@ -1,0 +1,118 @@
+entries:
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs: []
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: inactive
+  submitted_message: 'Checked basket_126 (unknown, store unknown). Searched /docs
+    for claimed ''Store Associate Exception Handbook'' / ''floor-approved pickup-prepared''
+    exception: found candidate doc(s): /docs/checkout.md, /docs/store-associate-exception-handbook.md.
+    No /docs policy authorizes skipping stock verification, so stock stands: no basket
+    line items / stock rows returned for basket_126. Desk verbal claim alone cannot
+    waive the checkout/security stock check. <NO> on exception applicability per actual
+    policy.'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /docs
+  - /docs/checkout.md
+  - /docs/store-associate-exception-handbook.md
+- agents_md_anchor: '#important-things > grounding'
+  content: When the answer_template lists an unbound grounding-policy placeholder
+    (e.g. $policy_path) and the verdict cites a named policy, the script must resolve
+    and append the governing policy document's full path to refs — derive it from
+    the docs tree or a deterministic policy file rather than populating refs solely
+    from search-hit paths for the disproven claim.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/docs/security.md''".
+    Root cause: tool_plan answer_template.refs contained placeholder $policy_path,
+    but discovery only bound a handbook search (handbook_hits) for the *claimed* exception
+    — never the actual governing checkout/security policy. CODEGEN built refs only
+    from search-hit paths (policy_paths) plus basket_path: `refs = [''/docs'']; for
+    p in policy_paths: refs.append(p)`. When the claimed handbook is absent, policy_paths
+    is empty, so the doc that actually grounds the <NO> verdict (the checkout/security
+    stock-check policy, /docs/security.md) is never referenced. The verdict text itself
+    cites ''the checkout/security stock check'' yet the script omits the doc backing
+    it. Failing fragment: refs assembly drops the unresolved $policy_path silently.
+    Rule linkage: codegen technique — when a grounding placeholder is unbound and
+    the verdict names a policy, derive and include that policy doc path; never leave
+    refs dependent only on disproven-claim search hits.'
+  status: active
+- agents_md_anchor: '#important-things > startup-context'
+  content: Always wrap each individual discovery RPC call (vm.exec, vm.search, vm.read)
+    in its own try/except that falls back to a safe empty/default value, so a missing
+    or unavailable runtime tool degrades gracefully instead of raising and aborting
+    the script before vm.answer is reached.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''real_vm_exec: runtime tool not found: not found''.
+    Observed RPC outputs confirm only the first call (vm.exec /bin/id -> cust_027)
+    succeeded; the very next unguarded call `docs_tree = vm.exec(path="/bin/tree",
+    args=["-L", "2", "/docs"])` (and similarly `vm.exec(path="/bin/sql", ...)`) hit
+    a runtime that does not provide that binary, raising before any answer was emitted.
+    Root cause: codegen guarded only vm.read in try/except but left vm.exec/vm.search
+    discovery calls unprotected, so a single absent runtime tool kills the whole run
+    and produces no <NO> answer. Rule linkage: per-call try/except with fallbacks
+    lets the script continue to vm.answer using whatever discovery data resolved,
+    which is exactly the resilience needed when tool_plan lists binaries that may
+    be absent. Distinct from r001 (refs/policy-path binding) and v002 (verdict), so
+    no overlap.'
+  status: active
+- agents_md_anchor: null
+  content: Always translate each tool_plan discovery step that runs a binary via Exec
+    (e.g. /bin/tree, /bin/id, /bin/sql) into a literal vm.exec(path=..., args=...)
+    call, and never substitute a native helper RPC (vm.tree/vm.list/vm.read-equivalent)
+    or add discovery RPCs absent from the plan, so the emitted RPC multiset matches
+    the frozen tool_plan exactly.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC
+    multiset) expected: [Answer, Exec, Exec, Exec, Read, Search] got: [Answer, Exec,
+    Exec, List, Read, Search, Tree]''. tool_plan.discovery specifies three Exec calls
+    — /bin/id, /bin/tree -L 2 /docs, /bin/sql — plus Search, Read, Answer. Root cause:
+    script second-guessed the plan (comment ''use native RPC; /bin/tree is not a runtime
+    tool'') and replaced the planned Exec(/bin/tree) with vm.tree(root=/docs, level=2)
+    AND additionally called vm.list(path=/docs). Failing fragment: ''docs_tree = vm.tree(root="/docs",
+    level=2)'' and ''listing = vm.list(path="/docs")'' — these emit Tree and List
+    RPCs, dropping one expected Exec and adding two unplanned RPCs. The new rule forbids
+    native-helper substitution for plan Exec steps and forbids extra discovery RPCs,
+    addressing the multiset mismatch directly. Distinct from r001 (refs/policy path
+    resolution) and the in-session try/except rule (graceful degradation), neither
+    of which constrains RPC selection fidelity.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+last_run:
+  cycles_used: 3
+  date: '2026-06-06'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t36

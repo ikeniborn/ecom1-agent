@@ -1,0 +1,34 @@
+{
+  "intent": "Count catalogue product variants whose product kind is 'Workshop Drill Grinder and Sander'.",
+  "params": {
+    "kind_name": "Workshop Drill Grinder and Sander"
+  },
+  "success_criteria": [
+    "Single integer count returned",
+    "Answer formatted exactly as <COUNT:%d>"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT COUNT(*) AS product_count FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pk.product_kind_name = :kind_name;"
+      },
+      "bind": "count_row"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-tools > sql",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session."
+    }
+  ],
+  "answer_template": {
+    "message": "<COUNT:{count_row.product_count}>",
+    "outcome": "OUTCOME_OK",
+    "refs": []
+  },
+  "outcome_override": null
+}

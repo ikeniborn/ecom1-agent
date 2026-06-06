@@ -1,0 +1,132 @@
+entries:
+- agents_md_anchor: null
+  content: When extracting a list payload from a tool result, guard each candidate
+    with isinstance(v, (list, tuple)) before treating it as iterable, and avoid probing
+    generic attribute names like items/keys/values via getattr — on dict/mapping results
+    those names resolve to built-in bound methods that are truthy but not iterable.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: fidelity TypeError: ''builtin_function_or_method'' object
+    is not iterable at line 17 in _first_path. Root cause: _first_path probes container
+    attribute names (''matches'',''results'',''entries'',''files'',''items'') with
+    getattr(find_result, attr, None). When find_result is a dict (or dict-like), getattr(...,''items'',None)
+    returns the built-in bound method dict.items, which is truthy, so `containers
+    = v` then `for item in containers` iterates a method object — fails. Failing fragment:
+    the for-attr loop assigns v=getattr(...) without verifying v is a sequence. Rule
+    linkage: codegen must not assume probed attribute names are payload lists; collision
+    with built-in mapping methods (items/keys/values) yields callables, so candidates
+    must pass an isinstance list/tuple check before iteration.'
+  status: active
+- agents_md_anchor: null
+  content: Always emit every RPC enumerated in the tool_plan discovery and ops blocks
+    exactly once and unconditionally; never gate a planned Read/Exec/Find/Tree call
+    behind runtime-derived truthiness (e.g. `vm.read(...) if path else None`) or behind
+    early-return guards (authorization/empty-result short-circuits placed before the
+    ops calls), because fidelity is scored on the RPC multiset matching the plan —
+    move guard-based answers after the planned ops, or issue best-effort planned calls
+    before branching.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''fidelity: AssertionError: fidelity drift (RPC multiset)
+    expected: [Answer, Exec×5, Find×2, Read×2, Tree] got: [Answer, Exec×4, Find×2,
+    Tree]''. Diff = missing 2 Read and 1 Exec. Root cause: planned RPCs made conditional
+    on runtime values. Failing fragments: `discount_policy = vm.read(...) if discount_policy_path
+    else None` and `checkout_policy = vm.read(...) if checkout_policy_path else None`
+    — both skipped when _first_path() returned empty, dropping the 2 Read calls; and
+    the `discount apply` Exec was skipped by the early-return guards (`if not authorized:
+    ...return` / `if not target_basket_id: ...return`) before the ops block ran, dropping
+    1 Exec. Tool_plan freezes 11 RPCs; CODEGEN emitted only 8. Rule linkage: CODEGEN
+    must translate every planned RPC into an unconditional call; conditional/guard
+    logic may change the Answer outcome but must not suppress planned discovery Reads
+    or ops Execs. Complementary to the existing extraction-guard rule (which addresses
+    why _first_path can return empty) but distinct — that rule is about safe list
+    extraction, this is about unconditional RPC emission for fidelity.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/checkout.md'
+  source: verdict
+  status: inactive
+  submitted_message: No checkoutable basket found for luisa.scholz+cust673@gmail.com;
+    cannot apply 9% service_recovery discount. Governed by discount policy /docs/security.md.
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: '#important-things > policy-grounding'
+  content: Never hardcode or fabricate fallback document paths in answer refs; populate
+    every policy/grounding reference exclusively from paths actually returned by the
+    plan's Find/Read discovery results, and include all governing/policy documents
+    surfaced by discovery rather than heuristically selecting or defaulting to a single
+    guessed path.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/docs/checkout.md''".
+    Root cause: the script builds refs from guessed/hardcoded paths instead of the
+    docs actually discovered. Failing fragment: `discount_policy_path = policy_paths[0]
+    if policy_paths else "/docs/security.md"` plus the unconditional `if "/docs/security.md"
+    not in refs: refs.append("/docs/security.md")`. It (a) defaults to a fabricated
+    /docs/security.md never returned by Find, (b) heuristically picks one ''security''-named
+    match, and (c) never surfaces the actual governing checkout policy doc, so the
+    required /docs/checkout.md is absent. Linkage: existing r001/r002 cover iterable
+    guarding and RPC-multiset fidelity, not reference fabrication; this CODEGEN technique
+    rule forbids inventing/hardcoding ref paths and mandates deriving all grounding
+    refs from real discovery output, complementing the policy-grounding constraint.'
+  status: active
+- agents_md_anchor: null
+  content: When a Read's path is bound from a prior Find/discovery result, never fall
+    back to the Find root or any directory path when that result is empty; bind the
+    path only from a file entry actually returned, and skip the dependent Read when
+    no file path exists, because Read on a directory raises a hard 'is a directory'
+    error that aborts the whole script rather than degrading gracefully.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: ''real_vm_exec: read failed: is a directory''. Observed
+    Find returned <empty> (plan Find used name=''discount'' but file is /docs/discounts.md,
+    no match). Failing fragment: `policy_path = policy_paths[0] if policy_paths else
+    "/docs"` then `policy_doc = vm.read(path=policy_path, number=True)` — with empty
+    Find, policy_path falls back to directory root ''/docs'', and Read on a directory
+    is a hard runtime crash that kills the script (not a soft fidelity miss). Linkage:
+    r003 bars fabricated fallback *document* paths in answer refs; r002 mandates unconditional
+    emit of planned Reads — but neither addresses that the bound path resolves to
+    a directory and crashes vm.read. New rule scopes the Find→Read binding: a planned
+    Read may be skipped (or must use a real file path only) when discovery yields
+    no file, since a directory-read abort is strictly worse than a fidelity multiset
+    mismatch.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+last_run:
+  cycles_used: 3
+  date: '2026-06-06'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t26

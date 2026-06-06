@@ -1,0 +1,46 @@
+{
+  "intent": "Verify the Heco Unix TopFix S9H-9J6 Nut Bolt and Washer variant (machine screw, 6 mm, 40 mm) exists but lacks the claimed extra length 80 mm, and answer <NO> with the checked SKU.",
+  "params": {
+    "brand": "Heco",
+    "family_like": "%Unix TopFix%S9H-9J6%Nut Bolt and Washer%",
+    "fastener_type": "machine screw",
+    "diameter_mm": 6,
+    "length_mm": 40,
+    "extra_length_mm": 80
+  },
+  "success_criteria": [
+    "Base variant matching brand Heco, family Heco Unix TopFix S9H-9J6 Nut Bolt and Washer, fastener type machine screw, diameter 6 mm, length 40 mm is located",
+    "Absence of a length_mm=80 property on that variant is confirmed",
+    "Answer contains <NO> and the exact checked SKU plus its product record path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH base AS (\n  SELECT v.product_sku, v.record_path, v.product_name\n  FROM product_variants v\n  JOIN product_variant_properties ft ON ft.product_sku = v.product_sku AND ft.property_key = 'fastener_type' AND ft.property_value_text = :fastener_type\n  JOIN product_variant_properties d  ON d.product_sku  = v.product_sku AND d.property_key  = 'diameter_mm'  AND d.property_value_number = :diameter_mm\n  JOIN product_variant_properties l  ON l.product_sku  = v.product_sku AND l.property_key  = 'length_mm'    AND l.property_value_number = :length_mm\n  WHERE v.brand = :brand AND v.product_name LIKE :family_like\n)\nSELECT b.product_sku, b.record_path, b.product_name,\n       EXISTS(SELECT 1 FROM product_variant_properties e\n              WHERE e.product_sku = b.product_sku\n                AND e.property_key = 'length_mm'\n                AND e.property_value_number = :extra_length_mm) AS has_extra_length\nFROM base b;"
+      },
+      "bind": "match"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > yes/no",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+    }
+  ],
+  "answer_template": {
+    "message": "<NO>. Base product exists — checked SKU {match.product_sku} ({match.product_name}, fastener type machine screw, diameter 6 mm, length 40 mm) at {match.record_path}. No catalogue property for length 80 mm is present on this record, so the support note's extra length 80 mm claim is absent.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$record_path"
+    ]
+  },
+  "outcome_override": null
+}

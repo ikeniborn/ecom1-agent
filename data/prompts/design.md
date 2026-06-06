@@ -106,8 +106,15 @@ CODEGEN reads each `$name` token and substitutes the bound value at run
 time from a `discovery` or `ops` result. Tokens that survive into the
 `vm.answer(refs=[...])` call cause a terminal LEARN trigger.
 
-If `outcome_override` is set (DENIED_SECURITY / NONE_UNSUPPORTED) emit
-`refs: []` — no grounding is expected for refusal answers.
+If `outcome_override` is set, the answer still grounds in the policy it
+applied (AGENTS.MD: "When you apply a policy from `docs`, include that policy
+document as a grounding reference in the final response"):
+
+- `DENIED_SECURITY` → `refs` MUST include `/docs/security.md` (plus the
+  specific action policy doc you consulted, e.g. `/docs/discounts.md` or
+  `/docs/checkout.md`, when the refusal is about that action).
+- `NONE_UNSUPPORTED` → `refs` MUST include the policy doc whose rule the
+  request failed (e.g. `/docs/checkout.md` for an unavailable basket line).
 
 ## AGENTS.MD anchoring
 

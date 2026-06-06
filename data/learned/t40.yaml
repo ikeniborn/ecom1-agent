@@ -1,0 +1,152 @@
+entries:
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - payment fraud refs recovered ~0% EUR from fraud amount, and also marked a few
+    payments as false positives.
+  source: verdict
+  status: inactive
+  submitted_message: 'No archived payment_transactions row (is_archived_basket_reference
+    = 1) matched any concrete fraud signal. Files left unchanged. Grounding policy:
+    /docs/security.md.'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: When success_criteria require a single record selected by the strongest
+    fraud/anomaly signal, do not return every row matched by an OR-ed disjunctive
+    query nor pick the first row; score each returned row by how many independent
+    signals it concurrently triggers (including discriminating signals computed in
+    discovery such as location mismatch), select only the maximally-scored row, and
+    derive both the cited reason and the refs from that one row's own columns rather
+    than a hardcoded literal.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''grader: payment fraud refs recovered ~0% EUR from
+    fraud amount, and also marked a few payments as false positives.'' Root cause:
+    the ops query selects with a broad disjunction — `WHERE ... method_reuse OR ...
+    device_reuse OR (three_ds_status IS NOT NULL AND payment_status=''paid'' AND three_ds_failure_reason
+    IS NOT NULL)` — and the script then emits ALL returned record_paths into refs
+    while reporting only the first row. Shared-fingerprint reuse and 3DS-failure are
+    weak signals that match many legitimate archived payments, so refs balloon with
+    false positives (the ~0% recovery / false positives). The discriminating location-mismatch
+    signal (observed vs home lat/long) was computed in the discovery query but never
+    used to isolate the single true fraud. Failing fragment: `for cols in rows: ...
+    record_paths.append(rpath)` plus `vm.answer(..., refs=refs)` blindly appends every
+    disjunctive hit instead of ranking. Rule linkage: CODEGEN should post-process
+    returned rows into a per-row signal count, keep only the top-scored record, and
+    source reason/refs from it — converting a noisy union into a single high-confidence
+    pick.'
+  status: active
+- agents_md_anchor: '#important-things > startup'
+  content: Always emit each tool_plan discovery/ops step using the exact RPC named
+    in that step's rpc field; when the plan expresses a step as Exec (e.g. a shell
+    command like tree run via /bin/sh), call vm.exec rather than substituting a convenience
+    VM helper such as vm.tree, so the generated script's RPC multiset matches the
+    plan and passes the fidelity check.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC
+    multiset) expected: [Answer, Exec, Exec, Exec, Find, Find, Read] got: [Answer,
+    Exec, Exec, Find, Find, Read, Tree]''. Root cause: tool_plan declared the startup
+    tree step as Exec {path:/bin/sh, args:[-c, tree -L 2 /docs]}, but CODEGEN substituted
+    the convenience helper vm.tree(root=/docs, level=2). Failing fragment: ''docs_tree
+    = vm.tree(root="/docs", level=2)'' — this emits a Tree RPC instead of the planned
+    Exec, dropping Exec count from 3 to 2 and adding an unplanned Tree. The fidelity
+    test compares RPC multisets one-to-one, so any helper substitution that changes
+    the emitted RPC name fails. Rule linkage: existing r001 governs single-record
+    selection scoring (semantic, disjunctive-OR concern) and is orthogonal to RPC-emission
+    fidelity; this is a new distinct CODEGEN technique about mirroring the plan''s
+    rpc field exactly. Not a duplicate.'
+  status: active
+- agents_md_anchor: null
+  content: When the tool_plan's ops/discovery steps define the fraud or anomaly signature
+    through specific SQL columns and predicates (e.g. matching device/method fingerprint
+    clusters against a known hit), generate the query using exactly those columns
+    and predicates; never substitute an invented detection method or reference columns
+    absent from the tool_plan.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''real_vm_exec: _ssl.c:983: The handshake operation
+    timed out''. Root cause beyond the transient SSL timeout: the CODEGEN script abandoned
+    the tool_plan''s defined fraud signature. tool_plan ops query is ''WHERE is_archived_basket_reference
+    = :archived_flag AND ( device_fingerprint = :fraud_device_fingerprint OR payment_method_fingerprint
+    = :fraud_method_fingerprint )'' over columns payment_method_fingerprint / device_fingerprint,
+    and discovery computes device_cluster_size / method_cluster_size. Failing fragment:
+    the script instead built impossible-travel geo logic (''SELECT ... observed_latitude
+    AS lat, observed_longitude AS lon ... LAG/LEAD ... WHERE in_speed > 2.0 OR out_speed
+    > 2.0'') referencing observed_latitude/observed_longitude columns that appear
+    nowhere in the tool_plan. This invents a detection method and columns not in the
+    plan, producing wrong refs. Rule linkage: distinct from r001 (single maximal-score
+    row selection) and the in-session RPC-fidelity rule (exact RPC name) — neither
+    constrains the script to the plan''s defined columns/predicates for the signature
+    itself.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - payment fraud refs recovered ~0% EUR from fraud amount, and also marked more than
+    ten payments as false positives.
+  source: verdict
+  status: active
+  submitted_message: 'Fraud incident. Applied policy /docs/security.md. Classified
+    15 archived payment records as part of incident: /proc/payments/pay_20210506T113853Z_LuGaYp3sSG.json,cust_031,2021-05-06T11:38:53Z,
+    /proc/payments/pay_20210506T114710Z_CH88xpNE7i.json,cust_031,2021-05-06T11:47:10Z,
+    /proc/payments/pay_20210506T120253Z_FHLaja4i2r.json,cust_032,2021-05-06T12:02:53Z,
+    /proc/payments/pay_20210506T121126Z_QUxvV35QqK.json,cust_032,2021-05-06T12:11:26Z,
+    /proc/payments/pay_20210506T122053Z_3FDm6EDeDa.json,cust_033,2021-05-06T12:20:53Z,
+    /proc/payments/pay_20210506T122627Z_WnzYMpsRPk.json,cust_033,2021-05-06T12:26:27Z,
+    /proc/payments/pay_20210506T124753Z_W5mLEQxzj5.json,cust_034,2021-05-06T12:47:53Z,
+    /proc/payments/pay_20210506T125655Z_PbRnfQc37t.json,cust_034,2021-05-06T12:56:55Z,
+    /proc/payments/pay_20210506T125853Z_NHZJDKZQfu.json,cust_035,2021-05-06T12:58:53Z,
+    /proc/payments/pay_20210506T130608Z_jT661ai8wU.json,cust_035,2021-05-06T13:06:08Z,
+    /proc/payments/pay_20210526T002730Z_HkHUXAQSXh.json,cust_082,2021-05-26T00:27:30Z,
+    /proc/payments/pay_20210526T004138Z_AmUjSajRn4.json,cust_082,2021-05-26T00:41:38Z,
+    /proc/payments/pay_20210526T005427Z_PzNmaU8UB9.json,cust_082,2021-05-26T00:54:27Z,
+    /proc/payments/pay_20210526T005523Z_4iWLuG1bpP.json,cust_082,2021-05-26T00:55:23Z,
+    /proc/payments/pay_20210526T011512Z_DGF92Wq5uE.json,cust_082,2021-05-26T01:15:12Z.
+    Read-only, nothing modified.'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/payments/pay_20210506T113853Z_LuGaYp3sSG.json,cust_031,2021-05-06T11:38:53Z
+  - /proc/payments/pay_20210506T114710Z_CH88xpNE7i.json,cust_031,2021-05-06T11:47:10Z
+  - /proc/payments/pay_20210506T120253Z_FHLaja4i2r.json,cust_032,2021-05-06T12:02:53Z
+  - /proc/payments/pay_20210506T121126Z_QUxvV35QqK.json,cust_032,2021-05-06T12:11:26Z
+  - /proc/payments/pay_20210506T122053Z_3FDm6EDeDa.json,cust_033,2021-05-06T12:20:53Z
+  - /proc/payments/pay_20210506T122627Z_WnzYMpsRPk.json,cust_033,2021-05-06T12:26:27Z
+  - /proc/payments/pay_20210506T124753Z_W5mLEQxzj5.json,cust_034,2021-05-06T12:47:53Z
+  - /proc/payments/pay_20210506T125655Z_PbRnfQc37t.json,cust_034,2021-05-06T12:56:55Z
+  - /proc/payments/pay_20210506T125853Z_NHZJDKZQfu.json,cust_035,2021-05-06T12:58:53Z
+  - /proc/payments/pay_20210506T130608Z_jT661ai8wU.json,cust_035,2021-05-06T13:06:08Z
+  - /proc/payments/pay_20210526T002730Z_HkHUXAQSXh.json,cust_082,2021-05-26T00:27:30Z
+  - /proc/payments/pay_20210526T004138Z_AmUjSajRn4.json,cust_082,2021-05-26T00:41:38Z
+  - /proc/payments/pay_20210526T005427Z_PzNmaU8UB9.json,cust_082,2021-05-26T00:54:27Z
+  - /proc/payments/pay_20210526T005523Z_4iWLuG1bpP.json,cust_082,2021-05-26T00:55:23Z
+  - /proc/payments/pay_20210526T011512Z_DGF92Wq5uE.json,cust_082,2021-05-26T01:15:12Z
+  - /docs/security.md
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t40

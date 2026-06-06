@@ -1,0 +1,97 @@
+{
+  "intent": "Verify Tobias Hartmann is store_manager for PowerTool Graz Jakomini, confirm basket_037 subtotal is EUR 427.00, then apply the 5% service_recovery discount he approved.",
+  "params": {
+    "store_name": "PowerTool Graz Jakomini",
+    "manager_name": "Tobias Hartmann",
+    "basket_id": "basket_037",
+    "discount_percent": 5,
+    "reason_code": "service_recovery",
+    "expected_subtotal_cents": 42700,
+    "issuer_employee_id": "$manager_id"
+  },
+  "success_criteria": [
+    "Tobias Hartmann resolves to an employee whose store_id matches PowerTool Graz Jakomini and who holds the store_manager (and discount_manager) role",
+    "basket_037 exists and its store_id matches the same store",
+    "computed subtotal of basket_037 line items equals 42700 cents (EUR 427.00)",
+    "5% service_recovery discount applied to basket_037 with discount_issuer_employee_id = Tobias Hartmann's employee_id",
+    "answer references basket record path, store, manager and discount policy doc"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH st AS (SELECT store_id, store_name, record_path FROM stores WHERE store_name = :store_name), mgr AS (SELECT e.employee_id, e.employee_display_name, e.job_title, e.store_id, e.record_path, (SELECT GROUP_CONCAT(r.role_code) FROM employee_role_assignments r WHERE r.employee_id = e.employee_id) AS roles FROM employee_accounts e WHERE e.employee_display_name = :manager_name), bk AS (SELECT b.basket_id, b.store_id, b.basket_status, b.discount_percent, b.discount_reason_code, b.discount_issuer_employee_id, b.record_path FROM shopping_baskets b WHERE b.basket_id = :basket_id), sub AS (SELECT bi.basket_id, SUM(pv.price_cents * bi.requested_quantity) AS subtotal_cents FROM shopping_basket_items bi JOIN product_variants pv ON pv.product_sku = bi.product_sku WHERE bi.basket_id = :basket_id GROUP BY bi.basket_id) SELECT st.store_id AS store_id, st.record_path AS store_path, mgr.employee_id AS manager_id, mgr.job_title AS manager_title, mgr.store_id AS manager_store_id, mgr.roles AS manager_roles, mgr.record_path AS manager_path, bk.store_id AS basket_store_id, bk.basket_status AS basket_status, bk.record_path AS basket_path, sub.subtotal_cents AS subtotal_cents FROM st LEFT JOIN mgr ON 1=1 LEFT JOIN bk ON 1=1 LEFT JOIN sub ON 1=1;"
+      },
+      "bind": "verify"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/discount",
+        "args": [
+          "--help"
+        ]
+      },
+      "bind": "discount_help"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/docs",
+        "pattern": "discount",
+        "limit": 5
+      },
+      "bind": "discount_policy"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/discount",
+        "args": [
+          "set",
+          "--basket",
+          "basket_037",
+          "--percent",
+          "5",
+          "--reason",
+          "service_recovery",
+          "--issuer",
+          "$manager_id"
+        ]
+      },
+      "bind": "apply_result"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#Important tools > discount",
+      "rule": "use discount tool to manage basket discounts"
+    },
+    {
+      "anchor": "#Important things > policy grounding",
+      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
+    },
+    {
+      "anchor": "#Important things > reference path",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#Important things > yes/no tokens",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response."
+    }
+  ],
+  "answer_template": {
+    "message": "<YES> Tobias Hartmann ($manager_id, $manager_title) is the store_manager for PowerTool Graz Jakomini ($store_id); roles: $manager_roles. basket_037 subtotal verified at EUR {subtotal_cents/100} (=EUR 427.00). Applied 5% service_recovery discount, issuer $manager_id. Result: $apply_result.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$basket_path",
+      "$store_path",
+      "$manager_path",
+      "$discount_policy"
+    ]
+  },
+  "outcome_override": null
+}

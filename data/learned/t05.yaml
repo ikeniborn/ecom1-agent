@@ -1,0 +1,29 @@
+entries:
+- agents_md_anchor: '#important-things > references'
+  content: When parsing /bin/sql stdout into rows, split on the delimiter the tool
+    actually emits (comma-separated CSV with a leading header line), not an assumed
+    pipe '|'; map columns by their header names so ref columns like record_path survive
+    into vm.answer refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$record_path'']) but actual refs [] contain only static template entries []".
+    Root cause: /bin/sql returns CSV (comma-delimited, e.g. ''FST-2JPIIG2S,/proc/catalog/FST-2JPIIG2S.json,1,0''),
+    but SCRIPT_CODE parses with `cols = [c.strip() for c in line.split("|")]`. Splitting
+    a comma row on ''|'' yields one element, so cols[0] holds the whole line and cols[1]
+    never exists. Failing fragment: `path = cols[1] if len(cols) > 1 else ""` always
+    returns "", so `paths` stays empty and `refs = list(paths)` is []; also the header
+    guard `cols[0].lower() == ''product_sku''` never matches since cols[0] is ''product_sku,record_path,has_a,has_b''.
+    The SQL was correct — claim_check returned 3 valid rows with record_path — the
+    loss happened purely in stdout row parsing. Rule linkage: delimiter mismatch in
+    stdout parsing is the generic CODEGEN defect; parsing the real CSV delimiter and
+    indexing by header name preserves record_path for refs, satisfying the references
+    constraint.'
+  status: active
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t05

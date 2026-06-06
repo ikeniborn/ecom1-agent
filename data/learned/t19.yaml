@@ -1,0 +1,29 @@
+entries:
+- agents_md_anchor: null
+  content: When parsing /bin/sql stdout into rows, split on the actual output delimiter
+    — comma-separated CSV with a header line — never an assumed pipe '|'; a wrong
+    delimiter collapses each line into one cell, fails the column-count guard, and
+    drops path columns so runtime refs come up empty.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "template/constraints require runtime refs ([''$product.product_path'',
+    ''$rows[*].store_path'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". Root
+    cause: NOT empty SQL — OBSERVED_RPC_OUTPUTS show all three queries returned rows
+    with paths (product_path /proc/catalog/.../SFE-57W1EN82.json, store paths, total
+    7). The failing fragment is _rows(): `out.append([c.strip() for c in line.split("|")])`.
+    /bin/sql emits comma-delimited CSV (header `store_id,store_path,...`), but code
+    splits on ''|''. Result: each line becomes one cell. Then `if len(cells) < 5:
+    continue` drops every store row → available_store_paths empty; product loop checks
+    `c.startswith(''/'')` on the single cell `SFE-57W1EN82,/proc/...` which starts
+    with ''SFE'' → product_path stays ''''. So refs=[] even though total=7 parsed
+    (single-cell ''7'' coincidentally int-castable). Rule linkage: corrective rule
+    fixes the delimiter assumption that severed path extraction.'
+  status: active
+last_run:
+  cycles_used: 2
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t19

@@ -1,0 +1,59 @@
+{
+  "intent": "Sum available-today units of the specific Dresselhaus machine screw (5mm/60mm) across every Graz store branch including those with zero availability, and cite each Graz store record plus the product record.",
+  "params": {
+    "brand": "Dresselhaus",
+    "model": "DRE 2A1-OSK",
+    "family_name": "Dresselhaus Outdoor DRE 2A1-OSK Wood and Drywall Screw",
+    "screw_type": "machine screw",
+    "diameter_mm": 5,
+    "length_mm": 60,
+    "city": "Graz"
+  },
+  "success_criteria": [
+    "Exactly one product_sku resolves from brand+family+screw_type+diameter_mm+length_mm",
+    "Total = SUM(available_today_quantity) over ALL stores where city='Graz', counting stores with no/0 inventory as 0",
+    "Answer string formatted exactly as 'qty %d'",
+    "refs contains the product record path and every Graz store record path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH target AS (\n  SELECT pv.product_sku, pv.record_path AS product_path\n  FROM product_variants pv\n  WHERE pv.brand = :brand\n    AND pv.model = :model\n    AND pv.product_sku IN (SELECT product_sku FROM product_variant_properties WHERE property_key='screw_type' AND property_value_text = :screw_type)\n    AND pv.product_sku IN (SELECT product_sku FROM product_variant_properties WHERE property_key='diameter_mm' AND property_value_number = :diameter_mm)\n    AND pv.product_sku IN (SELECT product_sku FROM product_variant_properties WHERE property_key='length_mm' AND property_value_number = :length_mm)\n)\nSELECT s.store_id, s.record_path AS store_path, t.product_sku, t.product_path,\n       COALESCE(si.available_today_quantity, 0) AS available_today\nFROM target t\nCROSS JOIN stores s\nLEFT JOIN store_inventory si\n  ON si.store_id = s.store_id AND si.product_sku = t.product_sku\nWHERE s.city = :city\nORDER BY s.store_id;"
+      },
+      "bind": "graz_rows"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH target AS (\n  SELECT pv.product_sku, pv.record_path AS product_path\n  FROM product_variants pv\n  WHERE pv.brand = :brand\n    AND pv.model = :model\n    AND pv.product_sku IN (SELECT product_sku FROM product_variant_properties WHERE property_key='screw_type' AND property_value_text = :screw_type)\n    AND pv.product_sku IN (SELECT product_sku FROM product_variant_properties WHERE property_key='diameter_mm' AND property_value_number = :diameter_mm)\n    AND pv.product_sku IN (SELECT product_sku FROM product_variant_properties WHERE property_key='length_mm' AND property_value_number = :length_mm)\n)\nSELECT COALESCE(SUM(COALESCE(si.available_today_quantity,0)),0) AS total_qty\nFROM target t\nCROSS JOIN stores s\nLEFT JOIN store_inventory si\n  ON si.store_id = s.store_id AND si.product_sku = t.product_sku\nWHERE s.city = :city;"
+      },
+      "bind": "total"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > inventory",
+      "rule": "Note that inventory lives only in SQL projections"
+    }
+  ],
+  "answer_template": {
+    "message": "qty {total.total_qty}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$product_path",
+      "$store_paths"
+    ]
+  },
+  "outcome_override": null
+}

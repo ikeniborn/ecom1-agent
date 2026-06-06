@@ -179,7 +179,10 @@ entries:
     enumeration always yields refs to existing catalog files while match determination
     stays accurate.
   created: '2026-05-29'
-  deactivated_reason: null
+  deactivated_reason: r011 only broadens the WHERE clause to scope columns but leaves
+    narrowing INNER property JOINs and HAVING qty>0 in place, which re-empty the rowset;
+    the new rule strictly supersedes it by also relaxing those JOINs/HAVING into Python
+    post-filters.
   id: r011
   reasoning: 'ERROR: ''grader: answer missing required reference /proc/catalog/CLN-NOLQX7ED.json''.
     Script ran ops SQL with all four equality filters (brand, line, product_type,
@@ -192,7 +195,7 @@ entries:
     the single ops query: drop narrow predicates from SQL, keep scope predicates,
     post-filter narrow ones in Python — refs then enumerate all line products (including
     CLN-NOLQX7ED) while <YES>/<NO> reflects post-filter result.'
-  status: active
+  status: inactive
 - agents_md_anchor: null
   content: When tool_plan discovery entry specifies SQL via `stdin` field, pass it
     through vm.exec stdin parameter (not args=[sql]), since /bin/sql reads query from
@@ -209,9 +212,115 @@ entries:
     channel. r011 covers broadening WHERE (done) but assumed SQL executed. Root cause
     is transport mismatch with tool_plan invocation contract.'
   status: active
+- agents_md_anchor: null
+  content: When parsing /bin/sql stdout into rows, detect the delimiter from the emitted
+    header line (default comma/CSV) rather than hardcoding pipe '|', since /bin/sql
+    outputs comma-separated values and a '|' split matches zero columns on every line,
+    dropping all rows and leaving refs empty even when the query returned data.
+  created: '2026-06-05'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matches[0].record_path'']) but actual refs [] contain only static template
+    entries []". Root cause: /bin/sql emits CSV (header observed as comma-joined:
+    `product_sku,record_path,product_name,brand,series,model,cleaner_type,available_qty`),
+    but _parse_rows assumes pipe-delimited output. Failing fragment: `if not line
+    or "|" not in line: continue` then `parts = [c.strip() for c in line.split("|")]`
+    with the `len(parts) != 8` guard — every CSV line lacks ''|'', so it is skipped,
+    rows=[] for any result, matches=[] and the negative-branch ref loop also empties,
+    producing refs []. Distinct from r012 (stdin vs args delivery) and r010 (ID regex):
+    those cover delivery and ID extraction, not the row-field delimiter. New rule
+    adds the CSV delimiter technique so parsing yields rows and ref columns survive.'
+  status: active
+- agents_md_anchor: '#important-things > references'
+  content: When broadening SQL scope so row enumeration always yields refs to in-scope
+    catalog files (e.g. for negative yes/no answers), also convert narrow property-key
+    INNER JOINs to LEFT JOIN and strip HAVING availability filters (qty>0) from the
+    SQL, then apply property and availability predicates in Python post-filter, since
+    INNER JOIN on a narrow property_key plus HAVING qty>0 re-narrows the rowset back
+    to empty and leaves refs blank despite the broadened WHERE clause.
+  created: '2026-06-05'
+  deactivated_reason: null
+  id: r014
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matches[0].record_path'']) but actual refs [] contain only static template
+    entries [] — SQL likely returned no rows or row parsing dropped the path column".
+    Root cause: script followed r011 (broadened WHERE to brand+series, case-insensitive
+    per r009) but left two narrowing constructs in SQL: INNER ''JOIN product_variant_properties
+    p ON p.product_sku = v.product_sku AND p.property_key = ''cleaner_type'''' and
+    ''HAVING available_qty > 0''. OBSERVED_RPC_OUTPUTS shows only the header line
+    emitted, zero data rows — the broadened WHERE was defeated by the inner property
+    join and HAVING availability filter, so parsed=[] and the negative branch refs=[r.get(''record_path'')
+    for r in parsed] yielded []. Failing fragment: ''JOIN product_variant_properties
+    p ... AND p.property_key=...'' (should be LEFT JOIN) and ''HAVING available_qty
+    > 0'' (should be removed from SQL, checked in Python). Linkage: extends r011 —
+    broadening WHERE alone is insufficient when JOINs/HAVING still narrow the rowset.'
+  status: active
+- content: null
+  created: '2026-06-05'
+  id: v001
+  score: 0.0
+  score_detail:
+  - Answer should contain '<YES>'
+  source: verdict
+  status: active
+  submitted_message: <NO> No, we do not currently carry an available Ajax Eco Classic
+    25C-DXE Cleaning Liquid with cleaner type floor cleaner.
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/CLN-GEF2EYP9.json
+  - /proc/catalog/CLN-NOLQX7ED.json
+- agents_md_anchor: '#important-things > yes/no'
+  content: When post-filtering a broadened rowset in Python to decide a yes/no presence
+    answer, match split identifier params (such as series and model) against catalog
+    identifier columns using normalized substring/containment comparison rather than
+    requiring exact per-column equality of each split param, since the catalog often
+    stores the full line identifier combined in a single field and conjunctive per-segment
+    equality then returns zero matches, emitting a false-negative <NO> token for a
+    product that is actually present and available.
+  created: '2026-06-05'
+  deactivated_reason: null
+  id: r015
+  reasoning: 'Verbatim error: grader: Answer should contain ''<YES>''. Refs/rowset
+    are now populated (broadening per r014/r005/r009/r012/r013 worked), so the new
+    failure is the answer TOKEN: script emitted <NO> when the product exists and is
+    available, so grader expected <YES>. Root cause is the post-filter false-negative.
+    Failing fragment: `matches = [r for r in rows if low(r.get("series")) == low(series)
+    and low(r.get("model")) == low(model) and ...]`. The tool_plan intent and success_criteria
+    treat the identifier as a single combined line (''<series> <model>''), but params
+    split it into series + model, and the catalog stores the line as one combined
+    field; requiring exact equality of each segment against a separate column yields
+    zero matches, so matches is empty and the NO branch fires. r009 (case-insensitivity)
+    and r014 (broaden + Python post-filter) do not cover over-strict conjunctive per-segment
+    equality on combined identifier fields, so this is a new technique, not a duplicate.
+    Linkage: refines the post-filter matching step introduced by r014 to use containment
+    matching for segmented identifiers, preventing false-negative yes/no tokens.'
+  status: active
+- agents_md_anchor: '#important-things > full path references'
+  content: Always pass through every static literal ref from answer_template.refs
+    (entries not prefixed with $) into the vm.answer refs list, in addition to the
+    dynamically resolved $-bound record paths, since static refs are grader-required
+    citations and dropping them fails answer_refs validation.
+  created: '2026-06-05'
+  deactivated_reason: null
+  id: r016
+  reasoning: 'Verbatim error: "answer_refs: missing static template refs [''/proc/catalog''];
+    actual refs [''/proc/catalog/CLN-GEF2EYP9.json'']. Static refs are grader-required
+    citations — always pass them through." Root cause: answer_template.refs = [''/proc/catalog'',
+    ''$match.record_path'']; the first is a static literal citation, the second is
+    dynamic. Failing fragment: script built refs purely from matched record_paths
+    (`for m2 in match: refs.append(m2.get(''record_path''))`) and passed only those
+    to vm.answer, never emitting the static ''/proc/catalog'' literal. Linkage: this
+    rule directs CODEGEN to always include the non-$-prefixed template refs verbatim
+    alongside resolved dynamic refs. Note: prior compacted guidance (''never prepend
+    a parent directory like /proc/catalog as a ref'') is too broad — it forbids adding
+    /proc/catalog even when it is an explicit static template ref the grader demands;
+    this new rule scopes that to only avoid INVENTING parent dirs, while honoring
+    declared static refs. It has no addressable rXXX id, so no deactivation issued.'
+  status: active
 last_run:
   cycles_used: 1
-  date: '2026-05-29'
-  outcome: OUTCOME_NONE_CLARIFICATION
-  status: failure
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
 task_id: t01

@@ -1,0 +1,48 @@
+{
+  "intent": "Verify whether Greta Engel is the store manager of PowerTool Innsbruck Wilten and, if so, return her contact email.",
+  "params": {
+    "name": "Greta Engel",
+    "store": "%Innsbruck Wilten%",
+    "manager_role": "store_manager"
+  },
+  "success_criteria": [
+    "Determine if an employee named Greta Engel is assigned to the store whose name matches 'Innsbruck Wilten' AND holds the store_manager role",
+    "If confirmed, the answer includes her employee_email and a <YES> token",
+    "If not confirmed, the answer includes a <NO> token and does not disclose an email for a non-matching manager",
+    "Answer references the matched employee record full path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT e.employee_id, e.employee_display_name, e.employee_email, e.job_title, e.record_path AS employee_path, s.store_id, s.store_name, s.record_path AS store_path, MAX(CASE WHEN r.role_code = :manager_role THEN 1 ELSE 0 END) AS is_store_manager FROM employee_accounts e JOIN stores s ON e.store_id = s.store_id LEFT JOIN employee_role_assignments r ON r.employee_id = e.employee_id WHERE e.employee_display_name = :name AND s.store_name LIKE :store GROUP BY e.employee_id;"
+      },
+      "bind": "match"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > yes/no tokens",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+    },
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > ambiguity",
+      "rule": "When a request is ambiguous and you ask for clarification, reference all concrete candidate objects that make it ambiguous."
+    }
+  ],
+  "answer_template": {
+    "message": "{match.is_store_manager and match.employee_display_name and '<YES> Greta Engel manages '+match.store_name+' (role store_manager). Contact email: '+match.employee_email+'.' or '<NO> Greta Engel is not the store_manager of PowerTool Innsbruck Wilten; no manager email disclosed.'}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$employee_path",
+      "$store_path"
+    ]
+  },
+  "outcome_override": null
+}

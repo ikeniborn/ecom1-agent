@@ -1,0 +1,73 @@
+{
+  "intent": "Count how many of the 6 specified product variants have available_today_quantity >= 2 at the central Salzburg PowerTool branch.",
+  "params": {
+    "store_city": "Salzburg",
+    "store_name_hint": "central",
+    "min_qty": 2,
+    "p1_family": "Delta Plus Panoply Panoply 11V-VHV Work Gloves",
+    "p1_size": "XXL",
+    "p1_color_family": "Red",
+    "p2_family": "Stihl Battery AK 3LQ-DDU Chainsaw",
+    "p2_power_source": "battery",
+    "p2_bar_length_cm": "30",
+    "p2_battery_platform": "18v-system",
+    "p3_family": "Helios Belton Mobihel 34S-TXZ Wood Stain and Deck Oil",
+    "p3_product_type": "wood stain",
+    "p3_color_family": "White",
+    "p4_family": "Stanley Professional SX 3VB-LPP Tool Box and Bag",
+    "p4_storage_type": "tool box",
+    "p4_color_family": "Green",
+    "p5_family": "Delta Plus Panoply Panoply 11V-VHV Work Gloves",
+    "p5_size": "L",
+    "p5_color_family": "Orange",
+    "p6_family": "Jub Jupol Akrilin 296-K0S Wall Paint",
+    "p6_color_family": "Beige",
+    "p6_finish": "matte",
+    "p6_volume_ml": "2500"
+  },
+  "success_criteria": [
+    "Exactly one store resolved as central Salzburg PowerTool branch",
+    "Each of the 6 specs resolved to its matching product_sku via family + variant properties",
+    "Count = number of those 6 SKUs with available_today_quantity >= 2 at the resolved store",
+    "Answer formatted exactly as 'Count: %d'"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT store_id, store_name, city FROM stores WHERE city = :store_city AND store_name LIKE '%' || :store_name_hint || '%';"
+      },
+      "bind": "store"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH specs(idx, family, k1, v1, k2, v2, k3, v3) AS (VALUES (1, :p1_family, 'size', :p1_size, 'color_family', :p1_color_family, NULL, NULL), (2, :p2_family, 'power_source', :p2_power_source, 'bar_length_cm', :p2_bar_length_cm, 'battery_platform', :p2_battery_platform), (3, :p3_family, 'product_type', :p3_product_type, 'color_family', :p3_color_family, NULL, NULL), (4, :p4_family, 'storage_type', :p4_storage_type, 'color_family', :p4_color_family, NULL, NULL), (5, :p5_family, 'size', :p5_size, 'color_family', :p5_color_family, NULL, NULL), (6, :p6_family, 'color_family', :p6_color_family, 'finish', :p6_finish, 'volume_ml', :p6_volume_ml)), matched AS (SELECT s.idx, pv.product_sku FROM specs s JOIN product_families pf ON pf.product_family_name = s.family JOIN product_variants pv ON pv.product_family_id = pf.product_family_id WHERE EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = s.k1 AND p.property_value_text = s.v1) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = s.k2 AND p.property_value_text = s.v2) AND (s.k3 IS NULL OR EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = s.k3 AND p.property_value_text = s.v3))) SELECT COUNT(*) AS available_count FROM matched m JOIN store_inventory si ON si.product_sku = m.product_sku WHERE si.store_id = (SELECT store_id FROM stores WHERE city = :store_city AND store_name LIKE '%' || :store_name_hint || '%' LIMIT 1) AND si.available_today_quantity >= :min_qty;"
+      },
+      "bind": "count_result"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > availability",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
+    },
+    {
+      "anchor": "#important-tools > sql",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
+    }
+  ],
+  "answer_template": {
+    "message": "Count: {count_result.available_count}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$store.record_path"
+    ]
+  },
+  "outcome_override": null
+}

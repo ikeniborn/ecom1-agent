@@ -1,0 +1,68 @@
+{
+  "intent": "Sum available_today_quantity of the specific Honeywell FFP2 dust-mask respirator across every Vienna PowerTool store (including stores with zero availability) and report as 'qty %d', citing all Vienna store records plus the product record.",
+  "params": {
+    "brand": "Honeywell",
+    "line": "Honeywell Pro HW 2GM-UMP Respiratory Protection",
+    "mask_type": "dust mask",
+    "protection_class": "ffp2",
+    "size": "one size",
+    "city": "Vienna"
+  },
+  "success_criteria": [
+    "Exactly one product_sku resolves matching brand, family line, mask_type, protection_class, and size",
+    "All Vienna stores enumerated via LEFT JOIN so zero-availability branches are included",
+    "Total equals SUM(COALESCE(available_today_quantity,0)) over all Vienna stores",
+    "Answer formatted exactly as 'qty %d'",
+    "refs contain the product record path and every Vienna store record path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT v.product_sku, v.record_path AS product_path FROM product_variants v JOIN product_families f ON v.product_family_id = f.product_family_id WHERE v.brand = :brand AND f.product_family_name = :line AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key='mask_type' AND p.property_value_text = :mask_type) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key='protection_class' AND p.property_value_text = :protection_class) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key='size' AND p.property_value_text = :size);"
+      },
+      "bind": "product"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH target AS (SELECT v.product_sku, v.record_path FROM product_variants v JOIN product_families f ON v.product_family_id = f.product_family_id WHERE v.brand = :brand AND f.product_family_name = :line AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=v.product_sku AND p.property_key='mask_type' AND p.property_value_text=:mask_type) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=v.product_sku AND p.property_key='protection_class' AND p.property_value_text=:protection_class) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=v.product_sku AND p.property_key='size' AND p.property_value_text=:size)) SELECT s.store_id, s.record_path AS store_path, t.product_sku, t.record_path AS product_path, COALESCE(i.available_today_quantity,0) AS available_today FROM stores s CROSS JOIN target t LEFT JOIN store_inventory i ON i.store_id=s.store_id AND i.product_sku=t.product_sku WHERE s.city = :city ORDER BY s.store_id;"
+      },
+      "bind": "rows"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH target AS (SELECT v.product_sku FROM product_variants v JOIN product_families f ON v.product_family_id = f.product_family_id WHERE v.brand = :brand AND f.product_family_name = :line AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=v.product_sku AND p.property_key='mask_type' AND p.property_value_text=:mask_type) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=v.product_sku AND p.property_key='protection_class' AND p.property_value_text=:protection_class) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku=v.product_sku AND p.property_key='size' AND p.property_value_text=:size)) SELECT COALESCE(SUM(COALESCE(i.available_today_quantity,0)),0) AS total_available FROM stores s CROSS JOIN target t LEFT JOIN store_inventory i ON i.store_id=s.store_id AND i.product_sku=t.product_sku WHERE s.city = :city;"
+      },
+      "bind": "total"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > availability",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
+    }
+  ],
+  "answer_template": {
+    "message": "qty {total.total_available}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$product.product_path",
+      "$rows[*].store_path"
+    ]
+  },
+  "outcome_override": null
+}

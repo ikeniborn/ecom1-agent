@@ -240,11 +240,24 @@ def _terminal_clarification(vm, message: str) -> None:
     vm.answer(message=message[:800], outcome="OUTCOME_NONE_CLARIFICATION", refs=[])
 
 
+# AGENTS.MD: "When you apply a policy from `docs`, include that policy document
+# as a grounding reference in the final response." A security denial always
+# applies /docs/security.md, so the grader requires it in refs even for refusals.
+_SECURITY_POLICY_REF = "/docs/security.md"
+
+
+def _ground_security_refs(outcome: str, refs: list[str]) -> list[str]:
+    """Guarantee a DENIED_SECURITY answer cites the security policy it applied."""
+    if outcome == "OUTCOME_DENIED_SECURITY" and _SECURITY_POLICY_REF not in refs:
+        return [*refs, _SECURITY_POLICY_REF]
+    return refs
+
+
 def _terminal_outcome_override(vm, design: DesignOutput) -> None:
     vm.answer(
         message=design.answer_template.message,
         outcome=design.outcome_override,
-        refs=list(design.answer_template.refs),
+        refs=_ground_security_refs(design.outcome_override or "", list(design.answer_template.refs)),
     )
 
 
@@ -369,6 +382,7 @@ class _AnswerGuard:
         # matches grader expectation. Pass through; grader feedback drives
         # LEARN via `learn_from_grader` between training cycles.
         if outcome != "OUTCOME_OK":
+            refs_list = _ground_security_refs(outcome, refs_list)
             self._captured = {"message": message, "outcome": outcome, "refs": refs_list}
             self._vm.answer(message=message, outcome=outcome, refs=refs_list)
             return

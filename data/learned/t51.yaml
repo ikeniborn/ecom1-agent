@@ -1,80 +1,91 @@
 entries:
 - agents_md_anchor: null
-  content: Always execute every RPC listed in tool_plan.discovery before any vm.answer() call, even when
-    intermediate results are empty or a guard condition would otherwise short-circuit; fidelity checks
-    compare RPC multisets, so skipping planned Read/Exec calls fails drift validation. Use best-effort
-    placeholder args (e.g., empty SKU list, fallback path) rather than early-returning.
+  content: Always execute every RPC listed in tool_plan.discovery before any vm.answer()
+    call, even when intermediate results are empty or a guard condition would otherwise
+    short-circuit; fidelity checks compare RPC multisets, so skipping planned Read/Exec
+    calls fails drift validation. Use best-effort placeholder args (e.g., empty SKU
+    list, fallback path) rather than early-returning.
   created: '2026-05-29'
   deactivated_reason: null
   id: r001
-  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC multiset) expected:
-    [Answer, Exec, List, Read] got: [Answer, List]''. Root cause: script branched into early vm.answer()
-    at `if not receipt_path` and `if not items` guards, skipping vm.read() and vm.exec() planned in tool_plan.discovery.
-    Failing fragment: `if not receipt_path: vm.answer(...); return` and `if not items: vm.answer(...);
-    return` — both fire before the Read/Exec RPCs. Fidelity validator counts RPC multiset against tool_plan,
-    so any skipped discovery RPC triggers drift. Rule links CODEGEN translation: every discovery entry
-    must materialize as a vm call regardless of branch outcome.'
+  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC
+    multiset) expected: [Answer, Exec, List, Read] got: [Answer, List]''. Root cause:
+    script branched into early vm.answer() at `if not receipt_path` and `if not items`
+    guards, skipping vm.read() and vm.exec() planned in tool_plan.discovery. Failing
+    fragment: `if not receipt_path: vm.answer(...); return` and `if not items: vm.answer(...);
+    return` — both fire before the Read/Exec RPCs. Fidelity validator counts RPC multiset
+    against tool_plan, so any skipped discovery RPC triggers drift. Rule links CODEGEN
+    translation: every discovery entry must materialize as a vm call regardless of
+    branch outcome.'
   status: active
 - agents_md_anchor: '#Important things > yes/no token'
-  content: Always finalize CODEGEN script with vm.answer(message=..., outcome=..., refs=...) call rendered
-    from tool_plan.answer_template; computing the message string without invoking vm.answer leaves the
-    response empty and grader token assertions (e.g. <YES>/<NO>) fail.
+  content: Always finalize CODEGEN script with vm.answer(message=..., outcome=...,
+    refs=...) call rendered from tool_plan.answer_template; computing the message
+    string without invoking vm.answer leaves the response empty and grader token assertions
+    (e.g. <YES>/<NO>) fail.
   created: '2026-05-29'
   deactivated_reason: null
   id: r002
-  reasoning: 'ERROR ''grader: Answer should contain <NO>'' indicates no token in final response. SCRIPT_CODE
-    builds msg and refs locals at end of run() but never calls vm.answer(), so harness receives empty/default
-    answer. answer_template in tool_plan was ignored at emit step. Root cause: missing terminal vm.answer()
-    invocation. Rule links CODEGEN obligation: render answer_template.message with computed bindings AND
-    dispatch via vm.answer so token/refs reach grader.'
+  reasoning: 'ERROR ''grader: Answer should contain <NO>'' indicates no token in final
+    response. SCRIPT_CODE builds msg and refs locals at end of run() but never calls
+    vm.answer(), so harness receives empty/default answer. answer_template in tool_plan
+    was ignored at emit step. Root cause: missing terminal vm.answer() invocation.
+    Rule links CODEGEN obligation: render answer_template.message with computed bindings
+    AND dispatch via vm.answer so token/refs reach grader.'
   status: active
 - agents_md_anchor: '#Important things > yes/no'
-  content: When computing yes/no comparisons between two aggregates (e.g., old vs current totals) derived
-    from same line items, sum both sides from identical per-line basis instead of mixing explicit document
-    totals with per-line catalog sums; inconsistent aggregation bases produce spurious deltas that flip
-    the YES/NO token.
+  content: When computing yes/no comparisons between two aggregates (e.g., old vs
+    current totals) derived from same line items, sum both sides from identical per-line
+    basis instead of mixing explicit document totals with per-line catalog sums; inconsistent
+    aggregation bases produce spurious deltas that flip the YES/NO token.
   created: '2026-05-29'
   deactivated_reason: null
   id: r003
-  reasoning: 'ERROR=''grader: Answer should contain <YES>''. Template `<{yes_or_no}>` renders correctly
-    via .format, so token literal not the issue — yes_or_no resolved to NO. Root cause: script sets `old_total
-    = explicit_total` when receipt contains ''total''/''ex vat'' line, but `new_total` summed per-line
-    via `catalog.get(sku, old_price)`. Two aggregates use different bases — explicit receipt total vs
-    summed catalog/line prices — so delta becomes nonzero even when prices match within tolerance, yielding
-    NO. Failing fragment: `if explicit_total is not None: old_total = explicit_total` paired with per-line
-    `new_total += catalog.get(sku, old_price)`. Rule links: prevents future CODEGEN from mixing aggregate
-    sources when computing comparison deltas. Not covered by r001 (RPC execution) or r002 (vm.answer call).'
+  reasoning: 'ERROR=''grader: Answer should contain <YES>''. Template `<{yes_or_no}>`
+    renders correctly via .format, so token literal not the issue — yes_or_no resolved
+    to NO. Root cause: script sets `old_total = explicit_total` when receipt contains
+    ''total''/''ex vat'' line, but `new_total` summed per-line via `catalog.get(sku,
+    old_price)`. Two aggregates use different bases — explicit receipt total vs summed
+    catalog/line prices — so delta becomes nonzero even when prices match within tolerance,
+    yielding NO. Failing fragment: `if explicit_total is not None: old_total = explicit_total`
+    paired with per-line `new_total += catalog.get(sku, old_price)`. Rule links: prevents
+    future CODEGEN from mixing aggregate sources when computing comparison deltas.
+    Not covered by r001 (RPC execution) or r002 (vm.answer call).'
   status: active
 - agents_md_anchor: null
-  content: Always keep CODEGEN scripts compact by using a single access pattern per VM result (direct
-    attribute OR dict access, not both with getattr+dict fallback chains); verbose defensive unwrapping
-    inflates token count and truncates the script before the final vm.answer() call, leaving grader tokens
-    like <YES>/<NO> absent.
+  content: Always keep CODEGEN scripts compact by using a single access pattern per
+    VM result (direct attribute OR dict access, not both with getattr+dict fallback
+    chains); verbose defensive unwrapping inflates token count and truncates the script
+    before the final vm.answer() call, leaving grader tokens like <YES>/<NO> absent.
   created: '2026-05-29'
   deactivated_reason: null
   id: r004
-  reasoning: 'Error ''grader: Answer should contain <YES>'' verbatim. SCRIPT_CODE ends mid-expression:
-    ''within_tolerance = "within 2 EUR tolerance" if'' — truncated before vm.answer(). r002 mandates vm.answer
-    call but script never reached it due to token exhaustion from repeated getattr(x, ''k'', None) or
-    (x.get(''k'','''') if isinstance(x, dict) else '''') boilerplate across 5 RPC results. Root cause
-    = bloat-induced truncation, not missing intent to call vm.answer. New rule targets the bloat pattern
-    that caused truncation; complementary to r002, not superseding.'
+  reasoning: 'Error ''grader: Answer should contain <YES>'' verbatim. SCRIPT_CODE
+    ends mid-expression: ''within_tolerance = "within 2 EUR tolerance" if'' — truncated
+    before vm.answer(). r002 mandates vm.answer call but script never reached it due
+    to token exhaustion from repeated getattr(x, ''k'', None) or (x.get(''k'','''')
+    if isinstance(x, dict) else '''') boilerplate across 5 RPC results. Root cause
+    = bloat-induced truncation, not missing intent to call vm.answer. New rule targets
+    the bloat pattern that caused truncation; complementary to r002, not superseding.'
   status: active
 - agents_md_anchor: null
-  content: Always access fields on VM RPC results using dict-style subscript notation such as result['items']
-    or result['stdout'] rather than dot-attribute notation such as result.items or result.stdout, because
-    VM responses are deserialized as plain Python dicts where common names like items shadow built-in
-    dict methods and raise TypeError when iterated.
+  content: Always access fields on VM RPC results using dict-style subscript notation
+    such as result['items'] or result['stdout'] rather than dot-attribute notation
+    such as result.items or result.stdout, because VM responses are deserialized as
+    plain Python dicts where common names like items shadow built-in dict methods
+    and raise TypeError when iterated.
   created: '2026-06-05'
   deactivated_reason: null
   id: r005
-  reasoning: 'Diagnosis: fidelity TypeError: ''builtin_function_or_method'' object is not iterable occurs
-    at `for it in ul.items:`. The variable `ul` is assigned from `vm.list(...)`. The codegen used attribute-style
-    `ul.items` expecting a list, but VM RPC results are plain dicts, so `.items` resolves to the built-in
-    dict method object which is not iterable. Root cause: dot-attribute access on dict-like VM result
-    objects collides with dict methods for keys like ''items''. Failing fragment: `ul=vm.list(path=''/uploads/'');
-    ... for it in ul.items:`. Rule linkage: mandate dict subscript access for all VM result fields to
-    avoid method-shadowing crashes.'
+  reasoning: 'Diagnosis: fidelity TypeError: ''builtin_function_or_method'' object
+    is not iterable occurs at `for it in ul.items:`. The variable `ul` is assigned
+    from `vm.list(...)`. The codegen used attribute-style `ul.items` expecting a list,
+    but VM RPC results are plain dicts, so `.items` resolves to the built-in dict
+    method object which is not iterable. Root cause: dot-attribute access on dict-like
+    VM result objects collides with dict methods for keys like ''items''. Failing
+    fragment: `ul=vm.list(path=''/uploads/''); ... for it in ul.items:`. Rule linkage:
+    mandate dict subscript access for all VM result fields to avoid method-shadowing
+    crashes.'
   status: active
 - content: null
   created: '2026-06-05'
@@ -85,31 +96,35 @@ entries:
   - Answer should contain '<NO>'
   source: verdict
   status: inactive
-  submitted_message: 'Old receipt net total (excl VAT): 48135.69 EUR. Today''s catalog net total for same
-    products: 48135.69 EUR. Difference: 0.00 EUR, threshold 3 EUR. <YES>'
+  submitted_message: 'Old receipt net total (excl VAT): 48135.69 EUR. Today''s catalog
+    net total for same products: 48135.69 EUR. Difference: 0.00 EUR, threshold 3 EUR.
+    <YES>'
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /uploads/receipt_ocr_7oz25PB2.txt
 - agents_md_anchor: '#important-tools > sql'
-  content: Never default the current/catalog side of a numeric comparison to the document's own recorded
-    value for unmatched keys (e.g. cat.get(sku, old_unit_price) as a dict default, or treating a JOIN's
-    unmatched rows as if priced from the receipt); when a parsed identifier misses the catalog the per-item
-    delta collapses to zero and biases the absolute-difference threshold toward a false within-range token.
-    Treat an unmatched lookup as a failure — exclude it, surface it, or zero only the current side — never
-    copy the baseline value across.
+  content: Never default the current/catalog side of a numeric comparison to the document's
+    own recorded value for unmatched keys (e.g. cat.get(sku, old_unit_price) as a
+    dict default, or treating a JOIN's unmatched rows as if priced from the receipt);
+    when a parsed identifier misses the catalog the per-item delta collapses to zero
+    and biases the absolute-difference threshold toward a false within-range token.
+    Treat an unmatched lookup as a failure — exclude it, surface it, or zero only
+    the current side — never copy the baseline value across.
   created: '2026-06-05'
   deactivated_reason: null
   id: r006
-  reasoning: 'Verbatim error: "grader: Answer should contain ''<NO>''" — script emitted <YES> (diff <=
-    3 EUR) when correct answer was <NO> (diff > 3 EUR). Root cause: catalog lookup for parsed receipt
-    SKUs returned no matches, so the JOIN aggregate `SUM(r.qty * pv.price_cents)` came back NULL/empty;
-    the loop then failed to parse two numeric totals and dropped into the fallback. Failing fragment:
-    `cur_cents = sum(q * cat.get(s, c) for s, q, c in rows)` defaults the current price to the receipt''s
-    own old price `c` for every SKU absent from `cat`, plus the SQL JOIN naturally excludes unmatched
-    SKUs — both paths force current==old, yielding diff=0 and a false <YES>. This is distinct from r003
-    (consistent aggregation basis across both sides): here both sides ARE same-basis, but the current
-    side silently inherits baseline values for missing keys. The fallback default-to-baseline masks the
-    lookup miss and inverts the threshold token.'
+  reasoning: 'Verbatim error: "grader: Answer should contain ''<NO>''" — script emitted
+    <YES> (diff <= 3 EUR) when correct answer was <NO> (diff > 3 EUR). Root cause:
+    catalog lookup for parsed receipt SKUs returned no matches, so the JOIN aggregate
+    `SUM(r.qty * pv.price_cents)` came back NULL/empty; the loop then failed to parse
+    two numeric totals and dropped into the fallback. Failing fragment: `cur_cents
+    = sum(q * cat.get(s, c) for s, q, c in rows)` defaults the current price to the
+    receipt''s own old price `c` for every SKU absent from `cat`, plus the SQL JOIN
+    naturally excludes unmatched SKUs — both paths force current==old, yielding diff=0
+    and a false <YES>. This is distinct from r003 (consistent aggregation basis across
+    both sides): here both sides ARE same-basis, but the current side silently inherits
+    baseline values for missing keys. The fallback default-to-baseline masks the lookup
+    miss and inverts the threshold token.'
   status: active
 - content: null
   created: '2026-06-05'
@@ -120,50 +135,58 @@ entries:
   - Answer should contain '<NO>'
   source: verdict
   status: inactive
-  submitted_message: 'Old receipt /uploads/receipt_ocr_7zpBazPf.txt: total excl. VAT = 0.0 EUR. Today
-    catalog prices for same products: total excl. VAT = 0.0 EUR. Difference = 0.0 EUR (within 2 EUR threshold).
-    <YES>'
+  submitted_message: 'Old receipt /uploads/receipt_ocr_7zpBazPf.txt: total excl. VAT
+    = 0.0 EUR. Today catalog prices for same products: total excl. VAT = 0.0 EUR.
+    Difference = 0.0 EUR (within 2 EUR threshold). <YES>'
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /uploads/receipt_ocr_7zpBazPf.txt
   - /docs/merchant-continuity-and-critical-incidents.md
 - agents_md_anchor: null
-  content: 'When a yes/no threshold compares two aggregates summed over matched line items, guard against
-    the degenerate empty-match case: if the catalog/current-price lookup returns zero parseable rows (or
-    no receipt key overlaps it), both sums collapse to 0 and abs_diff becomes 0, which falsely satisfies
-    any within-threshold test and emits the wrong token; treat an empty match set as a retrieval failure
-    that takes the over-threshold/negative branch or surfaces the gap, never as a within-range zero difference.'
+  content: 'When a yes/no threshold compares two aggregates summed over matched line
+    items, guard against the degenerate empty-match case: if the catalog/current-price
+    lookup returns zero parseable rows (or no receipt key overlaps it), both sums
+    collapse to 0 and abs_diff becomes 0, which falsely satisfies any within-threshold
+    test and emits the wrong token; treat an empty match set as a retrieval failure
+    that takes the over-threshold/negative branch or surfaces the gap, never as a
+    within-range zero difference.'
   created: '2026-06-05'
   deactivated_reason: null
   id: r007
-  reasoning: 'Verbatim error: "grader: Answer should contain ''<NO>''". Expected NO (difference over 2
-    EUR) but script emitted <YES>. Root cause: the catalog dict is built by parsing pipe-split stdout
-    from the /bin/sql current_prices exec; when that lookup yields no parseable rows (binding/format mismatch
-    or no overlapping SKU), `catalog` stays empty. Failing fragment: `for it in items: if it[''sku'']
-    in catalog: old_gross += ...; today_gross += ...` — with empty catalog both `old_gross` and `today_gross`
-    remain 0, so `abs_diff = 0`, `within = 0 <= threshold = True`, and `yes_no_token = ''<YES>''`. A collapsed-to-zero
-    difference from missing data silently passes the within-threshold test. r006 covers per-item baseline
-    defaulting and r003 covers consistent aggregation basis, but neither catches the all-empty aggregate
-    producing a false zero-difference token, so this is a new technique rule rather than a skip.'
+  reasoning: 'Verbatim error: "grader: Answer should contain ''<NO>''". Expected NO
+    (difference over 2 EUR) but script emitted <YES>. Root cause: the catalog dict
+    is built by parsing pipe-split stdout from the /bin/sql current_prices exec; when
+    that lookup yields no parseable rows (binding/format mismatch or no overlapping
+    SKU), `catalog` stays empty. Failing fragment: `for it in items: if it[''sku'']
+    in catalog: old_gross += ...; today_gross += ...` — with empty catalog both `old_gross`
+    and `today_gross` remain 0, so `abs_diff = 0`, `within = 0 <= threshold = True`,
+    and `yes_no_token = ''<YES>''`. A collapsed-to-zero difference from missing data
+    silently passes the within-threshold test. r006 covers per-item baseline defaulting
+    and r003 covers consistent aggregation basis, but neither catches the all-empty
+    aggregate producing a false zero-difference token, so this is a new technique
+    rule rather than a skip.'
   status: active
 - agents_md_anchor: null
-  content: 'When a planned Read RPC targets a path resolved at runtime from an empty Search/List result,
-    never default its placeholder argument to a directory root (e.g. read(path=vat_policy_path or "/docs"));
-    reading a directory raises "read failed: is a directory" and aborts the whole script before vm.answer,
-    so emit no token. Guard the unresolved-path case by skipping that Read (or substituting a known regular-file
-    path) while still issuing the other planned RPCs.'
+  content: 'When a planned Read RPC targets a path resolved at runtime from an empty
+    Search/List result, never default its placeholder argument to a directory root
+    (e.g. read(path=vat_policy_path or "/docs")); reading a directory raises "read
+    failed: is a directory" and aborts the whole script before vm.answer, so emit
+    no token. Guard the unresolved-path case by skipping that Read (or substituting
+    a known regular-file path) while still issuing the other planned RPCs.'
   created: '2026-06-05'
   deactivated_reason: null
   id: r008
-  reasoning: 'Verbatim error: ''real_vm_exec: read failed: is a directory''. OBSERVED_RPC_OUTPUTS show
-    the receipt Read succeeded and the Search(''/docs'',''(?i)vat|tax'') returned <empty>, leaving vat_policy_path
-    = "". Failing fragment: `vat_policy = vm.read(path=vat_policy_path or "/docs", number=True)` — the
-    `or "/docs"` fallback feeds a directory to read(), which the VM rejects, crashing before vm.answer()
-    and emitting no <YES>/<NO> token. Root cause: r001 mandates running every planned RPC with best-effort
-    placeholder args including a ''fallback path'', but a directory-root fallback is not a legal Read
-    target. New rule refines r001''s placeholder strategy specifically for runtime-resolved Read paths:
-    the fallback must be a regular file or the Read must be skipped. It complements r001/r002 (still run
-    RPCs, still finalize with vm.answer) rather than superseding them, so no deactivation.'
+  reasoning: 'Verbatim error: ''real_vm_exec: read failed: is a directory''. OBSERVED_RPC_OUTPUTS
+    show the receipt Read succeeded and the Search(''/docs'',''(?i)vat|tax'') returned
+    <empty>, leaving vat_policy_path = "". Failing fragment: `vat_policy = vm.read(path=vat_policy_path
+    or "/docs", number=True)` — the `or "/docs"` fallback feeds a directory to read(),
+    which the VM rejects, crashing before vm.answer() and emitting no <YES>/<NO> token.
+    Root cause: r001 mandates running every planned RPC with best-effort placeholder
+    args including a ''fallback path'', but a directory-root fallback is not a legal
+    Read target. New rule refines r001''s placeholder strategy specifically for runtime-resolved
+    Read paths: the fallback must be a regular file or the Read must be skipped. It
+    complements r001/r002 (still run RPCs, still finalize with vm.answer) rather than
+    superseding them, so no deactivation.'
   status: active
 - content: null
   created: '2026-06-05'
@@ -186,24 +209,28 @@ entries:
   - Answer should contain '<YES>'
   source: verdict
   status: inactive
-  submitted_message: Old receipt /uploads/receipt_ocr_irY3QG2V.txt net (ex-VAT) total = €0.00. Today's
-    catalog net total for same SKUs/qty = €0.00. Difference = €4.00, threshold €3. <NO>
+  submitted_message: Old receipt /uploads/receipt_ocr_irY3QG2V.txt net (ex-VAT) total
+    = €0.00. Today's catalog net total for same SKUs/qty = €0.00. Difference = €4.00,
+    threshold €3. <NO>
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /uploads/receipt_ocr_irY3QG2V.txt
-- content: When parsing /bin/sql stdout into the catalog price map, detect the column delimiter from the
-    header line (it is comma/CSV, not pipe) and never require or split solely on '|'; a hardcoded '|'
-    split skips every comma-delimited row, leaving the catalog map empty so no receipt line matches, both
-    net totals collapse to 0, the degenerate empty-match branch fires (diff=tol+1) and the wrong <YES>/<NO>
-    token is emitted. Parse header cols, split each data row on the same delimiter, map product_sku ->
-    price_cents.
+- content: When parsing /bin/sql stdout into the catalog price map, detect the column
+    delimiter from the header line (it is comma/CSV, not pipe) and never require or
+    split solely on '|'; a hardcoded '|' split skips every comma-delimited row, leaving
+    the catalog map empty so no receipt line matches, both net totals collapse to
+    0, the degenerate empty-match branch fires (diff=tol+1) and the wrong <YES>/<NO>
+    token is emitted. Parse header cols, split each data row on the same delimiter,
+    map product_sku -> price_cents.
   created: '2026-06-05'
   id: r009
-  reasoning: 'Verdict v004 root cause: t51 codegen split /bin/sql output on ''|'' and skipped lines lacking
-    ''|''. Runtime emits CSV (comma) with header on line 1, so the catalog map was empty (message showed
-    catalog total EUR 0.00), no receipt SKU matched, items=[] took the degenerate branch (old=0, new=0,
-    diff=tol+1=4.0) and emitted <NO> when grader expected <YES>. Mirrors proven t01 r013 / t38 r009 CSV-parsing
-    fixes. Complements r006/r007 (empty-match guards) by removing the empty-match cause.'
+  reasoning: 'Verdict v004 root cause: t51 codegen split /bin/sql output on ''|''
+    and skipped lines lacking ''|''. Runtime emits CSV (comma) with header on line
+    1, so the catalog map was empty (message showed catalog total EUR 0.00), no receipt
+    SKU matched, items=[] took the degenerate branch (old=0, new=0, diff=tol+1=4.0)
+    and emitted <NO> when grader expected <YES>. Mirrors proven t01 r013 / t38 r009
+    CSV-parsing fixes. Complements r006/r007 (empty-match guards) by removing the
+    empty-match cause.'
   status: active
 - content: null
   created: '2026-06-05'
@@ -230,26 +257,31 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Receipt-vs-today ex-VAT comparison. (1) vm.list(''/uploads/'') then vm.read the FILE entry
-    (never a directory path). (2) old_ex = receipt SUBTOTAL = SUM over ALL line items of qty*unit (parse
-    the printed ''SUB T0TAL'' line; OCR writes 0 for O). (3) today_ex = SUM over EVERY receipt line item
-    of qty*catalogue_price_cents/100; catalogue price_cents is EX-VAT so NO division by (1+vat). A line
-    item whose SKU is genuinely absent from the catalogue (discontinued) contributes 0 to today_ex (NOT
-    its old price, NOT dropped) so its full value enters the diff and forces <NO>. Do NOT restrict the
-    OLD side to matched SKUs. (4) Query catalogue with INLINE single-quoted SKU literals IN (''AAA-111'',...),
-    NOT :name binds (the /bin/sql tool rejects binds: exit_code 1 ''missing named argument''). Extract
-    SKUs only from the SKU column (token [A-Z]{3}-[A-Z0-9]+ right after the leading qty), not from wrapped
-    description text or TERM/POS header codes. Receipt SKUs are OCR-noisy: match catalogue EXACTLY first,
-    then FUZZY (0/O, 1/I, 5/S, 8/B, 2/Z interchangeable) before treating a SKU as discontinued. (5) diff=abs(today_ex-old_ex);
-    <YES> if diff<=3 else <NO>; outcome OUTCOME_OK; refs include the receipt file path.'
+  content: 'Receipt-vs-today ex-VAT comparison. (1) vm.list(''/uploads/'') then vm.read
+    the FILE entry (never a directory path). (2) old_ex = receipt SUBTOTAL = SUM over
+    ALL line items of qty*unit (parse the printed ''SUB T0TAL'' line; OCR writes 0
+    for O). (3) today_ex = SUM over EVERY receipt line item of qty*catalogue_price_cents/100;
+    catalogue price_cents is EX-VAT so NO division by (1+vat). A line item whose SKU
+    is genuinely absent from the catalogue (discontinued) contributes 0 to today_ex
+    (NOT its old price, NOT dropped) so its full value enters the diff and forces
+    <NO>. Do NOT restrict the OLD side to matched SKUs. (4) Query catalogue with INLINE
+    single-quoted SKU literals IN (''AAA-111'',...), NOT :name binds (the /bin/sql
+    tool rejects binds: exit_code 1 ''missing named argument''). Extract SKUs only
+    from the SKU column (token [A-Z]{3}-[A-Z0-9]+ right after the leading qty), not
+    from wrapped description text or TERM/POS header codes. Receipt SKUs are OCR-noisy:
+    match catalogue EXACTLY first, then FUZZY (0/O, 1/I, 5/S, 8/B, 2/Z interchangeable)
+    before treating a SKU as discontinued. (5) diff=abs(today_ex-old_ex); <YES> if
+    diff<=3 else <NO>; outcome OUTCOME_OK; refs include the receipt file path.'
   created: '2026-06-05'
   deactivated_reason: null
   id: r010
-  reasoning: 'Grader-oracle confirmed: catalogue price_cents is ex-VAT (an unchanged item''s receipt unit
-    == price_cents/100 exactly, e.g. 2371==2371); the prior ''restrict both sums to matched'' guidance
-    was the bug — it dropped discontinued items from the OLD side, hiding their full-value gap and emitting
-    <YES> when the answer was <NO>. Discontinued SKU -> today 0. OCR corrupts receipt SKUs so fuzzy matching
-    is required to avoid false ''discontinued''. :name binds fail; inline literals work.'
+  reasoning: 'Grader-oracle confirmed: catalogue price_cents is ex-VAT (an unchanged
+    item''s receipt unit == price_cents/100 exactly, e.g. 2371==2371); the prior ''restrict
+    both sums to matched'' guidance was the bug — it dropped discontinued items from
+    the OLD side, hiding their full-value gap and emitting <YES> when the answer was
+    <NO>. Discontinued SKU -> today 0. OCR corrupts receipt SKUs so fuzzy matching
+    is required to avoid false ''discontinued''. :name binds fail; inline literals
+    work.'
   status: active
 - content: null
   created: '2026-06-05'
@@ -260,31 +292,35 @@ entries:
   - Answer should contain '<YES>'
   source: verdict
   status: inactive
-  submitted_message: 'Old receipt /uploads/receipt_ocr_jYdpQ82b.txt: total ex-VAT 0.0 EUR. Today same
-    products ex-VAT 0.0 EUR. Diff 4.0 EUR vs 3 EUR limit. <NO> within 3 EUR.'
+  submitted_message: 'Old receipt /uploads/receipt_ocr_jYdpQ82b.txt: total ex-VAT
+    0.0 EUR. Today same products ex-VAT 0.0 EUR. Diff 4.0 EUR vs 3 EUR limit. <NO>
+    within 3 EUR.'
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /uploads/receipt_ocr_jYdpQ82b.txt
   - /docs/merchant-continuity-and-critical-incidents.md
 - agents_md_anchor: null
-  content: Always issue every tool_plan.discovery RPC—including a Read whose path is resolved at runtime—even
-    when that path cannot be determined from prior results; substitute a best-effort non-directory placeholder
-    (the listing's first file entry, or any known regular file) instead of guarding the call as `vm.read(...)
-    if path else None`, because conditionally skipping the Read drops it from the fidelity RPC multiset
-    and triggers a drift failure.
+  content: Always issue every tool_plan.discovery RPC—including a Read whose path
+    is resolved at runtime—even when that path cannot be determined from prior results;
+    substitute a best-effort non-directory placeholder (the listing's first file entry,
+    or any known regular file) instead of guarding the call as `vm.read(...) if path
+    else None`, because conditionally skipping the Read drops it from the fidelity
+    RPC multiset and triggers a drift failure.
   created: '2026-06-05'
   deactivated_reason: null
   id: r011
-  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC multiset) expected:
-    [Answer, Exec, Exec, List, Read] got: [Answer, Exec, Exec, List]''. Root cause: the Read RPC was emitted
-    conditionally. Failing fragment: `receipt = vm.read(path=receipt_path, number=True) if receipt_path
-    else None` — when the /uploads listing yields no resolvable file entry, receipt_path stays '''' and
-    the Read call is never issued, so the executed multiset loses one Read. The compacted rule permits
-    ''skip the unresolved Read or substitute a known regular file''; this run exercised the skip branch,
-    which directly breaks fidelity. New rule strictly tightens that: never skip — always substitute a
-    non-directory placeholder so the Read RPC always executes. Distinct from r010 (which only covers the
-    2nd/VAT Read fallback, not the first runtime-resolved Read) and not identical to the compacted rule,
-    since it removes the permitted skip option.'
+  reasoning: 'Verbatim error: ''fidelity: ... AssertionError: fidelity drift (RPC
+    multiset) expected: [Answer, Exec, Exec, List, Read] got: [Answer, Exec, Exec,
+    List]''. Root cause: the Read RPC was emitted conditionally. Failing fragment:
+    `receipt = vm.read(path=receipt_path, number=True) if receipt_path else None`
+    — when the /uploads listing yields no resolvable file entry, receipt_path stays
+    '''' and the Read call is never issued, so the executed multiset loses one Read.
+    The compacted rule permits ''skip the unresolved Read or substitute a known regular
+    file''; this run exercised the skip branch, which directly breaks fidelity. New
+    rule strictly tightens that: never skip — always substitute a non-directory placeholder
+    so the Read RPC always executes. Distinct from r010 (which only covers the 2nd/VAT
+    Read fallback, not the first runtime-resolved Read) and not identical to the compacted
+    rule, since it removes the permitted skip option.'
   status: active
 - content: null
   created: '2026-06-05'
@@ -295,21 +331,24 @@ entries:
   - Answer should contain '<YES>'
   source: verdict
   status: inactive
-  submitted_message: 'Old receipt /uploads/receipt_ocr_HWW3s1R7.txt: ex-VAT total 5616.28 EUR. Today current
-    catalog ex-VAT total 7593.00 EUR. Difference 1976.72 EUR. <NO> — exceeds 2 EUR threshold.'
+  submitted_message: 'Old receipt /uploads/receipt_ocr_HWW3s1R7.txt: ex-VAT total
+    5616.28 EUR. Today current catalog ex-VAT total 7593.00 EUR. Difference 1976.72
+    EUR. <NO> — exceeds 2 EUR threshold.'
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /uploads/receipt_ocr_HWW3s1R7.txt
 - content: null
   created: '2026-06-05'
+  deactivated_reason: superseded by newer verdict
   id: v009
   score: 0.0
   score_detail:
   - Answer should contain '<YES>'
   source: verdict
-  status: active
-  submitted_message: Old receipt /uploads/receipt_ocr_hWi6zicN.txt total excl. VAT = 1731.86 EUR. Today
-    catalog total excl. VAT for same SKUs = 1721.0 EUR. Diff = 10.86 EUR. Outside 3 EUR threshold. <NO>
+  status: inactive
+  submitted_message: Old receipt /uploads/receipt_ocr_hWi6zicN.txt total excl. VAT
+    = 1731.86 EUR. Today catalog total excl. VAT for same SKUs = 1721.0 EUR. Diff
+    = 10.86 EUR. Outside 3 EUR threshold. <NO>
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /uploads/receipt_ocr_hWi6zicN.txt
@@ -318,9 +357,55 @@ entries:
   - /proc/catalog/Helios/PNT-OYI3I497.json
   - /proc/catalog/Portwest/SFE-1WT01OHC.json
   - /docs/merchant-continuity-and-critical-incidents.md
+- content: null
+  created: '2026-06-06'
+  id: v010
+  score: 0.0
+  score_detail:
+  - Answer should contain '<YES>'
+  source: verdict
+  status: active
+  submitted_message: 'Old receipt total (excl. VAT): 439.98 EUR. Today total (excl.
+    VAT): 2466.00 EUR. Diff: 2026.02 EUR. <NO> within 3 EUR. Per-line: AUT-EFU34IM8
+    x9 today=63.00; HND-2YJMDCJE x10 today=400.00; WRK-2DUHTNWG x11 today=1155.00;
+    GRD-360WMOZT x12 today=744.00; HND-285R47SD x13 today=104.00.'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /uploads/receipt_ocr_UcfHqbFY.txt
+  - /proc/catalog/Sonax/AUT-EFU34IM8.json
+  - /proc/catalog/Gardena/GRD-360WMOZT.json
+  - /proc/catalog/Wiha/HND-285R47SD.json
+  - /proc/catalog/Bahco/HND-2YJMDCJE.json
+  - /proc/catalog/Engelbert Strauss/WRK-2DUHTNWG.json
+- agents_md_anchor: null
+  content: When extracting OCR-noisy receipt SKUs for catalog matching, use a glyph-tolerant
+    prefix character class such as [A-Z0-9]{3}-[A-Z0-9]+ (anchored on the leading
+    qty position) instead of an alphabetic-only prefix [A-Z]{3}-..., and apply the
+    full ambiguous-glyph canonicalization on BOTH the receipt and catalog sides before
+    lookup; an over-strict prefix silently drops noisy lines from the parsed line-items
+    so that line zeroes the today/current side while the SUBTOTAL-based old total
+    still includes it, creating a one-sided gap that inflates the absolute diff and
+    flips the threshold token from the correct value to the wrong one.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Verbatim error: "grader: Answer should contain ''<YES>''" — the script
+    emitted <NO> when correct answer was within-threshold <YES>. Root cause: SKU extraction
+    regex `sku_re = re.compile(r"\b([A-Z]{3}-[A-Z0-9]+)\b")` requires a clean ALPHABETIC
+    3-char prefix. OCR substitutes digits into prefix glyphs (8->B, 0->O, etc.), so
+    a noisy line fails `m = sku_re.search(ln)` and is skipped from `line_items` entirely
+    (the `if m:` branch never appends it). The downstream canon/fuzzy matching (price_map
+    keyed on _canon) never gets a chance because the line was already dropped pre-match.
+    Effect: old_ex = receipt SUBTOTAL still counts that line''s value, but today_ex
+    omits it -> asymmetric gap -> diff inflated past 3 EUR -> yes_no="<NO>". This
+    refines r010 part (4), which explicitly recommends the over-strict token [A-Z]{3}-[A-Z0-9]+;
+    the prefix must also tolerate OCR noise. Distinct from r006/r007/r009 (those cover
+    unmatched defaults, empty-match, and delimiter parsing) — this is a pre-match
+    extraction defect. Not identical to any existing rule, so not skipped.'
+  status: active
 last_run:
   cycles_used: 1
-  date: '2026-06-05'
+  date: '2026-06-06'
   outcome: OUTCOME_OK
-  status: failure
+  status: success
 task_id: t51

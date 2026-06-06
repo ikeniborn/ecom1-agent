@@ -1,0 +1,48 @@
+{
+  "intent": "Check if Ryobi Corded Angle Grinder in family 'Ryobi Precision ONE 21I-JSQ Corded Angle Grinder' with disc diameter 115 mm exists in the catalogue.",
+  "params": {
+    "brand": "Ryobi",
+    "kind": "corded_angle_grinder",
+    "line": "Ryobi Precision ONE 21I-JSQ Corded Angle Grinder",
+    "diameter_mm": 115
+  },
+  "success_criteria": [
+    "Query returns matching product_variant row(s) or empty set",
+    "Answer carries <YES> or <NO> token",
+    "If found, refs includes the matched variant's full record_path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT v.product_sku, v.record_path, v.product_name, v.price_cents, v.price_currency FROM product_variants v JOIN product_families f ON f.product_family_id = v.product_family_id JOIN product_variant_properties p ON p.product_sku = v.product_sku WHERE v.brand = :brand AND v.product_kind_id = :kind AND f.product_family_name = :line AND p.property_key = 'disc_diameter_mm' AND p.property_value_number = :diameter_mm;"
+      },
+      "bind": "match"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > yes/no",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+    },
+    {
+      "anchor": "#important-things > availability",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
+    }
+  ],
+  "answer_template": {
+    "message": "{'<YES>' if match else '<NO>'} Ryobi 'Ryobi Precision ONE 21I-JSQ Corded Angle Grinder' Corded Angle Grinder with disc diameter 115 mm {'is in catalogue: ' + match[0].product_name + ' (' + match[0].product_sku + ') at ' + match[0].record_path if match else 'not found in catalogue.'}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$match.record_path"
+    ]
+  },
+  "outcome_override": null
+}

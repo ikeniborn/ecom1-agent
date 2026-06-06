@@ -1,0 +1,70 @@
+entries:
+- agents_md_anchor: null
+  content: When parsing /bin/sql stdout into rows, split each line on the delimiter
+    the tool actually emits — detect it from the header line (CSV uses comma) instead
+    of hardcoding pipe ('|'); a wrong delimiter collapses every row to one field and
+    silently drops the record_path/refs columns.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error verbatim: "actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". OBSERVED_RPC_OUTPUTS
+    shows /bin/sql stdout = comma-separated header `product_sku,record_path,product_name`.
+    Failing fragment: `parts = line.split("|")` then `if len(parts) < 3: continue`.
+    The tool emits CSV (comma), but code splits on pipe, so every line yields parts
+    of length 1 and is skipped — match stays [], refs=[], template `$path` never resolves.
+    Root cause is delimiter mismatch in CODEGEN output parsing, not the SQL itself.
+    Rule links failure to a general CODEGEN technique: derive the delimiter from the
+    actual output (header) before column extraction.'
+  status: active
+- agents_md_anchor: '#important-things > reference full path'
+  content: When an answer_template lists a runtime ref placeholder (e.g. ['$path'])
+    but the discovery query legitimately returns zero data rows, emit the NO/empty-result
+    branch with refs=[] — never forward the unresolved placeholder token into actual
+    refs; resolve the placeholder only from columns of rows the query actually returned,
+    and gate ref population on a non-empty parsed result set.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$path'']) but actual refs [] contain only static template entries [] — SQL
+    likely returned no rows or row parsing dropped the path column". Root cause: OBSERVED_RPC_OUTPUTS
+    stdout is header-only (''product_sku,record_path,product_name'') with no data
+    rows — a genuine zero-match (NO) result. Script correctly detects header via has_header,
+    sets data_lines=[], match=[], and emits refs=[]. Failing fragment: `refs = []`
+    in the NO branch, which the fidelity check flags against the template''s static
+    `refs: ["$path"]`. The technique gap is that CODEGEN must treat the `$path` placeholder
+    as conditional on a non-empty result set rather than a guaranteed-resolved ref,
+    so an empty-refs NO answer is valid output, not a dropped-column bug. Distinct
+    from the existing delimiter-detection rule (output here is comma-delimited and
+    parsed correctly); this rule addresses ref population, not row splitting.'
+  status: active
+- agents_md_anchor: null
+  content: Always pass the SQL query to /bin/sql through stdin exactly as the tool_plan
+    discovery specifies — never relocate it into the argv args list; /bin/sql reads
+    its statement from stdin and ignores positional args, so a query sent via args
+    (with empty stdin) executes nothing and emits only the header row, producing zero
+    data rows and empty refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$path'']) but actual refs [] contain only static template entries [] — SQL
+    likely returned no rows or row parsing dropped the path column". Observed RPC
+    output is only the header line `product_sku,record_path,product_name` with no
+    data rows. Root cause: the frozen tool_plan discovery places the query in `stdin`
+    with `args: []`, but the failing fragment `result = vm.exec(path="/bin/sql", args=[sql],
+    stdin="")` inverts this — it inlines the literals into the SQL string and dispatches
+    it via `args` while leaving `stdin` empty. /bin/sql consumes its statement from
+    stdin, so the args-borne query never ran; the tool returned just the schema header,
+    parsing yielded match=[], and refs stayed empty, tripping the runtime-ref validator.
+    This is distinct from the two existing rules (delimiter detection; empty-result
+    refs gating) — both were correctly implemented here; the defect is the stdin-vs-args
+    dispatch channel, which neither rule covers.'
+  status: active
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t03

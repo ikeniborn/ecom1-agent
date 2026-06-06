@@ -1,0 +1,157 @@
+entries:
+- agents_md_anchor: '#important-tools > sql'
+  content: When parsing /bin/sql stdout, split each row on commas matching the emitted
+    CSV header line and skip the header row — the sql tool returns comma-delimited
+    rows, so splitting on '|' (or any non-comma delimiter) matches nothing and drops
+    every data row, leaving refs empty even when the query returns results.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$available_paths'']) but actual refs [] contain only static template entries
+    [] — SQL likely returned no rows or row parsing dropped the path column". Root
+    cause: SCRIPT_CODE parses sql output with `if "|" not in line: continue` then
+    `cols = line.split("|")`, but OBSERVED_RPC_OUTPUTS shows /bin/sql emits CSV (`store_id,store_name\nstore_salzburg_elisabeth_vorstadt,PowerTool...`)
+    — comma-delimited with a header line, no pipes. Failing fragment: every data line
+    lacks ''|'', so the loop `continue`s on all rows and `paths` stays empty regardless
+    of query results, forcing refs=[] and the answer_refs failure. Rule linkage: codegen
+    must split sql output on commas per the CSV header, not on ''|'', so record_path
+    column is extracted into runtime refs.'
+  status: active
+- agents_md_anchor: null
+  content: When the answer_template or constraints declare a runtime ref placeholder
+    (e.g. $store_path), the script must extract that value from the resolving discovery/ops
+    SQL output rows and pass it into vm.answer refs; never hardcode refs to an empty
+    list, which fails runtime-ref validation even when the query succeeds.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''answer_refs: template/constraints require runtime
+    refs ([''$store_path'']) but actual refs [] contain only static template entries
+    []''. Root cause: answer_template.refs declared the runtime placeholder $store_path,
+    but CODEGEN hardcoded `refs = []` with comment ''$store_path cannot be bound to
+    a filesystem path here; keep only static refs (none)''. The script ran the discovery
+    query (returning store_id store_bratislava_stare_mesto) yet never parsed that
+    output to resolve $store_path, then emitted vm.answer(refs=refs) with an empty
+    list — so the harness saw zero runtime refs and rejected. Failing fragment: `refs
+    = []` followed by `vm.answer(..., refs=refs)`. Rule linkage: distinct from r001
+    (which covers CSV delimiter parsing of stdout); this rule covers populating declared
+    runtime ref placeholders from query output instead of dropping them.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/storage/bins_organizers/STO-D0B4ZK0E.json'
+  source: verdict
+  status: inactive
+  submitted_message: 0 products
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - store_bratislava_stare_mesto
+- agents_md_anchor: '#important-things > availability'
+  content: When the answer must reference matching products (availability/count tasks),
+    make the ops query SELECT the individual product_sku of each matching variant
+    rather than only COUNT(*), then include every matching product's catalog ref path
+    in vm.answer refs — an aggregate-only query discards the per-item SKUs the grader
+    requires as references.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/catalog/storage/bins_organizers/STO-D0B4ZK0E.json''".
+    Root cause: ops SQL is `SELECT COUNT(*) AS available_count ...` — it collapses
+    matched variants into a single number and never returns the individual product_sku
+    values, so the script''s refs list only ever contains store_path. The availability
+    constraint (#important-things > availability) requires the answer to reference
+    the products that are available; the grader enforces this by demanding each matching
+    variant''s catalog JSON path (e.g. STO-D0B4ZK0E for the Raaco storage bin). Failing
+    fragment: `SELECT COUNT(*) AS available_count FROM prod p JOIN store_inventory
+    si ...` plus `refs = []; if store_path: refs.append(store_path)`. Linkage: extends
+    r002 (extract refs from output rows) to a structural cause — the rows themselves
+    lack the needed SKUs because the query aggregates; fix is to also return per-variant
+    SKUs and emit their catalog refs.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/automotive/wiper_blades/AUT-2D3E2A2Y.json'
+  source: verdict
+  status: inactive
+  submitted_message: 0 products
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/stores/store_linz_hauptplatz.json
+- agents_md_anchor: '#important-tools > sql'
+  content: When filtering variants by property values in SQL, do not assume every
+    property lives in property_value_text — numeric discriminators (length_mm, voltage_v,
+    wattage_w, luminous_flux_lm, etc.) are commonly stored in a numeric column (property_value_num),
+    so a `property_value_text = :bind` predicate silently fails to match and drops
+    that variant; compare each property against BOTH typed columns (e.g. `(p.property_value_text
+    = :v OR CAST(p.property_value_num AS TEXT) = :v)`) so numeric-keyed products still
+    match and their required catalog refs reach vm.answer.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: grader: answer missing required reference ''/proc/catalog/automotive/wiper_blades/AUT-2D3E2A2Y.json''.
+    Root cause: the script already emits per-SKU refs (r003 applied), so the Michelin
+    wiper blade is available (qty>=3) yet its ref is absent — meaning the variant
+    was never matched, not merely unreferenced. Failing fragment: every property EXISTS
+    subquery checks only `p.property_value_text = prod.vN` (e.g. michelin length_mm=''650'').
+    A numeric discriminator stored in property_value_num never equals the text bind,
+    so the AND-chained predicate excludes product 4 entirely, dropping its required
+    catalog ref. Other numeric products (Makita/Milwaukee voltage, Osram wattage)
+    hit the same defect but did not surface because they were not available, so the
+    grader required no ref for them. Linkage: extends r001/r002/r003 (parsing, runtime
+    refs, per-SKU refs) by addressing the upstream match failure that empties refs
+    for genuinely-available items.'
+  status: active
+- agents_md_anchor: '#important-things > availability'
+  content: When matching a variant's text property values in /bin/sql, compare case-
+    and whitespace-insensitively (use `property_value_text = :v COLLATE NOCASE` or
+    `LOWER(TRIM(property_value_text)) = LOWER(TRIM(:v))`) instead of strict `property_value_text
+    = :v`; the catalog stores property values with casing/spacing that often differs
+    from the plan params, so exact equality silently drops every matching variant,
+    returning no rows and leaving the count at 0 with refs empty.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: ''answer_refs: template/constraints require runtime
+    refs ([\''$available_paths\'']) but actual refs [] contain only static template
+    entries [] — SQL likely returned no rows''. Discovery succeeded (store_graz_lend
+    resolved), but the per-variant UNION ALL ops query returned <empty>, so paths=[]
+    → count=0 and refs=[]. The harness treats this as a failure, meaning matching
+    available variants exist but were not found, i.e. the query is over-constrained.
+    Failing fragment: the codegen emits exact text predicates `p0_0.property_value_text=''screen
+    wash''` ... `p5_1.property_value_text=''Clear''` (note capitalized ''Clear'').
+    SQLite `=` on TEXT is case- and whitespace-sensitive; any divergence between the
+    plan param casing/spacing and the stored value drops that variant. This is distinct
+    from r004 (numeric typed-column handling) and r001 (CSV parsing): both numeric
+    typing and parsing are already handled correctly here, so the residual silent-drop
+    cause is strict text equality. Rule links failing fragment → root cause (case-sensitive
+    text match) → fix (COLLATE NOCASE / LOWER+TRIM).'
+  status: active
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/stores/store_graz_lend.json'
+  source: verdict
+  status: active
+  submitted_message: qty=3
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/plumbing/pipe_fittings/PLB-XU8P72YI.json
+  - /proc/catalog/garden_tools/lawn_mowers/GRD-2RMRJIFM.json
+  - /proc/catalog/storage/bins_organizers/STO-VCT0NRRC.json
+last_run:
+  cycles_used: 2
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: failure
+task_id: t15

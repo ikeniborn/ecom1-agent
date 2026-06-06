@@ -1,60 +1,50 @@
 def run(vm, params):
-    brand = params['brand']
-    series = params['series']
-    model = params['model']
-    screw_type = params['screw_type']
-    diameter_mm = str(params['diameter_mm'])
-
-    def esc(s):
-        return str(s).replace("'", "''")
+    brand = str(params["brand"]).replace("'", "''")
+    family_name = str(params["family_name"]).replace("'", "''")
+    screw_type = str(params["screw_type"]).replace("'", "''")
+    diameter_mm = str(params["diameter_mm"]).replace("'", "''")
 
     sql = (
-        "SELECT pv.product_sku, pv.record_path, pv.product_name, pv.brand, pv.series, pv.model, "
-        "pt.property_value_text AS screw_type, pd.property_value_number AS diameter_mm "
+        "SELECT pv.product_sku, pv.product_name, pv.record_path "
         "FROM product_variants pv "
-        "LEFT JOIN product_variant_properties pt ON pt.product_sku = pv.product_sku AND pt.property_key = 'screw_type' "
-        "LEFT JOIN product_variant_properties pd ON pd.product_sku = pv.product_sku AND pd.property_key = 'diameter_mm' "
-        "WHERE LOWER(pv.brand) = LOWER('" + esc(brand) + "') "
-        "AND LOWER(pv.series) = LOWER('" + esc(series) + "');"
+        "JOIN product_variant_properties st ON st.product_sku = pv.product_sku "
+        "AND st.property_key = 'screw_type' AND LOWER(st.property_value_text) = LOWER('" + screw_type + "') "
+        "JOIN product_variant_properties dm ON dm.product_sku = pv.product_sku "
+        "AND dm.property_key = 'diameter_mm' AND dm.property_value_number = " + diameter_mm + " "
+        "JOIN product_families pf ON pf.product_family_id = pv.product_family_id "
+        "WHERE LOWER(pv.brand) = LOWER('" + brand + "') "
+        "AND LOWER(pf.product_family_name) = LOWER('" + family_name + "');"
     )
 
-    result = vm.exec(path='/bin/sql', args=[sql])
-    stdout = getattr(result, 'stdout', '') or (result.get('stdout', '') if isinstance(result, dict) else '')
+    result = vm.exec(path="/bin/sql", args=[], stdin=sql)
+    stdout = getattr(result, "stdout", "") or (result.get("stdout", "") if isinstance(result, dict) else "")
 
-    rows = []
-    for line in stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        parts = line.split('|')
-        if len(parts) < 6:
-            continue
-        rows.append(parts)
+    lines = [ln for ln in stdout.splitlines() if ln.strip() != ""]
+    matches = []
+    if lines:
+        header = lines[0]
+        delim = "|" if "|" in header else ("," if "," in header else "\t")
+        cols = [c.strip().lower() for c in header.split(delim)]
+        path_idx = cols.index("record_path") if "record_path" in cols else (len(cols) - 1)
+        sku_idx = cols.index("product_sku") if "product_sku" in cols else 0
+        name_idx = cols.index("product_name") if "product_name" in cols else 1
+        for ln in lines[1:]:
+            parts = [p.strip() for p in ln.split(delim)]
+            if len(parts) < len(cols):
+                continue
+            matches.append({
+                "product_sku": parts[sku_idx] if sku_idx < len(parts) else "",
+                "product_name": parts[name_idx] if name_idx < len(parts) else "",
+                "record_path": parts[path_idx] if path_idx < len(parts) else "",
+            })
 
-    match = None
-    in_scope_refs = []
-    for r in rows:
-        sku, record_path, pname, b, s, m = r[0], r[1], r[2], r[3], r[4], r[5]
-        st = r[6] if len(r) > 6 else ''
-        dm = r[7] if len(r) > 7 else ''
-        if record_path and record_path not in in_scope_refs:
-            in_scope_refs.append(record_path)
-        if (m.strip().lower() == model.strip().lower()
-                and st.strip().lower() == screw_type.strip().lower()):
-            try:
-                if float(dm) == float(diameter_mm):
-                    match = record_path
-                    break
-            except (ValueError, TypeError):
-                if dm.strip() == diameter_mm.strip():
-                    match = record_path
-                    break
+    refs = []
+    if matches and matches[0].get("record_path"):
+        refs.append(matches[0]["record_path"])
 
-    if match:
-        message = '<YES> Heco Zinc Plated TopFix GTU-YPJ wood screw 6mm in catalogue at ' + match + '.'
-        refs = [match]
+    if matches:
+        message = "<YES> Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw with screw type 'wood screw' and diameter 3 mm is in the catalogue: " + matches[0]["record_path"]
     else:
-        message = '<NO> Not in catalogue.'
-        refs = in_scope_refs
+        message = "<NO> Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw with screw type 'wood screw' and diameter 3 mm is not in the catalogue."
 
-    vm.answer(message=message, outcome='OUTCOME_OK', refs=refs)
+    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)

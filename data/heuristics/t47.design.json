@@ -1,0 +1,161 @@
+{
+  "intent": "For each pasted row, match the description to an exact catalogue product (brand/series/model/kind + given properties), look up the requesting employee's store same-day availability, and emit the tab-separated RowID/SKU/in_stock/match table in input order.",
+  "params": {
+    "store_id": "$agent_store_id",
+    "FK775": {
+      "brand": "Bosch",
+      "series": "Bench IXO",
+      "model": "3JP-JOU",
+      "kind": "Workshop Saw and Cutter",
+      "props": {
+        "machine_type": "table saw",
+        "voltage_v": "230"
+      },
+      "quantity": 1
+    },
+    "WgE71": {
+      "brand": "Makita",
+      "series": "Workshop DDF",
+      "model": "OIE-YYP",
+      "kind": "Workshop Drill Grinder and Sander",
+      "props": {
+        "machine_type": "drill press",
+        "voltage_v": "230",
+        "power_w": "750"
+      },
+      "quantity": 1
+    },
+    "KQHmi": {
+      "brand": "Bahco",
+      "series": "Comfort Grip BE",
+      "model": "1ZR-PGS",
+      "kind": "Pliers and Wrenches",
+      "props": {
+        "tool_type": "adjustable wrench"
+      },
+      "quantity": 3
+    },
+    "UUzXw": {
+      "brand": "3M",
+      "series": "Ventilated SecureFit",
+      "model": "2CE-B35",
+      "kind": "Safety Eyewear",
+      "props": {
+        "lens_color": "Yellow"
+      },
+      "quantity": 5
+    },
+    "T4swK": {
+      "brand": "Bahco",
+      "series": "Workshop BAH",
+      "model": "3VZ-SPH",
+      "kind": "Hammer Measuring and Cutting Tool",
+      "props": {
+        "tool_type": "measuring tape"
+      },
+      "quantity": 3
+    }
+  },
+  "success_criteria": [
+    "Output is tab-separated with header line: RowID\\tSKU\\tin_stock\\tmatch",
+    "Rows emitted in the same order as input: FK775, WgE71, KQHmi, UUzXw, T4swK",
+    "A row with no exact catalogue product has empty SKU and empty in_stock and match=false",
+    "in_stock equals store_inventory.available_today_quantity for the requesting employee's store_id",
+    "match=true only when an exact catalogue product exists AND in_stock >= requested quantity",
+    "refs include the record_path of every matched SKU"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id",
+        "args": [],
+        "stdin": ""
+      },
+      "bind": "identity"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH matched AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pk.product_kind_name = :kind AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'machine_type' AND p.property_value_text = :machine_type) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'voltage_v' AND p.property_value_text = :voltage_v)) SELECT m.product_sku, m.record_path, COALESCE(si.available_today_quantity, 0) AS in_stock FROM matched m LEFT JOIN store_inventory si ON si.product_sku = m.product_sku AND si.store_id = :store_id;"
+        ],
+        "stdin": ""
+      },
+      "bind": "row_FK775"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH matched AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pk.product_kind_name = :kind AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'machine_type' AND p.property_value_text = :machine_type) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'voltage_v' AND p.property_value_text = :voltage_v) AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'power_w' AND p.property_value_text = :power_w)) SELECT m.product_sku, m.record_path, COALESCE(si.available_today_quantity, 0) AS in_stock FROM matched m LEFT JOIN store_inventory si ON si.product_sku = m.product_sku AND si.store_id = :store_id;"
+        ],
+        "stdin": ""
+      },
+      "bind": "row_WgE71"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH matched AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pk.product_kind_name = :kind AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'tool_type' AND p.property_value_text = :tool_type)) SELECT m.product_sku, m.record_path, COALESCE(si.available_today_quantity, 0) AS in_stock FROM matched m LEFT JOIN store_inventory si ON si.product_sku = m.product_sku AND si.store_id = :store_id;"
+        ],
+        "stdin": ""
+      },
+      "bind": "row_KQHmi"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH matched AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pk.product_kind_name = :kind AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'lens_color' AND p.property_value_text = :lens_color)) SELECT m.product_sku, m.record_path, COALESCE(si.available_today_quantity, 0) AS in_stock FROM matched m LEFT JOIN store_inventory si ON si.product_sku = m.product_sku AND si.store_id = :store_id;"
+        ],
+        "stdin": ""
+      },
+      "bind": "row_UUzXw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "WITH matched AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pk.product_kind_name = :kind AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = pv.product_sku AND p.property_key = 'tool_type' AND p.property_value_text = :tool_type)) SELECT m.product_sku, m.record_path, COALESCE(si.available_today_quantity, 0) AS in_stock FROM matched m LEFT JOIN store_inventory si ON si.product_sku = m.product_sku AND si.store_id = :store_id;"
+        ],
+        "stdin": ""
+      },
+      "bind": "row_T4swK"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#Important tools > id",
+      "rule": "id tool returns identity of the user/customer/guest under which we are running current request."
+    },
+    {
+      "anchor": "#Important tools > sql",
+      "rule": "Note that inventory lives only in SQL projections"
+    },
+    {
+      "anchor": "#Important things > availability",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
+    },
+    {
+      "anchor": "#Important things > reference",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    }
+  ],
+  "answer_template": {
+    "message": "RowID\\tSKU\\tin_stock\\tmatch\\nFK775\\t{row_FK775.product_sku}\\t{row_FK775.in_stock}\\t{row_FK775.match}\\nWgE71\\t{row_WgE71.product_sku}\\t{row_WgE71.in_stock}\\t{row_WgE71.match}\\nKQHmi\\t{row_KQHmi.product_sku}\\t{row_KQHmi.in_stock}\\t{row_KQHmi.match}\\nUUzXw\\t{row_UUzXw.product_sku}\\t{row_UUzXw.in_stock}\\t{row_UUzXw.match}\\nT4swK\\t{row_T4swK.product_sku}\\t{row_T4swK.in_stock}\\t{row_T4swK.match}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$matched_paths"
+    ]
+  },
+  "outcome_override": null
+}

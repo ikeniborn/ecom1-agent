@@ -1,0 +1,115 @@
+entries:
+- agents_md_anchor: null
+  content: Always execute every RPC declared in the tool_plan discovery and ops arrays
+    unconditionally, before any result-dependent early return or guard, so the emitted
+    RPC multiset matches the plan; never gate a planned RPC behind a truthiness check
+    on a value parsed from a prior result (e.g. `vm.read(path) if policy_path else
+    None`), and never short-circuit remaining discovery/ops RPCs when an intermediate
+    row set is empty — branch on results only after all planned calls have fired.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: `fidelity: ... AssertionError: fidelity drift (RPC multiset)
+    expected: [''Answer'', ''Exec'', ''Exec'', ''Exec'', ''Exec'', ''Find'', ''Read'']
+    got: [''Answer'', ''Exec'', ''Exec'', ''Find'']`. Plan declares 4 Exec (id, basket
+    sql, issuer sql, discount) + 1 Find + 1 Read + 1 Answer. Script emitted only Exec(id),
+    Find, Exec(basket sql), Answer. Two drops: (1) Read skipped because `policy_doc
+    = vm.read(...) if policy_path else None` — path extraction from Find returned
+    empty so the planned Read never fired; (2) issuer Exec and discount Exec skipped
+    because `if not basket_rows: return vm.answer(...)` short-circuited the rest of
+    the sequence when the basket query returned no rows. Root cause: defensive early-returns
+    and truthiness guards suppress planned RPCs, so the executed multiset diverges
+    from the frozen tool_plan. Fix linkage: codegen must run the full discovery+ops
+    RPC sequence verbatim and defer all result-conditional branching (not-found answers,
+    denials) until after every planned call has executed.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: 'When a planned Read consumes a path bound from a prior Find, substitute
+    the resolved match value verbatim; if Find returned no matches, fire the Read
+    with the empty/None binding (capture its error in the result) rather than falling
+    back to the Find search root or any other container path — passing a directory
+    to a file-read RPC raises ''read failed: is a directory'' and aborts the script
+    before any outcome branch.'
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: ''real_vm_exec: read failed: is a directory''. Root
+    cause: Find on /docs returned empty (observed: [find {''root'': ''/docs''}] <empty>),
+    so policy_path resolved to None; the failing fragment `policy_doc = vm.read(path=policy_path
+    if policy_path else "/docs", number=True)` then substituted the search-root directory
+    "/docs" as the read target, and reading a directory hard-errors and crashes the
+    script before reaching the scope/role/percent outcome branch. This is distinct
+    from r001: r001 governs whether a planned RPC fires (it did); this governs the
+    value passed — a hand-picked directory fallback must never replace an unresolved
+    Find binding for a file-read.'
+  status: active
+- agents_md_anchor: null
+  content: 'Always wrap each planned discovery/ops RPC call in error-capturing logic
+    (try/except) so a runtime RPC failure — e.g. ''read failed: is a directory'' raised
+    when a Read receives an empty or directory path resolved from a Find that returned
+    no matches — is stored as that binding''s result instead of propagating and aborting
+    the script before the outcome branch runs; downstream guards then treat the errored
+    binding as missing data and still emit a deterministic outcome.'
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim ERROR: ''real_vm_exec: read failed: is a directory''. Root
+    cause: Find over /docs returned <empty>, so _first_file_path(policy_find) yielded
+    '''' and the failing fragment `policy_doc = vm.read(path=policy_path, number=True)`
+    was invoked with an empty path that resolves to a directory; vm.read raised and
+    the exception propagated uncaught, aborting before the basket_ok/scope_ok/role_ok
+    branch could emit OUTCOME_DENIED_SECURITY. Existing [in-session] note already
+    says to fire the Read with the empty binding and ''capture its error in the result'',
+    but the script did not operationalize capture — the call had no try/except, so
+    the raise aborted the run. r001 mandates firing all planned RPCs unconditionally
+    but is silent on exceptions that abort mid-discovery. This rule generalizes the
+    capture mechanism to every planned RPC, making error-as-result the technique so
+    the emitted RPC multiset and outcome branch both survive a failing call.'
+  status: active
+- content: null
+  created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-06'
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: active
+  submitted_message: 'Denied service_recovery discount on basket_078 for issuer=user:
+    emp_048
+
+    roles: employee, fulfillment_coordinator, fulfillment_operator, inventory_viewer:
+    issuer lacks discount-granting role (discount_manager); issuer home store does
+    not match basket store and named store; service_recovery 10% cap not confirmed
+    in policy.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs: []
+last_run:
+  cycles_used: 2
+  date: '2026-06-06'
+  outcome: OUTCOME_DENIED_SECURITY
+  status: failure
+task_id: t37

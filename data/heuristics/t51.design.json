@@ -1,11 +1,15 @@
 {
-  "intent": "Compare old receipt total (ex-VAT) in /uploads/ against today's catalog prices within 2 EUR.",
-  "params": {},
+  "intent": "Read the old receipt in /uploads/, compute its VAT-excluded total, recompute today's VAT-excluded total from current catalog prices for the same products/quantities, and answer whether the two totals differ by ≤1 EUR.",
+  "params": {
+    "uploads_dir": "/uploads",
+    "vat_threshold_eur": 1
+  },
   "success_criteria": [
-    "Receipt file found and parsed",
-    "Each line item mapped to product_variants by SKU or name",
-    "Today's ex-VAT total computed and diff vs old total reported",
-    "Answer includes <YES> or <NO> token"
+    "Receipt file in /uploads/ is located and read",
+    "Each receipt line item (SKU/product + quantity + old unit price) is extracted",
+    "Old total excluding VAT and today's total excluding VAT are computed using the same VAT rate",
+    "Absolute difference between the two VAT-excluded totals is compared against 1 EUR",
+    "Answer contains <YES> or <NO> token and references the receipt file path"
   ],
   "discovery": [
     {
@@ -21,56 +25,64 @@
         "path": "$receipt_path",
         "number": true
       },
-      "bind": "receipt_content"
-    },
-    {
-      "rpc": "Tree",
-      "args": {
-        "root": "/docs",
-        "level": 2
-      },
-      "bind": "docs_tree"
+      "bind": "receipt"
     },
     {
       "rpc": "Search",
       "args": {
         "root": "/docs",
-        "pattern": "VAT|tax",
+        "pattern": "(?i)VAT|tax|MwSt",
         "limit": 20
       },
       "bind": "vat_policy_hits"
     },
     {
+      "rpc": "Read",
+      "args": {
+        "path": "$vat_policy_path",
+        "number": true
+      },
+      "bind": "vat_policy"
+    },
+    {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT product_sku, product_name, price_cents, price_currency FROM product_variants WHERE product_sku IN (:skus) OR product_name IN (:names);"
+        "stdin": "SELECT product_sku, product_name, price_cents, price_currency FROM product_variants WHERE product_sku IN (:skus);"
       },
       "bind": "current_prices"
     }
   ],
-  "ops": [],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH receipt(product_sku, qty, old_unit_cents) AS (VALUES (:receipt_rows)) SELECT r.product_sku, r.qty, r.old_unit_cents, v.price_cents AS new_unit_cents, (r.qty*r.old_unit_cents) AS old_line_cents, (r.qty*v.price_cents) AS new_line_cents FROM receipt r JOIN product_variants v ON v.product_sku = r.product_sku;"
+      },
+      "bind": "comparison"
+    }
+  ],
   "agents_md_constraints": [
     {
-      "anchor": "#Important things > reference paths",
+      "anchor": "#important-things > references",
       "rule": "When responding with reference - provide full path in the repo to the object."
     },
     {
-      "anchor": "#Important things > policy grounding",
+      "anchor": "#important-things > policy-grounding",
       "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
     },
     {
-      "anchor": "#Important things > yes/no tokens",
-      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response."
+      "anchor": "#important-things > yes-no",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
     },
     {
-      "anchor": "#Important tools > sql",
+      "anchor": "#important-tools > sql",
       "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session."
     }
   ],
   "answer_template": {
-    "message": "<$yesno> Old receipt total ex-VAT: €$old_total. Today's catalog total ex-VAT: €$new_total. Diff: €$diff (threshold 2 EUR).",
+    "message": "Receipt {$receipt_path}: old VAT-excluded total {$old_net_eur} EUR vs today {$new_net_eur} EUR (same VAT rate applied to both). Difference {$diff_eur} EUR. {$within_token} — within 1 EUR threshold: {$within_bool}. Per-line: {$line_breakdown}.",
     "outcome": "OUTCOME_OK",
     "refs": [
       "$receipt_path",

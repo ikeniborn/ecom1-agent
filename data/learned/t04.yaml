@@ -1,0 +1,25 @@
+entries:
+- agents_md_anchor: '#important-things > reference'
+  content: When parsing /bin/sql stdout into rows, split each line on comma (CSV format)
+    not on '|', skip the first header line by matching known column names, and extract
+    columns positionally so record_path is captured for refs.
+  created: '2026-06-06'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''answer_refs: template/constraints require runtime
+    refs ([''$match.record_path'']) but actual refs [] contain only static template
+    entries''. OBSERVED_RPC_OUTPUTS shows /bin/sql DID return one row (PNT-1IHWIL07,/proc/catalog/...PNT-1IHWIL07.json,Dulux...)
+    — output is comma-delimited CSV with header line ''product_sku,record_path,product_name''.
+    Root cause in SCRIPT_CODE: row parser uses `cols = [c.strip() for c in row.split(''|'')]`
+    then `if len(cols) < 3: continue`. CSV has no ''|'', so every line yields one
+    column, len<3, match stays None, refs=[] and script emits <NO> despite a real
+    match. Failing fragment: `row.split(''|'')`. Rule linkage: codegen technique for
+    translating SQL discovery output into refs — parse the actual CSV delimiter and
+    skip header — independent of domain params.'
+  status: active
+last_run:
+  cycles_used: 1
+  date: '2026-06-06'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t04

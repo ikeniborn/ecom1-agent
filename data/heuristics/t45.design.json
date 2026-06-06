@@ -1,0 +1,72 @@
+{
+  "intent": "Count how many of 6 specified product variants are not available today at the Brno Veveri store.",
+  "params": {
+    "store_city": "Brno",
+    "store_name_like": "%Veveri%",
+    "p1_brand": "Gardena",
+    "p1_model": "280-5FI",
+    "p1_tool_type": "pruning saw",
+    "p2_brand": "Makita",
+    "p2_model": "DDF OIE-YYP",
+    "p2_machine_type": "planer thicknesser",
+    "p3_brand": "Dresselhaus",
+    "p3_model": "1VG-P5G",
+    "p3_screw_type": "wood screw",
+    "p3_diameter_mm": 8,
+    "p4_brand": "Viega",
+    "p4_model": "2OG-ENN",
+    "p4_fitting_type": "pipe fitting",
+    "p4_diameter_mm": 15,
+    "p4_connection_type": "threaded",
+    "p5_brand": "Engelbert Strauss",
+    "p5_model": "150-ZC6",
+    "p5_garment_type": "polo shirt",
+    "p6_brand": "Gorilla",
+    "p6_model": "2ZQ-D83",
+    "p6_adhesive_type": "epoxy"
+  },
+  "success_criteria": [
+    "Resolves the Brno Veveri store_id",
+    "Resolves each of the 6 SKUs by brand + model + property filters",
+    "Counts SKUs whose available_today_quantity is 0 or have no inventory row at that store",
+    "Answer is exactly the integer count in '%d' format"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH target_store AS (\n  SELECT store_id FROM stores\n  WHERE city = :store_city AND store_name LIKE :store_name_like\n  LIMIT 1\n),\ntargets AS (\n  SELECT v.product_sku,\n         (SELECT property_value_text FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'tool_type') AS tool_type\n  FROM product_variants v\n  WHERE v.brand = :p1_brand AND v.model = :p1_model\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'tool_type' AND p.property_value_text = :p1_tool_type)\n)\nSELECT v.product_sku FROM target_store LIMIT 1;"
+      },
+      "bind": "store_probe"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH target_store AS (\n  SELECT store_id FROM stores\n  WHERE city = :store_city AND store_name LIKE :store_name_like\n  LIMIT 1\n),\nmatched AS (\n  SELECT v.product_sku FROM product_variants v\n  WHERE v.brand = :p1_brand AND v.model = :p1_model\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'tool_type' AND p.property_value_text = :p1_tool_type)\n  UNION ALL\n  SELECT v.product_sku FROM product_variants v\n  WHERE v.brand = :p2_brand AND v.model = :p2_model\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'machine_type' AND p.property_value_text = :p2_machine_type)\n  UNION ALL\n  SELECT v.product_sku FROM product_variants v\n  WHERE v.brand = :p3_brand AND v.model = :p3_model\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'screw_type' AND p.property_value_text = :p3_screw_type)\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'diameter_mm' AND p.property_value_number = :p3_diameter_mm)\n  UNION ALL\n  SELECT v.product_sku FROM product_variants v\n  WHERE v.brand = :p4_brand AND v.model = :p4_model\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'fitting_type' AND p.property_value_text = :p4_fitting_type)\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'diameter_mm' AND p.property_value_number = :p4_diameter_mm)\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'connection_type' AND p.property_value_text = :p4_connection_type)\n  UNION ALL\n  SELECT v.product_sku FROM product_variants v\n  WHERE v.brand = :p5_brand AND v.model = :p5_model\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'garment_type' AND p.property_value_text = :p5_garment_type)\n  UNION ALL\n  SELECT v.product_sku FROM product_variants v\n  WHERE v.brand = :p6_brand AND v.model = :p6_model\n    AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'adhesive_type' AND p.property_value_text = :p6_adhesive_type)\n)\nSELECT COUNT(*) AS unavailable_count\nFROM matched m\nLEFT JOIN store_inventory si\n  ON si.product_sku = m.product_sku\n  AND si.store_id = (SELECT store_id FROM target_store)\nWHERE COALESCE(si.available_today_quantity, 0) = 0;"
+      },
+      "bind": "unavailable_count"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > availability",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
+    },
+    {
+      "anchor": "#important-tools > sql",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
+    }
+  ],
+  "answer_template": {
+    "message": "{unavailable_count}",
+    "outcome": "OUTCOME_OK",
+    "refs": []
+  },
+  "outcome_override": null
+}

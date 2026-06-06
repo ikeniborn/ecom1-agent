@@ -1,0 +1,49 @@
+{
+  "intent": "Check whether a Wurth anchor/wall plug variant in the 'Wurth Universal WU XLL-87U Anchor and Wall Plug' line with anchor_type 'concrete anchor' exists in the catalogue.",
+  "params": {
+    "brand": "Wurth",
+    "family_name": "Wurth Universal WU XLL-87U Anchor and Wall Plug",
+    "anchor_type_key": "anchor_type",
+    "anchor_type_value": "concrete anchor"
+  },
+  "success_criteria": [
+    "Query returns whether a product_variant matching brand, family line, and anchor_type=concrete anchor exists",
+    "Answer contains <YES> or <NO> token",
+    "If found, answer references the exact matched product record_path"
+  ],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH match AS (SELECT pv.product_sku, pv.record_path, pv.product_name FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku WHERE pv.brand = :brand AND pf.product_family_name = :family_name AND pvp.property_key = :anchor_type_key AND lower(pvp.property_value_text) = lower(:anchor_type_value)) SELECT product_sku, record_path, product_name FROM match;"
+      },
+      "bind": "match"
+    }
+  ],
+  "ops": [],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > yes-no",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+    },
+    {
+      "anchor": "#important-things > sql-projection",
+      "rule": "Note that inventory lives only in SQL projections"
+    }
+  ],
+  "answer_template": {
+    "message": "{('<YES> The ' + match[0]['product_name'] + ' (concrete anchor) from the Wurth Universal WU XLL-87U Anchor and Wall Plug line is in the catalogue at ' + match[0]['record_path'] + '.') if match else '<NO> No Wurth Universal WU XLL-87U Anchor and Wall Plug with anchor type concrete anchor exists in the catalogue.'}",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "/proc/catalog",
+      "$match.record_path"
+    ]
+  },
+  "outcome_override": null
+}
