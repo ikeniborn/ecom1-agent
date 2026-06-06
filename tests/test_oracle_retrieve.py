@@ -13,7 +13,7 @@ def test_cosine_orders_by_similarity():
              _atom("vat", "vat ex-vat pricing", ["pricing"])]
     emap = {"C:sql binds": [1.0, 0.0], "C:vat ex-vat pricing": [0.0, 1.0]}
 
-    def fake_embed(texts, model, base_url=None):
+    def fake_embed(texts, model, base_url=None, prefix=None):
         return [emap.get(t, [0.0, 1.0]) for t in texts]  # query -> [0,1] (vat)
 
     o = KnowledgeOracle(atoms=atoms, embed_fn=fake_embed)
@@ -26,7 +26,7 @@ def test_candidate_atoms_excluded():
              Atom(id="b", description="y", domain=[], content="c",
                   source="s", validated_by="manual", validated_at="d",
                   status="candidate", embedding_hash="")]
-    o = KnowledgeOracle(atoms=atoms, embed_fn=lambda t, model, base_url=None: [[1.0]] * len(t))
+    o = KnowledgeOracle(atoms=atoms, embed_fn=lambda t, model, base_url=None, prefix=None: [[1.0]] * len(t))
     assert all(a.status == "active" for a in o._active())
     assert [a.id for a in o._active()] == ["a"]
 
@@ -34,9 +34,24 @@ def test_candidate_atoms_excluded():
 def test_retrieve_falls_back_to_tags_when_embed_down():
     atoms = [_atom("sql", "sql binds", ["sql"]), _atom("vat", "vat", ["pricing"])]
 
-    def boom(texts, model, base_url=None):
+    def boom(texts, model, base_url=None, prefix=None):
         raise RuntimeError("ollama down")
 
     o = KnowledgeOracle(atoms=atoms, embed_fn=boom)
     out = o.retrieve("sql query help", k=1, rank_fn=None)
     assert out and out[0].id == "sql"
+
+
+def test_oracle_passes_nomic_prefixes():
+    calls = []
+
+    def fake_embed(texts, model, base_url=None, prefix=None):
+        calls.append((texts[0], prefix))
+        return [[1.0, 0.0]] * len(texts)
+
+    atoms = [_atom("sql", "sql binds", ["sql"])]
+    o = KnowledgeOracle(atoms=atoms, embed_fn=fake_embed)
+    o._cosine_topn("query text", n=1)
+    prefixes = {p for _, p in calls}
+    assert "search_query" in prefixes
+    assert "search_document" in prefixes

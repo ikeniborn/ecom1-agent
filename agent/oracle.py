@@ -36,12 +36,12 @@ class KnowledgeOracle:
         h = content_hash(a.content)
         if h in self._vec_cache:
             return self._vec_cache[h]
-        vec = self._embed([a.content], model=self._model)[0]
+        vec = self._embed([a.content], model=self._model, prefix="search_document")[0]
         self._vec_cache[h] = vec
         return vec
 
     def _cosine_topn(self, query: str, n: int):
-        qv = self._embed([query], model=self._model)[0]
+        qv = self._embed([query], model=self._model, prefix="search_query")[0]
         scored = []
         for a in self._active():
             sv = self._embed_atom(a)
