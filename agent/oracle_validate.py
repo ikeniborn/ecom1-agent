@@ -30,6 +30,9 @@ def grade_candidate(task_id, answer_builder):
     c = HarnessServiceClientSync(_URL)
     run = c.start_run(H.StartRunRequest(name=f"oracle-validate-{task_id}",
                                         benchmark_id=_BID, api_key=_KEY))
+    # The harness serializes trials: a later start_trial force-closes the active one,
+    # and end_trial transitions a trial to DONE. So for the target: start -> answer ->
+    # end_trial immediately (locks DONE-with-answer before any later trial starts).
     answered = False
     for tid in run.trial_ids:
         try:
@@ -41,7 +44,6 @@ def grade_candidate(task_id, answer_builder):
             msg, outcome, refs = answer_builder(vm)
             vm.answer(message=msg, outcome=outcome, refs=refs)
             answered = True
-            break
         try:
             c.end_trial(H.EndTrialRequest(trial_id=t.trial_id))
         except Exception:
