@@ -7,6 +7,7 @@ on production tasks) because score is visible only post-SubmitRun.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import yaml
@@ -65,7 +66,6 @@ def run_promote(oracle, green_suite, run_fn, validated_at, validated_by="grader"
     active_n = len([a for a in oracle.atoms if a.status == "active"])
     print(f"[promote] active={active_n} candidates={len(candidates)}")
     if active_n > 10:
-        import os
         topn = int(os.environ.get("ORACLE_TOPN", "10"))
         if topn >= active_n:
             print(f"[promote] WARNING: active={active_n} but ORACLE_TOPN={topn} — "
