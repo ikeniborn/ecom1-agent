@@ -600,16 +600,22 @@ OUTCOME_BY_NAME = {
 
 
 
-def embed_texts(texts, model, base_url=None):
+def embed_texts(texts, model, base_url=None, prefix=None):
     """Return a list of embedding vectors (one per input) via the Ollama OpenAI-compat
-    /v1/embeddings endpoint. Raises on HTTP error; callers handle fallback."""
-    import os
+    /v1/embeddings endpoint. Raises on HTTP error; callers handle fallback.
+
+    `prefix` applies the nomic task-prefix convention ("search_document"/"search_query")
+    only for nomic-* model ids; other models receive raw text unchanged.
+    """
     base = (base_url or os.environ.get("EMBED_BASE_URL")
             or os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434/v1")
     url = base.rstrip("/") + "/embeddings"
     key = os.environ.get("OLLAMA_API_KEY", "")
     headers = {"Authorization": f"Bearer {key}"} if key else {}
-    resp = httpx.post(url, json={"model": model, "input": list(texts)},
+    inputs = list(texts)
+    if prefix and model and model.lower().startswith("nomic"):
+        inputs = [f"{prefix}: {t}" for t in inputs]
+    resp = httpx.post(url, json={"model": model, "input": inputs},
                       headers=headers, timeout=60.0)
     resp.raise_for_status()
     data = resp.json().get("data", [])
