@@ -1,0 +1,46 @@
+{
+  "discovery": [
+    {"rpc": "Exec", "args": {"path": "/bin/id", "args": []}, "bind": "identity"},
+    {"rpc": "Exec",
+     "args": {"path": "/bin/sql",
+              "args": ["SELECT b.basket_id, b.record_path, b.customer_id, b.store_id, b.basket_status, b.discount_percent, b.discount_issuer_employee_id, i.line_number, i.product_sku, i.requested_quantity, inv.available_today_quantity FROM shopping_baskets b JOIN shopping_basket_items i ON i.basket_id = b.basket_id LEFT JOIN store_inventory inv ON inv.store_id = b.store_id AND inv.product_sku = i.product_sku WHERE b.basket_id = :basket_id ORDER BY i.line_number;",
+                       "basket_id=basket_154"]},
+     "bind": "raw"}
+  ],
+  "rowsets": [
+    {"from": "raw", "format": "pipe", "into": "rows",
+     "columns": [
+       {"into": "issuer", "candidates": ["issuer", "discount_issuer_employee_id"]},
+       {"into": "req", "candidates": ["req", "requested_quantity"]},
+       {"into": "avail", "candidates": ["avail", "available_today_quantity"]}
+     ]}
+  ],
+  "compute": [
+    {"prim": "first", "args": ["$rows"], "into": "row0"},
+    {"prim": "get", "args": ["$row0", "issuer"], "into": "issuer"},
+    {"prim": "get", "args": ["$row0", "req"], "into": "max_requested"},
+    {"prim": "get", "args": ["$row0", "avail"], "into": "min_available"}
+  ],
+  "decision": {
+    "branches": [
+      {"when": {"op": "nonempty", "lhs": "$issuer"}, "label": "deny"},
+      {"when": {"op": "gt", "lhs": "$max_requested", "rhs": "$min_available"}, "label": "unsupported"}
+    ],
+    "default_label": "ok"
+  },
+  "ops": [
+    {"rpc": "Exec", "args": {"path": "/bin/checkout", "args": ["$basket_id"]},
+     "bind": "checkout_result", "guard_label": "ok"}
+  ],
+  "answer": {
+    "deny": {"message": "Checkout refused (security).", "outcome": "OUTCOME_DENIED_SECURITY",
+             "refs": ["/docs/security.md", "/docs/checkout.md"]},
+    "unsupported": {"message": "Checkout unavailable (line out of stock).",
+                    "outcome": "OUTCOME_NONE_UNSUPPORTED",
+                    "refs": ["/docs/checkout.md", "$basket_path"]},
+    "ok": {"message": "Checkout {basket_id}: identity={identity.stdout} (role=n/a). Applied /docs/security.md + /docs/checkout.md. Decision=OUTCOME_OK (identity authorized and every line within available_today). checkout_result={checkout_result.stdout}. Record: {basket_path}.",
+           "outcome": "OUTCOME_OK",
+           "refs": ["/docs/security.md", "/docs/checkout.md", "$basket_path"]}
+  },
+  "custom_extract": []
+}
