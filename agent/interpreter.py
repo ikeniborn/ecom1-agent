@@ -9,6 +9,7 @@ from __future__ import annotations
 import csv as _csv
 import io
 import json
+import re as _re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -79,6 +80,38 @@ def _resolve_args(args: dict, env: dict) -> dict:
         else:
             out[k] = resolve(v, env)
     return out
+
+
+_SLOT_RE = _re.compile(r"\{([^{}]+)\}")
+
+
+def _fill_slots(message: str, env: dict) -> str:
+    def repl(m):
+        val = resolve("$" + m.group(1), env)
+        return "" if val is None else str(val)
+    return _SLOT_RE.sub(repl, message)
+
+
+def _resolve_refs(refs: list, env: dict) -> tuple[list[str], list[str]]:
+    """Return (resolved, unresolved_tokens)."""
+    out, unresolved = [], []
+    for r in refs:
+        if isinstance(r, str) and r.startswith("$"):
+            val = resolve(r, env)
+            if val in (None, ""):
+                unresolved.append(r)
+            else:
+                out.append(str(val))
+        else:
+            out.append(str(r))
+    return out, unresolved
+
+
+def _refuse(msg: str, mutation_landed: bool) -> InterpretError:
+    """Build an InterpretError tagged with mutation state (retry-safety)."""
+    err = InterpretError(msg)
+    err.mutation_landed = mutation_landed
+    return err
 
 
 def _delim_for(text: str, fmt: str) -> str:
@@ -195,9 +228,24 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
         if op.outcome_from_exit is not None:           # mutate-then-classify
             exit_outcome = _classify_from_exit(op.outcome_from_exit, result)
 
+    # 7. answer assembly
     tmpl = plan.answer.get(label) or next(iter(plan.answer.values()))
     outcome = exit_outcome or tmpl.outcome
-    captured = CapturedAnswer(message=tmpl.message, outcome=outcome, refs=[])
+    message = _fill_slots(tmpl.message, env)
+    refs, unresolved = _resolve_refs(tmpl.refs, env)
+
+    # 8. refuse invariant (mirrors the deleted _AnswerGuard). A refusal raised after
+    #    a mutation already landed carries mutation_landed so the pipeline routes to
+    #    terminal (retry unsafe) instead of re-planning.
+    if outcome == "OUTCOME_OK":
+        if unresolved:
+            raise _refuse(f"unresolved runtime ref(s) {unresolved!r} on OK answer", mutation_landed)
+        if "runtime" in intent.answer_shape.required_ref_kinds:
+            static_refs = {str(r) for r in tmpl.refs if not (isinstance(r, str) and r.startswith("$"))}
+            if not any(r not in static_refs for r in refs):
+                raise _refuse("OK answer carries only static refs but a runtime ref is required",
+                              mutation_landed)
+    captured = CapturedAnswer(message=message, outcome=outcome, refs=refs)
     return InterpretResult(captured=captured, env=env, observations=observations,
                            sql_results=sql_results, mutation_landed=mutation_landed,
                            label=label)
