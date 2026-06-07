@@ -409,6 +409,18 @@ def learn_from_grader(
     if not task_id or not score_detail:
         return False
     heur_dir = Path("data/heuristics")
+    ir_intent = heur_dir / f"{task_id}.intent.json"
+    ir_plan = heur_dir / f"{task_id}.plan.json"
+    if ir_intent.exists() and ir_plan.exists():
+        learn_ctx = load_entries(task_id)
+        error = "grader: " + " | ".join(s.strip() for s in score_detail if s.strip())
+        _learn_consolidate_text(
+            task_id, learn_ctx,
+            plan_context=ir_intent.read_text(encoding="utf-8"),
+            error=error, artifact=ir_plan.read_text(encoding="utf-8"),
+            token_out=token_out,
+        )
+        return True
     script_path = heur_dir / f"{task_id}.py"
     design_path = heur_dir / f"{task_id}.design.json"
     if not script_path.exists() or not design_path.exists():

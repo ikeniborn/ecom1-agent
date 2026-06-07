@@ -94,3 +94,20 @@ def test_interpreted_verify_fail_then_learn_then_exhaust():
         m = run_pipeline(vm, instruction="x", task_id="t_vf", agents_md_text="A")
     vm.answer.assert_called_once()
     assert m["outcome"] == "OUTCOME_NONE_CLARIFICATION"
+
+
+def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
+    from agent import learned_store
+    from agent.pipeline import learn_from_grader
+    monkeypatch.setattr(learned_store, "_LEARNED_DIR", tmp_path)
+    monkeypatch.chdir(tmp_path)
+    heur = tmp_path / "data" / "heuristics"; heur.mkdir(parents=True, exist_ok=True)
+    (heur / "t_ir.intent.json").write_text(_INTENT)
+    (heur / "t_ir.plan.json").write_text(_PLAN)
+    learn = json.dumps({"rule_content": "Always cite the record path in refs",
+                        "reasoning": "grader said missing ref", "deactivate_ids": [], "skip": False})
+    with patch("agent.pipeline.call_llm_raw", return_value=learn):
+        made = learn_from_grader("t_ir", ["answer missing required reference"])
+    assert made is True
+    data = __import__("yaml").safe_load((tmp_path / "t_ir.yaml").read_text())
+    assert any(e.get("content") for e in data["entries"])
