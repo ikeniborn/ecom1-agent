@@ -105,3 +105,46 @@ def test_security_first_lint_accepts_denied_first():
                 "ok": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}},
     )
     lint_security_first(plan)  # no raise
+
+
+def test_guarded_op_skipped_on_non_matching_label():
+    vm = MockVMSpy(fixtures={})
+    plan = _plan(
+        decision={"branches": [], "default_label": "deny"},
+        ops=[{"rpc": "Exec", "args": {"path": "/bin/checkout", "args": ["b1"]},
+              "bind": "co", "guard_label": "ok"}],
+        answer={"deny": {"message": "no", "outcome": "OUTCOME_DENIED_SECURITY", "refs": []}},
+    )
+    res = interpret(plan, _INTENT, vm)
+    assert ("Exec", {"path": "/bin/checkout", "args": ["b1"], "stdin": ""}) not in vm.calls
+    assert res.mutation_landed is False
+
+
+def test_guarded_op_runs_on_matching_label():
+    fx = {fixture_key("Exec", "/bin/checkout", ["b1"]): {"stdout": "OK", "exit_code": 0}}
+    vm = MockVMSpy(fixtures=fx)
+    plan = _plan(
+        decision={"branches": [], "default_label": "ok"},
+        ops=[{"rpc": "Write", "args": {"path": "/proc/x", "content": "y"},
+              "bind": "w", "guard_label": "ok"}],
+        answer={"ok": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}},
+    )
+    res = interpret(plan, _INTENT, vm)
+    assert res.mutation_landed is True
+
+
+def test_outcome_from_exit_overrides_outcome():
+    fx = {fixture_key("Exec", "/bin/checkout", ["b1"]):
+          {"stdout": "line out of stock", "exit_code": 1}}
+    vm = MockVMSpy(fixtures=fx)
+    plan = _plan(
+        decision={"branches": [], "default_label": "ok"},
+        ops=[{"rpc": "Exec", "args": {"path": "/bin/checkout", "args": ["b1"]}, "bind": "co",
+              "outcome_from_exit": {"ok_outcome": "OUTCOME_OK",
+                                    "keyword_buckets": [{"keywords": ["out of stock"],
+                                                         "outcome": "OUTCOME_NONE_UNSUPPORTED"}],
+                                    "default_outcome": "OUTCOME_NONE_UNSUPPORTED"}}],
+        answer={"ok": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}},
+    )
+    res = interpret(plan, _INTENT, vm)
+    assert res.captured.outcome == "OUTCOME_NONE_UNSUPPORTED"

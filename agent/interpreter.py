@@ -42,6 +42,25 @@ _MUTATING = {"Write", "Delete"}
 _OBS_PER_CALL = 800
 
 
+def _exit_code(result: Any) -> int:
+    code = getattr(result, "exit_code", None)
+    if code is None and isinstance(result, dict):
+        code = result.get("exit_code", 0)
+    return int(code or 0)
+
+
+def _classify_from_exit(spec, result) -> str:
+    if _exit_code(result) == 0:
+        return spec.ok_outcome
+    blob = (_payload(result) + " " +
+            (getattr(result, "stderr", "") or
+             (result.get("stderr", "") if isinstance(result, dict) else ""))).lower()
+    for bucket in spec.keyword_buckets:
+        if any(k.lower() in blob for k in bucket.keywords):
+            return bucket.outcome
+    return spec.default_outcome
+
+
 def _payload(result: Any) -> str:
     stdout = getattr(result, "stdout", None)
     if stdout is None and isinstance(result, dict):
@@ -159,8 +178,26 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
             label = br.label
             break
 
-    # (compute / custom_extract / decision / ops / answer added in later tasks)
-    captured = CapturedAnswer(message="", outcome="OUTCOME_NONE_CLARIFICATION", refs=[])
+    # 6. guarded ops
+    exit_outcome: str | None = None
+    for op in plan.ops:
+        if op.guard_label is not None and op.guard_label != label:
+            continue                                   # decide-then-guard
+        kwargs = _resolve_args(op.args, env)
+        result = getattr(vm, op.rpc.lower())(**kwargs)
+        if op.bind:
+            env[op.bind] = result
+        if op.rpc in _MUTATING or (op.rpc == "Exec" and str(kwargs.get("path", "")).startswith("/bin/")
+                                   and kwargs.get("path") != "/bin/sql"):
+            mutation_landed = True
+        if op.rpc == "Exec" and kwargs.get("path") == "/bin/sql":
+            sql_results.append(_payload(result))
+        if op.outcome_from_exit is not None:           # mutate-then-classify
+            exit_outcome = _classify_from_exit(op.outcome_from_exit, result)
+
+    tmpl = plan.answer.get(label) or next(iter(plan.answer.values()))
+    outcome = exit_outcome or tmpl.outcome
+    captured = CapturedAnswer(message=tmpl.message, outcome=outcome, refs=[])
     return InterpretResult(captured=captured, env=env, observations=observations,
                            sql_results=sql_results, mutation_landed=mutation_landed,
                            label=label)
