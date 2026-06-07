@@ -5,7 +5,14 @@ entries:
     discovery response or zero result rows as a failure signal rather than silently
     defaulting an aggregate to a placeholder like "0".
   created: '2026-06-06'
-  deactivated_reason: null
+  deactivated_reason: r001's directive to 'confirm referenced tables and columns exist
+    before querying' and 'treat an empty discovery response ... as a failure signal'
+    is exactly what misled CODEGEN into inserting the crashing assert, and it contradicts
+    the new rule plus r002/r003 (proceed through all ops and derive failure from validated
+    op results, not from discovery output). r001's surviving value — not discarding
+    discovery output and not defaulting aggregates to a placeholder '0' — is now subsumed
+    by the new rule (use discovery only to inform parsing) and r003/r004 (no fabricated
+    success/placeholder, aggregate always one row).
   id: r001
   reasoning: 'Verbatim ERROR: ''answer_refs: template/constraints require runtime
     refs ... but actual refs [''/proc/catalog''] contain only static template entries
@@ -18,7 +25,7 @@ entries:
     the static template ref. Rule linkage: codegen must consume discovery output to
     adapt SQL identifiers and must escalate empty results as failure instead of masking
     them with a default value.'
-  status: active
+  status: inactive
 - agents_md_anchor: null
   content: Always emit every RPC declared in tool_plan (discovery RPCs and ops RPCs)
     unconditionally; never insert an early-return or vm.answer branch that skips a
@@ -192,9 +199,33 @@ entries:
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs:
   - /proc/catalog
+- agents_md_anchor: null
+  content: Never gate or abort a CODEGEN script with a Python `assert` or `raise`
+    on discovery RPC output (e.g. asserting a table or column name appears in the
+    schema text); an assertion failure throws an uncaught traceback that aborts the
+    whole run before the declared ops RPCs ever execute. Use discovery results only
+    to inform parsing, always proceed through every planned ops RPC, and derive any
+    failure outcome from validated op results rather than from a substring check on
+    discovery output.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Verbatim error: ''fidelity: AssertionError: product_variants table not
+    found in schema discovery'' crashing at line 20 (`assert "product_variants" in
+    schema_out`). Root cause: CODEGEN added a hard `assert` on the schema-discovery
+    stdout — a precondition NOT declared in tool_plan. When the actual /bin/sql schema
+    output did not contain the literal substring ''product_variants'', the assert
+    raised an uncaught AssertionError, producing a traceback that aborted the run
+    before the codex Find and both ops Execs (rows, count) and before vm.answer. Failing
+    fragment: `schema_out = get_stdout(schema); assert "product_variants" in schema_out`.
+    Linkage: r002 forbids early-return/vm.answer short-circuits that skip planned
+    Execs; this is the harsher exception-based variant (raise) that the existing rules
+    did not cover. The new rule prohibits crashing on discovery and mandates running
+    all ops, deriving outcome from op results (per r003/r004).'
+  status: active
 last_run:
-  cycles_used: 4
+  cycles_used: 3
   date: '2026-06-07'
-  outcome: OUTCOME_NONE_UNSUPPORTED
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t49

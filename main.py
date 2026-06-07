@@ -14,6 +14,7 @@ from typing import IO
 _task_local = threading.local()
 _run_dir: "Path | None" = None
 _stats_fh: "IO[str] | None" = None  # opened by _setup_logging()
+_trace_fh: "IO[str] | None" = None  # full terminal mirror (trace.log), opened by _setup_logging()
 _ansi_re = re.compile(r"\x1B\[[0-9;]*[A-Za-z]")
 
 
@@ -53,21 +54,32 @@ def _setup_logging() -> None:
     run_path = logs_dir / run_name
     run_path.mkdir(exist_ok=True)
 
-    global _run_dir, _stats_fh
+    global _run_dir, _stats_fh, _trace_fh
     _run_dir = run_path
     _stats_fh = open(run_path / "main.log", "w", buffering=1, encoding="utf-8")
     _stats_fh.write(f"[LOG] {run_path}/  (LOG_LEVEL={log_level})\n")
     _stats_fh.flush()
 
+    # Full terminal mirror: every stdout/stderr line (ANSI stripped) is tee'd here
+    # so a run's complete console output survives in the run dir, not just on screen.
+    _trace_fh = open(run_path / "trace.log", "w", buffering=1, encoding="utf-8")
+
+    def _tee_trace(text: str) -> None:
+        if _trace_fh is not None and text:
+            try:
+                _trace_fh.write(_ansi_re.sub("", text))
+            except Exception:
+                pass
+
     _orig = sys.stdout
+    _orig_err = sys.stderr
 
     class _PrefixWriter:
         def write(self, data: str) -> None:
             prefix = getattr(_task_local, "task_id", None)
-            if prefix and data and data != "\n":
-                _orig.write(f"[{prefix}] {data}")
-            else:
-                _orig.write(data)
+            out = f"[{prefix}] {data}" if (prefix and data and data != "\n") else data
+            _orig.write(out)
+            _tee_trace(out)
 
         def writelines(self, lines) -> None:
             for line in lines:
@@ -83,7 +95,28 @@ def _setup_logging() -> None:
         def encoding(self) -> str:
             return _orig.encoding
 
+    class _StderrTee:
+        """Mirror stderr (tracebacks, warnings) into trace.log unprefixed."""
+        def write(self, data: str) -> None:
+            _orig_err.write(data)
+            _tee_trace(data)
+
+        def writelines(self, lines) -> None:
+            for line in lines:
+                self.write(line)
+
+        def flush(self) -> None:
+            _orig_err.flush()
+
+        def isatty(self) -> bool:
+            return _orig_err.isatty()
+
+        @property
+        def encoding(self) -> str:
+            return _orig_err.encoding
+
     sys.stdout = _PrefixWriter()
+    sys.stderr = _StderrTee()
     print(f"[LOG] {run_path}/  (LOG_LEVEL={log_level})")
 
 

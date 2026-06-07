@@ -1,49 +1,101 @@
 {
-  "intent": "Check whether a Holzmann Compact D 327-RR0 Compressor and Dust Extractor variant with machine type compressor, 230 V, and 3000 W exists in the catalogue.",
+  "intent": "Check whether the catalogue contains a Keter Storage Bin and Organizer with series Deep Stack, model 2OO-VJU, parts case, yellow, and 8‑litre volume.",
   "params": {
-    "brand": "Holzmann",
-    "series": "Compact",
-    "model": "D 327-RR0",
-    "kind_name": "Compressor and Dust Extractor",
-    "machine_type": "compressor",
-    "voltage_v": 230,
-    "power_w": 3000
+    "brand": "Keter",
+    "series": "Deep Stack",
+    "model": "2OO-VJU",
+    "product_kind_name": "Storage Bin and Organizer",
+    "expected_storage_type": "parts case",
+    "expected_color_family": "Yellow",
+    "expected_volume": "8 l"
   },
   "success_criteria": [
-    "Catalogue queried for product_variants matching brand Holzmann, series Compact, model D 327-RR0, kind Compressor and Dust Extractor, machine_type compressor, voltage_v 230, power_w 3000",
-    "Answer states YES with the matched variant's record_path if a row exists, else NO with no product reference",
-    "<YES> or <NO> token included in the message"
+    "Answer includes <YES> if a matching variant is found, otherwise <NO>.",
+    "If found, answer references the matched product's record_path; if not found, no record_path is referenced."
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT v.product_sku, v.record_path, v.product_name, v.brand, v.series, v.model, k.product_kind_name, mt.property_value_text AS machine_type, volt.property_value_number AS voltage_v, pw.property_value_number AS power_w FROM product_variants v JOIN product_kinds k ON k.product_kind_id = v.product_kind_id LEFT JOIN product_variant_properties mt ON mt.product_sku = v.product_sku AND mt.property_key = 'machine_type' LEFT JOIN product_variant_properties volt ON volt.product_sku = v.product_sku AND volt.property_key = 'voltage_v' LEFT JOIN product_variant_properties pw ON pw.product_sku = v.product_sku AND pw.property_key = 'power_w' WHERE v.brand = 'Holzmann' AND v.series = 'Compact' AND v.model = 'D 327-RR0' AND k.product_kind_name = 'Compressor and Dust Extractor' AND mt.property_value_text = 'compressor' AND volt.property_value_number = 230 AND pw.property_value_number = 3000;"
+        "path": "/bin/id",
+        "args": [],
+        "stdin": null
       },
-      "bind": "match"
+      "bind": "id_result"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "SELECT datetime('now') AS current_datetime"
+        ],
+        "stdin": null
+      },
+      "bind": "current_datetime"
+    },
+    {
+      "rpc": "Tree",
+      "args": {
+        "root": "/docs",
+        "level": 2
+      },
+      "bind": "docs_tree"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [
+          "SELECT pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pk.product_kind_name = :product_kind_name"
+        ],
+        "stdin": null
+      },
+      "bind": "candidate_rows"
     }
   ],
-  "ops": [],
+  "ops": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$candidate_rows[0].record_path",
+        "number": null,
+        "start_line": null,
+        "end_line": null
+      },
+      "bind": "product_json"
+    },
+    {
+      "rpc": "Answer",
+      "args": {
+        "message": "<YES> We carry the Keter Deep Stack 2OO-VJU Storage Bin and Organizer (parts case, Yellow, 8 l). Record: $candidate_rows[0].record_path",
+        "outcome": "OUTCOME_OK",
+        "refs": [
+          "$candidate_rows[0].record_path"
+        ]
+      },
+      "bind": null
+    }
+  ],
   "agents_md_constraints": [
     {
-      "anchor": "#important-things > yes/no tokens",
-      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+      "anchor": "#When answering yes/no questions",
+      "rule": "include <YES> or <NO> tokens in the response."
     },
     {
-      "anchor": "#important-things > references",
-      "rule": "When responding with reference - provide full path in the repo to the object."
+      "anchor": "#When starting work",
+      "rule": "make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context."
     },
     {
-      "anchor": "#important-things > availability",
-      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
+      "anchor": "#When answering with reference",
+      "rule": "provide full path in the repo to the object."
     }
   ],
   "answer_template": {
-    "message": "{'<YES>' if match else '<NO>'} The Holzmann Compact D 327-RR0 Compressor and Dust Extractor (machine type compressor, 230 V, 3000 W) {'is in the catalogue: ' + match.record_path if match else 'is not in the catalogue.'}",
+    "message": "<YES> We carry the Keter Deep Stack 2OO-VJU Storage Bin and Organizer (parts case, Yellow, 8 l). Record: $candidate_rows[0].record_path",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$record_path"
+      "$candidate_rows[0].record_path"
     ]
   },
   "outcome_override": null

@@ -28,6 +28,12 @@ class FidelityResult:
 def _serialize_expected(ops: list[ToolOp]) -> list[tuple[str, dict[str, Any]]]:
     out: list[tuple[str, dict[str, Any]]] = []
     for op in ops:
+        # The terminal Answer is appended exactly once by _expected_answer_call.
+        # A weak DESIGN may hallucinate an Answer rpc inside discovery/ops; counting
+        # it here would demand two vm.answer calls — unsatisfiable, since the
+        # pipeline allows exactly one terminal answer (t51 fidelity drift).
+        if op.rpc == "Answer":
+            continue
         out.append((op.rpc, dict(op.args)))
     return out
 

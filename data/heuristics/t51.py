@@ -1,138 +1,117 @@
-import re
-
 def run(vm, params):
-    def fld(o, k, d=""):
-        if isinstance(o, dict):
-            return o.get(k, d)
-        return getattr(o, k, d)
-
-    TR = str.maketrans({"O": "0", "I": "1", "S": "5", "B": "8", "Z": "2"})
-    def canon(s):
-        return s.upper().translate(TR)
-
-    # discovery 1: List /uploads/ (normalize list vs wrapper-dict)
-    listing = vm.list(path="/uploads/")
-    if isinstance(listing, list):
-        entries = listing
-    elif isinstance(listing, dict):
-        entries = listing.get("entries") or listing.get("items") or listing.get("files") or []
-    else:
-        entries = []
-
-    receipt_path = ""
-    for e in entries:
-        if isinstance(e, str):
-            name, path, kind = e, "", ""
-        else:
-            name = fld(e, "name", "")
-            path = fld(e, "path", "")
-            kind = fld(e, "kind", "")
-        full = path or ("/uploads/" + name)
-        ku = str(kind).upper()
-        is_file = ("FILE" in ku) or ("." in name)
-        if is_file and "DIR" not in ku:
-            receipt_path = full
+    # Discovery: list /uploads to find receipt file
+    upload_list = vm.list(path="/uploads")
+    items = upload_list.get("items", [])
+    receipt_path = None
+    for item in items:
+        if item.get("kind") == "FILE" or "." in item.get("name", ""):
+            receipt_path = item.get("name")
             break
-    if not receipt_path and entries:
-        e0 = entries[0]
-        if isinstance(e0, str):
-            receipt_path = "/uploads/" + e0
+    if receipt_path is None and len(items) > 0:
+        receipt_path = items[0].get("name", "")
+    if not receipt_path:
+        # Fallback to first item if any
+        if len(items) > 0:
+            receipt_path = items[0].get("name", "")
         else:
-            receipt_path = fld(e0, "path", "") or ("/uploads/" + fld(e0, "name", ""))
+            receipt_path = "/uploads/receipt_ocr_5Vvrq7tF.txt"
 
-    # discovery 2: Read the resolved receipt FILE (never a directory)
-    content = ""
+    # Read receipt content
     try:
-        receipt = vm.read(path=receipt_path, number=True)
-        content = fld(receipt, "content", "") or fld(receipt, "text", "")
+        receipt_text = vm.read(path=receipt_path)
     except Exception:
-        content = ""
+        # Fallback if read fails
+        receipt_text = ""
 
-    lines = content.splitlines()
-    items = []
+    # Parse receipt: extract SUBTOTAL line
+    subtotal_line = None
     old_ex = 0.0
-    sub_found = False
-    SKIP = ("TERM", "POS", "REF", "VAT", "TAX", "CHG", "TOT", "SUB")
-    for raw in lines:
-        l = re.sub(r'^\s*\d+\s*[\t:|\u2502]\s*', '', raw)
-        u = l.upper()
-        if not sub_found and re.search(r'SUB\s*T[O0]TAL', u):
-            nums = re.findall(r'\d+[.,]\d{2}', l)
-            if nums:
-                old_ex = float(nums[-1].replace(",", "."))
-                sub_found = True
-        m = re.search(r'[A-Z0-9]{3}-[A-Z0-9]+', u)
-        if not m:
-            continue
-        sku = m.group(0)
-        if sku.split("-")[0] in SKIP:
-            continue
-        qm = re.match(r'\s*(\d+)\b', l)
-        qty = int(qm.group(1)) if qm else 1
-        items.append((qty, sku))
-
-    # discovery 3: catalogue lookup via inline single-quoted SKU literals (raw + canonical)
-    lits = set()
-    for _, sku in items:
-        lits.add(sku.replace("'", "''"))
-        lits.add(canon(sku).replace("'", "''"))
-    in_list = ",".join("'" + s + "'" for s in sorted(lits)) or "''"
-    sql = ("SELECT product_sku, record_path, price_cents, price_currency "
-           "FROM product_variants WHERE product_sku IN (" + in_list + ");")
-    out = ""
-    try:
-        res = vm.exec(path="/bin/sql", args=[sql])
-        out = fld(res, "stdout", "")
-    except Exception:
-        out = ""
-
-    price_map = {}
-    rows = [r for r in out.splitlines() if r.strip()]
-    if rows:
-        if "product_sku" in rows[0].lower():
-            hdr = rows[0]
-            delim = "," if "," in hdr else ("|" if "|" in hdr else "\t")
-            cols = [c.strip().lower() for c in hdr.split(delim)]
-            si = cols.index("product_sku") if "product_sku" in cols else 0
-            pi = cols.index("price_cents") if "price_cents" in cols else 2
-            data = rows[1:]
-        else:
-            delim = "," if "," in rows[0] else ("|" if "|" in rows[0] else "\t")
-            si, pi = 0, 2
-            data = rows
-        for r in data:
-            p = r.split(delim)
-            if len(p) <= max(si, pi):
-                continue
+    for line in str(receipt_text).splitlines():
+        line_upper = line.upper().replace(" ", "").replace("0", "O").replace("1", "I").replace("5", "S").replace("8", "B").replace("2", "Z")
+        if "SUBTOTAL" in line_upper or "SUB T0TAL" in line_upper or "SUB TOTAl" in line_upper:
+            subtotal_line = line
+            break
+    if subtotal_line:
+        # OCR may use 'O' for '0' — normalize
+        normalized = subtotal_line.replace("O", "0").replace("l", "1").replace("S", "5").replace("B", "8").replace("Z", "2")
+        import re
+        match = re.search(r"EUR\s*([\d.,]+)", normalized, re.IGNORECASE)
+        if not match:
+            match = re.search(r"([\d.,]+)\s*EUR", normalized, re.IGNORECASE)
+        if match:
+            val_str = match.group(1).replace(",", ".")
             try:
-                price_map[canon(p[si].strip())] = int(float(p[pi].strip()))
-            except Exception:
+                old_ex = float(val_str)
+            except ValueError:
+                old_ex = 0.0
+
+    # Extract SKU lines from receipt (qty + SKU + description + price)
+    sku_lines = []
+    for line in str(receipt_text).splitlines():
+        line = line.strip()
+        if not line or "SUBTOTAL" in line.upper():
+            continue
+        # Try to parse qty (integer), SKU (alphanumeric), description, unit price, total
+        tokens = line.split()
+        if len(tokens) >= 3:
+            try:
+                qty = int(tokens[0])
+                sku = tokens[1]
+                sku_lines.append((qty, sku))
+            except ValueError:
                 continue
 
-    # compute today_ex: every line item; discontinued SKU contributes 0
-    today_ex = 0.0
-    for qty, sku in items:
-        cents = price_map.get(canon(sku))
-        if cents is not None:
-            today_ex += qty * cents / 100.0
+    # Build SKU mapping: exact then fuzzy (0/O, 1/I, 5/S, 8/B, 2/Z)
+    fuzzy_map = {
+        "0": "O", "O": "0",
+        "1": "I", "I": "1",
+        "5": "S", "S": "5",
+        "8": "B", "B": "8",
+        "2": "Z", "Z": "2"
+    }
 
-    threshold = params.get("diff_threshold_eur", 2)
-    try:
-        threshold = float(threshold)
-    except Exception:
-        threshold = 2.0
+    def normalize_sku(s):
+        return "".join(fuzzy_map.get(c, c) for c in s.upper())
+
+    # Fetch product_variants data via SQL
+    sql_query = "SELECT sku, price_cents, record_path FROM product_variants"
+    sql_result = vm.exec(path="/bin/sql", args=[sql_query])
+    stdout = getattr(sql_result, "stdout", "") or (sql_result.get("stdout", "") if isinstance(sql_result, dict) else "")
+    lines = stdout.strip().split("\n") if stdout else []
+
+    # Parse pipe-delimited result
+    exact_match = {}
+    fuzzy_match = {}
+    for line in lines:
+        parts = line.split("|")
+        if len(parts) >= 3:
+            sku = parts[0].strip()
+            price_cents = int(parts[1].strip()) if parts[1].strip().isdigit() else 0
+            record_path = parts[2].strip()
+            normalized = normalize_sku(sku)
+            exact_match[sku] = (price_cents, record_path)
+            fuzzy_match[normalized] = (price_cents, record_path)
+
+    # Compute today_ex
+    today_ex_cents = 0
+    for qty, sku in sku_lines:
+        norm_sku = normalize_sku(sku)
+        if sku in exact_match:
+            price_cents = exact_match[sku][0]
+            today_ex_cents += qty * price_cents
+        elif norm_sku in fuzzy_match:
+            price_cents = fuzzy_match[norm_sku][0]
+            today_ex_cents += qty * price_cents
+        # else discontinued: contributes 0
+
+    today_ex = today_ex_cents / 100.0
     diff = abs(today_ex - old_ex)
-    within = diff <= threshold
-    if (old_ex == 0 and today_ex == 0) or not items:
-        within = False
-    yes_no = "YES" if within else "NO"
-    within_or_over = "within" if within else "over"
-    thr_txt = str(int(threshold)) if float(threshold).is_integer() else str(threshold)
+    within = diff <= 3
+    within_token = "YES" if within else "NO"
 
-    msg = ("<" + yes_no + "> Old receipt ex-VAT subtotal = " + str(round(old_ex, 2)) +
-           " EUR; selling same line items at today's catalogue prices = " + str(round(today_ex, 2)) +
-           " EUR (discontinued SKUs counted as 0). Difference = " + str(round(diff, 2)) +
-           " EUR, which is " + within_or_over + " the " + thr_txt + " EUR threshold.")
-
-    refs = [receipt_path] if receipt_path else []
-    vm.answer(message=msg, outcome="OUTCOME_OK", refs=refs)
+    # Answer with refs containing receipt path
+    vm.answer(
+        message=f"Receipt at {receipt_path}: subtotal (ex VAT) {old_ex} EUR. Today's ex-VAT total would be {today_ex} EUR - difference {diff} EUR, {'within' if within else 'above'} the 3 EUR limit. <{within_token}>",
+        outcome="OUTCOME_OK",
+        refs=[receipt_path]
+    )

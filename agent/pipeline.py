@@ -94,6 +94,26 @@ def _identical_sql_set(a: list[str], b: list[str]) -> bool:
     return sorted(_normalise(s) for s in a) == sorted(_normalise(s) for s in b)
 
 
+# Errors whose fix lives downstream of SQL CONTENT — identical SQL recurring is
+# correct, not a stuck loop, so check_retry_loop must NOT fire on them. fidelity
+# asserts the RPC-name multiset (never SQL text); lint is ast.parse; answer_refs
+# is parsing/refs/answer_template. None are caused by the SQL statement itself.
+_RETRY_GUARD_SKIP_PREFIXES = ("answer_refs:", "fidelity:", "lint:")
+
+
+def _retry_guard_applies(last_error: str | None) -> bool:
+    """True only when the prior failure is plausibly SQL-content-driven.
+
+    The anti-infinite-loop guard breaks on 3 identical SQL multisets. That signal
+    is meaningful only when the SQL itself is what codegen keeps getting wrong;
+    for shape/refs/lint failures the SQL is correct and stable while the fix lives
+    elsewhere, so the guard would mis-fire and starve the cycle budget (t51).
+    """
+    if not last_error:
+        return True
+    return not last_error.startswith(_RETRY_GUARD_SKIP_PREFIXES)
+
+
 # ---------------------------------------------------------------------------
 # Learn + consolidate (merged LLM call)
 # ---------------------------------------------------------------------------
@@ -449,7 +469,14 @@ class _AnswerGuard:
             ref_hint_re.search(c.rule or "") for c in self._design.agents_md_constraints
         )
 
-        if demands_runtime:
+        # A negative yes/no answer (<NO>) legitimately cites nothing — AGENTS.MD:
+        # "should not reference unavailable products". The empty-refs demand only
+        # applies when the answer asserts a match. Without this, a correct <NO>
+        # (no matching row) loops on answer_refs until the cycle budget exhausts
+        # and degrades to CLARIFICATION (t02).
+        negative_answer = "<NO>" in (message or "") and "<YES>" not in (message or "")
+
+        if demands_runtime and not negative_answer:
             non_static = [r for r in refs_list if r not in static_template]
             if not non_static:
                 hint = (
@@ -689,12 +716,12 @@ def run_pipeline(
         # DESIGN is a starting point; CODEGEN reshapes through LEARN. Same SQL across
         # cycles is normal when the bug is elsewhere (shape, refs, lint). Break only
         # after 3 consecutive identical SQL multisets — gives LEARN 2 chances to refine.
-        # Skip when last error was answer_refs: SQL may be semantically correct and
-        # the fix lives in parsing/refs/answer_template, not in SQL — same SQL is OK.
+        # _retry_guard_applies suppresses the break for SQL-orthogonal failures
+        # (fidelity/lint/answer_refs): the SQL is correct and stable while the fix
+        # lives elsewhere, so identical SQL is expected, not a stuck loop (t51).
         sqls = _extract_sql_literals(cg.script_code)
-        prev_was_answer_refs = bool(last_error and last_error.startswith("answer_refs:"))
         if (
-            not prev_was_answer_refs
+            _retry_guard_applies(last_error)
             and len(prior_sql_sets) >= 2
             and _identical_sql_set(sqls, prior_sql_sets[-1])
             and _identical_sql_set(prior_sql_sets[-1], prior_sql_sets[-2])

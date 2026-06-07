@@ -1,54 +1,56 @@
 {
-  "intent": "Read OCR receipt in /uploads/, recompute today's ex-VAT total from catalogue prices, compare to receipt subtotal, answer YES if abs diff <= 2 EUR else NO.",
-  "params": {
-    "diff_threshold_eur": 2
-  },
+  "intent": "Compare today's ex-VAT total price of items on the old receipt to the receipt's subtotal, answer YES if difference <= 3 EUR else NO.",
+  "params": {},
   "success_criteria": [
-    "Receipt FILE located via List of /uploads/ (not the directory root) and read",
-    "Every receipt line-item SKU resolved against product_variants by EXACT match first, then FUZZY (0/O,1/I,5/S,8/B,2/Z interchangeable)",
-    "today_ex = SUM over EVERY receipt line of qty * catalogue price_cents / 100; a genuinely discontinued SKU contributes 0 (not dropped, not old price)",
-    "old_ex = printed receipt SUBTOTAL line (OCR may render O as 0)",
-    "diff = abs(today_ex - old_ex); answer contains <YES> if diff <= 2 EUR else <NO>",
-    "refs cite the exact receipt file path"
+    "Receipt file in /uploads/ located via List and read",
+    "Subtotal (old_ex) extracted from receipt SUBTOTAL line",
+    "Every receipt SKU matched to catalogue product_variants, first exact then fuzzy (0/O, 1/I, 5/S, 8/B, 2/Z interchangeable), discontinued SKUs contribute 0",
+    "today_ex computed as SUM(qty * matched price_cents)/100 over all receipt lines",
+    "diff = abs(today_ex - old_ex)",
+    "Answer <YES> if diff <= 3, else <NO>",
+    "Answer refs contains receipt file path"
   ],
   "discovery": [
     {
       "rpc": "List",
       "args": {
-        "path": "/uploads/"
+        "path": "/uploads"
       },
-      "bind": "uploads_listing"
+      "bind": "upload_list"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "$receipt_path",
-        "number": true
+        "path": "$upload_file_path"
       },
-      "bind": "receipt"
-    },
+      "bind": "receipt_text"
+    }
+  ],
+  "ops": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT product_sku, record_path, price_cents, price_currency FROM product_variants WHERE product_sku IN (:receipt_skus);"
+        "args": [
+          "$sql_query"
+        ],
+        "stdin": null
       },
-      "bind": "catalogue_prices"
+      "bind": "sql_result"
     }
   ],
-  "ops": [],
   "agents_md_constraints": [
     {
-      "anchor": "#important-things > yes/no",
-      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+      "anchor": "# Important things > When responding with reference - provide full path in the repo to the object.",
+      "rule": "When responding with reference - provide full path in the repo to the object."
     },
     {
-      "anchor": "#important-things > references",
-      "rule": "When responding with reference - provide full path in the repo to the object."
+      "anchor": "# Important things > When answering yes/no questions - include <YES> or <NO> tokens in the response.",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response."
     }
   ],
   "answer_template": {
-    "message": "<{YES_NO}> Old receipt ex-VAT subtotal = {old_ex} EUR; selling same line items at today's catalogue prices = {today_ex} EUR (discontinued SKUs counted as 0). Difference = {diff} EUR, which is {within_or_over} the 2 EUR threshold.",
+    "message": "Receipt at {receipt_path}: subtotal (ex VAT) {old_ex} EUR. Today's ex-VAT total would be {today_ex} EUR - difference {diff} EUR, {within} the 3 EUR limit. <YES/NO>",
     "outcome": "OUTCOME_OK",
     "refs": [
       "$receipt_path"

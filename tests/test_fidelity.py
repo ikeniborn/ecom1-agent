@@ -84,6 +84,28 @@ def test_subprocess_fail_missing_discovery():
     assert not result.passed
 
 
+def test_answer_op_in_plan_not_double_counted():
+    """A weak DESIGN may hallucinate an Answer rpc inside discovery/ops.
+
+    The terminal Answer is appended exactly once by the gate; an Answer listed
+    in the plan must NOT add a second expected Answer, or the multiset becomes
+    unsatisfiable (the pipeline allows exactly one vm.answer). Regression: t51
+    fidelity drift expected ['Answer','Answer','Exec','List','Read'].
+    """
+    d = _design()
+    d.ops = [*d.ops, ToolOp(rpc="Answer", args={}, bind=None)]
+    test_src = generate_fidelity_test(d, "t_fp")
+    assert test_src.count("'Answer'") == 1
+    script = textwrap.dedent('''
+        def run(vm, params):
+            vm.exec(path="/bin/sql", args=[".schema baskets"])
+            vm.exec(path="/bin/sql", args=["SELECT COUNT(*) AS cnt FROM baskets WHERE store_id=:store_id"])
+            vm.answer(message="0 baskets", outcome="OUTCOME_OK", refs=[])
+    ''')
+    result = exec_fidelity_in_subprocess(test_src, script, timeout_s=30)
+    assert result.passed, f"unexpected fail: {result.error}"
+
+
 def test_subprocess_timeout():
     """Infinite loop -> killed by timeout, reported as failure."""
     d = _design()

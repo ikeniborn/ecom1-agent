@@ -172,6 +172,30 @@ def test_answer_guard_raises_on_empty_refs_when_template_needs_runtime():
     vm.answer.assert_not_called()
 
 
+def test_answer_guard_allows_empty_refs_on_negative_answer():
+    """yes/no <NO> answer legitimately cites nothing.
+
+    AGENTS.MD: "should not reference unavailable products". When no row matched,
+    the script emits <NO> with empty refs — that is correct, not a SQL failure.
+    Regression: t02 looped all cycles on answer_refs for a legitimate <NO>.
+    """
+    vm = MagicMock()
+    design = _design_with_template_refs(["$matches[*].record_path"])
+    g = _AnswerGuard(vm, design)
+    g.answer(message="<NO> No matching variant exists.", outcome="OUTCOME_OK", refs=[])
+    vm.answer.assert_called_once()
+
+
+def test_answer_guard_raises_on_empty_refs_for_positive_answer():
+    """A <YES> answer asserting a match MUST still cite the runtime path."""
+    vm = MagicMock()
+    design = _design_with_template_refs(["$matches[*].record_path"])
+    g = _AnswerGuard(vm, design)
+    with pytest.raises(_AnswerRefsError, match="only static template"):
+        g.answer(message="<YES> Found the variant.", outcome="OUTCOME_OK", refs=[])
+    vm.answer.assert_not_called()
+
+
 def test_answer_guard_raises_when_only_static_refs_present():
     """Real regression: template ['/proc/catalog', '$path'], script returned only '/proc/catalog'."""
     vm = MagicMock()
@@ -385,6 +409,26 @@ def test_identical_sql_set_normalises_whitespace():
     c = ["SELECT  1", "  SELECT 2  "]
     d = ["SELECT 1", "SELECT 2"]
     assert _identical_sql_set(c, d)
+
+
+def test_retry_guard_skips_sql_orthogonal_errors():
+    """check_retry_loop must NOT fire when the prior failure is orthogonal to
+    SQL content. fidelity asserts the RPC-name multiset (never SQL text), lint
+    is ast.parse, answer_refs is parsing/refs — identical SQL recurring is
+    correct, not a stuck loop. Regression: t51 aborted at cycle 3 on fidelity.
+    """
+    from agent.pipeline import _retry_guard_applies
+    assert _retry_guard_applies("fidelity: drift (RPC multiset) ...") is False
+    assert _retry_guard_applies("lint: SyntaxError ...") is False
+    assert _retry_guard_applies("answer_refs: only static template ...") is False
+
+
+def test_retry_guard_fires_on_sql_driven_errors():
+    """Plausibly SQL-content-driven failures keep the anti-loop guard active."""
+    from agent.pipeline import _retry_guard_applies
+    assert _retry_guard_applies("real_vm_exec: ...") is True
+    assert _retry_guard_applies("intent_test: ...") is True
+    assert _retry_guard_applies(None) is True
 
 
 def test_answer_guard_captures_submitted_answer():

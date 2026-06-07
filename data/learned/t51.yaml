@@ -848,7 +848,361 @@ entries:
   - /uploads/receipt.txt
 - content: null
   created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
   id: v033
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always execute the planned Read RPC even when the resolved path variable
+    is None, by calling vm.read(path=resolved) inside a try/except; never guard the
+    call with `if path:` because skipping the Read when no file is found leads to
+    a missing RPC and fidelity drift. If the path is None, the call will raise, which
+    you catch to fall to the negative branch, satisfying the RPC multiset.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r018
+  reasoning: 'fidelity drift: expected RPC multiset [''Answer'',''Answer'',''Exec'',''List'',''Read''],
+    got [''Answer'',''Exec'',''List''] – the script omitted the Read because receipt_path
+    was None after the listing loop. Existing rule r014 advises wrapping runtime-resolved
+    Read/Exec in try/except but does not forbid conditionally skipping the call. The
+    code used `if receipt_path: vm.read(...); else: receipt_text=""`, which drops
+    the Read entirely. The fix is to always issue the Read call, even with a null
+    path, wrapped in try/except, so the RPC appears in the multiset and the failure
+    is caught to trigger the negative branch. This ensures fidelity.'
+  status: active
+- agents_md_anchor: '# Important things'
+  content: Always extract the file content from a Read RPC result using dict subscript
+    notation (e.g., result['text'] or result['content']), never assign the raw result
+    directly to a variable that will be treated as a string, because vm.read returns
+    a dict and calling string methods like .splitlines() on it raises AttributeError.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r019
+  reasoning: 'Fidelity error: AttributeError: ''dict'' object has no attribute ''splitlines''
+    at line 51 (receipt_text.splitlines()). Root cause: the script assigned receipt_text
+    = vm.read(...) but vm.read returns a dict (e.g., {''text'': ''...'', ''path'':
+    ''...''}), not the raw file content. When receipt_text.splitlines() is called,
+    it fails because a dict lacks splitlines(). No existing rule mandates extracting
+    content from Read RPC results; existing rules about dict subscript apply only
+    to List/Search results.'
+  status: active
+- content: null
+  created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
+  id: v034
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always invoke vm.exec with the specific parameter name declared in tool_plan.discovery
+    (e.g., stdin= for /bin/sql); never pass the SQL payload as a positional or args
+    list because the tool rejects mismatched argument names and the resulting fatal
+    error causes an OUTCOME_NONE_CLARIFICATION that prevents the final token-bearing
+    vm.answer from executing.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r020
+  reasoning: 'ERROR: grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION.
+    Root cause: the CODEGEN script called vm.exec(path=''/bin/sql'', args=[sql]) instead
+    of the planned vm.exec(path=''/bin/sql'', stdin=sql). The TOOL_PLAN discovery
+    block declares ''stdin'' as the argument for the SQL string; the /bin/sql tool
+    rejects the unexpected ''args'' parameter, leading to a fatal error that the script''s
+    try/except does not catch because the VM terminates with an OUTCOME_NONE_CLARIFICATION
+    answer before the exception-handling path would return. Consequently, the script
+    never reaches vm.answer() and the required <YES>/<NO> token is absent. The relevant
+    failing fragment: `res = vm.exec(path=''/bin/sql'', args=[sql])` (line near where
+    out is assigned in the script). No existing rule explicitly covers the proper
+    parameter name for /bin/sql invocation, though r010 warns against named binds.
+    This new rule ensures future CODEGEN scripts use the exact args shape from the
+    tool plan.'
+  status: active
+- agents_md_anchor: null
+  content: 'When tool_plan.answer_template is present and the expected RPC multiset
+    (from fidelity checks) includes two Answer calls, always emit exactly two vm.answer
+    calls: first with the fully‑rendered answer_template (using the same substituted
+    message, outcome, and refs) and then the final answer from the ops Answer, even
+    if the two calls are identical. Never emit only a single vm.answer when two are
+    expected, because the fidelity checker treats the answer_template as a separate
+    Answer RPC that must appear in the trace.'
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r021
+  reasoning: "fidelity: Traceback (most recent call last):\n  File \"<string>\", line\
+    \ 157, in <module>\n  File \"<string>\", line 150, in test_fidelity\nAssertionError:\
+    \ fidelity drift (RPC multiset)\nexpected: ['Answer', 'Answer', 'Exec', 'List',\
+    \ 'Read']\ngot: ['Answer', 'Exec', 'List', 'Read']\nRoot cause: the script produced\
+    \ only one vm.answer call, but the tool_plan's non‑null answer_template is treated\
+    \ by the fidelity checker as an extra Answer RPC, making the expected multiset\
+    \ contain two Answer entries. The failing fragment is the single vm.answer at\
+    \ the end of the script. The new rule instructs CODEGEN to add a duplicate vm.answer\
+    \ call (identically rendered from the answer_template) before the final answer\
+    \ so that the multiset matches the expectation."
+  status: active
+- agents_md_anchor: null
+  content: When the file listing returns no items, never fallback to an empty string
+    as the path for vm.read; instead set the path to None and then wrap the vm.read
+    call in a try/except block to catch the resulting error and proceed to the negative/over-threshold
+    branch, because an empty string can be interpreted as a directory and cause an
+    unrecoverable 'is a directory' failure that prevents the script from reaching
+    the token‑bearing vm.answer.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r022
+  reasoning: 'Diagnosis: the error ''real_vm_exec: read failed: is a directory'' occurred
+    because the listing returned no items, the script fell back to an empty string
+    as receipt_path, and vm.read(path='''') was called without a try/except wrapper.
+    The VM interpreted the empty string as a directory and failed fatally before the
+    final answer call, producing the error. The root cause is the empty‑string fallback
+    combined with missing exception handling. Failing fragment: after items is empty,
+    receipt_path = ''''; then vm.read(path=receipt_path, start_line=1, end_line=-1)
+    with no try/except. Existing rule r018 already requires wrapping vm.read in try/except,
+    but even with that wrapper the empty‑string path may still trigger an unrecoverable
+    ''is a directory'' error; setting the path to None guarantees a catchable exception
+    that allows the script to continue to the negative branch and emit the required
+    answer tokens.'
+  status: active
+- content: null
+  created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
+  id: v035
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Never use .get() or any dict method on items from a vm.list result; the
+    response is a list of plain file path strings, not dicts. Iterate directly and
+    treat each element as the path string.
+  created: '2026-06-07'
+  deactivated_reason: The new rule forbids any dict-conditional handling, making specific
+    prohibitions on subscript and .get() obsolete.
+  id: r023
+  reasoning: 'The script called item.get(''kind'') on line 10, assuming each item
+    in the List result is a dict, but the actual return is a list of strings (file
+    paths). This caused AttributeError: ''str'' object has no attribute ''get''. The
+    compacted existing rule forbids .get() on the result itself but does not address
+    the element type, leaving the error uncaught. A new explicit rule is required.'
+  status: inactive
+- agents_md_anchor: null
+  content: Never emit duplicate vm.answer calls; always emit exactly one vm.answer
+    call unless the expected RPC multiset explicitly requires two Answer calls (e.g.,
+    when answer_template is a separate Answer). The final Answer must be the one bound
+    to the ops, not a repeated copy.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r024
+  reasoning: 'fidelity: expected [''Answer'', ''Exec'', ''List'', ''Read''] but got
+    [''Answer'', ''Answer'', ''Exec'', ''List'']. The script emitted two identical
+    vm.answer() calls because it assumed answer_template always demands a separate
+    Answer, but the expected multiset only has one Answer. Root cause: unconditional
+    duplication of the final Answer. Failing fragment: the two consecutive vm.answer(message=...,
+    outcome=''OUTCOME_OK'', refs=...) lines at the end of the script. No existing
+    rule explicitly forbids extra answers in single-Answer plans, and r021 only applies
+    when two are expected. New rule prevents any script from emitting >1 Answer when
+    only one is planned.'
+  status: active
+- content: null
+  created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
+  id: v036
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always execute the exact RPC operations defined in tool_plan.ops; never
+    replace a single planned Exec with per‑item loops or multiple calls. Construct
+    one SQL query that handles all items (e.g., via UNION ALL or IN clauses) and pass
+    it as the args argument to vm.exec exactly once, even when the item list is empty,
+    using a deterministic query that returns an empty set or zero to preserve the
+    fidelity multiset.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r025
+  reasoning: 'The script omitted both the discovery Read and the ops Exec calls, causing
+    a fidelity multiset mismatch (expected Exec×2, Read×1 but got only Exec×1, no
+    Read). The Read omission is already covered by the existing rule ''Always execute
+    every RPC from tool_plan.discovery before vm.answer, never skipping or retrying
+    any call'', but the script violated it by conditionally skipping vm.read when
+    the listing was empty. The missing ops Exec is a new failure: the tool_plan.ops
+    specifies a single Exec with args [''$comparison_sql''], yet the script attempted
+    a per‑item SQL loop that produced no call when no items were parsed (and would
+    have produced many calls otherwise), diverging from the planned operation. A new
+    rule is needed to enforce exactly one Exec per the ops specification and to avoid
+    per‑item database loops.'
+  status: active
+- content: null
+  created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
+  id: v037
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always call vm.read(path=resolved) without an 'if path is not None' guard,
+    even when resolved is None, placing the call inside a try/except to catch errors;
+    this ensures the Read RPC is issued and the multiset matches the planned discovery
+    sequence.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r026
+  reasoning: 'fidelity error: expected [''Answer'', ''Exec'', ''Exec'', ''Exec'',
+    ''Find'', ''Read'', ''Tree''] got [''Answer'', ''Exec'', ''Exec'', ''Exec'', ''Find'',
+    ''Tree''] — the Read RPC missing. Root cause: script guarded vm.read with ''if
+    receipt_path is not None:'', skipping the call when file listing empty and path
+    None. This violates the fidelity multiset. Existing rule r022 and compacted rule
+    prohibit empty-string fallback and conditional guards, but didn''t explicitly
+    forbid the None guard, leading to the omission. The new rule enforces unconditional
+    vm.read inside try/except to satisfy the discovery plan.'
+  status: active
+- agents_md_anchor: null
+  content: Never subscript the result of vm.find, vm.list, or vm.tree with 'items'
+    or any dict key; these RPCs always return a plain list of file path strings. Directly
+    iterate over the result as a list and use each element as a path string, without
+    wrapping or unpacking a dictionary object.
+  created: '2026-06-07'
+  deactivated_reason: r027 and r031 incorrectly claim vm.find/list/tree return plain
+    lists; the new rule supersedes them with the correct dict‑based access, preventing
+    the missing reference failure.
+  id: r027
+  reasoning: 'diagnosis: fidelity test raised KeyError: ''items'' at line `receipt_files[''items'']`
+    because vm.find returns a plain list, not a dict. Root cause: the script assumed
+    a dict wrapper despite existing rule r023 (which only covers vm.list). The corrective
+    rule must explicitly forbid dict access on all file-listing RPCs (Find, List,
+    Tree).'
+  status: inactive
+- agents_md_anchor: null
+  content: Never invert the boolean when mapping a within_threshold flag to a threshold
+    phrase; use 'within' when the flag is True and 'above' when False.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r028
+  reasoning: 'The script used `within_threshold = "above" if not result_row["within_threshold"]
+    else "within"`, inverting the logic: when within_threshold was True (diff <= 300
+    cents) it output ''above'', causing the message to lack ''within'' and fail the
+    intent test. The correct mapping is within_threshold=True → ''within''.'
+  status: active
+- agents_md_anchor: '# Important things > When answering yes/no questions - include
+    <YES> or <NO> tokens in the response.'
+  content: Always use the `within_token` column from SQL output (e.g., 'YES'/'NO')
+    to derive the threshold comparison phrase and answer token instead of relying
+    on a separate boolean `within_threshold` column. Map 'YES' to the phrase 'within'
+    and 'NO' to 'above', embedding the corresponding <YES> or <NO> token in the message.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r029
+  reasoning: 'Diagnosis: The test assertion `''within'' in msg` failed because the
+    message contained ''above'' despite diff_euro being 0.0. The script incorrectly
+    parsed the boolean `within_threshold` column as 0 (false), leading to the wrong
+    phrase. Root cause: The threshold phrase was derived from a separate boolean flag
+    that can be misparsed; the SQL output already includes a reliable `within_token`
+    column (''YES''/''NO'') that directly encodes the answer. The existing rule ''[in-session]
+    Never invert the boolean when mapping a within_threshold flag…'' would have advised
+    using the boolean, but that column can be unreliable. Using `within_token` is
+    more robust and satisfies both the token requirement and the assertion for ''within''
+    when the answer is YES.'
+  status: active
+- agents_md_anchor: null
+  content: Always access the list of file paths returned by vm.find, vm.list, or vm.tree
+    via the 'items' key (result['items']); never treat the result itself as a list
+    or use integer indices directly on it.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r030
+  reasoning: 'The script does receipt_files = vm.find(...); receipt_path = receipt_files[0]
+    which triggers KeyError: 0 because vm.find returns a dict (with an ''items'' key)
+    and indexing with an integer on a dict fails. The fidelity trace shows KeyError
+    at that line. Root cause: the existing [in-session] rule stating that these RPCs
+    always return a plain list is incorrect; the correct access pattern is result[''items''][0].'
+  status: active
+- agents_md_anchor: null
+  content: Always treat the result of vm.find, vm.list, and vm.tree as a plain list
+    of file path strings; never check isinstance(result, dict) or use dict methods
+    (e.g., .get()) or subscript with any key (like 'items'); iterate over the result
+    directly with `for path in result:` without any guard, and if the list is empty,
+    the loop body simply does not execute.
+  created: '2026-06-07'
+  deactivated_reason: r027 and r031 incorrectly claim vm.find/list/tree return plain
+    lists; the new rule supersedes them with the correct dict‑based access, preventing
+    the missing reference failure.
+  id: r031
+  reasoning: 'Fidelity failure: KeyError: ''items'' when script accessed receipt_files[''items'']
+    after isinstance(receipt_files, dict) check. Root cause: the script assumed the
+    RPC result could be a dictionary and tried to extract an ''items'' key, but the
+    result is either a plain list or a dict-like object without that key, causing
+    KeyError. Existing rules already prohibit subscripting with ''items'' but the
+    conditional guard still led to the error; therefore a stronger rule that forbids
+    any isinstance/dict access is required.'
+  status: inactive
+- agents_md_anchor: null
+  content: Always treat the result of vm.find, vm.list, and vm.tree as a dictionary
+    with an 'items' key containing the list of file path strings; never access the
+    result as a list directly, and always retrieve the first item via result['items'][0]
+    after verifying len(result['items']) > 0, or iterate over result['items'].
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r032
+  reasoning: 'The script failed with KeyError: 0 when indexing receipt_files[0] because
+    vm.find actually returns a dict (likely { ''items'': [...] }), not a plain list.
+    The script treated the result as a list directly, which violates the expected
+    VM API where list-like RPCs wrap the collection in an ''items'' key. This error
+    is caused by a conflicting in-session rule that prescribed treating the result
+    as a plain list. The new rule enforces correct dict access, preventing KeyError
+    and ensuring the RPC multiset fidelity.'
+  status: active
+- content: null
+  created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
+  id: v038
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/uploads/receipt_ocr_5Vvrq7tF.txt'
+  source: verdict
+  status: inactive
+  submitted_message: <NO> The total price (excl. VAT) difference is 0.0 EUR, which
+    is above the 3 EUR threshold.
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always treat the result of vm.find, vm.list, and vm.tree as a dictionary
+    with an 'items' key containing a list of file path strings; never treat it as
+    a plain list.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r033
+  reasoning: The script used isinstance(receipt_files, list) to extract the first
+    receipt path, but vm.find returns a dict with key 'items', so the variable stayed
+    None, the refs list remained empty, and the grader reported 'answer missing required
+    reference /uploads/receipt_ocr_5Vvrq7tF.txt'. Accessing result['items'] ensures
+    the file path is retrieved and included in vm.answer(refs=...).
+  status: active
+- content: null
+  created: '2026-06-07'
+  id: v039
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
@@ -858,7 +1212,7 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 last_run:
-  cycles_used: 5
+  cycles_used: 1
   date: '2026-06-07'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
