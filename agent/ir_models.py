@@ -42,3 +42,122 @@ class PredExpr(BaseModel):
 
 
 PredExpr.model_rebuild()
+
+
+from pydantic import Field
+
+
+# --- IntentSpec (IDD layer) -----------------------------------------------
+
+class Constraint(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    anchor: str
+    rule: str
+    security: bool = False
+    deny_when: PredExpr | None = None   # I3: True => must deny (security only)
+
+
+class AnswerShape(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    msg_skeleton: str = ""
+    required_ref_kinds: list[str] = []  # subset of {"static","runtime"}
+
+
+class IntentSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    objective: str
+    desired_outcome: str
+    params: dict[str, Any] = {}
+    outcome_space: list[str]
+    constraints: list[Constraint] = []
+    success_criteria: list[PredExpr] = []
+    answer_shape: AnswerShape
+
+
+# --- PlanIR (SDD layer) ----------------------------------------------------
+
+class Step(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rpc: str
+    args: dict[str, Any] = {}
+    bind: str | None = None
+
+
+class ColResolve(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    into: str
+    candidates: list[str]
+
+
+class RowSet(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    from_: str = Field(alias="from")
+    format: str = "auto_delim"
+    into: str
+    columns: list[ColResolve] = []
+
+
+class ComputeStep(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    prim: str
+    args: list[Any] = []
+    into: str
+
+
+class Branch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    when: PredExpr
+    label: str
+
+
+class DecisionTree(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    branches: list[Branch] = []
+    default_label: str
+
+
+class KeywordBucket(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    keywords: list[str]
+    outcome: str
+
+
+class OutcomeFromExit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ok_outcome: str = "OUTCOME_OK"
+    keyword_buckets: list[KeywordBucket] = []
+    default_outcome: str = "OUTCOME_NONE_UNSUPPORTED"
+
+
+class GuardedOp(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rpc: str
+    args: dict[str, Any] = {}
+    bind: str | None = None
+    guard_label: str | None = None
+    outcome_from_exit: OutcomeFromExit | None = None
+
+
+class AnswerTemplateIR(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str
+    outcome: str
+    refs: list[Any] = []
+
+
+class CustomExtract(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    input: str
+    into: str
+
+
+class PlanIR(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    discovery: list[Step] = []
+    rowsets: list[RowSet] = []
+    compute: list[ComputeStep] = []
+    decision: DecisionTree
+    ops: list[GuardedOp] = []
+    answer: dict[str, AnswerTemplateIR]
+    custom_extract: list[CustomExtract] = []
