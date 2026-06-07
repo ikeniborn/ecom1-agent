@@ -1,3 +1,33 @@
+---
+review:
+  spec_hash: dfdc6266343cedfe
+  last_run: 2026-06-07
+  phases:
+    structure:   { status: passed }
+    coverage:    { status: passed }
+    clarity:     { status: passed }
+    consistency: { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: WARNING
+      section: "Acceptance (from intent)"
+      section_hash: 842e28d096a55917
+      text: "'materially fewer lines/LOC' (OC7 + Done-when) is a quantitative acceptance criterion with no measurable threshold/DoD."
+      verdict: fixed
+      verdict_at: 2026-06-07
+    - id: F-002
+      phase: clarity
+      severity: INFO
+      section: "Testing strategy (TDD, bottom-up)"
+      section_hash: 52ee265bee9d002e
+      text: "'a few tasks end-to-end' — integration test count unspecified."
+      verdict: fixed
+      verdict_at: 2026-06-07
+chain:
+  intent: docs/superpowers/intents/2026-06-07-deterministic-plan-interpreter-intent.md
+---
+
 # Design: Deterministic Plan-IR Interpreter — LLM proposes, agent executes
 
 **Date:** 2026-06-07
@@ -42,15 +72,17 @@ Carried verbatim from the approved intent doc; these gate the work.
 - OC5. Deterministic `VERIFY` against the `IntentSpec` replaces `fidelity`, the intent-test gate,
   and `_AnswerGuard` policing — using the same predicate engine as the IR.
 - OC6. Benchmark score on a full run is ≥ the current baseline (~32%).
-- OC7. Net complexity drops: interpreter + IR models are materially fewer lines than the
-  replaced code; `fidelity.py`, the retry-guard machinery, and `_AnswerGuard` policing are removed.
+- OC7. Net complexity drops: `fidelity.py`, the retry-guard machinery, `_AnswerGuard` policing,
+  `testgen.py`, `test_runner.py`, and `check_retry_loop` are removed, and the added LOC across the
+  new modules (`ir_models`, `predicates`, `primitives`, `interpreter`, `verify`, `reason`) is
+  **≤ 60% of the deleted LOC**, measured by `cloc` on the added vs deleted `agent/` files.
 - OC8. The escape hatch is a frozen, named-parser registry (`custom_extract`), bounded to ~2
   tasks (t51, t53) — never a general expression/code evaluator.
 
 **Done when**
 - A full benchmark run scores ≥ baseline AND
 - the `CODEGEN` free-Python path is removed (OC1) AND
-- the interpreter + IR are materially fewer LOC than the replaced fortress (OC7) AND
+- the new-module added LOC ≤ 60% of the deleted LOC by `cloc` (OC7) AND
 - HM3 load-bearing guards are covered by passing regression tests AND
 - HM1/HM2/HM4–HM6 hold (no green regressions, LEARN/oracle/training intact, cost/tier envelope intact).
 
@@ -243,7 +275,7 @@ replace discovery. The duplicate read (probe + discovery) is acceptable — both
 | `interpreter` | golden `PlanIR` → `MockVMSpy` → expected `CapturedAnswer` |
 | `verify` | I1–I4 + criteria; **HM3 regressions**: unresolved-`$ref`→REFUSE · static-only→REFUSE · `id≠record`→DENIED (I3 catches an OK plan) · exit-code mapping · guarded-op skipped on non-OK branch |
 | **corpus replay** | per task: a frozen `PlanIR` → interpreter → `MockVMSpy`(existing fixtures) → captured answer == known-good answer from `data/heuristics`. Start with the riskiest 6: **t21, t25, t47, t48, t51, t53** |
-| integration | a few tasks end-to-end against the real VM behind the flag |
+| integration | 3 named tasks end-to-end against the real VM behind the flag: t09 (lookup), t27 (RBAC/payment decision), t51 (compute + escape hatch) |
 
 Existing `tests/` asserting codegen/fidelity/`_AnswerGuard` behavior are removed/rewritten as those
 modules are deleted — expect test churn (called out in the plan).
