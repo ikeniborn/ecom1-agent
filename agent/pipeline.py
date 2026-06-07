@@ -114,6 +114,38 @@ def _retry_guard_applies(last_error: str | None) -> bool:
     return not last_error.startswith(_RETRY_GUARD_SKIP_PREFIXES)
 
 
+# Real-VM exceptions whose fix is a deterministic input-validation failure
+# (bad tool path, reading a directory, missing file/record) OR a network
+# transient. On a read-only plan these are safe to re-run, so the loop should
+# LEARN + retry rather than dead-end at clarification. Matched against
+# str(exc).lower(); the read-only guard lives at the call site (has_mutations).
+_RETRYABLE_VM_ERROR_PATTERNS = (
+    # Missing path/record. The ECOM runtime phrases this "read failed: not found";
+    # POSIX-style backends say "no such file" / "does not exist". Cover both, else
+    # a read-only plan that probes a non-existent path dead-ends instead of
+    # retrying (regression: t02 broke at cycle 5/10 on "read failed: not found").
+    "not found",
+    "is a directory",
+    "does not exist",
+    "no such file",
+    "not a file",
+    # Network/VM transients. Read-only plans are safe to re-run; mutating
+    # plans are guarded by `has_mutations` (set from design.ops).
+    "the read operation timed out",
+    "the write operation timed out",
+    "connection reset",
+    "remote disconnected",
+    "connection aborted",
+)
+
+
+def _is_retryable_vm_error(msg: str) -> bool:
+    """True when a real-VM exception is a deterministic input or transient
+    failure that a read-only plan can safely re-run (see patterns above)."""
+    msg = msg.lower()
+    return any(p in msg for p in _RETRYABLE_VM_ERROR_PATTERNS)
+
+
 # ---------------------------------------------------------------------------
 # Learn + consolidate (merged LLM call)
 # ---------------------------------------------------------------------------
@@ -312,6 +344,81 @@ def _run_script_on_vm(script_code: str, vm, params: dict[str, str]) -> None:
 # AnswerGuard — refs pre-check before real vm.answer
 # ---------------------------------------------------------------------------
 
+# Phrases in success_criteria / agents_md_constraints that imply the answer
+# must cite a runtime-discovered path (a record_path-style grounding ref).
+_RUNTIME_REF_HINT_RE = re.compile(
+    r"\b(reference|full path|grounding|file path|path to|object path|"
+    r"matched row|matched product|matched file|catalog (file|path|entry))\b",
+    re.IGNORECASE,
+)
+
+
+def _demands_runtime_ref(design: DesignOutput) -> bool:
+    """True if the task requires a runtime-bound (record_path-style) ref.
+
+    Sources, in order: a `$`-placeholder in answer_template.refs, or a ref-hint
+    phrase in success_criteria / agents_md_constraints. Shared by `_AnswerGuard`
+    and `_detect_zero_row_miss` so both agree on what "needs grounding" means.
+    """
+    template_refs = list(design.answer_template.refs or [])
+    if any(isinstance(r, str) and "$" in r for r in template_refs):
+        return True
+    if any(_RUNTIME_REF_HINT_RE.search(s or "") for s in design.success_criteria):
+        return True
+    return any(
+        _RUNTIME_REF_HINT_RE.search(c.rule or "") for c in design.agents_md_constraints
+    )
+
+
+def _detect_zero_row_miss(
+    design: DesignOutput, sql_results: list[str], answer: dict
+) -> str | None:
+    """Catch a `<NO>`/un-grounded OK answer backed by 0 data rows from /bin/sql.
+
+    For lookup tasks the seeded product exists, so the only correct answer is
+    `<YES>` + record_path. When a discovery /bin/sql returns header-only output
+    (0 data rows), the script emits `<NO>` with no runtime ref — today silently
+    accepted via the negative-answer escape, then failed by the grader. Turn it
+    into a precise red signal so LEARN/CODEGEN can reshape the binding/predicates.
+
+    Returns an error string when ALL hold, else None:
+      - outcome is OUTCOME_OK;
+      - task demands a runtime ref (`_demands_runtime_ref`);
+      - actual refs carry no non-static (runtime) entry;
+      - at least one /bin/sql ran and EVERY result has 0 data rows.
+    """
+    if answer.get("outcome") != "OUTCOME_OK":
+        return None
+    if not _demands_runtime_ref(design):
+        return None
+
+    template_refs = list(design.answer_template.refs or [])
+    static_template = {r for r in template_refs if isinstance(r, str) and "$" not in r}
+    refs_list = list(answer.get("refs") or [])
+    has_runtime_ref = any(r not in static_template for r in refs_list)
+    if has_runtime_ref:
+        return None
+
+    # /bin/sql emits CSV with a leading column-name header row; data_rows =
+    # non-empty lines minus that header. No query at all → cannot conclude.
+    if not sql_results:
+        return None
+    max_data_rows = max(
+        max(len([ln for ln in (s or "").splitlines() if ln.strip()]) - 1, 0)
+        for s in sql_results
+    )
+    if max_data_rows > 0:
+        return None
+
+    return (
+        "zero_row_miss: discovery /bin/sql returned header-only (0 data rows) on "
+        "real VM while the answer is <NO>/un-grounded, but the task requires a "
+        "runtime record_path ref — :name bindings likely unbound or predicates "
+        "too strict; the product may exist. Reshape the SQL binding/predicates "
+        "so the query returns the matching row."
+    )
+
+
 class _AnswerRefsError(RuntimeError):
     """Raised when the script's vm.answer call has invalid refs.
 
@@ -458,16 +565,7 @@ class _AnswerGuard:
         # Safety net: even if the template forgot a $placeholder, the
         # DESIGN's own success_criteria / agents_md_constraints may demand
         # a runtime reference. Infer the demand from those fields.
-        ref_hint_re = re.compile(
-            r"\b(reference|full path|grounding|file path|path to|object path|"
-            r"matched row|matched product|matched file|catalog (file|path|entry))\b",
-            re.IGNORECASE,
-        )
-        demands_runtime = bool(runtime_placeholders) or any(
-            ref_hint_re.search(s or "") for s in self._design.success_criteria
-        ) or any(
-            ref_hint_re.search(c.rule or "") for c in self._design.agents_md_constraints
-        )
+        demands_runtime = _demands_runtime_ref(self._design)
 
         # A negative yes/no answer (<NO>) legitimately cites nothing — AGENTS.MD:
         # "should not reference unavailable products". The empty-refs demand only
@@ -699,7 +797,13 @@ def run_pipeline(
         except CodegenError as e:
             last_error = f"codegen_llm_fail: {e}"
             print(f"{CLI_YELLOW}[pipeline] CODEGEN llm fail: {e}{CLI_CLR}")
-            continue   # no LEARN; just retry
+            # Distil a LEARN rule so a weak model learns the output contract
+            # (emit script_code as a plain field, not a fenced/escaped JSON blob).
+            # No script parsed yet → the error string is the only signal.
+            _tk = {}
+            _learn_consolidate(task_id, learn_ctx, design, last_error, "", token_out=_tk)
+            _accum(_tk)
+            continue
 
         # Lint gate
         try:
@@ -798,26 +902,11 @@ def run_pipeline(
                 break
             continue
         except Exception as e:
-            msg = str(e).lower()
-            # These VM errors are deterministic input-validation failures (bad
-            # tool path, reading a directory, missing file). They surface from
+            # Deterministic input-validation failures (bad tool path, reading a
+            # directory, missing file/record) and network transients surface from
             # the failing op itself — partial mutations BEFORE them are still
             # possible, so retry is only safe when the plan is read-only.
-            retryable_patterns = (
-                "runtime tool not found",
-                "is a directory",
-                "does not exist",
-                "no such file",
-                "not a file",
-                # Network/VM transients. Read-only plans are safe to re-run; mutating
-                # plans are guarded above by `has_mutations` (set from design.ops).
-                "the read operation timed out",
-                "the write operation timed out",
-                "connection reset",
-                "remote disconnected",
-                "connection aborted",
-            )
-            is_retryable = any(p in msg for p in retryable_patterns)
+            is_retryable = _is_retryable_vm_error(str(e))
             last_error = f"real_vm_exec: {e}"
             print(f"{CLI_RED}[pipeline] real-vm exec failed: {e}{CLI_CLR}")
             _tk = {}
@@ -846,9 +935,18 @@ def run_pipeline(
             answered = True
             break
 
-        ok, err = _run_intent_tests(
-            test_spec, guarded_vm.sql_results, guarded_vm._captured, task_text=instruction
-        )
+        # Deterministic precheck before the LLM intent test: a <NO>/un-grounded
+        # OK answer backed by 0 data rows is a SQL miss, not a real negative —
+        # the LLM test_sql can't tell (it passes on a header-only row). Feed the
+        # precise signal to LEARN instead of submitting an answer the grader
+        # will reject for a missing record_path ref (t02 root cause).
+        zr_err = _detect_zero_row_miss(design, guarded_vm.sql_results, guarded_vm._captured)
+        if zr_err:
+            ok, err = False, zr_err
+        else:
+            ok, err = _run_intent_tests(
+                test_spec, guarded_vm.sql_results, guarded_vm._captured, task_text=instruction
+            )
         if ok:
             print(f"{CLI_GREEN}[pipeline] intent tests green — submitting{CLI_CLR}")
             guarded_vm.submit()

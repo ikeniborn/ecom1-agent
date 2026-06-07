@@ -14,7 +14,8 @@ from typing import IO
 _task_local = threading.local()
 _run_dir: "Path | None" = None
 _stats_fh: "IO[str] | None" = None  # opened by _setup_logging()
-_trace_fh: "IO[str] | None" = None  # full terminal mirror (trace.log), opened by _setup_logging()
+_task_trace_fhs: "dict[str, IO[str]]" = {}  # per-task terminal mirror ({task_id}.trace.log)
+_trace_lock = threading.Lock()  # guards lazy per-task fh creation under ThreadPoolExecutor
 _ansi_re = re.compile(r"\x1B\[[0-9;]*[A-Za-z]")
 
 
@@ -54,22 +55,29 @@ def _setup_logging() -> None:
     run_path = logs_dir / run_name
     run_path.mkdir(exist_ok=True)
 
-    global _run_dir, _stats_fh, _trace_fh
+    global _run_dir, _stats_fh
     _run_dir = run_path
     _stats_fh = open(run_path / "main.log", "w", buffering=1, encoding="utf-8")
     _stats_fh.write(f"[LOG] {run_path}/  (LOG_LEVEL={log_level})\n")
     _stats_fh.flush()
 
-    # Full terminal mirror: every stdout/stderr line (ANSI stripped) is tee'd here
-    # so a run's complete console output survives in the run dir, not just on screen.
-    _trace_fh = open(run_path / "trace.log", "w", buffering=1, encoding="utf-8")
-
-    def _tee_trace(text: str) -> None:
-        if _trace_fh is not None and text:
-            try:
-                _trace_fh.write(_ansi_re.sub("", text))
-            except Exception:
-                pass
+    def _tee_task_trace(task_id: str, text: str) -> None:
+        # Per-task terminal mirror ({task_id}.trace.log) so concurrent tasks don't
+        # interleave. Lazily opened, keyed by task_id; the file is already
+        # task-scoped so the [task_id] prefix is dropped. ANSI stripped for readability.
+        if not text:
+            return
+        fh = _task_trace_fhs.get(task_id)
+        if fh is None:
+            with _trace_lock:
+                fh = _task_trace_fhs.get(task_id)
+                if fh is None:
+                    fh = open(run_path / f"{task_id}.trace.log", "a", buffering=1, encoding="utf-8")
+                    _task_trace_fhs[task_id] = fh
+        try:
+            fh.write(_ansi_re.sub("", text))
+        except Exception:
+            pass
 
     _orig = sys.stdout
     _orig_err = sys.stderr
@@ -79,7 +87,8 @@ def _setup_logging() -> None:
             prefix = getattr(_task_local, "task_id", None)
             out = f"[{prefix}] {data}" if (prefix and data and data != "\n") else data
             _orig.write(out)
-            _tee_trace(out)
+            if prefix:
+                _tee_task_trace(prefix, data)
 
         def writelines(self, lines) -> None:
             for line in lines:
@@ -96,10 +105,12 @@ def _setup_logging() -> None:
             return _orig.encoding
 
     class _StderrTee:
-        """Mirror stderr (tracebacks, warnings) into trace.log unprefixed."""
+        """Mirror stderr (tracebacks/warnings) into the active task's trace file."""
         def write(self, data: str) -> None:
             _orig_err.write(data)
-            _tee_trace(data)
+            prefix = getattr(_task_local, "task_id", None)
+            if prefix:
+                _tee_task_trace(prefix, data)
 
         def writelines(self, lines) -> None:
             for line in lines:

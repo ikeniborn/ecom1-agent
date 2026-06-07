@@ -2119,3 +2119,895 @@
   status: candidate
   embedding_hash: e184c1c72a586458a6782aed80e5d572395ac6ad9782770ea85687e11ce7b430
   source_task: t51
+- id: trace-multiset-category-match
+  description: Match operation primitives to the required trace event categories in multiset fidelity
+    assertions.
+  domain:
+  - testing
+  - rpc
+  - fidelity
+  - debugging
+  - api-semantics
+  content: In trace-based or RPC fidelity checks that assert an expected multiset of event categories,
+    each system primitive emits a specific semantic category such as read-only introspection, execution,
+    or answer submission. A primitive from one category cannot count toward a required category from another.
+    To satisfy the assertion, identify the category emitted by each candidate primitive and choose only
+    those whose categories are present in the expected multiset; never substitute a read-only inspection
+    operation for an effectful execution or a result-submission operation.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9e59d26ace66c3a9678a28efd94a20f810381b21fbe9db2d79a197da61860543
+  source_task: t_ex
+- id: tree-vs-query-rpc
+  description: Structural tree traversal does not satisfy data-query or computational intents; query or
+    execution primitives are required.
+  domain:
+  - fidelity
+  - rpc-semantics
+  - intent-matching
+  - vm-api
+  content: An intent requiring data extraction, counting, or computation must be fulfilled by query or
+    execution RPCs (e.g., Answer, Exec) rather than purely structural navigation RPCs (e.g., Tree). Returning
+    only tree topology causes a fidelity drift because the expected multiset includes result-bearing operations,
+    not just structure-walking operations.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9c5082af84b077e3bec6f830a42e9eced6894269f2d8935f26e68349b28c6131
+  source_task: t_ex
+- id: rpc-fidelity-computed-result-requires-exec-and-answer
+  description: A rule about RPC fidelity requirements for computed-value intents.
+  domain:
+  - rpc
+  - agent
+  - dsl
+  - fidelity
+  content: Intents that require returning a computed scalar result (e.g., counts, totals) must generate
+    both an `Exec` and an `Answer` RPC. Navigation-only operations that emit a `Tree` or listing RPC are
+    insufficient because they do not register as execution plus result delivery, causing fidelity-drift
+    failures.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: b5bd7f3a9fd0fb539b42f0cf18027711d1abff41596bed0459a029ea36364e99
+  source_task: t_ex
+- id: rpc-fidelity-terminal-vs-query
+  description: Structural query RPCs cannot replace terminal action/response RPCs in fidelity-tested traces.
+  domain:
+  - rpc
+  - fidelity
+  - vm
+  - api
+  - testing
+  content: In systems that validate behavior by comparing the multiset of RPC operation categories performed,
+    using a low-level structural query primitive (e.g., tree, list, read, get) in place of a required
+    terminal primitive (e.g., answer, exec, submit, run) causes fidelity drift. The runtime checks the
+    trace of operation types, not just the data retrieved; retrieving information does not automatically
+    satisfy protocol requirements for reporting results or executing commands. Always invoke the expected
+    terminal primitives to match the required RPC category multiset.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 7ba4a70a4b60137bb39dae092909a54c8bac52202267de062801c84662dc006c
+  source_task: t_ex
+- id: structural-exploration-vs-query-exec-rpc
+  description: Structural exploration primitives emit Tree-type RPC events and cannot satisfy analytical
+    intents; use Answer-type queries and Exec-type operations instead.
+  domain:
+  - rpc
+  - automation
+  - fidelity
+  - intent-scripting
+  content: 'Analytical intents such as counting, summing, or querying information must be implemented
+    with primitives that emit Answer-type RPC events, and may require Exec-type events for subsequent
+    actions. Structural exploration primitives (e.g., tree, list, browse) only emit Tree/List-type events
+    and lack the semantic operations needed for analytical objectives. Always map the intent category
+    to the matching RPC family: Tree/List for exploration, Answer for data retrieval, and Exec for execution.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: b7bd241739db9da58be6fdcad9c713d05de4cc6fb26903dadf73100ccfb69432
+  source_task: t_ex
+- id: fidelity-rpc-category-match
+  description: Read-only inspection primitives cannot substitute for Answer or Exec primitives in fidelity
+    tests that assert an exact RPC tag multiset.
+  domain:
+  - vm
+  - sandbox
+  - fidelity
+  - rpc
+  - assertion
+  content: In environments where fidelity is validated by exact RPC-tag multisets, choosing a primitive
+    based solely on data overlap is insufficient. Structural-inspection calls emit tags from the 'inspection'
+    category, whereas intents requiring a response or side effect expect 'Answer' or 'Exec' tags. A category
+    mismatch causes a fidelity drift even if the inspected data could theoretically answer the question.
+    The correct primitive must align with the intent's semantic category, not just its informational content.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 310b43aa472fe67f89b49dd9e6a1bc45cc269365440cd6a6d1bfc22b2dec1b09
+  source_task: t_ex
+- id: structural-inspection-rpc-type-limitation
+  description: Read-only structural inspection calls produce only Tree-type RPC tags and cannot fulfill
+    fidelity requirements expecting Answer or Exec categories.
+  domain:
+  - rpc
+  - vm-api
+  - agent-environment
+  - fidelity-testing
+  content: Pure structural inspection or navigation calls (e.g., tree, list, browse) return only the structural
+    semantic tag (Tree). They do not generate Answer or Exec tags. To satisfy fidelity checks or task
+    intents requiring computed answers or state changes, use computation or execution endpoints rather
+    than read-only structural queries.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 1dc9643e74299e05c58940f6e6483abb80d622d46df89830bdd9f40bc331897f
+  source_task: t_ex
+- id: rpc-fidelity-intent-matching
+  description: Computational intents require eval/exec RPCs rather than structural browsing to satisfy
+    RPC multiset fidelity.
+  domain:
+  - rpc
+  - fidelity-testing
+  - vm-interface
+  content: For counting, aggregation, or answering intents over an RPC interface, use the evaluation and
+    execution endpoints that perform server-side computation. Structural introspection endpoints (e.g.,
+    tree listings) only return metadata and produce an RPC multiset that fails fidelity checks expecting
+    computational calls.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 602baa343f90b40713ede367745b6802f59a8abb8b53b6559dc162578f78cf13
+  source_task: t_ex
+- id: rpc-fidelity-observation-not-execution
+  description: In sandbox environments that validate behavior via expected RPC multisets, substituting
+    pure state-inspection calls for the required execution and answer primitives causes fidelity-drift
+    failures because observation generates different tags than computation and result submission.
+  domain:
+  - agent
+  - sandbox
+  - vm
+  - rpc
+  - fidelity
+  - testing
+  content: 'When a runtime validates a handler by checking an exact multiset of RPC tags, fulfilling a
+    user intent requires two distinct instrumented operations: (1) performing the requested work through
+    the execution primitive (e.g., exec, run, apply), and (2) emitting the final result through the answer
+    primitive (e.g., answer, submit, return). Pure introspection or navigation primitives (e.g., tree,
+    list, read, view) only generate observation-level tags and cannot substitute for either required tag.
+    Relying solely on observation calls to expose or infer the answer produces a divergent RPC multiset
+    and fails fidelity assertions.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 1877210d1cdc2ff5fae8cb12a39c819ab9b6b06ac561af6a6ec2ca8884e89df8
+  source_task: t_ex
+- id: auto-grader-required-reference
+  description: Auto-graders may require explicit mention of dataset identifiers in code, so no-op or indirect
+    solutions fail validation.
+  domain:
+  - auto-grading
+  - scripting
+  - query-writing
+  content: When an auto-grader checks for a required reference to a specific entity (table, column, variable,
+    or dataset), ensure your solution explicitly includes that identifier in the code body or query. Returning
+    a hard-coded value, empty result, or otherwise omitting the named entity causes a validation failure
+    even if the final computed value is correct.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: fab7dc11d1139db1fbda97d37743ae3f1096e9c76b74366fb0e13af179ba1b4f
+  source_task: t_learn
+- id: padding-dead-code-failure
+  description: A function body consisting solely of no-op padding assignments that ignore all inputs and
+    produce no output cannot fulfill any stated functional intent and will always result in failure.
+  domain:
+  - program-synthesis
+  - code-generation
+  - debugging
+  - automated-refinement
+  content: When a generated function is composed entirely of dead code—such as repeated self-overwriting
+    assignments used only as padding—and it never accesses provided arguments, invokes available APIs,
+    returns a value, or causes side effects, it is guaranteed to fail any non-trivial task. Objectives
+    like counting, filtering, or aggregating require active logic that reads inputs and manipulates state.
+    Padding-only scripts represent incomplete synthesis and must be rejected or replaced with actual algorithmic
+    steps.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 3ab439af9c07dcc5fa10c1927e2c7dde9799fd58aee8fa6d7e79f5947d50461b
+  source_task: t10
+- id: bind-output-to-required-reference
+  description: A script that computes a value but fails to store it in the grader's expected named reference
+    will be marked as missing that reference.
+  domain:
+  - scripting
+  - automated-grading
+  - vm-api
+  - interpreter-pattern
+  content: When an evaluation system checks for a specific named reference to retrieve the answer, the
+    solution must explicitly assign the final result to that reference identifier (e.g., a register, output
+    variable, dictionary key, or object attribute). Simply computing the value internally without binding
+    it to the required reference causes a 'missing required reference' error.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 63d1bf068e878c33c74cd1713326f4087e70c6c1942f16537cbf879304a91329
+  source_task: t_learn
+- id: dead-code-padding-no-functionality
+  description: A function body consisting entirely of no-op padding statements contains zero executable
+    logic and therefore cannot satisfy any non-trivial intent, such as counting objects or querying data.
+  domain:
+  - program_synthesis
+  - code_generation
+  - debugging
+  - anti-pattern
+  content: Padding a function with no-op assignments (e.g., repeated `x = 1`) eliminates all executable
+    logic. To fulfill an intent like counting items, the implementation must include actual domain-relevant
+    operations—such as iterating over a collection, invoking a query, or calling a count primitive—rather
+    than filling the body with dead code.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9ec49406c7e2c3847f7cfdb528e8c33a60840ca55bd405cccaaa91dbea48937a
+  source_task: t10
+- id: atom-file-read-query-dependency
+  description: Ensure file read operation occurs before using its content in a database query, with fallback
+    content if file missing.
+  domain:
+  - data pipelines
+  - tool sequencing
+  content: 'In a multi-step data processing workflow where a file''s content is needed for a database
+    query, the sequence must be: search for file, read file content, then execute query with the content.
+    If the file is not found or cannot be read, provide a safe default content (e.g., empty JSON object)
+    to prevent downstream failures and ensure the expected tool call sequence for verification.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 62ab7e104f2fba24464ca43a9fc19f8c9b8977f14b91871fb4539a1750b7bec2
+  source_task: t51
+- id: safe-dict-access-for-search-results
+  description: Use .get() to safely access nested search result keys and avoid KeyError
+  domain:
+  - Python
+  - Defensive programming
+  - API interaction
+  content: 'To avoid KeyError when a dictionary may not contain a specific key, use the .get() method
+    with a default value. For example, to retrieve a list of items from a search response that might lack
+    the ''items'' key: `items = response.get(''items'', [])`. This returns an empty list if the key is
+    absent, preventing crashes and allowing graceful handling of missing data.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: fbbd43b7606cfedc66225cc42b24ca90bad41c980bde6ded0c7d81c17207c3a7
+  source_task: t51
+- id: safe-exec-stdout-access
+  description: Defensive extraction of stdout from a command result that may be either an object or a
+    dictionary
+  domain:
+  - System Integration
+  - Error Handling
+  content: "When calling a system execution method (e.g., `vm.exec()`) that returns a result object whose\
+    \ type can vary between an object with attributes and a plain dictionary, always use a fallback pattern\
+    \ to safely access the `stdout` output. Implement a helper like:\n```python\ndef get_stdout(result):\n\
+    \    if not isinstance(result, dict):\n        return getattr(result, 'stdout', '') or ''\n    return\
+    \ result.get('stdout', '') or ''\n```\nThis prevents `AttributeError` or `TypeError` caused by attempting\
+    \ `.get()` on a non-dict or assuming a dict structure."
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: acfae2a6af76ac34d159aede64742df7e107927c2e91eb0247460c8b3efd0629
+  source_task: t51
+- id: check-product-variant-existence-via-sql
+  description: Method to verify if a product variant exists in a catalogue database by executing a parameterized
+    SQL query with join and property filter, returning a structured answer with record paths as references.
+  domain:
+  - catalogue
+  - database-query
+  - product-search
+  - sql
+  content: Construct a SQL query joining product_variants and product_variant_properties tables. Parameterize
+    brand, kind, series, model, and a property key with a numeric value. Execute the query using a virtual
+    machine exec function, passing bindings securely. Parse the result (CSV delimited by '|') to extract
+    product_sku, record_path, and product_name. If rows exist, compose a positive existence message and
+    list all record_paths as references in the answer. If no rows, compose a negative existence message
+    with empty references. Return the answer via vm.answer with an appropriate outcome and the refs array.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 24112ec30d3ec7729bbd0a1c7abb9bde31596027174fbc7ce4131a69c29b250c
+  source_task: t02
+- id: price-diff-check
+  description: Method to compare total price from a receipt with current catalog prices and determine
+    if the difference is within a specified threshold
+  domain:
+  - e-commerce
+  - pricing
+  - data-comparison
+  content: '1. Locate receipt file (e.g., search for JSON in a designated uploads folder).
+
+    2. Read and parse the receipt, extracting: list of items (SKU, quantity, unit net price excluding
+    VAT), and optionally a pre-computed total net from the receipt.
+
+    3. Query the product catalog (database, file, API) to get current net price (excluding VAT) per SKU.
+
+    4. For each item, compute its net total: old_total = sum(qty * old_unit_net_price), current_total
+    = sum(qty * current_unit_net_price). If a pre-computed receipt total is provided, validate against
+    calculated old total; use whichever is more reliable.
+
+    5. Calculate absolute difference: |current_total - old_total|.
+
+    6. Check if all order items are still available in the catalog.
+
+    7. Set outcome: if difference <= threshold (e.g., 200 cents for 2 EUR) and all items are found, return
+    OK; otherwise, return appropriate clarification or warning.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 34ddd8746f6f3fcdd2d69ca6e2a6fe991750fdff2d6e8cf19af50c4e1aa982b7
+  source_task: t51
+- id: sql-bind-query-product-variant-record-path
+  description: Method to query product variant record path by brand, series pattern, product kind, and
+    property using SQL bind parameters and parse CSV result.
+  domain:
+  - vm_exec
+  - sql
+  - product-catalog
+  content: 'To look up a product variant record path from the product catalog using multiple criteria:
+
+    1. Collect required filter values (brand, series pattern, product kind name, property key, property
+    value) from input parameters.
+
+    2. Build an SQL query joining the tables `product_variants`, `product_kinds`, and `product_variant_properties`
+    with named placeholders (e.g., :brand, :series_pattern). The query should match `product_variants.brand`,
+    `product_variants.series` (or `product_name`) using LIKE, `product_kinds.product_kind_name`, and `product_variant_properties.property_key`/`property_value_text`,
+    then return `product_variants.record_path`.
+
+    3. Construct stdin input for `/bin/sql` with the SQL statement followed by a blank line and `key=value`
+    bind assignments.
+
+    4. Execute `/bin/sql` with `vm.exec(path="/bin/sql", args=[], stdin=stdin_content)`.
+
+    5. Parse the stdout as CSV with pipe (`|`) delimiter to extract the first column (record_path). If
+    no rows found, result is None.
+
+    6. The caller can then use the record path for further actions (e.g., verify existence or retrieve
+    details).'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 4109e58bf6b27a9112c0caead15507089e7b0a71de729564cc6f1270d1d5d951
+  source_task: t02
+- id: handle-directory-listing-return-types
+  description: When using a list method to enumerate files in a directory, the return structure may be
+    a plain list of filenames or a dict with an 'items' key. Always inspect the type and extract data
+    accordingly to avoid KeyError.
+  domain:
+  - Python
+  - API Integration
+  - Error Handling
+  content: 'To safely get file names from a directory listing (e.g., `vm.list(path)`), check the result
+    type. If it''s a list, use it directly; if it''s a dict, look for the ''items'' key. Example: `result
+    = list_fn(path); files = result if isinstance(result, list) else result.get(''items'', [])`. This
+    prevents KeyError when the API returns a list instead of a dict with ''items''.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 56c38b67acd01b81b238724fd1e70121dc1e7d5aee441a6e07c643765058b66e
+  source_task: t51
+- id: ocr-sku-canonicalization
+  description: Normalize product identifiers from OCR by substituting commonly confused characters.
+  domain:
+  - OCR
+  - Data Cleaning
+  - Product Catalogs
+  content: When working with product codes (e.g., SKUs) extracted from OCR outputs, apply a character
+    substitution mapping to correct typical OCR errors. Define a dictionary of common confusions (e.g.,
+    '0'→'O', '1'→'I', '5'→'S', '8'→'B', '2'→'Z') based on known misrecognitions in your font/context.
+    Iterate through the extracted identifier string and replace each character according to the mapping,
+    ensuring the normalized identifier is used for all subsequent lookups, comparisons, or database queries.
+    This reduces false mismatches and improves matching accuracy without modifying source data.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 13062faf85aa29027b4e9751ababd22cbb74134de92b98da9839c6ad080e7cbb
+  source_task: t51
+- id: catalogue-product-existence-check
+  description: Method to check product existence in a catalogue using SQL and generate answer with dynamic
+    references when found, static otherwise.
+  domain:
+  - inventory
+  - catalog
+  - sql
+  content: 'When checking for product existence in a catalogue:
+
+    - Use a SQL query joining product variants and properties tables, filtering by brand, series, model,
+    product name, and optionally by property key/value (e.g., color).
+
+    - Select the record_path of the matching variant.
+
+    - If a row exists, construct a positive answer message that includes the product path; set answer
+    refs to a list containing a static catalogue root path and the dynamic product path.
+
+    - If no row exists, construct a negative answer message; set answer refs containing only the static
+    catalogue root path.
+
+    - Parse SQL output: split by delimiter (e.g., ''|''), skip header row.
+
+    - Always use parameterized inputs to the SQL to prevent injection.
+
+    - Return answer with outcome OUTCOME_OK.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 51518052532667f83f286a712746cdf6e5ae9679d78088bc3300fb891324be4f
+  source_task: t02
+- id: atom-001
+  description: Ensure code strings are properly escaped when embedding them as JSON values to avoid parsing
+    failures.
+  domain:
+  - code-generation
+  - json
+  - error-handling
+  content: 'When embedding generated code as a JSON string (e.g., for ''script_code''), escape all special
+    characters: replace each backslash \ with \\, each double quote " with \", each newline (LF) with
+    \n, each carriage return (CR) with \r. Then enclose the whole string in double quotes. Validate that
+    the final JSON structure is syntactically complete.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 91cf01ff114fa24541dea207f91892430724c9683e81613b23054dc5d541b9be
+  source_task: t02
+- id: handle-empty-sql-output-in-vm
+  description: When executing SQL via a virtual machine tool that returns CSV with a header row, always
+    check for an empty result set before parsing rows to avoid assertion errors from a missing header.
+  domain:
+  - vm-scripting
+  - sql-output-parsing
+  - error-handling
+  content: "When using a VM's SQL executor (e.g., /bin/sql) that outputs CSV with a header row, first\
+    \ verify stdout is not empty. If using csv.reader, ensure the rows list has at least a header row\
+    \ (len(rows) >= 1) and that a data row exists (len(rows) >= 2) if you need to access row data. Example:\n\
+    \nstdout = getattr(result, 'stdout', '')\nif not stdout.strip():\n    # handle empty result\n    product_path\
+    \ = \"\"\nelse:\n    rows = list(csv.reader(io.StringIO(stdout.strip()), delimiter='|'))\n    if len(rows)\
+    \ >= 2:\n        product_path = rows[1][0].strip()\n\nThis prevents AssertionError when the query\
+    \ returns no rows and the output lacks a header row."
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 24ce9d34b198395607b7d834236eceb22a2b0fa04ca5e280567b358200304ddd
+  source_task: t02
+- id: required-rpc-set-for-receipt-pricing-accuracy
+  description: When implementing a function that compares a receipt's total against catalogue prices,
+    the code must include exactly three Exec (or other) RPC calls to avoid fidelity drift. Missing one
+    leads to test failure.
+  domain:
+  - automated-testing
+  - code-fidelity
+  - api-usage
+  content: 'To faithfully implement a receipt-to-catalogue price comparison and pass automated fidelity
+    checks, your function must execute a precise multiset of remote procedure calls: list the document
+    source directory, read the receipt file, tree the reference data directory, execute an identity/environment
+    check (e.g., `id`), and execute two additional command calls (e.g., an SQL query on the catalogue
+    and another helper script), for a total of three execution calls. Ensure these are all present regardless
+    of their order or conditional branching to satisfy the expected RPC multiset and prevent `AssertionError:
+    fidelity drift`.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 7b3bf2e5cba5c79fbd94b74ffdbd0c28c96aff8236ce49bed42dcb1aed5b37d6
+  source_task: t51
+- id: conditional-import-leads-to-unboundlocal
+  description: Avoid conditional import statements; import modules at the top of the function to prevent
+    UnboundLocalError.
+  domain:
+  - python
+  - error-handling
+  - best-practices
+  content: When an `import` statement appears inside a conditional block (e.g., `if`, `for`) within a
+    function, Python treats the imported module as a local variable. If the condition is not met and the
+    code later tries to access the module, an `UnboundLocalError` is raised because the variable was never
+    assigned. To avoid this, place all `import` statements at the very top of the function (or globally)
+    so that the module is always available regardless of control flow.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 5ace3d536f3343e1a47fc9a3fd1f5abdad36eb529bc796be5ac49ece5b3d2e61
+  source_task: t51
+- id: atom-safe-file-read-text-extraction
+  description: Safely extract text content from a file read operation that may return a string, a dictionary
+    with a 'text' key, or other structures, avoiding KeyError.
+  domain:
+  - python
+  - file i/o
+  - error handling
+  content: 'When using `vm.read(path)` (or similar file read calls), the return value can be a plain string,
+    a dictionary containing a `''text''` field, or some other structure. To safely extract the text content
+    without risking a KeyError, avoid direct key access like `result[''text'']`. Instead, use a pattern
+    like:
+
+
+    ```python
+
+    content = result if isinstance(result, str) else (result.get(''text'', '''') if isinstance(result,
+    dict) else '''')
+
+    ```
+
+
+    This handles all common return formats and defaults to an empty string when the text is missing or
+    the format is unexpected. Additionally, wrap in try/except if the read itself may raise.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 7989293d7bb1c8accece0d7638d03b4237ae8f77d354d7c5c404d6725af58654
+  source_task: t51
+- id: use-exec-for-catalogue-file
+  description: When comparing receipt totals with catalogue prices, retrieve the catalogue by executing
+    a file read command on the catalogue file found in /docs, not by SQL query.
+  domain:
+  - data comparison
+  - API usage
+  - file system
+  - automation
+  content: To fetch current catalogue prices in a file system environment, after listing /docs to find
+    the catalogue file (e.g., catalogue.csv), use vm.exec(path='/bin/cat', args=[path_to_catalogue]) to
+    read its contents, then parse the CSV. This avoids reliance on SQL databases which may not be available
+    or may have outdated data. Ensure you also perform an id check with vm.exec(path='/bin/id') for authentication.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: ffd2ee2c8f337b6c56e3f4d644ec9bc9d9b78872fe498870bdeb43ef199a5ddd
+  source_task: t51
+- id: receipt-price-comparison-via-sql
+  description: General method to compare a JSON receipt total excluding VAT with current product variant
+    prices using a single SQL query, handling missing price fields and VAT rate fallback.
+  domain:
+  - coding
+  - python
+  - sql
+  - data-processing
+  content: 'When comparing the total price of items from a JSON receipt (which may contain unit prices
+    including or excluding VAT) with today''s catalog prices stored in a database, you can use a single
+    SQL query that:
+
+    1. Parses the receipt JSON using json_each() and json_extract() to extract item SKU, quantity, and
+    unit prices.
+
+    2. Computes the net (excluding VAT) unit price by checking if an ex-VAT field exists; if not, it falls
+    back to the price inclusive of VAT divided by (1 + VAT rate/100), using a VAT rate extracted from
+    the receipt.
+
+    3. Joins the extracted receipt items with the product_variants table on SKU to obtain current prices
+    (in the same unit, e.g., cents).
+
+    4. Aggregates the old total (using the computed net unit prices) and today''s total, then computes
+    the absolute difference.
+
+    5. Handles missing product variants by counting missing matches and flagging whether all products
+    are available.
+
+    6. Returns the old total, today''s total, the difference, a boolean indicating if the difference is
+    within a predefined threshold (e.g., €2.00 = 200 cents), and whether all products were found.
+
+    Important details: escape single quotes in the receipt JSON string when embedding it into SQL (e.g.,
+    replace '' with ''''). Use COALESCE to fallback to the original unit_price_cents if ex-VAT price is
+    unavailable. Wrap the entire logic in a WITH statement for readability. This method avoids multiple
+    round trips and can be used in environments like a Python virtual machine that executes commands via
+    exec() and reads files.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 6cc7c8de9a5aa38a5ed6f3dec0024457becc614771d97be1e9c6bb0f31f245f5
+  source_task: t51
+- id: atom-fuzzy-sku-price-comparison
+  description: Method to compare a previous receipt total against current catalog prices using fuzzy SKU
+    matching, handling discontinued items, within a tolerance threshold.
+  domain:
+  - data-processing
+  - retail
+  - financial
+  - sku-matching
+  content: "General method for price comparison across data sources:\n1. Parse receipt text to extract\
+    \ individual item SKUs and the original total amount (excluding tax).\n2. Retrieve current product\
+    \ catalog prices for all known SKUs.\n3. Normalize SKUs using a character confusion map (e.g., O↔0,\
+    \ I↔1, S↔5, B↔8, Z↔2) to enable fuzzy matching.\n4. For each SKU on the receipt:\n   a. If an exact\
+    \ match exists in the catalog, use its price.\n   b. Else if the normalized SKU maps to a catalog\
+    \ SKU, use that price.\n   c. If no match is found, treat the item as discontinued (contribute zero\
+    \ to total).\n5. Sum all matched prices to obtain the today's equivalent total.\n6. Compute absolute\
+    \ difference between the original total and the today's total.\n7. Return TRUE if the difference is\
+    \ less than or equal to a configurable tolerance threshold, otherwise return FALSE."
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 06a5641b40dd5837456a32596bc9dcdb74a7888cd70cffede7d60442af3b8572
+  source_task: t51
+- id: scalar-answer-requires-explicit-report
+  description: Read/traversal RPCs alone do not satisfy intents requiring a reported scalar answer; an
+    explicit answer/report RPC is needed to match Answer+Exec fidelity.
+  domain:
+  - agent
+  - vm
+  - rpc-fidelity
+  - validation
+  content: When an intent requires computing and returning a scalar result (e.g., a count or total) in
+    an environment that validates RPC call types, perform data collection via read or traversal APIs,
+    derive the scalar, then explicitly submit it through the answer/reporting API (e.g., `vm.answer(result)`).
+    Simply emitting or returning raw structural data (e.g., a tree or list view) produces a non-answer
+    RPC and fails fidelity checks that expect an `Answer`–`Exec` pair.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: e48b0c034c74ebf9087b1435ce647f80ef9e056916faea1bfafc453af540a361
+  source_task: t_ex
+- id: rpc-fidelity-structural-vs-operational-events
+  description: Structural VM methods emit different RPC event tags than operational methods, causing fidelity
+    drift when the test expects execution/result tags.
+  domain:
+  - rpc
+  - vm
+  - fidelity-testing
+  - event-multiset
+  content: In RPC fidelity tests that verify the multiset of event tags produced by a VM call, structural
+    or introspection methods emit only structural tags (e.g., Tree). Operational tasks requiring results
+    and side-effects must use operational methods (e.g., query or command execution) to generate the corresponding
+    execution tags (e.g., Answer, Exec). Using a structural method for an operational intent causes fidelity
+    drift because the emitted multiset will contain an unexpected structural tag and lack the required
+    operational tags.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 13bd71cddd3fa8015b5765d8f541a9f57ea66a49de06bca9953ae234a9ae6685
+  source_task: t_ex
+- id: rpc-multiset-exec-answer-pattern
+  description: Intents that compute and return data require both an execution and an answer RPC node;
+    a read-only structural node alone causes fidelity drift.
+  domain:
+  - rpc
+  - fidelity-testing
+  - vm-scripting
+  - intent-fulfillment
+  content: In RPC-fidelity tests that verify call multisets, an intent requiring both computation and
+    a returned result (e.g., count, query) must emit an execution-type node (Exec) and a response-type
+    node (Answer). Using only a read-only structural node (Tree) fails the assertion because introspection
+    does not satisfy the expected execution-plus-response pattern.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 72153140709893d18ddd16e340144643c80de697f32ed64733fa0ea6ce8f8588
+  source_task: t_ex
+- id: expose-result-via-required-reference
+  description: In automated coding challenges and VM-scripted tasks, a correct computation is only accepted
+    if the result is explicitly bound to the specific reference name the grader expects; otherwise the
+    submission fails with a missing-reference error.
+  domain:
+  - scripting
+  - code-challenges
+  - vm-api
+  - grading
+  - automation
+  content: After computing the desired value, identify the exact reference identifier (variable name,
+    dictionary key, object property, or register) mandated by the evaluation system. Publish the result
+    by assigning it to that identifier through the host environment's API—such as updating a state map,
+    returning a structured object containing the key, or mutating the provided parameters—so the grader
+    can retrieve the answer.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 80638c41d036dba2e4f68571b427f7437cf216a5e63fc087b508d324ddac9f49
+  source_task: t_learn
+- id: noop-padding-does-not-implement-logic
+  description: A script composed solely of no-op padding cannot fulfill functional intents like counting
+    or aggregation.
+  domain:
+  - program-synthesis
+  - debugging
+  - anti-pattern
+  content: When a code generation pipeline emits only no-op padding statements (e.g., dummy variable assignments
+    such as `x = 1`) and omits domain-relevant operations, the resulting script is functionally empty.
+    It will fail to execute any required logic such as iteration, filtering, counting, or I/O, and will
+    typically produce a runtime error or an incorrect null result. This pattern indicates that the generator
+    exhausted its length budget, failed to synthesize the needed code, or fell back to filler tokens,
+    making the script non-functional for its stated intent.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 1325562a259bc01eb27d0372ddacf039b989458363edfb71276b55e258b35e0c
+  source_task: t10
+- id: computed-metrics-require-exec-answer
+  description: Read-only browse RPCs (e.g., Tree) list raw structure but cannot satisfy intents that require
+    counting, filtering, or aggregating. Those need a compute RPC (Exec) and a result-return RPC (Answer).
+  domain:
+  - agent
+  - rpc
+  - protocol
+  - fidelity
+  content: When the user intent involves computation over stored data—such as counting, filtering, or
+    aggregating—emit an Exec-style RPC to perform the calculation and an Answer-style RPC to return the
+    final value. Using only a Tree-style browse RPC returns raw structure rather than a computed result
+    and causes a fidelity drift in the expected RPC multiset.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: f3fe8585cd233d2980c30d5540515f4b3aec1988fe42f8655bbb7c47b0c64c1a
+  source_task: t_ex
+- id: introspection-does-not-satisfy-exec-answer
+  description: Pure environment introspection (e.g., tree listing) produces the wrong RPC type for intents
+    that require computation and a submitted answer.
+  domain:
+  - agent-environment
+  - vm-api
+  - rpc-fidelity
+  - intent-satisfaction
+  content: When the intent requires computing a result (e.g., counting items), invoke the execution primitive
+    (e.g., vm.exec) to perform the calculation and the answer primitive (e.g., vm.answer) to submit the
+    result. Calling only an exploration/introspection primitive (e.g., vm.tree) emits an observational
+    RPC type (e.g., Tree) and fails fidelity checks that expect the Exec and Answer RPC multiset.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: b284be88b0ec5a38eedf835cf9b0de717a2540a07032227d3b0c01f1d59e7ebb
+  source_task: t_ex
+- id: fidelity-match-execution-answer-primitives
+  description: Using only structure-inspection primitives fails when the fidelity signature requires execution
+    and result-reporting tags.
+  domain:
+  - fidelity
+  - vm
+  - agent
+  - rpc
+  - multiset-validation
+  content: In fidelity-tracked environments, the multiset of RPC tags emitted by a script must exactly
+    match the intent's expected signature. If the signature requires both execution and result-reporting
+    tags, the script must invoke the corresponding execution primitive and answer primitive; relying solely
+    on structure-inspection primitives produces only inspection tags, leading to a fidelity-drift assertion.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 67812a8d7a104604960eb061c17f75d45c3bb02eb59d4a4c76e0be269db8ef1e
+  source_task: t_ex
+- id: linter-bad-syntax-valid-code
+  description: Diagnose phantom linter syntax errors by checking language mode and parser configuration
+    when valid-looking code is flagged.
+  domain:
+  - linting
+  - syntax-error
+  - debugging
+  - language-configuration
+  content: If a linter reports a generic 'bad syntax' error on code that appears syntactically valid in
+    the target language, the linter is likely parsing the file with the wrong language mode, interpreter
+    version, or grammar subset. Verify that the file extension, shebang, project configuration, and IDE/linter
+    settings all match the intended language and version.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 669d6a95bcbbfe30c3cea9d87a9795e5b09f15b4bf6b74b7022f97d8afe98143
+  source_task: tX
+- id: noop-stub-fidelity-drift
+  description: Placeholder no-op implementations for unfulfilled requirements create silent fidelity drift
+    by masking the gap between intent and actual behavior.
+  domain:
+  - software-engineering
+  - code-quality
+  - defensive-programming
+  content: 'When a required behavior is not yet implemented, using a no-op stub or empty body as the final
+    code creates fidelity drift: the program appears to satisfy the intent while actually doing nothing.
+    To avoid silent divergence, either implement the behavior or explicitly signal the missing logic with
+    a hard failure such as raising NotImplementedError. This makes the gap detectable during testing or
+    review rather than allowing it to drift unnoticed.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: c8d2d1a188d47fc995dd8607d17e565b1f405ab98b155900800d0b4b13b0b137
+  source_task: tY
+- id: fidelity-rpc-method-matching
+  description: Match the high-level API method to the expected underlying RPC multiset in fidelity tests.
+  domain:
+  - testing
+  - api-design
+  - rpc
+  - mocks
+  content: Behavioral fidelity tests compare the multiset of RPC calls emitted by a script against an
+    expected pattern. Because distinct high-level API methods (e.g., query/execution vs. introspection/navigation)
+    map to different underlying RPC multisets, selecting the wrong method will trigger a fidelity drift
+    assertion even if the return value seems relevant. Always choose the API entry point whose native
+    RPC footprint exactly matches the tested multiset.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 6e966a6d346c1655e5906fc89e64373ecf783213bb99927b804b74cb6aeedee8
+  source_task: t_ex
+- id: vm-rpc-tag-mapping
+  description: VM inspection methods emit only their own RPC tag (e.g., Tree), so a script that solely
+    calls them cannot satisfy a fidelity test expecting action/response tags (e.g., Exec, Answer).
+  domain:
+  - vm-scripting
+  - fidelity-testing
+  - rpc
+  content: Every VM API method maps one-to-one to a specific RPC tag recorded by the fidelity checker.
+    To match an expected RPC multiset containing execution or answer tags, explicitly invoke the corresponding
+    VM methods (e.g., vm.exec(...) for Exec, vm.answer(...) for Answer) rather than only using inspection
+    methods such as vm.tree(...), which only produce the Tree tag.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 1aaf2b6084ef32d024d70692a169b446358ac040f7bd4a0ad4a697ad9fe74051
+  source_task: t_ex
+- id: sanitize-upstream-metadata-before-script-linting
+  description: Malformed or placeholder metadata values injected into scripts can produce false syntax
+    errors during linting.
+  domain:
+  - linting
+  - code-generation
+  - metadata-validation
+  - debugging
+  content: Treat all externally provided identifiers, intent strings, and configuration values as untrusted
+    input. Before embedding them into a script or passing the combined text to a linter, validate against
+    a strict schema and sanitize for language-appropriate character sets and reserved words. An invalid
+    placeholder in an upstream field can be silently concatenated into the script body, causing a downstream
+    syntax error on otherwise valid code.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 492117e96a8e13d91fa29fc0d24946b33522ae524c9be625816462fde0ec71c2
+  source_task: tX
+- id: no-op-impl-fidelity-drift
+  description: Stub implementations consisting solely of no-op statements cause fidelity drift for any
+    non-trivial intent by silently failing to execute required behavior.
+  domain:
+  - software engineering
+  - fidelity
+  content: Do not use no-op bodies (e.g., `pass`) as final implementations. Map every intent to concrete
+    executable logic. When logic is missing, use an explicit unimplemented sentinel such as `raise NotImplementedError`
+    instead of `pass`, so that the deviation is caught immediately rather than drifting silently.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: c00ad142bc9ad7b56cbf7da2bb01eba8af149be47a6a96273a813ae9b114a598
+  source_task: tY

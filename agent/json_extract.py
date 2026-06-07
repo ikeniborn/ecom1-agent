@@ -92,10 +92,26 @@ def _extract_json_from_text(text: str) -> dict | None:
             if inferred_tool:
                 prefix_match = inferred_tool
         depth = 0
+        in_str = False
+        escape = False
         for idx in range(start, len(text)):
-            if text[idx] == "{":
+            ch = text[idx]
+            # String-aware: braces/quotes inside a JSON string value must not move
+            # the brace depth, else an object whose value embeds Python code (e.g.
+            # {"script_code": "x = {1: 2}"}) is mis-matched (t02 codegen parse fail).
+            if in_str:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch == "{":
                 depth += 1
-            elif text[idx] == "}":
+            elif ch == "}":
                 depth -= 1
                 if depth == 0:
                     fragment = text[start:idx + 1]

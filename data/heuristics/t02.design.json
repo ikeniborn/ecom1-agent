@@ -1,38 +1,23 @@
 {
-  "intent": "Check whether the catalogue contains a Keter Storage Bin and Organizer with series Deep Stack, model 2OO-VJU, parts case, yellow, and 8‑litre volume.",
+  "intent": "Check existence of Engelbert Strauss Classic e.s. 37H-N9K Work Trousers (color Black) in the catalogue.",
   "params": {
-    "brand": "Keter",
-    "series": "Deep Stack",
-    "model": "2OO-VJU",
-    "product_kind_name": "Storage Bin and Organizer",
-    "expected_storage_type": "parts case",
-    "expected_color_family": "Yellow",
-    "expected_volume": "8 l"
+    "brand": "Engelbert Strauss",
+    "series": "Classic",
+    "model": "e.s. 37H-N9K",
+    "product_name_like": "%Work Trousers%",
+    "color": "Black"
   },
   "success_criteria": [
-    "Answer includes <YES> if a matching variant is found, otherwise <NO>.",
-    "If found, answer references the matched product's record_path; if not found, no record_path is referenced."
+    "If matching product variant exists, answer message contains <YES> token and full path to the variant record; otherwise contains <NO> token."
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/id",
-        "args": [],
-        "stdin": null
+        "args": []
       },
-      "bind": "id_result"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "args": [
-          "SELECT datetime('now') AS current_datetime"
-        ],
-        "stdin": null
-      },
-      "bind": "current_datetime"
+      "bind": "id_context"
     },
     {
       "rpc": "Tree",
@@ -46,32 +31,30 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [
-          "SELECT pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pk.product_kind_name = :product_kind_name"
-        ],
-        "stdin": null
+        "args": [],
+        "stdin": "SELECT pv.record_path\nFROM product_variants pv\nJOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku\nWHERE pv.brand = :brand\n  AND pv.series = :series\n  AND pv.model = :model\n  AND pv.product_name LIKE :product_name_like\n  AND pvp.property_key = 'color_family'\n  AND pvp.property_value_text = :color\nLIMIT 1;"
       },
-      "bind": "candidate_rows"
+      "bind": "product_path"
     }
   ],
   "ops": [
     {
-      "rpc": "Read",
+      "rpc": "Exec",
       "args": {
-        "path": "$candidate_rows[0].record_path",
-        "number": null,
-        "start_line": null,
-        "end_line": null
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT CASE\n  WHEN EXISTS(\n    SELECT 1\n    FROM product_variants pv\n    JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku\n    WHERE pv.brand = :brand\n      AND pv.series = :series\n      AND pv.model = :model\n      AND pv.product_name LIKE :product_name_like\n      AND pvp.property_key = 'color_family'\n      AND pvp.property_value_text = :color\n  ) THEN '<YES> Product found: ' || (\n    SELECT pv.record_path\n    FROM product_variants pv\n    JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku\n    WHERE pv.brand = :brand\n      AND pv.series = :series\n      AND pv.model = :model\n      AND pv.product_name LIKE :product_name_like\n      AND pvp.property_key = 'color_family'\n      AND pvp.property_value_text = :color\n    LIMIT 1\n  )\n  ELSE '<NO> No matching product in catalogue'\nEND AS answer_msg;"
       },
-      "bind": "product_json"
+      "bind": "result_raw"
     },
     {
       "rpc": "Answer",
       "args": {
-        "message": "<YES> We carry the Keter Deep Stack 2OO-VJU Storage Bin and Organizer (parts case, Yellow, 8 l). Record: $candidate_rows[0].record_path",
+        "message": "{result_raw}",
         "outcome": "OUTCOME_OK",
         "refs": [
-          "$candidate_rows[0].record_path"
+          "/proc/catalog/",
+          "$product_path"
         ]
       },
       "bind": null
@@ -79,23 +62,24 @@
   ],
   "agents_md_constraints": [
     {
-      "anchor": "#When answering yes/no questions",
-      "rule": "include <YES> or <NO> tokens in the response."
+      "anchor": "# Important things > 5",
+      "rule": "When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context"
     },
     {
-      "anchor": "#When starting work",
-      "rule": "make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context."
+      "anchor": "# Important things > 7",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response."
     },
     {
-      "anchor": "#When answering with reference",
-      "rule": "provide full path in the repo to the object."
+      "anchor": "# Important things > 4",
+      "rule": "When responding with reference - provide full path in the repo to the object."
     }
   ],
   "answer_template": {
-    "message": "<YES> We carry the Keter Deep Stack 2OO-VJU Storage Bin and Organizer (parts case, Yellow, 8 l). Record: $candidate_rows[0].record_path",
+    "message": "{result_raw}",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$candidate_rows[0].record_path"
+      "/proc/catalog/",
+      "$product_path"
     ]
   },
   "outcome_override": null

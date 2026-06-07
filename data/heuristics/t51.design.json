@@ -1,29 +1,49 @@
 {
-  "intent": "Compare today's ex-VAT total price of items on the old receipt to the receipt's subtotal, answer YES if difference <= 3 EUR else NO.",
-  "params": {},
+  "intent": "Compare the old receipt ex-VAT total from /uploads/ with today's catalogue prices for the same items; return <YES> if the absolute difference ≤ 2 EUR, else <NO>.",
+  "params": {
+    "euro_threshold": 2
+  },
   "success_criteria": [
-    "Receipt file in /uploads/ located via List and read",
-    "Subtotal (old_ex) extracted from receipt SUBTOTAL line",
-    "Every receipt SKU matched to catalogue product_variants, first exact then fuzzy (0/O, 1/I, 5/S, 8/B, 2/Z interchangeable), discontinued SKUs contribute 0",
-    "today_ex computed as SUM(qty * matched price_cents)/100 over all receipt lines",
-    "diff = abs(today_ex - old_ex)",
-    "Answer <YES> if diff <= 3, else <NO>",
-    "Answer refs contains receipt file path"
+    "Answer contains <YES> or <NO> token",
+    "Answer references the exact receipt file path",
+    "Old ex-VAT total is the parsed SUBTOTAL from the receipt",
+    "Today's ex-VAT total is SUM(qty × catalogue price_cents)/100 using exact + fuzzy SKU matching (0/O, 1/I, 5/S, 8/B, 2/Z); discontinued SKUs contribute 0",
+    "Difference = abs(today_ex - old_ex) compared to euro_threshold"
   ],
   "discovery": [
     {
       "rpc": "List",
       "args": {
-        "path": "/uploads"
+        "path": "/uploads/"
       },
-      "bind": "upload_list"
+      "bind": "upload_dir"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "$upload_file_path"
+        "path": "/uploads/$upload_dir_first_name",
+        "start_line": 1,
+        "end_line": 0
       },
       "bind": "receipt_text"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/uploads/",
+        "pattern": "SUB.TOTAL",
+        "limit": 5
+      },
+      "bind": "subtotal_search"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/uploads/",
+        "pattern": "[A-Z]{3}-[A-Z0-9]{8}",
+        "limit": 100
+      },
+      "bind": "sku_search"
     }
   ],
   "ops": [
@@ -32,25 +52,27 @@
       "args": {
         "path": "/bin/sql",
         "args": [
-          "$sql_query"
+          "SELECT product_sku, price_cents FROM product_variants WHERE product_sku IN ($all_candidate_skus_quoted);"
         ],
         "stdin": null
       },
-      "bind": "sql_result"
-    }
-  ],
-  "agents_md_constraints": [
-    {
-      "anchor": "# Important things > When responding with reference - provide full path in the repo to the object.",
-      "rule": "When responding with reference - provide full path in the repo to the object."
+      "bind": "candidate_prices"
     },
     {
-      "anchor": "# Important things > When answering yes/no questions - include <YES> or <NO> tokens in the response.",
-      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response."
+      "rpc": "Answer",
+      "args": {
+        "message": "Receipt subtotal (ex-VAT): {old_ex:.2f} EUR. Today's ex-VAT total: {today_ex:.2f} EUR. Difference: {diff:.2f} EUR. Within the {euro_threshold} EUR threshold? {outcome_token}",
+        "outcome": "OUTCOME_OK",
+        "refs": [
+          "$receipt_path"
+        ]
+      },
+      "bind": null
     }
   ],
+  "agents_md_constraints": [],
   "answer_template": {
-    "message": "Receipt at {receipt_path}: subtotal (ex VAT) {old_ex} EUR. Today's ex-VAT total would be {today_ex} EUR - difference {diff} EUR, {within} the 3 EUR limit. <YES/NO>",
+    "message": "Receipt subtotal (ex-VAT): {old_ex:.2f} EUR. Today's ex-VAT total: {today_ex:.2f} EUR. Difference: {diff:.2f} EUR. Within the {euro_threshold} EUR threshold? {outcome_token}",
     "outcome": "OUTCOME_OK",
     "refs": [
       "$receipt_path"

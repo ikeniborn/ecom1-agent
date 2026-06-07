@@ -7,6 +7,7 @@ import pytest
 from agent.pipeline import (
     _AnswerGuard,
     _AnswerRefsError,
+    _detect_zero_row_miss,
     _extract_sql_literals,
     _identical_sql_set,
     learn_from_grader,
@@ -111,6 +112,35 @@ def test_exhaust_path_terminates_clarification(tmp_path, monkeypatch):
     assert kwargs.get("outcome") == "OUTCOME_NONE_CLARIFICATION" or "OUTCOME_NONE_CLARIFICATION" in str(args)
 
 
+def test_codegen_llm_fail_triggers_learn(tmp_path, monkeypatch):
+    """A CODEGEN response with no parseable script_code must distil a LEARN rule
+    (so a weak model learns the output contract), not silently retry. Regression:
+    t02 cycles 3-4 burned on 'could not parse script_code' with no LEARN."""
+    from agent import learned_store, pipeline
+    monkeypatch.setattr(learned_store, "_LEARNED_DIR", tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data" / "heuristics").mkdir(parents=True)
+
+    learn_errors: list[str] = []
+    monkeypatch.setattr(
+        pipeline, "_learn_consolidate",
+        lambda task_id, learn_ctx, design, error, script_code, **kw: learn_errors.append(error),
+    )
+
+    vm = MagicMock()
+    bad_codegen = json.dumps({"oops": "no script_code field"})
+    good_codegen = json.dumps({"script_code": _GOOD_SCRIPT})
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(
+        json.dumps(_GOOD_DESIGN),
+        bad_codegen,
+        good_codegen,
+    )):
+        run_pipeline(vm, instruction="how many baskets", task_id="t_cgfail", agents_md_text="AGENTS")
+
+    assert any(e.startswith("codegen_llm_fail:") for e in learn_errors)
+    vm.answer.assert_called_once()
+
+
 def test_extract_sql_literals_basic():
     code = '''
 def run(vm, params):
@@ -204,6 +234,53 @@ def test_answer_guard_raises_when_only_static_refs_present():
     with pytest.raises(_AnswerRefsError, match="only static template"):
         g.answer(message="ok", outcome="OUTCOME_OK", refs=["/proc/catalog"])
     vm.answer.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Zero-data-row miss gate (t02 non-determinism root cause)
+# ---------------------------------------------------------------------------
+# A discovery /bin/sql that returns header-only (0 data rows) for an existing
+# product is silently accepted today via the <NO> escape, then fails the grader
+# with "missing required reference". The gate must turn that into a red retry
+# signal — but only when the task actually demands a runtime record_path ref.
+
+
+def test_zero_row_miss_detected_on_negative_answer():
+    design = _design_with_template_refs(["/proc/catalog/", "$record_path"])
+    answer = {
+        "message": "<NO> No matching product in catalogue",
+        "outcome": "OUTCOME_OK",
+        "refs": ["/proc/catalog/"],
+    }
+    err = _detect_zero_row_miss(design, ["product_sku,record_path"], answer)
+    assert err and "zero_row_miss" in err
+
+
+def test_zero_row_miss_silent_when_data_row_present():
+    design = _design_with_template_refs(["/proc/catalog/", "$record_path"])
+    answer = {
+        "message": "<YES> Product found",
+        "outcome": "OUTCOME_OK",
+        "refs": ["/proc/catalog/", "/proc/catalog/ES/WRK-1.json"],
+    }
+    sql_results = ["product_sku,record_path\nWRK-1,/proc/catalog/ES/WRK-1.json"]
+    assert _detect_zero_row_miss(design, sql_results, answer) is None
+
+
+def test_zero_row_miss_silent_when_no_runtime_demanded():
+    # COUNT-style task: no runtime record_path required → header-only is fine
+    # (and a genuine count=0 / <NO> answer must not be forced into retries).
+    design = _design_with_template_refs([])
+    answer = {"message": "<NO> none", "outcome": "OUTCOME_OK", "refs": []}
+    assert _detect_zero_row_miss(design, ["product_sku,record_path"], answer) is None
+
+
+def test_zero_row_miss_silent_when_no_sql_ran():
+    # No /bin/sql executed → cannot conclude "0 rows for an existing product".
+    # Keeps the legitimate-<NO> path (test_answer_guard_allows_empty_refs_on_negative_answer) intact.
+    design = _design_with_template_refs(["/proc/catalog/", "$record_path"])
+    answer = {"message": "<NO> none", "outcome": "OUTCOME_OK", "refs": ["/proc/catalog/"]}
+    assert _detect_zero_row_miss(design, [], answer) is None
 
 
 def test_learn_from_grader_missing_state_returns_false(tmp_path, monkeypatch):
@@ -429,6 +506,25 @@ def test_retry_guard_fires_on_sql_driven_errors():
     assert _retry_guard_applies("real_vm_exec: ...") is True
     assert _retry_guard_applies("intent_test: ...") is True
     assert _retry_guard_applies(None) is True
+
+
+def test_is_retryable_vm_error_covers_ecom_not_found():
+    """The ECOM runtime phrases a missing file/record as 'read failed: not found'.
+    On a read-only plan that must be retryable so the loop LEARNs + retries rather
+    than dead-ending at clarification (regression: t02 broke at cycle 5/10).
+    """
+    from agent.pipeline import _is_retryable_vm_error
+    # ECOM phrasing — the regression case.
+    assert _is_retryable_vm_error("read failed: not found") is True
+    # POSIX-style phrasings the gate already intended to cover.
+    assert _is_retryable_vm_error("[INVALID_ARGUMENT] no such file or directory") is True
+    assert _is_retryable_vm_error("path does not exist") is True
+    assert _is_retryable_vm_error("/docs is a directory") is True
+    # Network transients stay retryable.
+    assert _is_retryable_vm_error("The read operation timed out") is True
+    # Non-deterministic / genuinely fatal errors stay non-retryable.
+    assert _is_retryable_vm_error("permission denied") is False
+    assert _is_retryable_vm_error("internal server error") is False
 
 
 def test_answer_guard_captures_submitted_answer():

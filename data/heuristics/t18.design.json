@@ -1,67 +1,33 @@
 {
-  "intent": "Sum available_today_quantity for the Bondex Garden Classic 106-TS1 Wood Stain and Deck Oil (lacquer) variant across every Graz store, including branches with 0 availability.",
-  "params": {
-    "brand": "Bondex",
-    "line": "Bondex Garden Classic 106-TS1 Wood Stain and Deck Oil",
-    "product_kind": "Wood Stain and Deck Oil",
-    "product_type": "lacquer",
-    "city": "Graz"
-  },
+  "intent": "Query total available inventory for a specific Philips LED bulb across all Vienna stores, returning every store record path and the product record path.",
+  "params": {},
   "success_criteria": [
-    "Resolve the single product_variant: brand=Bondex, family=Bondex Garden Classic 106-TS1 Wood Stain and Deck Oil, kind=Wood Stain and Deck Oil, property value=lacquer",
-    "Enumerate ALL Graz stores (city='Graz'), including those with no store_inventory row or available_today_quantity=0",
-    "Total = SUM(COALESCE(available_today_quantity,0)) over every Graz store for the matched SKU",
-    "Answer rendered exactly as '<N> total'",
-    "refs contain every Graz store record_path plus the matched product record_path"
+    "SQL returns one row per Vienna store with store_path and per-store available quantity",
+    "Total sum of available_today_quantity across all Vienna stores is present in each row",
+    "Product record_path is present in each row",
+    "Answer is formatted exactly as '{total_available} total'"
   ],
-  "discovery": [
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pv.brand = :brand AND pf.product_family_name = :line AND pk.product_kind_name = :product_kind AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_value_text = :product_type);"
-      },
-      "bind": "product"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT store_id, record_path FROM stores WHERE city = :city ORDER BY store_id;"
-      },
-      "bind": "stores"
-    }
-  ],
+  "discovery": [],
   "ops": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH prod AS (SELECT pv.product_sku, pv.record_path AS product_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id WHERE pv.brand = :brand AND pf.product_family_name = :line AND pk.product_kind_name = :product_kind AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_value_text = :product_type)) SELECT s.store_id, s.record_path AS store_path, p.product_sku, p.product_path, COALESCE(si.available_today_quantity,0) AS available_today, (SELECT COALESCE(SUM(COALESCE(si2.available_today_quantity,0)),0) FROM stores s2 CROSS JOIN prod p2 LEFT JOIN store_inventory si2 ON si2.store_id = s2.store_id AND si2.product_sku = p2.product_sku WHERE s2.city = :city) AS total FROM stores s CROSS JOIN prod p LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = p.product_sku WHERE s.city = :city ORDER BY s.store_id;"
+        "args": [
+          "WITH target_product AS ( SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_families pf ON pf.product_family_id = pv.product_family_id WHERE pv.brand = 'Philips' AND pf.product_family_name LIKE '%Philips Professional Hue 3JS-MSN LED Bulb%' AND pv.product_sku IN ( SELECT product_sku FROM product_variant_properties WHERE property_key = 'wattage' AND property_value_text = '10 W' INTERSECT SELECT product_sku FROM product_variant_properties WHERE property_key = 'luminous_flux' AND property_value_text = '470 lm' ) LIMIT 1 ), vienna_stores AS ( SELECT store_id, record_path FROM stores WHERE city = 'Vienna' ) SELECT (SELECT record_path FROM target_product) AS product_path, vs.record_path AS store_path, COALESCE(si.available_today_quantity, 0) AS available_today, ( SELECT SUM(COALESCE(si2.available_today_quantity, 0)) FROM vienna_stores vs2 LEFT JOIN store_inventory si2 ON si2.store_id = vs2.store_id AND si2.product_sku = (SELECT product_sku FROM target_product) ) AS total_available FROM vienna_stores vs LEFT JOIN store_inventory si ON si.store_id = vs.store_id AND si.product_sku = (SELECT product_sku FROM target_product)"
+        ],
+        "stdin": null
       },
-      "bind": "result"
+      "bind": "inventory_rows"
     }
   ],
-  "agents_md_constraints": [
-    {
-      "anchor": "#Important things > references",
-      "rule": "When responding with reference - provide full path in the repo to the object."
-    },
-    {
-      "anchor": "#Important things > availability",
-      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
-    },
-    {
-      "anchor": "#Founding principles > 2",
-      "rule": "All paths are / rooted (pass as such to tools and OS ops)."
-    }
-  ],
+  "agents_md_constraints": [],
   "answer_template": {
-    "message": "{result.total} total",
+    "message": "{total_available} total",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$store_paths",
-      "$product_path"
+      "$product_path",
+      "$store_path"
     ]
   },
   "outcome_override": null

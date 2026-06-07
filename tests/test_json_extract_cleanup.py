@@ -28,3 +28,28 @@ def test_extract_json_mutation_preferred():
 def test_extract_json_returns_none_for_no_json():
     result = je._extract_json_from_text("no json here at all")
     assert result is None
+
+
+def test_extract_script_code_with_braces_in_fenced_json():
+    """codegen returns {"script_code": "...python with {dict} braces..."} in a
+    ```json fence. Non-greedy level-1 regex truncated at the first inner '}';
+    the bracket loop must skip string contents. Regression: t02 cycles 3-4
+    'could not parse script_code'."""
+    text = (
+        '```json\n'
+        '{"script_code": "def run(vm, p):\\n    d = {\\"a\\": 1}\\n    return d"}\n'
+        '```'
+    )
+    obj = je._extract_json_from_text(text)
+    assert obj is not None
+    assert "script_code" in obj
+    assert "{" in obj["script_code"] and "}" in obj["script_code"]
+
+
+def test_extract_object_with_braces_and_close_brace_in_string_unfenced():
+    """String-aware depth: a literal '}' inside a quoted value must not close
+    the object early (no fence here, so the bracket matcher is exercised)."""
+    text = 'noise {"script_code": "x = {1: 2}; y = \\"}\\""} trailing'
+    obj = je._extract_json_from_text(text)
+    assert obj is not None
+    assert obj.get("script_code") == 'x = {1: 2}; y = "}"'

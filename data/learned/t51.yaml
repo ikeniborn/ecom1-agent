@@ -911,7 +911,8 @@ entries:
     error causes an OUTCOME_NONE_CLARIFICATION that prevents the final token-bearing
     vm.answer from executing.
   created: '2026-06-07'
-  deactivated_reason: null
+  deactivated_reason: r020 only covers discovery; the new rule extends the same principle
+    to ops and all Exec calls, superseding r020.
   id: r020
   reasoning: 'ERROR: grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION.
     Root cause: the CODEGEN script called vm.exec(path=''/bin/sql'', args=[sql]) instead
@@ -926,7 +927,7 @@ entries:
     parameter name for /bin/sql invocation, though r010 warns against named binds.
     This new rule ensures future CODEGEN scripts use the exact args shape from the
     tool plan.'
-  status: active
+  status: inactive
 - agents_md_anchor: null
   content: 'When tool_plan.answer_template is present and the expected RPC multiset
     (from fidelity checks) includes two Answer calls, always emit exactly two vm.answer
@@ -1192,17 +1193,196 @@ entries:
     with an 'items' key containing a list of file path strings; never treat it as
     a plain list.
   created: '2026-06-07'
-  deactivated_reason: null
+  deactivated_reason: r033's unconditional dict['items'] access causes KeyError when
+    the key is missing, superseded by the new robust extraction rule.
   id: r033
   reasoning: The script used isinstance(receipt_files, list) to extract the first
     receipt path, but vm.find returns a dict with key 'items', so the variable stayed
     None, the refs list remained empty, and the grader reported 'answer missing required
     reference /uploads/receipt_ocr_5Vvrq7tF.txt'. Accessing result['items'] ensures
     the file path is retrieved and included in vm.answer(refs=...).
+  status: inactive
+- content: null
+  created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
+  id: v039
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always execute every planned discovery Read RPC exactly as defined without
+    conditional guards; call vm.read(path=resolved_path) inside try/except even when
+    resolved_path is None, never wrap the call in an if statement that can skip it.
+    When resolving the path from a preceding vm.search (or any file‑listing RPC),
+    access the result via result['items'] – a list of path strings – and set resolved_path
+    = result['items'][0] if len(result['items']) > 0 else None.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r034
+  reasoning: 'Fidelity error: expected RPC multiset included Read but got no Read
+    call. The script used `if receipt_path is not None: ... vm.read(...)`, which skipped
+    the planned Read when the resolved path was None, violating the discovery plan''s
+    unconditional obligation. Additionally, `vm.search` must be accessed as a dict
+    with ''items'' to retrieve the file paths; treating it as a plain list would crash
+    and also skip the Read. The correction ensures the Read is always executed and
+    the path is correctly extracted from the search output.'
+  status: active
+- agents_md_anchor: null
+  content: Always treat the result of vm.search as a list of file path strings; access
+    the first item with result[0] after checking len(result) > 0, and never use result['items']
+    or dictionary access on it.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r035
+  reasoning: 'Fidelity test failed with KeyError: ''items'' on line 7 of `run`, when
+    accessing `search_result[''items'']`. The root cause is that `vm.search` returns
+    a plain list of file paths, not a dictionary with an ''items'' key. The script
+    followed an existing in-session rule that prescribed `result[''items'']`, leading
+    to the crash. The corrective rule overrides that guidance, specifying list-style
+    access with index 0 after a length check. This makes the script resilient to the
+    actual VM interface and prevents the KeyError.'
+  status: active
+- agents_md_anchor: null
+  content: Never use .get() or getattr() methods when accessing fields of VM rpc results;
+    always use dict-style subscript notation (e.g., result['items']) for all discovery
+    and operation outputs, and handle missing keys via try/except or explicit 'key'
+    in result checks.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r036
+  reasoning: 'Error ''real_vm_exec: get'' triggered because the script used .get()
+    on tree, exec (identity), and read results. The compacted rule already forbids
+    dot attributes and chained .get() fallbacks, but the model still employed docs_tree.get(''items''),
+    identity.get(''stdout''), and receipt_content.get(''text''). The failing fragments:
+    ''docs_tree.get("items", [])'', ''identity.get("stdout", "")'', ''receipt_content.get("text",
+    "")''. Root cause: disregard for the existing dict‑subscript mandate; the .get()
+    call on VM result objects causes a runtime error. Therefore a concrete rule explicitly
+    banning .get() and getattr() is needed.'
   status: active
 - content: null
   created: '2026-06-07'
-  id: v039
+  deactivated_reason: superseded by newer verdict
+  id: v040
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '# Important things > When starting work'
+  content: 'Always extract file paths from vm.list, vm.tree, or vm.find by checking
+    the result type and the presence of an ''items'' key: if the result is a list,
+    use it directly; if a dict with ''items'' key, use result[''items'']; otherwise,
+    treat as empty list. Never assume the dict always contains ''items''.'
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r037
+  reasoning: 'The script crashed at line 4 with KeyError: ''items'' when accessing
+    upload_list[''items''] because the result was a dictionary missing that key, despite
+    isinstance(...,dict). Rule r033 incorrectly mandated unconditional dict[''items'']
+    access; the robust way is to check both type and key existence with a fallback
+    to empty list.'
+  status: active
+- agents_md_anchor: '# Important things > When starting work'
+  content: Always execute every RPC listed in tool_plan.ops exactly once and in the
+    order they appear, before calling vm.answer; fidelity checks the RPC multiset,
+    so omitting or merging planned operations (e.g., skipping a second Exec when data
+    was obtained from an earlier Exec) results in a drift failure.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r038
+  reasoning: 'Error: fidelity drift (RPC multiset) expected [..., Exec, Exec, Exec,
+    ...] but got only two Exec calls. The tool_plan required two Exec ops, one for
+    price_comparison_sql and one for matched_paths_sql. The script only executed the
+    first Exec (price) and skipped the second (matched_paths), causing a missing Exec.
+    Root cause: script merged two planned ops into one, assuming the data already
+    available; the fidelity checker counts each RPC call type.'
+  status: active
+- agents_md_anchor: null
+  content: Always execute every Exec op from tool_plan.ops individually using exactly
+    the bound parameter SQL query ($param_name) as the argument list; never merge
+    multiple planned SQL ops into a single broader query, even if you can fetch all
+    needed data in one call, because fidelity expects the exact multiset of RPC calls.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r039
+  reasoning: 'fidelity drift: expected multiset includes three Exec calls (one from
+    discovery /bin/id, two from ops for $price_comparison_sql and $matched_paths_sql).
+    The generated script performed only one Exec for catalog data, merging the two
+    planned SQL queries into a single broader query and omitting the second Exec.
+    This violates the ops multiset, causing the missing Exec error. Existing rules
+    cover executing all ops but do not explicitly forbid coalescing multiple planned
+    Exec calls into one; a new rule is required to prevent this pattern.'
+  status: active
+- agents_md_anchor: null
+  content: Never place `import` statements inside conditional blocks whose execution
+    is not guaranteed; always import all required modules at the top of the generated
+    script before any other code, to prevent UnboundLocalError when the module is
+    referenced on a code path where the import did not execute.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r040
+  reasoning: 'The fidelity failure was UnboundLocalError: cannot access local variable
+    ''re'' where it is not associated with a value. In the generated script, `import
+    re` was placed inside a `if ''SUB'' in stripped and ''TOTAL'' in stripped:` block
+    that may not execute (the receipt may lack a subtotal line). Later a `re.match(...)`
+    is called outside any conditional at the top level of the loop. Because `import
+    re` inside the function makes `re` a local variable for the entire function, referencing
+    it before the import executes raises UnboundLocalError. The root cause is a conditional
+    import that can be skipped. A rule requiring all imports to be at the top of the
+    script ensures the module is always bound.'
+  status: active
+- agents_md_anchor: '# Important things > When starting work'
+  content: 'When retrieving file content via vm.read, always handle both string and
+    dict returns: if isinstance(result, str), use it directly; if isinstance(result,
+    dict), use result.get(''text'', '''') and never assume the ''text'' key exists.'
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r041
+  reasoning: 'The fidelity error shows a KeyError: ''text'' at line 14 (`receipt_content
+    = receipt_text[''text'']`). vm.read returned a dict that did not contain a ''text''
+    key, aborting the script. The generated code must not blindly subscript with [''text''];
+    it must first test whether the result is a plain string (use directly) or a dict
+    (safely extract with .get(''text'', '''')).'
+  status: active
+- content: null
+  created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
+  id: v041
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always invoke vm.exec with the exact parameter structure shown in tool_plan
+    (args list and stdin keyword) for every Exec call, whether in discovery or ops;
+    for /bin/sql where the plan defines args=[] and stdin as the SQL, pass the SQL
+    as stdin=sql and never as an element of the args list, because passing SQL as
+    args causes a fatal tool error that terminates the script before vm.answer and
+    results in OUTCOME_NONE_CLARIFICATION.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r042
+  reasoning: The script passed the SQL query as args=[sql] instead of stdin=sql for
+    the /bin/sql Exec in ops. The tool rejected the mismatched argument and caused
+    an unrecoverable error, leading to OUTCOME_NONE_CLARIFICATION (the answer was
+    never emitted). Existing rule r020 only mentions discovery, so it wasn't applied
+    to this ops Exec; we need a broader rule covering all Exec invocations.
+  status: active
+- content: null
+  created: '2026-06-07'
+  id: v042
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION

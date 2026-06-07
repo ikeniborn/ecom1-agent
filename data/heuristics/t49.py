@@ -1,63 +1,62 @@
 def run(vm, params):
-    category = params["category"]
-
-    def get_stdout(r):
-        s = getattr(r, "stdout", None)
-        if s is None and isinstance(r, dict):
-            s = r.get("stdout", "")
-        return s or ""
-
-    # --- discovery ---
+    # Discovery: inspect database schema
     schema = vm.exec(
         path="/bin/sql",
-        args=[],
-        stdin="SELECT name, sql FROM sqlite_schema WHERE type='table' AND name='product_variants';",
+        args=["SELECT name, sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY type, name;"],
+        stdin=""
     )
-    codex_tool = vm.find(root="/bin", name="codex", kind="file", limit=1)
 
-    # /bin/sql does not resolve :name binds reliably; inline as a quoted literal.
-    cat_lit = str(category).replace("'", "''")
-
-    # --- ops ---
-    rows = vm.exec(
+    # Ops: count products in Adhesive or Glue categories
+    qty = vm.exec(
         path="/bin/sql",
-        args=[],
-        stdin="SELECT record_path FROM product_variants WHERE category = '%s';" % cat_lit,
-    )
-    count = vm.exec(
-        path="/bin/sql",
-        args=[],
-        stdin="SELECT COUNT(*) AS qty FROM product_variants WHERE category = '%s';" % cat_lit,
+        args=["SELECT COUNT(*) AS qty FROM products WHERE category IN ('Adhesive', 'Glue');"],
+        stdin=""
     )
 
-    # --- parse record paths ---
-    rows_out = get_stdout(rows)
-    record_paths = []
-    seen = set()
-    for ln in rows_out.splitlines():
-        for cell in ln.split("|"):
-            c = cell.strip()
-            if c.startswith("/") and c not in seen:
-                seen.add(c)
-                record_paths.append(c)
+    def get_field(obj, field, default=""):
+        if hasattr(obj, field):
+            val = getattr(obj, field)
+            return val if val is not None else default
+        if isinstance(obj, dict):
+            val = obj.get(field, default)
+            return val if val is not None else default
+        return default
 
-    # --- parse scalar aggregate (guaranteed single data row) ---
-    count_out = get_stdout(count)
-    qty = None
-    for ln in count_out.splitlines():
-        for cell in ln.split("|"):
-            c = cell.strip()
-            if c.isdigit():
-                qty = int(c)
+    qty_stdout = get_field(qty, "stdout")
+    qty_exit = get_field(qty, "exit_code", 0)
+    if qty_exit is None:
+        qty_exit = 0
+
+    qty_value = None
+    if qty_exit == 0 and qty_stdout:
+        for line in qty_stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            for part in line.split("|"):
+                part = part.strip()
+                if part.isdigit():
+                    qty_value = int(part)
+                    break
+            if qty_value is not None:
                 break
-        if qty is not None:
-            break
-    if qty is None:
-        qty = len(record_paths)
 
-    # --- refs: static literal + every counted product's record_path ---
-    refs = ["/proc/catalog"]
-    refs.extend(record_paths)
-
-    message = "<QTY: %d>" % qty
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+    if qty_exit != 0 or not qty_stdout.strip() or qty_value is None:
+        if qty_exit != 0 or not qty_stdout.strip():
+            vm.answer(
+                message="Failed to execute product count query.",
+                outcome="OUTCOME_NONE_UNSUPPORTED",
+                refs=[]
+            )
+        else:
+            vm.answer(
+                message="Could not parse aggregate count from query output.",
+                outcome="OUTCOME_NONE_CLARIFICATION",
+                refs=[]
+            )
+    else:
+        vm.answer(
+            message=f"<QTY: {qty_value}>",
+            outcome="OUTCOME_OK",
+            refs=[]
+        )

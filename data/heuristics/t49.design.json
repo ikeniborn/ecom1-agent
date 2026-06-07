@@ -1,32 +1,25 @@
 {
-  "intent": "Count catalogue products in category 'Wiring Device' using SQL (trust SQL over stale JSON availability).",
+  "intent": "Count products in the Adhesive and Glue categories using the SQLite catalogue database.",
   "params": {
-    "category": "Wiring Device"
+    "category_a": "Adhesive",
+    "category_b": "Glue"
   },
   "success_criteria": [
-    "Returns count of product_variants whose category is 'Wiring Device'",
-    "Answer rendered as <QTY: %VALUE%>",
-    "Every counted product's record_path cited in refs"
+    "sqlite_schema is queried to confirm product table and column names.",
+    "COUNT query returns the exact number of products whose category is Adhesive or Glue.",
+    "Final answer is formatted exactly as `<QTY: NUMBER>`."
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT name, sql FROM sqlite_schema WHERE type='table' AND name='product_variants';"
+        "args": [
+          "SELECT name, sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY type, name;"
+        ],
+        "stdin": ""
       },
       "bind": "schema"
-    },
-    {
-      "rpc": "Find",
-      "args": {
-        "root": "/bin",
-        "name": "codex",
-        "kind": "file",
-        "limit": 1
-      },
-      "bind": "codex_tool"
     }
   ],
   "ops": [
@@ -34,38 +27,19 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT record_path FROM product_variants WHERE category = :category;"
+        "args": [
+          "SELECT COUNT(*) AS qty FROM products WHERE category IN ('Adhesive', 'Glue');"
+        ],
+        "stdin": ""
       },
-      "bind": "rows"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT COUNT(*) AS qty FROM product_variants WHERE category = :category;"
-      },
-      "bind": "count"
+      "bind": "qty"
     }
   ],
-  "agents_md_constraints": [
-    {
-      "anchor": "#important-tools > sql",
-      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
-    },
-    {
-      "anchor": "#important-things > references",
-      "rule": "When responding with reference - provide full path in the repo to the object."
-    }
-  ],
+  "agents_md_constraints": [],
   "answer_template": {
-    "message": "<QTY: {count.qty}>",
+    "message": "<QTY: {qty}>",
     "outcome": "OUTCOME_OK",
-    "refs": [
-      "/proc/catalog",
-      "$rows.record_path"
-    ]
+    "refs": []
   },
   "outcome_override": null
 }

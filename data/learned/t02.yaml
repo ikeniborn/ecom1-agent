@@ -226,7 +226,8 @@ entries:
     bindings argument; do not append key=value lines to the stdin stream after the
     SQL.
   created: '2026-06-07'
-  deactivated_reason: null
+  deactivated_reason: r010 instructs not to append key=value lines, but the correct
+    method for this environment is to append them; this new rule supersedes it.
   id: r010
   reasoning: The error 'assert last, last result empty' occurs because the generated
     script appended the binding key=value lines directly to stdin after the SQL, violating
@@ -234,7 +235,7 @@ entries:
     expects bindings to be passed via a separate bindings channel (the bindings argument
     of vm.exec), not embedded in the stdin stream. As a result the parameters are
     not substituted, the query returns no rows, and the downstream test fails.
-  status: active
+  status: inactive
 - content: null
   created: '2026-06-07'
   deactivated_reason: superseded by newer verdict
@@ -314,18 +315,147 @@ entries:
   status: active
 - content: null
   created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
   id: v005
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
   source: verdict
-  status: active
+  status: inactive
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
+- agents_md_anchor: null
+  content: Always output the Python script code directly inside a single ```python
+    fenced code block, with no preceding or trailing text, no wrapping JSON, and no
+    extra markup.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r014
+  reasoning: 'error: codegen_llm_fail; CODEGEN could not parse script_code from response;
+    head shows LLM started ```json with a ''script_code'' field inside, not a plain
+    ```python block. Root cause: LLM wrapped the code in JSON instead of outputting
+    the raw Python script in a ```python block as the parser expects. No existing
+    rule covers output format.'
+  status: active
+- agents_md_anchor: null
+  content: When executing /bin/sql, always pass the SQL query via stdin as the sole
+    content and supply any :name bind values through the bindings keyword argument
+    of vm.exec. Never append key=value lines to the stdin string after the SQL, as
+    this interferes with the query execution and leads to empty results.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r015
+  reasoning: The error 'last result empty' indicates the SQL returned no rows, likely
+    because the bindings were appended to stdin rather than supplied via the bindings
+    argument. The existing rule r010 already forbids appending, but the script violated
+    it by concatenating the bindings string to the SQL. The conflicting older rule
+    (compacted) still suggests appending, causing confusion. The corrective rule reiterates
+    the correct method to eliminate ambiguity and supersede the conflicting guidance.
+  status: active
+- agents_md_anchor: null
+  content: When executing /bin/sql with :name placeholders, always pass the SQL query
+    via stdin, followed by a newline, and then append each bind variable as key=value
+    lines (one per line). Do not use the bindings keyword argument of vm.exec; supply
+    an empty list for args.
+  created: '2026-06-07'
+  deactivated_reason: r016 (append key=value lines to stdin) contradicts r015 and
+    causes empty sql output; superseded by the new rule to use bindings keyword argument
+    exclusively.
+  id: r016
+  reasoning: 'Mock test assertion ''last result empty'' occurred because script used
+    vm.exec''s bindings argument to supply values, but the test environment (and presumably
+    the real /bin/sql) expects bind values appended as key=value lines in the stdin
+    stream after the SQL statement. The script followed rule r010, which forbids appending
+    key=value lines; this caused the mock to receive no bindings, resulting in empty
+    stdout. Failing fragment: passing bindings via bindings argument instead of stdin.
+    Root cause: environment reads bindings only from stdin''s trailing lines.'
+  status: inactive
+- content: null
+  created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Bosch/PWR-2OJ53JYT.json'
+  source: verdict
+  status: inactive
+  submitted_message: The Bosch Compact PKS 375-EOK Corded Angle Grinder with disc
+    diameter 180 mm is not in the catalogue. <NO>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- content: null
+  created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Sonax/AUT-3M4PQR2Y.json'
+  source: verdict
+  status: inactive
+  submitted_message: <NO> The Automotive Cleaner from Sonax in the Sonax Workshop
+    XTREME 218-FC5 Automotive Cleaner line with cleaner type interior cleaner is not
+    in the catalogue.
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always skip the first row (header) when parsing stdout from /bin/sql with
+    csv.reader. Treat only the subsequent rows as data; ignore the header line to
+    avoid mistakenly returning column names as reference paths.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r017
+  reasoning: 'grader: answer missing required reference ''/proc/catalog/Sonax/AUT-3M4PQR2Y.json''.
+    Root cause: The script used csv.reader on stdout but did not skip the header row,
+    causing it to return the literal string ''record_path'' as the reference instead
+    of the actual data row. Failing fragment: ''record_path = row[0].strip()'' inside
+    the for row loop without skipping the first line.'
+  status: active
+- agents_md_anchor: null
+  content: When constructing the refs list for vm.answer, always include exactly the
+    entries specified in the answer_template from the tool plan, substituting each
+    $variable with its resolved value (which may be an empty string). Never conditionally
+    omit a reference, even if the variable is empty.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r018
+  reasoning: 'The fidelity error ''answer_refs: template/constraints require runtime
+    refs ([''$product_path'']) but actual refs [''/proc/catalog/''] contain only static
+    template entries'' indicates that the code omitted the $product_path reference
+    when the discovery SQL returned no rows, because product_path was empty and the
+    code conditionally appended it. The answer_template expects both refs unconditionally.
+    The correction is to always include all refs, substituting variables with their
+    resolved values, even if empty.'
+  status: active
+- agents_md_anchor: null
+  content: Always pass SQL queries with :name placeholders via stdin, and provide
+    the bind values using the bindings keyword argument of vm.exec. Never append key=value
+    lines to the stdin string, as that prevents substitution and leads to empty results.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r019
+  reasoning: 'The error ''missing header row'' indicates that the /bin/sql output
+    was empty because bind variables were not substituted. The script used key=value
+    lines appended to stdin (per r016) instead of the bindings argument, which is
+    the correct method per r015. This caused the database to receive an invalid query
+    or no bindings, returning no rows. Fix: enforce use of bindings keyword argument
+    to ensure proper execution.'
+  status: active
+- content: null
+  created: '2026-06-07'
+  id: v008
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Engelbert Strauss/WRK-18W93PML.json'
+  source: verdict
+  status: active
+  submitted_message: <NO> No matching product in catalogue
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/
 last_run:
-  cycles_used: 5
+  cycles_used: 4
   date: '2026-06-07'
-  outcome: OUTCOME_NONE_CLARIFICATION
+  outcome: OUTCOME_OK
   status: failure
 task_id: t02
