@@ -48,8 +48,36 @@ def test_interpreted_happy_path_answers_once():
     assert m["outcome"] == "OUTCOME_OK"
 
 
+def test_interpreted_genuine_verify_fail_via_success_criteria():
+    # Exercises the genuine verify() failure path: interpret() SUCCEEDS (no InterpretError)
+    # because required_ref_kinds=[] so the refuse-invariant never fires, then verify() returns
+    # (False, ...) because success_criteria[0] requires row0.cnt == "999" but plan yields "5".
+    # Three cycles: interpret() resolves normally each time, verify() rejects each time -> LEARN
+    # -> exhaust -> OUTCOME_NONE_CLARIFICATION. vm.answer called exactly once (terminal clarify).
+    intent_no_runtime_req = json.dumps({
+        "objective": "count", "desired_outcome": "int", "params": {},
+        "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
+        "constraints": [],
+        # success_criteria: row0.cnt must equal "999", but plan produces "5" -> always False
+        "success_criteria": [{"op": "eq", "lhs": "$row0.cnt", "rhs": "999"}],
+        # required_ref_kinds=[] -> interpreter refuse-invariant never fires for static-only refs
+        "answer_shape": {"required_ref_kinds": []},
+    })
+    learn = json.dumps({"rule_content": "cnt must be 999", "reasoning": "verify failed",
+                        "deactivate_ids": [], "skip": False})
+    vm = MagicMock()
+    vm.exec.return_value = {"stdout": "cnt\n5"}
+    # 1 INTENT + 3x(PLAN + LEARN)
+    seq = [intent_no_runtime_req, _PLAN, learn, _PLAN, learn, _PLAN, learn]
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(*seq)):
+        m = run_pipeline(vm, instruction="how many items", task_id="t_gvf", agents_md_text="A")
+    vm.answer.assert_called_once()
+    assert m["outcome"] == "OUTCOME_NONE_CLARIFICATION"
+
+
 def test_interpreted_verify_fail_then_learn_then_exhaust():
-    # answer_shape demands runtime ref but plan emits only a static ref -> VERIFY fails every cycle
+    # Exercises the interpreter REFUSE-INVARIANT path (InterpretError), not verify():
+    # answer_shape demands runtime ref but plan emits only a static ref -> InterpretError every cycle
     intent_runtime = json.dumps({
         "objective": "o", "desired_outcome": "d", "params": {},
         "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
