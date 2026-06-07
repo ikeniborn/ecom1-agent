@@ -39,3 +39,27 @@ def test_rowset_pipe_delim_with_col_resolve():
     )
     res = interpret(plan, _INTENT, vm)
     assert res.env["rows"] == [{"sku": "A", "price": "100"}, {"sku": "B", "price": "50"}]
+
+
+def test_compute_steps_chain():
+    vm = MockVMSpy(fixtures={})
+    plan = _plan(
+        compute=[
+            {"prim": "abs_diff", "args": [10, 3], "into": "diff"},
+            {"prim": "div", "args": ["$diff", 2], "into": "half"},
+        ],
+    )
+    res = interpret(plan, _INTENT, vm)
+    assert res.env["diff"] == 7 and res.env["half"] == 3.5
+
+
+def test_custom_extract_writes_rowset():
+    fx = {fixture_key("Read", "/uploads/r.txt", None): {"content": "ABC-0I5"}}
+    vm = MockVMSpy(fixtures=fx)
+    plan = _plan(
+        discovery=[{"rpc": "Read", "args": {"path": "/uploads/r.txt"}, "bind": "receipt"}],
+        custom_extract=[{"name": "fuzzy_sku_receipt", "input": "receipt", "into": "skus"}],
+    )
+    res = interpret(plan, _INTENT, vm)
+    assert isinstance(res.env["skus"], list) and res.env["skus"]
+    assert "normalized" in res.env["skus"][0]

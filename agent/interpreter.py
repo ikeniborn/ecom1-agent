@@ -125,6 +125,14 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
     for rs in plan.rowsets:
         env[rs.into] = _parse_rowset(_payload(env.get(rs.from_)), rs)
 
+    # 4. compute + custom_extract
+    from .primitives import run_parser, run_primitive
+    for cs in plan.compute:
+        cargs = [resolve(a, env) for a in cs.args]
+        env[cs.into] = run_primitive(cs.prim, cargs)
+    for ce in plan.custom_extract:
+        env[ce.into] = run_parser(ce.name, _payload(env.get(ce.input)), intent.params or {})
+
     # (compute / custom_extract / decision / ops / answer added in later tasks)
     captured = CapturedAnswer(message="", outcome="OUTCOME_NONE_CLARIFICATION", refs=[])
     return InterpretResult(captured=captured, env=env, observations=observations,
