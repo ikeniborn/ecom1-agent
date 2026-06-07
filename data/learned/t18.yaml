@@ -23,20 +23,112 @@ entries:
   status: active
 - content: null
   created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
   id: v001
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/stores/store_graz_jakomini.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: qty 10
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /proc/stores/store_graz_lend.json
   - /proc/catalog/Bondex/PNT-2ANVO7V6.json
+- agents_md_anchor: '#Important things > references'
+  content: When the answer requires refs for every entity in a scope (e.g., all stores
+    in a city), collect those record_paths from a query that enumerates the scope
+    directly using only the scope predicate, and never gate that enumeration on a
+    CROSS JOIN or INNER JOIN to a discovery CTE that can return zero rows — an empty
+    discovery match collapses the whole result set and leaves required runtime refs
+    empty even though the entities exist.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$vienna_store_paths'', ''$product_path'']) but actual refs [] contain only
+    static template entries []". Root cause: all three /bin/sql calls returned header-only
+    output (zero data rows). Discovery product query matched no product, so target
+    CTE is empty; the ops vienna_rows query then does `FROM stores s CROSS JOIN target
+    t LEFT JOIN store_inventory ...` — CROSS JOIN against an empty target yields zero
+    rows, so the required ''every Vienna store'' enumeration collapses to empty and
+    store_path refs vanish, plus product_path stays ''''. Refs end up []. Failing
+    fragment: `SELECT s.store_id, s.record_path AS store_path, t.product_path ...
+    FROM stores s CROSS JOIN target t LEFT JOIN store_inventory si ...`. The CSV parse
+    (r001) is correct and not at fault — input genuinely had no rows. Rule linkage:
+    new rule targets ref-enumeration translation technique (decouple scope-entity
+    ref collection from a possibly-empty discovery join); distinct from r001 (CSV
+    parsing) and v001 (a verdict), so not a skip.'
+  status: active
+- agents_md_anchor: '#Important things > availability'
+  content: When the answer template binds a refs variable to every entity in a scope
+    and the intent requires citing all of them including zero-quantity entries, populate
+    that refs list from the scope-enumeration query's record_path column for ALL returned
+    rows, and do not post-filter it by an availability or quantity>0 predicate even
+    when an agents_md availability constraint exists — the tool_plan already reconciled
+    that constraint into the template binding.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$vienna_store_paths'', ''$product_path'']) but actual refs [] contain only
+    static template entries []". Root cause: answer_template binds refs to $vienna_store_paths,
+    which success_criteria/intent define as EVERY Vienna store ''including zero-availability
+    ones''. But SCRIPT_CODE re-applies the agents_md #availability constraint as a
+    CODEGEN post-filter, keeping only stores with avail>0. OBSERVED data shows both
+    Vienna stores returned avail=0, so the filter dropped every store and collapsed
+    refs to []. Failing fragment: `available_store_paths = []` / `for r in v_rows:
+    if len(r) >= 3 and to_int(r[2]) > 0: available_store_paths.append(r[1])`. Because
+    the tool_plan already encoded the availability constraint into the explicit $vienna_store_paths
+    scope binding (and the intent overrides it with ''cite all Vienna store records''),
+    the CODEGEN re-derivation of the filter was redundant and destructive. (Secondary
+    symptom: discovery returned 0 rows so product_path stayed empty, but the discovery
+    SQL is frozen in tool_plan and not CODEGEN-fixable.) Rule linkage: directs CODEGEN
+    to fill scope-bound refs unfiltered from the enumeration query instead of re-applying
+    an availability filter the template already accounts for. Distinct from in-session
+    rule (which targets JOIN-collapse of the enumeration) and r001 (CSV parsing).'
+  status: active
+- content: null
+  created: '2026-06-07'
+  id: v002
+  score: 0.0
+  score_detail:
+  - Answer should be "12 total"
+  source: verdict
+  status: active
+  submitted_message: 0 total
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/stores/store_vienna_meidling.json
+  - /proc/stores/store_vienna_praterstern.json
+- agents_md_anchor: null
+  content: Always execute the exact SQL strings supplied in the tool_plan's discovery
+    and ops stdin fields verbatim instead of reconstructing semantically-equivalent
+    SQL in code; never collapse a discovery CTE joined via CROSS JOIN/`product_sku
+    = t.product_sku` into a scalar `si.product_sku = (SELECT ...)` subquery, because
+    a scalar subquery that resolves to more than one matching variant errors or silently
+    keeps one row, undercounting the aggregate.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Verbatim error: grader: Answer should be "12 total". Root cause: CODEGEN
+    did not run the frozen tool_plan ops SQL verbatim. The tool_plan resolves the
+    target via `WITH target AS (SELECT pv.product_sku ...)` and aggregates with `...
+    CROSS JOIN target t LEFT JOIN store_inventory si ON ... AND si.product_sku = t.product_sku`,
+    which sums across every matching variant. The script rebuilt this as a scalar
+    subquery — failing fragment `sku_subq = "(SELECT pv.product_sku " + target_pred
+    + ")"` used in `... AND si.product_sku = " + sku_subq` (both vienna_sql and total_sql).
+    When brand/series/model 218-FC5 + cleaner_type=''screen wash'' resolves to more
+    than one product_sku (e.g. multiple pack sizes), scalar `=` either errors or truncates
+    to a single SKU, so the Vienna SUM lands below the correct 12. Rule linkage: the
+    new rule forbids reconstructing tool_plan SQL and forbids collapsing a set-valued
+    CTE join into a scalar `= (subquery)`, preserving the multi-SKU sum. Distinct
+    from r001 (CSV parsing), r002 (refs enumeration not gated on zero-row discovery
+    — different query/concern), and r003 (no availability post-filter on refs).'
+  status: active
 last_run:
   cycles_used: 1
-  date: '2026-06-06'
+  date: '2026-06-07'
   outcome: OUTCOME_OK
-  status: failure
+  status: success
 task_id: t18

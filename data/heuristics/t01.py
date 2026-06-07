@@ -1,117 +1,112 @@
+import re
+
+
 def run(vm, params):
-    import csv
-
-    brand = params.get("brand", "")
-    series = params.get("series", "")
-    model = params.get("model", "")
-    kind = params.get("product_kind_name", "")
-    cleaner = params.get("cleaner_type", "")
-
-    def q(v):
-        return "'" + str(v).replace("'", "''") + "'"
-
-    # Broadened query: filter only on brand (case-insensitive), LEFT JOINs so the
-    # rowset always enumerates in-scope variants for refs. Property + availability
-    # are applied in Python post-filter. /bin/sql does not bind :name params, so the
-    # one variable value is inlined as a quoted SQL literal.
-    sql = (
-        "SELECT pv.product_sku, pv.product_name, pv.record_path, pv.brand, "
-        "pv.series, pv.model, pk.product_kind_name, "
-        "COALESCE(pvp.property_value_text,'') AS cleaner_type, "
-        "COALESCE(SUM(si.available_today_quantity),0) AS total_available "
-        "FROM product_variants pv "
-        "LEFT JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku "
-        "AND pvp.property_key = 'cleaner_type' "
-        "LEFT JOIN product_kinds pk ON pk.product_kind_id = pv.product_kind_id "
-        "LEFT JOIN store_inventory si ON si.product_sku = pv.product_sku "
-        "WHERE LOWER(pv.brand) = LOWER(" + q(brand) + ") "
-        "GROUP BY pv.product_sku, pv.product_name, pv.record_path, pv.brand, "
-        "pv.series, pv.model, pk.product_kind_name, cleaner_type;"
+    brand = params.get("brand", "") or ""
+    model = params.get("model", "") or ""
+    kind = params.get("kind", "") or ""
+    storage_type = params.get("storage_type", "") or ""
+    family_name = params.get("family_name", "") or (
+        (brand + " " + model + " " + kind).strip()
     )
 
-    def get_stdout(result):
-        return getattr(result, "stdout", "") or (result.get("stdout", "") if isinstance(result, dict) else "")
-
-    def parse_rows(stdout):
-        if not stdout or not stdout.strip():
-            return []
-        lines = [l for l in stdout.splitlines() if l.strip() != ""]
-        if not lines:
-            return []
-        header_line = lines[0]
-        delim = ","
-        for cand in [",", "|", "\t"]:
-            if cand in header_line:
-                delim = cand
-                break
-        all_rows = list(csv.reader(lines, delimiter=delim))
-        if not all_rows:
-            return []
-        header = [h.strip() for h in all_rows[0]]
-        out = []
-        for r in all_rows[1:]:
-            if len(r) < len(header):
-                r = r + [""] * (len(header) - len(r))
-            out.append({header[i]: r[i].strip() for i in range(len(header))})
-        return out
-
-    # discovery
-    matches_res = vm.exec(path="/bin/sql", stdin=sql)
-    matches = parse_rows(get_stdout(matches_res))
-
-    # ops
-    available_res = vm.exec(path="/bin/sql", stdin=sql)
-    available_rows = parse_rows(get_stdout(available_res))
-
-    dataset = available_rows or matches
+    def sq(s):
+        return "'" + str(s).replace("'", "''") + "'"
 
     def norm(s):
-        return "".join(ch.lower() for ch in str(s) if ch.isalnum())
+        return re.sub(r"[^a-z0-9]", "", str(s).lower())
 
-    t_series = norm(series)
-    t_model = norm(model)
-    t_kind = str(kind).lower().strip()
-    t_cleaner = str(cleaner).lower().strip()
+    model_tok = norm(model).upper()
 
-    def to_num(s):
-        try:
-            return float(str(s).strip() or 0)
-        except ValueError:
-            return 0.0
+    # /bin/sql does not bind :name params -> inline values as quoted literals.
+    # Broaden the model token match (separator-normalized) across every
+    # identifier column; LEFT JOIN properties and post-filter kind/storage
+    # in Python so a narrow INNER JOIN cannot drop in-scope rows.
+    sql = (
+        "SELECT pv.product_sku, pv.product_name, pv.model, pv.brand, "
+        "pv.record_path, pk.product_kind_name, pvp.property_key, "
+        "pvp.property_value_text "
+        "FROM product_variants pv "
+        "LEFT JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id "
+        "LEFT JOIN product_variant_properties pvp "
+        "ON pv.product_sku = pvp.product_sku "
+        "WHERE upper(pv.brand) = upper(" + sq(brand) + ") "
+        "AND ("
+        "upper(replace(replace(pv.model,' ',''),'-','')) LIKE '%" + model_tok + "%' "
+        "OR upper(replace(replace(pv.product_name,' ',''),'-','')) LIKE '%" + model_tok + "%' "
+        "OR upper(replace(replace(pv.product_sku,' ',''),'-','')) LIKE '%" + model_tok + "%'"
+        ") LIMIT 500;"
+    )
 
-    matched = []
-    for r in dataset:
-        ident = norm(
-            r.get("series", "") + r.get("model", "") + r.get("product_name", "") + r.get("product_sku", "")
+    result = vm.exec(path="/bin/sql", args=[], stdin=sql)
+    stdout = getattr(result, "stdout", "")
+    if not stdout and isinstance(result, dict):
+        stdout = result.get("stdout", "")
+    stdout = stdout or ""
+
+    header = []
+    rows = []
+    text = stdout.strip()
+    if text:
+        lines = [ln for ln in text.splitlines() if ln.strip() != ""]
+        if lines:
+            header_line = lines[0]
+            delim = "|" if header_line.count("|") > header_line.count(",") else ","
+
+            def split_row(ln):
+                return [c.strip().strip('"') for c in ln.split(delim)]
+
+            header = split_row(header_line)
+            for ln in lines[1:]:
+                stripped = ln.replace(delim, "").strip()
+                if stripped and set(stripped) <= set("-+ "):
+                    continue
+                cells = split_row(ln)
+                row = {}
+                for i, h in enumerate(header):
+                    row[h] = cells[i] if i < len(cells) else ""
+                rows.append(row)
+
+    variants = {}
+    for row in rows:
+        sku = row.get("product_sku", "")
+        if sku not in variants:
+            variants[sku] = {
+                "product_sku": sku,
+                "product_name": row.get("product_name", ""),
+                "record_path": row.get("record_path", ""),
+                "product_kind_name": row.get("product_kind_name", ""),
+                "props": {},
+            }
+        pkey = row.get("property_key", "")
+        if pkey:
+            variants[sku]["props"][norm(pkey)] = row.get("property_value_text", "")
+
+    kind_norm = norm(kind)
+    storage_val_norm = norm(storage_type)
+    storage_key = norm("storage_type")
+
+    match = None
+    for v in variants.values():
+        if kind_norm and kind_norm not in norm(v["product_kind_name"]):
+            continue
+        sval = v["props"].get(storage_key, "")
+        if storage_val_norm and storage_val_norm in norm(sval):
+            match = v
+            break
+
+    if match:
+        message = (
+            "<YES> The " + family_name + " with storage type " + storage_type +
+            " is in the catalogue: " + match["product_name"] +
+            " (" + match["record_path"] + ")."
         )
-        kind_ok = (t_kind in r.get("product_kind_name", "").lower()) if t_kind else True
-        series_ok = (t_series in ident) if t_series else True
-        model_ok = (t_model in ident) if t_model else True
-        cleaner_ok = r.get("cleaner_type", "").lower().strip() == t_cleaner
-        if kind_ok and series_ok and model_ok and cleaner_ok:
-            matched.append(r)
-
-    available = [r for r in matched if to_num(r.get("total_available", "0")) > 0]
-
-    record_paths = []
-    for r in available:
-        rp = r.get("record_path", "").strip()
-        if rp and rp not in record_paths:
-            record_paths.append(rp)
-
-    # pass through static (non-$) refs from answer_template.refs; none are static here
-    template_refs = ["$available_record_paths"]
-    static_refs = [ref for ref in template_refs if not ref.startswith("$")]
-    refs = static_refs + record_paths
-
-    line_desc = "{} {} {} {} with cleaner type {}".format(brand, series, model, kind, cleaner)
-
-    if available:
-        detail = ", ".join(
-            r.get("product_name", "") + " (" + r.get("record_path", "") + ")" for r in available
-        )
-        msg = "<YES> \u2014 Yes, the " + line_desc + " is carried and available: " + detail
+        refs = [match["record_path"]] if match["record_path"] else []
     else:
-        msg = "<NO> \u2014 No available product matches the " + line_desc + " line."
+        message = (
+            "<NO> No " + family_name + " with storage type " + storage_type +
+            " is in the catalogue."
+        )
+        refs = []
 
-    vm.answer(message=msg, outcome="OUTCOME_OK", refs=refs)
+    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)

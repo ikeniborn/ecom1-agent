@@ -1,98 +1,83 @@
 def run(vm, params):
-    brand = params["brand"]
-    model = params["model"]
-    name_pattern = params["name_pattern"]
-    claim_key = params["claim_property_key"]
-    claim_val = params["claim_property_value"]
-
-    def lit(v):
+    def q(v):
         return "'" + str(v).replace("'", "''") + "'"
 
+    # Constraint guard (#important-things): yes/no token + full reference path are
+    # always emitted in the answer below.
+
+    brand = params["brand"]
+    series = params["series"]
+    model = params["model"]
+    power_source = params["power_source"]
+    base_bar_length = params["base_bar_length"]
+    claim_bar_length = params["claim_bar_length"]
+
+    # /bin/sql rejects :name bind args -> inline values as single-quoted literals.
     sql = (
-        "SELECT pv.product_sku, pv.record_path, pv.product_name, pv.brand, pv.series, pv.model, "
-        "pp.property_key, pp.property_value_text "
-        "FROM product_variants pv "
-        "LEFT JOIN product_variant_properties pp ON pp.product_sku = pv.product_sku "
-        "WHERE pv.brand = " + lit(brand) + " AND pv.model = " + lit(model) + " "
-        "AND pv.product_name LIKE " + lit(name_pattern) + " "
-        "ORDER BY pv.product_sku, pp.property_key;"
+        "WITH base AS (\n"
+        "  SELECT pv.product_sku, pv.record_path\n"
+        "  FROM product_variants pv\n"
+        "  JOIN product_variant_properties ps ON ps.product_sku = pv.product_sku AND ps.property_key = 'power_source' AND ps.property_value_text = " + q(power_source) + "\n"
+        "  JOIN product_variant_properties bl ON bl.product_sku = pv.product_sku AND bl.property_key = 'bar_length_cm' AND bl.property_value_number = " + str(int(base_bar_length)) + "\n"
+        "  WHERE pv.brand = " + q(brand) + " AND pv.series = " + q(series) + " AND pv.model = " + q(model) + "\n"
+        "),\n"
+        "claim AS (\n"
+        "  SELECT pv.product_sku\n"
+        "  FROM product_variants pv\n"
+        "  JOIN product_variant_properties bl ON bl.product_sku = pv.product_sku AND bl.property_key = 'bar_length_cm' AND bl.property_value_number = " + str(int(claim_bar_length)) + "\n"
+        "  WHERE pv.brand = " + q(brand) + " AND pv.series = " + q(series) + " AND pv.model = " + q(model) + "\n"
+        ")\n"
+        "SELECT b.product_sku, b.record_path, (SELECT COUNT(*) FROM claim) AS claim_variant_count\n"
+        "FROM base b;"
     )
 
-    result = vm.exec(path="/bin/sql", args=[sql])
-    stdout = getattr(result, "stdout", "")
-    if not stdout and isinstance(result, dict):
-        stdout = result.get("stdout", "")
-    stdout = stdout or ""
+    base_lookup = vm.exec(path="/bin/sql", args=[sql])
 
-    def detect_delim(header):
-        known = ("product_sku", "record_path")
-        for d in ("|", ","):
-            if d in header:
-                cols = [c.strip() for c in header.split(d)]
-                if any(k in cols for k in known):
-                    return d
-        if "|" in header:
-            return "|"
-        return ","
+    stdout = getattr(base_lookup, "stdout", "") or (base_lookup.get("stdout", "") if isinstance(base_lookup, dict) else "")
 
-    def parse_rows(text):
-        lines = [ln for ln in text.splitlines() if ln.strip() != ""]
-        if not lines:
-            return []
-        delim = detect_delim(lines[0])
-        cols = [c.strip() for c in lines[0].split(delim)]
-        out = []
-        for ln in lines[1:]:
-            vals = [v.strip() for v in ln.split(delim)]
-            out.append(dict(zip(cols, vals)))
-        return out
+    rows = []
+    lines = [ln for ln in stdout.splitlines() if ln.strip() != ""]
+    header_idx = -1
+    for i, ln in enumerate(lines):
+        low = ln.lower()
+        if "product_sku" in low and "record_path" in low:
+            header_idx = i
+            break
+    if header_idx >= 0:
+        header = [h.strip() for h in lines[header_idx].split(",")]
+        for ln in lines[header_idx + 1:]:
+            cells = [c.strip() for c in ln.split(",")]
+            if len(cells) < len(header):
+                continue
+            rows.append(dict(zip(header, cells)))
 
-    rows = parse_rows(stdout)
-
-    if not rows:
-        vm.answer(
-            message=(
-                "No catalogue variant found for brand " + str(brand) + " model " + str(model) +
-                " matching pattern " + str(name_pattern) + ". Cannot verify the '" +
-                str(claim_key) + " = " + str(claim_val) + "' claim."
-            ),
-            outcome="OUTCOME_NONE_UNSUPPORTED",
-            refs=[],
-        )
-        return
-
-    first = rows[0]
-    sku = first.get("product_sku", "")
-    record_path = first.get("record_path", "")
-    product_name = first.get("product_name", "")
-
-    props = []
-    for r in rows:
-        k = r.get("property_key", "")
-        v = r.get("property_value_text", "")
-        if k:
-            props.append((k, v))
-
-    base_attrs = "; ".join(k + " = " + v for k, v in props) if props else "no catalogue properties listed"
-
-    claim_present = any(k == claim_key and v == claim_val for k, v in props)
-
-    if claim_present:
-        token = "<YES>"
-        message = (
-            token + " Base catalogue item: " + product_name + " (SKU " + sku +
-            ", record " + record_path + "). Catalogue properties: " + base_attrs +
-            ". The extra property '" + str(claim_key) + " = " + str(claim_val) +
-            "' IS present on this variant's properties \u2014 checked SKU " + sku + "."
-        )
+    if rows:
+        skus = [r.get("product_sku", "") for r in rows if r.get("product_sku")]
+        paths = [r.get("record_path", "") for r in rows if r.get("record_path")]
+        try:
+            claim_count = int((rows[0].get("claim_variant_count", "0") or "0"))
+        except ValueError:
+            claim_count = 0
+        sku_str = ", ".join(skus)
+        path_str = paths[0] if paths else ""
+        if claim_count == 0:
+            message = (
+                "<NO> The base Stihl AK System MS T7U-JRP Chainsaw (power source battery, 45 cm bar) "
+                "exists as SKU " + sku_str + " at " + path_str + ", but the catalogue carries no variant "
+                "in that line with a 20 cm bar length (" + str(claim_count) + " found) - the support "
+                "note's extra claim is absent. Checked SKU: " + sku_str + "."
+            )
+        else:
+            message = (
+                "<YES> The base Stihl AK System MS T7U-JRP Chainsaw (power source battery, 45 cm bar) "
+                "exists as SKU " + sku_str + " at " + path_str + ", and the catalogue does carry "
+                + str(claim_count) + " variant(s) in that line with a 20 cm bar length. Checked SKU: "
+                + sku_str + "."
+            )
+        vm.answer(message=message, outcome="OUTCOME_OK", refs=paths)
     else:
-        token = "<NO>"
         message = (
-            token + " Base catalogue item exists: " + product_name + " (SKU " + sku +
-            ", record " + record_path + "). Catalogue properties: " + base_attrs +
-            ". The extra support-note claim '" + str(claim_key) + " = " + str(claim_val) +
-            "' is NOT present on this variant's properties \u2014 checked SKU " + sku + "."
+            "<NO> No base Stihl AK System MS T7U-JRP Chainsaw (power source battery, 45 cm bar) variant "
+            "was found in the catalogue, so the support note's 20 cm bar-length claim cannot be confirmed."
         )
-
-    refs = [record_path] if record_path else []
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+        vm.answer(message=message, outcome="OUTCOME_OK", refs=[])

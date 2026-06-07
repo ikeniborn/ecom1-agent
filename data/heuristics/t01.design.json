@@ -1,58 +1,44 @@
 {
-  "intent": "Answer whether an available catalog product exists in the Ajax 'Eco Classic 25C-DXE' Cleaning Liquid line with cleaner_type=degreaser.",
+  "intent": "Check whether a Festool 'SYS 3JJ-9LM' Tool Box and Bag variant with storage type 'parts case' exists in the catalogue.",
   "params": {
-    "brand": "Ajax",
-    "series": "Eco Classic",
-    "model": "25C-DXE",
-    "product_kind_name": "Cleaning Liquid",
-    "cleaner_type": "degreaser"
+    "brand": "Festool",
+    "model": "SYS 3JJ-9LM",
+    "kind": "Tool Box and Bag",
+    "family_name": "Festool Stackable SYS 3JJ-9LM Tool Box and Bag",
+    "storage_type": "parts case"
   },
   "success_criteria": [
-    "SQL matches product_variants on brand='Ajax', series='Eco Classic', model='25C-DXE'",
-    "Match restricted to variants whose cleaner_type property equals 'degreaser'",
-    "Availability filtered via store_inventory.available_today_quantity > 0; unavailable variants excluded from the answer",
-    "Answer contains a <YES> or <NO> token",
-    "refs contain the record_path of each available matched product (runtime placeholder)"
+    "Query identifies any product_variants row with brand=Festool, model='SYS 3JJ-9LM', product kind 'Tool Box and Bag', and a storage_type property equal to 'parts case'",
+    "Answer states YES with the matched variant's record_path, or NO with no record_path if absent",
+    "Answer includes <YES> or <NO> token",
+    "refs cites the exact /proc/catalog/<SKU>.json of the matched variant when present"
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT pv.product_sku, pv.product_name, pv.record_path, pk.product_kind_name, COALESCE(SUM(si.available_today_quantity),0) AS total_available FROM product_variants pv JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku AND pvp.property_key = 'cleaner_type' AND pvp.property_value_text = :cleaner_type JOIN product_kinds pk ON pk.product_kind_id = pv.product_kind_id LEFT JOIN store_inventory si ON si.product_sku = pv.product_sku WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pk.product_kind_name = :product_kind_name GROUP BY pv.product_sku, pv.product_name, pv.record_path, pk.product_kind_name;"
+        "stdin": "SELECT pv.product_sku, pv.product_name, pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand = :brand AND pv.model = :model AND pk.product_kind_name = :kind AND pvp.property_key = 'storage_type' AND pvp.property_value_text = :storage_type;"
       },
-      "bind": "matches"
+      "bind": "match"
     }
   ],
-  "ops": [
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT pv.product_sku, pv.product_name, pv.record_path, COALESCE(SUM(si.available_today_quantity),0) AS total_available FROM product_variants pv JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku AND pvp.property_key = 'cleaner_type' AND pvp.property_value_text = :cleaner_type JOIN product_kinds pk ON pk.product_kind_id = pv.product_kind_id JOIN store_inventory si ON si.product_sku = pv.product_sku WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pk.product_kind_name = :product_kind_name GROUP BY pv.product_sku, pv.product_name, pv.record_path HAVING total_available > 0;"
-      },
-      "bind": "available"
-    }
-  ],
+  "ops": [],
   "agents_md_constraints": [
-    {
-      "anchor": "#important-things > yes/no tokens",
-      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
-    },
-    {
-      "anchor": "#important-things > availability",
-      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
-    },
     {
       "anchor": "#important-things > references",
       "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#important-things > yes/no",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
     }
   ],
   "answer_template": {
-    "message": "{'<YES>' if available else '<NO>'} — {('Yes, the Ajax Eco Classic 25C-DXE Cleaning Liquid with cleaner type degreaser is carried and available: ' + ', '.join(r['product_name'] + ' (' + r['record_path'] + ')' for r in available)) if available else 'No available product matches the Ajax Eco Classic 25C-DXE Cleaning Liquid line with cleaner type degreaser.'}",
+    "message": "{ '<YES> The Festool Stackable SYS 3JJ-9LM Tool Box and Bag with storage type parts case is in the catalogue: ' + match.product_name + ' (' + match.record_path + ').' if match else '<NO> No Festool Stackable SYS 3JJ-9LM Tool Box and Bag with storage type parts case is in the catalogue.' }",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$available_record_paths"
+      "$match.record_path"
     ]
   },
   "outcome_override": null

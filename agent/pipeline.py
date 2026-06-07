@@ -15,15 +15,27 @@ from .llm import (
     CLI_BLUE, CLI_CLR, CLI_GREEN, CLI_RED, CLI_YELLOW,
     OUTCOME_BY_NAME, _resolve_model_for_phase, call_llm_raw,
 )
-from .models import DesignOutput, LearnConsolidateOutput
+from .mock_vm_spy import MockVMSpy, fixture_key
+from .models import DesignOutput, LearnConsolidateOutput, TestSpec
 from .prompt import load_prompt
 from .sql_security import check_retry_loop  # noqa: F401  (retained for backward import compat)
+from .testgen import TestGenError, run_test_gen
+from .test_runner import run_tests
 
 _MAX_STEPS = int(os.environ.get("MAX_STEPS", "3"))
 _MAX_TOKENS_LEARN = int(os.environ.get("MAX_TOKENS_LEARN", "2048"))
 _FIDELITY_TIMEOUT_S = int(os.environ.get("FIDELITY_TIMEOUT_S", "30"))
 # Retries for transient DESIGN parse/empty failures (CC subprocess truncation).
 _DESIGN_MAX_ATTEMPTS = int(os.environ.get("DESIGN_MAX_ATTEMPTS", "3"))
+
+# Intent-driven TDD gate. Off by default so the green baseline can't regress;
+# flip on after validation. TDD_MOCK_ENABLED adds the in-loop MockVMSpy fail-fast
+# pre-check (best-effort — see run_pipeline). TDD_FORCE_SUBMIT_AFTER mirrors the
+# legacy "N consecutive test fails → submit best answer" escape so a bad test
+# can't downgrade an otherwise-green task to CLARIFICATION.
+_TDD_ENABLED = os.environ.get("TDD_ENABLED", "0") == "1"
+_TDD_MOCK_ENABLED = os.environ.get("TDD_MOCK_ENABLED", "0") == "1"
+_TDD_FORCE_SUBMIT_AFTER = int(os.environ.get("TDD_FORCE_SUBMIT_AFTER", "3"))
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
@@ -302,24 +314,59 @@ class _AnswerGuard:
     _OBS_PER_CALL = 800
     _OBS_TOTAL_MAX = 8000
 
-    def __init__(self, vm, design: DesignOutput):
+    # rpc method name -> (MockVMSpy-compatible RPC label, kwarg used as the
+    # fixture-key "path"). tree/find/search key on `root`, not `path`.
+    _FIXTURE_KEY_FIELD = {
+        "read": ("Read", "path"), "list": ("List", "path"),
+        "tree": ("Tree", "root"), "find": ("Find", "root"),
+        "search": ("Search", "root"), "exec": ("Exec", "path"),
+        "stat": ("Stat", "path"), "write": ("Write", "path"),
+        "delete": ("Delete", "path"),
+    }
+
+    def __init__(self, vm, design: DesignOutput, defer_submit: bool = False):
         self._vm = vm
         self._design = design
+        # When True, `answer` validates + captures but does NOT call the real
+        # vm.answer — the pipeline submits explicitly via `submit()` only after
+        # intent-tests pass. Keeps the terminal one-shot answer behind the gate.
+        self._defer_submit = defer_submit
         self.observed: list[str] = []
         self._observed_total = 0
         self.actual_outcome: str = ""
         self._captured: dict = {}
+        # fixture_key(...) -> raw RPC result, replayable by MockVMSpy for the
+        # SAME script next cycle. sql_results: /bin/sql Exec stdouts in call order.
+        self.fixtures: dict = {}
+        self.sql_results: list[str] = []
 
-    def _record(self, rpc: str, kwargs: dict, result) -> None:
-        if self._observed_total >= self._OBS_TOTAL_MAX:
-            return
+    @staticmethod
+    def _extract_payload(result) -> str:
         stdout = getattr(result, "stdout", None)
         if stdout is None and isinstance(result, dict):
             stdout = result.get("stdout", "")
         content = getattr(result, "content", None)
         if content is None and isinstance(result, dict):
             content = result.get("content", "")
-        payload = (stdout or content or "").strip()
+        return (stdout or content or "").strip()
+
+    def _capture_fixture(self, rpc: str, kwargs: dict, result) -> None:
+        """Key the raw result so MockVMSpy can replay the SAME script next cycle,
+        and collect /bin/sql stdouts in call order for test_sql(results=...)."""
+        label_field = self._FIXTURE_KEY_FIELD.get(rpc)
+        if not label_field:
+            return
+        label, path_kw = label_field
+        path_val = kwargs.get(path_kw, "") or ""
+        args_val = list(kwargs.get("args") or []) if rpc == "exec" else None
+        self.fixtures[fixture_key(label, path_val, args_val)] = result
+        if rpc == "exec" and path_val == "/bin/sql":
+            self.sql_results.append(self._extract_payload(result))
+
+    def _record(self, rpc: str, kwargs: dict, result) -> None:
+        if self._observed_total >= self._OBS_TOTAL_MAX:
+            return
+        payload = self._extract_payload(result)
         if not payload:
             payload = "<empty>"
         head = payload[: self._OBS_PER_CALL]
@@ -336,6 +383,7 @@ class _AnswerGuard:
             result = method(**kwargs)
             try:
                 self._record(rpc, kwargs, result)
+                self._capture_fixture(rpc, kwargs, result)
             except Exception:
                 pass
             return result
@@ -384,8 +432,7 @@ class _AnswerGuard:
         # LEARN via `learn_from_grader` between training cycles.
         if outcome != "OUTCOME_OK":
             refs_list = _ground_security_refs(outcome, refs_list)
-            self._captured = {"message": message, "outcome": outcome, "refs": refs_list}
-            self._vm.answer(message=message, outcome=outcome, refs=refs_list)
+            self._emit(message, outcome, refs_list)
             return
 
         # Safety net: even if the template forgot a $placeholder, the
@@ -417,8 +464,82 @@ class _AnswerGuard:
                     "check `:name` bindings on /bin/sql and the SELECT columns"
                 )
 
+        self._emit(message, outcome, refs_list)
+
+    def _emit(self, message: str, outcome: str, refs_list: list) -> None:
+        """Capture the answer; submit to the real VM now unless deferred."""
         self._captured = {"message": message, "outcome": outcome, "refs": refs_list}
-        self._vm.answer(message=message, outcome=outcome, refs=refs_list)
+        if not self._defer_submit:
+            self._vm.answer(message=message, outcome=outcome, refs=refs_list)
+
+    def submit(self) -> bool:
+        """Flush a deferred captured answer to the real VM. Returns True if sent."""
+        if not self._captured:
+            return False
+        self._vm.answer(**self._captured)
+        return True
+
+
+# ---------------------------------------------------------------------------
+# Intent-driven test gate (TDD_ENABLED)
+# ---------------------------------------------------------------------------
+
+def _run_intent_tests(
+    test_spec: TestSpec,
+    sql_results: list[str],
+    answer: dict,
+    task_text: str = "",
+) -> tuple[bool, str]:
+    """Run test_sql + test_answer against captured runtime data via test_runner.
+
+    Returns (passed, error). `answer` carries {message, outcome, refs}; a
+    `grounding_refs` alias is added for back-compat with older-style asserts.
+    """
+    answer_ctx = dict(answer)
+    answer_ctx.setdefault("grounding_refs", answer_ctx.get("refs", []))
+
+    sql_ok, sql_err, sql_warns = run_tests(
+        test_spec.sql_tests, "test_sql", {"results": sql_results},
+        task_text=task_text,
+    )
+    for w in sql_warns:
+        print(f"{CLI_YELLOW}[tdd] test_sql warning: {w}{CLI_CLR}")
+    if not sql_ok:
+        return False, f"test_sql: {sql_err}"
+
+    ans_ok, ans_err, ans_warns = run_tests(
+        test_spec.answer_tests, "test_answer",
+        {"sql_results": sql_results, "answer": answer_ctx},
+        task_text=task_text,
+    )
+    for w in ans_warns:
+        print(f"{CLI_YELLOW}[tdd] test_answer warning: {w}{CLI_CLR}")
+    if not ans_ok:
+        return False, f"test_answer: {ans_err}"
+    return True, ""
+
+
+def _mock_run(script_code: str, params: dict, fixtures: dict) -> tuple[dict, list[str]]:
+    """Replay the script against MockVMSpy(fixtures), returning (answer, sql_results).
+
+    Used by the optional in-loop fail-fast gate. `fixtures` come from the prior
+    cycle's real run (empty on cycle 1 → empty answer → expected-red). No refs
+    validation here — this only feeds the intent-tests."""
+    spy = MockVMSpy(fixtures=fixtures)
+    _run_script_on_vm(script_code, spy, params)
+    answer: dict = {}
+    sql_results: list[str] = []
+    for rpc, kw in spy.calls:
+        if rpc == "Exec" and kw.get("path") == "/bin/sql":
+            res = spy._lookup("Exec", "/bin/sql", kw.get("args"))
+            sql_results.append(_AnswerGuard._extract_payload(res))
+        elif rpc == "Answer":
+            answer = {
+                "message": kw.get("message", ""),
+                "outcome": kw.get("outcome", ""),
+                "refs": list(kw.get("refs") or []),
+            }
+    return answer, sql_results
 
 
 # ---------------------------------------------------------------------------
@@ -516,6 +637,19 @@ def run_pipeline(
     mutating_rpcs = {"Write", "Delete"}
     has_mutations = any(op.rpc in mutating_rpcs for op in design.ops)
 
+    # ── TEST-GEN (intent-driven acceptance tests, frozen for the run) ──────
+    # Generated once from DESIGN intent. Degrades gracefully: on TestGenError the
+    # task falls back to fidelity-only (test_spec=None disables the gate).
+    test_spec: TestSpec | None = None
+    if _TDD_ENABLED:
+        try:
+            _tk = {}
+            test_spec = run_test_gen(design, instruction, token_out=_tk)
+            _accum(_tk)
+            print(f"{CLI_BLUE}[pipeline] TEST-GEN ok (intent tests ready){CLI_CLR}")
+        except TestGenError as e:
+            print(f"{CLI_YELLOW}[pipeline] TEST-GEN failed, fidelity-only: {e}{CLI_CLR}")
+
     # ── CODEGEN+ANSWER retry loop (unified MAX_STEPS counter) ──────────────
     last_error: str | None = None
     prior_sql_sets: list[list[str]] = []
@@ -523,6 +657,10 @@ def run_pipeline(
     answered = False
     actual_outcome = "OUTCOME_OK"
     guarded_vm: _AnswerGuard | None = None
+    # TDD state: fixtures captured from the prior real run feed the mock fail-fast
+    # gate; the fail counter drives force-submit so a bad test can't sink the task.
+    prev_fixtures: dict = {}
+    test_fail_streak = 0
 
     for cycle in range(1, _MAX_STEPS + 1):
         print(f"{CLI_BLUE}[pipeline] cycle {cycle}/{_MAX_STEPS}{CLI_CLR}")
@@ -587,17 +725,38 @@ def run_pipeline(
             design.model_dump_json(indent=2), encoding="utf-8"
         )
 
+        # ── Mock fail-fast gate (best-effort) ──────────────────────────────
+        # Replay the script against fixtures captured from the PRIOR real run.
+        # Catches an OK-outcome answer that fails the intent-test before spending
+        # a real-VM pass. Only meaningful from cycle ≥2 (prev_fixtures populated)
+        # and read-only plans; weak under RPC-shape reshape (fixture miss → skip).
+        if (
+            _TDD_ENABLED and _TDD_MOCK_ENABLED and test_spec is not None
+            and not has_mutations and prev_fixtures
+        ):
+            try:
+                m_answer, m_sql = _mock_run(cg.script_code, design.params, prev_fixtures)
+                if m_answer.get("outcome") == "OUTCOME_OK":
+                    m_ok, m_err = _run_intent_tests(test_spec, m_sql, m_answer, task_text=instruction)
+                    if not m_ok:
+                        last_error = f"mock_test: {m_err}"
+                        print(f"{CLI_YELLOW}[pipeline] mock test fail-fast: {m_err[:120]}{CLI_CLR}")
+                        _tk = {}
+                        _learn_consolidate(task_id, learn_ctx, design, last_error, cg.script_code, token_out=_tk)
+                        _accum(_tk)
+                        continue
+            except Exception as e:
+                print(f"{CLI_YELLOW}[pipeline] mock gate skipped: {e}{CLI_CLR}")
+
         # ── ANSWER on real VM (guarded) ────────────────────────────────────
         # Real-VM exceptions and answer-refs gaps are the two failure categories
         # that bypass the in-loop gates. Without these hooks both classes vanish
         # after _terminal_clarification — next run starts blind. The guard also
         # captures stdouts so LEARN can see WHY refs were empty.
-        guarded_vm = _AnswerGuard(vm, design)
+        tdd_active = _TDD_ENABLED and test_spec is not None
+        guarded_vm = _AnswerGuard(vm, design, defer_submit=tdd_active)
         try:
             _run_script_on_vm(cg.script_code, guarded_vm, design.params)
-            actual_outcome = guarded_vm.actual_outcome or "OUTCOME_OK"
-            answered = True
-            break
         except _AnswerRefsError as e:
             last_error = f"answer_refs: {e}"
             print(f"{CLI_RED}[pipeline] answer refs check failed: {e}{CLI_CLR}")
@@ -645,6 +804,62 @@ def run_pipeline(
             # Other real-VM exec errors can land mid-script (after partial
             # writes); never retry — break to terminal clarification.
             break
+
+        # Script ran clean. Without TDD the answer was already submitted inline.
+        actual_outcome = guarded_vm.actual_outcome or "OUTCOME_OK"
+        if not tdd_active or test_spec is None:
+            answered = True
+            break
+
+        # ── Intent-test gate (TDD) — answer captured, not yet submitted ────
+        # Non-OK outcomes are explicit escape paths (CLARIFICATION/UNSUPPORTED/
+        # DENIED) — submit directly; the intent-test targets OK answers only.
+        if actual_outcome != "OUTCOME_OK":
+            guarded_vm.submit()
+            answered = True
+            break
+
+        ok, err = _run_intent_tests(
+            test_spec, guarded_vm.sql_results, guarded_vm._captured, task_text=instruction
+        )
+        if ok:
+            print(f"{CLI_GREEN}[pipeline] intent tests green — submitting{CLI_CLR}")
+            guarded_vm.submit()
+            answered = True
+            break
+
+        # Red. Distil a LEARN rule, seed mock fixtures, retry — unless force-submit.
+        test_fail_streak += 1
+        last_error = f"intent_test: {err}"
+        print(f"{CLI_YELLOW}[pipeline] intent test fail ({test_fail_streak}): {err[:160]}{CLI_CLR}")
+        _tk = {}
+        _learn_consolidate(
+            task_id, learn_ctx, design, last_error, cg.script_code,
+            token_out=_tk, observed=guarded_vm.observed,
+        )
+        _accum(_tk)
+        prev_fixtures = guarded_vm.fixtures
+        # Mutations already landed → retry unsafe. Force-submit best captured.
+        if has_mutations or test_fail_streak >= _TDD_FORCE_SUBMIT_AFTER:
+            why = "mutations in plan" if has_mutations else f"{test_fail_streak} consecutive fails"
+            print(f"{CLI_RED}[pipeline] force-submit best answer ({why}){CLI_CLR}")
+            if guarded_vm.submit():   # False only if the script never called answer
+                answered = True
+            break
+        continue
+
+    # TDD exhausted the loop without a green answer, but a captured OK answer
+    # exists (deferred, never submitted). Submitting it beats CLARIFICATION —
+    # the script may be correct and the test merely strict (grader is truth).
+    if (
+        not answered and _TDD_ENABLED and guarded_vm is not None
+        and guarded_vm._captured
+        and guarded_vm._captured.get("outcome") == "OUTCOME_OK"
+    ):
+        print(f"{CLI_RED}[pipeline] loop exhausted — force-submit last captured OK answer{CLI_CLR}")
+        guarded_vm.submit()
+        answered = True
+        actual_outcome = "OUTCOME_OK"
 
     if not answered:
         reason = (

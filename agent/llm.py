@@ -71,6 +71,7 @@ _PHASE_MODEL_MAP: dict[str, str | None] = {
     "design":  os.environ.get("MODEL_DESIGN") or None,
     "codegen": os.environ.get("MODEL_CODEGEN") or None,
     "learn":   os.environ.get("MODEL_LEARN") or None,
+    "test":    os.environ.get("MODEL_TEST") or None,
 }
 
 

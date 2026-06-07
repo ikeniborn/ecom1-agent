@@ -1,21 +1,21 @@
 {
-  "intent": "Read the old receipt in /uploads/, compute its VAT-excluded total, recompute today's VAT-excluded total from current catalog prices for the same products/quantities, and answer whether the two totals differ by ≤1 EUR.",
+  "intent": "Read OCR receipt in /uploads/, recompute today's ex-VAT total from catalogue prices, compare to receipt subtotal, answer YES if abs diff <= 2 EUR else NO.",
   "params": {
-    "uploads_dir": "/uploads",
-    "vat_threshold_eur": 1
+    "diff_threshold_eur": 2
   },
   "success_criteria": [
-    "Receipt file in /uploads/ is located and read",
-    "Each receipt line item (SKU/product + quantity + old unit price) is extracted",
-    "Old total excluding VAT and today's total excluding VAT are computed using the same VAT rate",
-    "Absolute difference between the two VAT-excluded totals is compared against 1 EUR",
-    "Answer contains <YES> or <NO> token and references the receipt file path"
+    "Receipt FILE located via List of /uploads/ (not the directory root) and read",
+    "Every receipt line-item SKU resolved against product_variants by EXACT match first, then FUZZY (0/O,1/I,5/S,8/B,2/Z interchangeable)",
+    "today_ex = SUM over EVERY receipt line of qty * catalogue price_cents / 100; a genuinely discontinued SKU contributes 0 (not dropped, not old price)",
+    "old_ex = printed receipt SUBTOTAL line (OCR may render O as 0)",
+    "diff = abs(today_ex - old_ex); answer contains <YES> if diff <= 2 EUR else <NO>",
+    "refs cite the exact receipt file path"
   ],
   "discovery": [
     {
       "rpc": "List",
       "args": {
-        "path": "/uploads"
+        "path": "/uploads/"
       },
       "bind": "uploads_listing"
     },
@@ -28,65 +28,30 @@
       "bind": "receipt"
     },
     {
-      "rpc": "Search",
-      "args": {
-        "root": "/docs",
-        "pattern": "(?i)VAT|tax|MwSt",
-        "limit": 20
-      },
-      "bind": "vat_policy_hits"
-    },
-    {
-      "rpc": "Read",
-      "args": {
-        "path": "$vat_policy_path",
-        "number": true
-      },
-      "bind": "vat_policy"
-    },
-    {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT product_sku, product_name, price_cents, price_currency FROM product_variants WHERE product_sku IN (:skus);"
+        "stdin": "SELECT product_sku, record_path, price_cents, price_currency FROM product_variants WHERE product_sku IN (:receipt_skus);"
       },
-      "bind": "current_prices"
+      "bind": "catalogue_prices"
     }
   ],
-  "ops": [
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "WITH receipt(product_sku, qty, old_unit_cents) AS (VALUES (:receipt_rows)) SELECT r.product_sku, r.qty, r.old_unit_cents, v.price_cents AS new_unit_cents, (r.qty*r.old_unit_cents) AS old_line_cents, (r.qty*v.price_cents) AS new_line_cents FROM receipt r JOIN product_variants v ON v.product_sku = r.product_sku;"
-      },
-      "bind": "comparison"
-    }
-  ],
+  "ops": [],
   "agents_md_constraints": [
     {
-      "anchor": "#important-things > references",
-      "rule": "When responding with reference - provide full path in the repo to the object."
-    },
-    {
-      "anchor": "#important-things > policy-grounding",
-      "rule": "When you apply a policy from `docs`, include that policy document as a grounding reference in the final response."
-    },
-    {
-      "anchor": "#important-things > yes-no",
+      "anchor": "#important-things > yes/no",
       "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
     },
     {
-      "anchor": "#important-tools > sql",
-      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session."
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
     }
   ],
   "answer_template": {
-    "message": "Receipt {$receipt_path}: old VAT-excluded total {$old_net_eur} EUR vs today {$new_net_eur} EUR (same VAT rate applied to both). Difference {$diff_eur} EUR. {$within_token} — within 1 EUR threshold: {$within_bool}. Per-line: {$line_breakdown}.",
+    "message": "<{YES_NO}> Old receipt ex-VAT subtotal = {old_ex} EUR; selling same line items at today's catalogue prices = {today_ex} EUR (discontinued SKUs counted as 0). Difference = {diff} EUR, which is {within_or_over} the 2 EUR threshold.",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$receipt_path",
-      "$vat_policy_path"
+      "$receipt_path"
     ]
   },
   "outcome_override": null

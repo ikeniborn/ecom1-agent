@@ -5,9 +5,17 @@ import agent.pipeline
 
 @pytest.fixture(autouse=True)
 def reset_pipeline_caches():
+    # Pin import-time module constants to test defaults so the suite is
+    # deterministic regardless of the developer's local .env (uv run loads it).
+    # TDD gate off + MAX_STEPS=3 match production defaults; TDD tests opt in via
+    # monkeypatch.setattr.
     agent.pipeline._SDD_ENABLED = True
+    agent.pipeline._TDD_ENABLED = False
+    agent.pipeline._MAX_STEPS = 3
     yield
     agent.pipeline._SDD_ENABLED = True
+    agent.pipeline._TDD_ENABLED = False
+    agent.pipeline._MAX_STEPS = 3
 
 
 @pytest.fixture(autouse=True)

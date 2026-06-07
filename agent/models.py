@@ -65,3 +65,15 @@ class AnswerOutput(BaseModel):
         "OUTCOME_DENIED_SECURITY",
     ]
     grounding_refs: list[str] = []
+
+
+class TestSpec(BaseModel):
+    """TEST-GEN output: intent-driven acceptance tests run by agent.test_runner.
+
+    `sql_tests` defines `test_sql(results)`, `answer_tests` defines
+    `test_answer(sql_results, answer)`. Both are Python source strings executed
+    in an isolated subprocess against captured runtime data (no LLM at run time).
+    """
+    reasoning: str = ""
+    sql_tests: str
+    answer_tests: str

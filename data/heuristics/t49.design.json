@@ -1,12 +1,12 @@
 {
-  "intent": "Count DB products of type 'Wood and Drywall Screw' using SQL projection only (catalogue JSON is stale).",
+  "intent": "Count catalogue products in category 'Wiring Device' using SQL (trust SQL over stale JSON availability).",
   "params": {
-    "category": "Wood and Drywall Screw"
+    "category": "Wiring Device"
   },
   "success_criteria": [
-    "Count derived from SQL projection, not catalogue JSON files",
-    "Only products whose category/type matches 'Wood and Drywall Screw' are counted",
-    "Answer rendered as <count:%VALUE%>"
+    "Returns count of product_variants whose category is 'Wiring Device'",
+    "Answer rendered as <QTY: %VALUE%>",
+    "Every counted product's record_path cited in refs"
   ],
   "discovery": [
     {
@@ -14,9 +14,19 @@
       "args": {
         "path": "/bin/sql",
         "args": [],
-        "stdin": "select name, sql from sqlite_schema where sql is not null order by type, name;"
+        "stdin": "SELECT name, sql FROM sqlite_schema WHERE type='table' AND name='product_variants';"
       },
       "bind": "schema"
+    },
+    {
+      "rpc": "Find",
+      "args": {
+        "root": "/bin",
+        "name": "codex",
+        "kind": "file",
+        "limit": 1
+      },
+      "bind": "codex_tool"
     }
   ],
   "ops": [
@@ -25,22 +35,36 @@
       "args": {
         "path": "/bin/sql",
         "args": [],
-        "stdin": "select count(*) as cnt from products where category = :category;"
+        "stdin": "SELECT record_path FROM product_variants WHERE category = :category;"
       },
-      "bind": "count_row"
+      "bind": "rows"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT COUNT(*) AS qty FROM product_variants WHERE category = :category;"
+      },
+      "bind": "count"
     }
   ],
   "agents_md_constraints": [
     {
       "anchor": "#important-tools > sql",
       "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Note that inventory lives only in SQL projections"
+    },
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
     }
   ],
   "answer_template": {
-    "message": "<count:{count_row.cnt}>",
+    "message": "<QTY: {count.qty}>",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "/bin/sql"
+      "/proc/catalog",
+      "$rows.record_path"
     ]
   },
   "outcome_override": null

@@ -1,164 +1,138 @@
+import re
+
 def run(vm, params):
-    import re
-
-    def fld(o, n, d=None):
+    def fld(o, k, d=""):
         if isinstance(o, dict):
-            return o.get(n, d)
-        return getattr(o, n, d)
+            return o.get(k, d)
+        return getattr(o, k, d)
 
-    def strip_ln(l):
-        return re.sub(r'^\s*\d+[:|\t]\s?', '', l)
-
+    TR = str.maketrans({"O": "0", "I": "1", "S": "5", "B": "8", "Z": "2"})
     def canon(s):
-        t = {'0': 'O', '1': 'I', '5': 'S', '8': 'B', '2': 'Z'}
-        return ''.join(t.get(c, c) for c in s.upper())
+        return s.upper().translate(TR)
 
-    def num(x):
-        x = x.replace(' ', '')
-        if ',' in x and '.' in x:
-            x = x.replace(',', '')
-        elif ',' in x:
-            x = x.replace(',', '.')
-        try:
-            return float(x)
-        except Exception:
-            return None
+    # discovery 1: List /uploads/ (normalize list vs wrapper-dict)
+    listing = vm.list(path="/uploads/")
+    if isinstance(listing, list):
+        entries = listing
+    elif isinstance(listing, dict):
+        entries = listing.get("entries") or listing.get("items") or listing.get("files") or []
+    else:
+        entries = []
 
-    def rows(res):
-        out = fld(res, 'stdout', '') or ''
-        ls = [l for l in out.splitlines() if l.strip()]
-        if not ls:
-            return []
-        hdr = ls[0]
-        delim = '|' if '|' in hdr else (',' if ',' in hdr else None)
-        if not delim:
-            return []
-        cols = [c.strip() for c in hdr.split(delim)]
-        out2 = []
-        for l in ls[1:]:
-            ps = [p.strip() for p in l.split(delim)]
-            out2.append(dict(zip(cols, ps)))
-        return out2
-
-    # discovery: list uploads dir, pick a FILE entry
-    listing = vm.list(path="/uploads")
-    entries = fld(listing, 'items', None) or fld(listing, 'entries', None) or []
-    receipt_path = None
+    receipt_path = ""
     for e in entries:
         if isinstance(e, str):
-            name = e
-            p = None
-            kind = ''
+            name, path, kind = e, "", ""
         else:
-            name = fld(e, 'name', '')
-            p = fld(e, 'path', None)
-            kind = fld(e, 'kind', '')
-        full = p or ("/uploads/" + name)
-        if str(kind).upper().endswith('FILE') or '.' in name:
+            name = fld(e, "name", "")
+            path = fld(e, "path", "")
+            kind = fld(e, "kind", "")
+        full = path or ("/uploads/" + name)
+        ku = str(kind).upper()
+        is_file = ("FILE" in ku) or ("." in name)
+        if is_file and "DIR" not in ku:
             receipt_path = full
             break
     if not receipt_path and entries:
-        e = entries[0]
-        if isinstance(e, str):
-            receipt_path = "/uploads/" + e
+        e0 = entries[0]
+        if isinstance(e0, str):
+            receipt_path = "/uploads/" + e0
         else:
-            receipt_path = fld(e, 'path', None) or ("/uploads/" + fld(e, 'name', 'receipt'))
-    if not receipt_path:
-        receipt_path = "/uploads/receipt"
+            receipt_path = fld(e0, "path", "") or ("/uploads/" + fld(e0, "name", ""))
 
-    # read receipt file
-    receipt = vm.read(path=receipt_path, number=True)
-    text = fld(receipt, 'content', '') or fld(receipt, 'text', '') or ''
+    # discovery 2: Read the resolved receipt FILE (never a directory)
+    content = ""
+    try:
+        receipt = vm.read(path=receipt_path, number=True)
+        content = fld(receipt, "content", "") or fld(receipt, "text", "")
+    except Exception:
+        content = ""
 
-    # discovery: search /docs for VAT policy
-    sr = vm.search(root="/docs", pattern="(?i)VAT|tax|MwSt", limit=20)
-    hits = fld(sr, 'hits', None) or fld(sr, 'matches', None) or fld(sr, 'results', None) or []
-    vat_path = None
-    for h in hits:
-        hp = h if isinstance(h, str) else fld(h, 'path', None)
-        if hp:
-            vat_path = hp
-            break
-
-    # second Read (policy doc, or re-read receipt file; never a directory)
-    read_path = vat_path or receipt_path
-    vm.read(path=read_path, number=True)
-
-    # parse receipt line items (strip line-number prefix first)
-    joined_lines = [strip_ln(l) for l in text.splitlines()]
+    lines = content.splitlines()
     items = []
-    for s in joined_lines:
-        m = re.match(r'\s*(\d+)\s+([A-Z0-9]{3}-[A-Z0-9]+)', s)
-        if m:
-            items.append((int(m.group(1)), m.group(2)))
-    joined = '\n'.join(joined_lines)
-    sm = re.search(r'SUB\s*T[O0]TAL[^\d]*([\d][\d.,]*)', joined, re.I)
-    old_ex = num(sm.group(1)) if sm else None
+    old_ex = 0.0
+    sub_found = False
+    SKIP = ("TERM", "POS", "REF", "VAT", "TAX", "CHG", "TOT", "SUB")
+    for raw in lines:
+        l = re.sub(r'^\s*\d+\s*[\t:|\u2502]\s*', '', raw)
+        u = l.upper()
+        if not sub_found and re.search(r'SUB\s*T[O0]TAL', u):
+            nums = re.findall(r'\d+[.,]\d{2}', l)
+            if nums:
+                old_ex = float(nums[-1].replace(",", "."))
+                sub_found = True
+        m = re.search(r'[A-Z0-9]{3}-[A-Z0-9]+', u)
+        if not m:
+            continue
+        sku = m.group(0)
+        if sku.split("-")[0] in SKIP:
+            continue
+        qm = re.match(r'\s*(\d+)\b', l)
+        qty = int(qm.group(1)) if qm else 1
+        items.append((qty, sku))
 
-    skus = sorted({sku for _, sku in items})
-    inlist = ','.join("'" + s.replace("'", "") + "'" for s in skus) if skus else "''"
+    # discovery 3: catalogue lookup via inline single-quoted SKU literals (raw + canonical)
+    lits = set()
+    for _, sku in items:
+        lits.add(sku.replace("'", "''"))
+        lits.add(canon(sku).replace("'", "''"))
+    in_list = ",".join("'" + s + "'" for s in sorted(lits)) or "''"
+    sql = ("SELECT product_sku, record_path, price_cents, price_currency "
+           "FROM product_variants WHERE product_sku IN (" + in_list + ");")
+    out = ""
+    try:
+        res = vm.exec(path="/bin/sql", args=[sql])
+        out = fld(res, "stdout", "")
+    except Exception:
+        out = ""
 
-    # Exec1 current_prices (inline single-quoted SKU literals)
-    sql1 = "SELECT product_sku, price_cents FROM product_variants WHERE product_sku IN (" + inlist + ");"
-    res1 = vm.exec(path="/bin/sql", args=[sql1])
-    map1 = {}
-    for r in rows(res1):
-        sk = r.get('product_sku')
-        pc = r.get('price_cents')
-        if sk and pc not in (None, ''):
-            try:
-                map1[sk] = int(float(pc))
-            except Exception:
-                pass
-
-    # Exec2 comparison: full catalogue for exact + fuzzy fallback
-    sql2 = "SELECT product_sku, price_cents FROM product_variants;"
-    res2 = vm.exec(path="/bin/sql", args=[sql2])
-    full = {}
-    for r in rows(res2):
-        sk = r.get('product_sku')
-        pc = r.get('price_cents')
-        if sk and pc not in (None, ''):
-            try:
-                full[sk] = int(float(pc))
-            except Exception:
-                pass
-    fullcanon = {}
-    for sk, pc in full.items():
-        fullcanon.setdefault(canon(sk), pc)
-
-    today_cents = 0
-    breakdown = []
-    for qty, sku in items:
-        price = map1.get(sku)
-        if price is None:
-            price = full.get(sku)
-        if price is None:
-            price = fullcanon.get(canon(sku))
-        if price is not None:
-            today_cents += qty * price
-            breakdown.append(sku + "x" + str(qty) + "=" + str(round(qty * price / 100.0, 2)))
+    price_map = {}
+    rows = [r for r in out.splitlines() if r.strip()]
+    if rows:
+        if "product_sku" in rows[0].lower():
+            hdr = rows[0]
+            delim = "," if "," in hdr else ("|" if "|" in hdr else "\t")
+            cols = [c.strip().lower() for c in hdr.split(delim)]
+            si = cols.index("product_sku") if "product_sku" in cols else 0
+            pi = cols.index("price_cents") if "price_cents" in cols else 2
+            data = rows[1:]
         else:
-            breakdown.append(sku + "x" + str(qty) + "=discontinued(0)")
-    today_ex = round(today_cents / 100.0, 2)
+            delim = "," if "," in rows[0] else ("|" if "|" in rows[0] else "\t")
+            si, pi = 0, 2
+            data = rows
+        for r in data:
+            p = r.split(delim)
+            if len(p) <= max(si, pi):
+                continue
+            try:
+                price_map[canon(p[si].strip())] = int(float(p[pi].strip()))
+            except Exception:
+                continue
 
-    tol = 3.0
-    if old_ex is None or not items:
-        old_disp = old_ex if old_ex is not None else 0.0
-        diff = tol + 1
+    # compute today_ex: every line item; discontinued SKU contributes 0
+    today_ex = 0.0
+    for qty, sku in items:
+        cents = price_map.get(canon(sku))
+        if cents is not None:
+            today_ex += qty * cents / 100.0
+
+    threshold = params.get("diff_threshold_eur", 2)
+    try:
+        threshold = float(threshold)
+    except Exception:
+        threshold = 2.0
+    diff = abs(today_ex - old_ex)
+    within = diff <= threshold
+    if (old_ex == 0 and today_ex == 0) or not items:
         within = False
-    else:
-        old_disp = old_ex
-        diff = round(abs(today_ex - old_ex), 2)
-        within = diff <= tol
+    yes_no = "YES" if within else "NO"
+    within_or_over = "within" if within else "over"
+    thr_txt = str(int(threshold)) if float(threshold).is_integer() else str(threshold)
 
-    token = "<YES>" if within else "<NO>"
-    refs = [receipt_path]
-    if vat_path:
-        refs.append(vat_path)
+    msg = ("<" + yes_no + "> Old receipt ex-VAT subtotal = " + str(round(old_ex, 2)) +
+           " EUR; selling same line items at today's catalogue prices = " + str(round(today_ex, 2)) +
+           " EUR (discontinued SKUs counted as 0). Difference = " + str(round(diff, 2)) +
+           " EUR, which is " + within_or_over + " the " + thr_txt + " EUR threshold.")
 
-    msg = ("Receipt " + receipt_path + ": old VAT-excluded total " + str(round(old_disp, 2)) +
-           " EUR vs today " + str(today_ex) + " EUR (same VAT basis; catalogue price_cents is ex-VAT). "
-           "Difference " + str(diff) + " EUR. " + token + " \u2014 within threshold: " + str(within) +
-           ". Per-line: " + "; ".join(breakdown) + ".")
+    refs = [receipt_path] if receipt_path else []
     vm.answer(message=msg, outcome="OUTCOME_OK", refs=refs)

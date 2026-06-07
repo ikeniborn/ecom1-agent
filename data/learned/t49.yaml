@@ -123,18 +123,78 @@ entries:
   - /bin/sql
 - content: null
   created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
   id: v004
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
   source: verdict
-  status: active
+  status: inactive
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
+- agents_md_anchor: null
+  content: Always include every static literal entry from answer_template.refs verbatim
+    in the emitted refs list, in addition to resolving dynamic $bind refs; never drop,
+    filter, or exclude a static citation (e.g. a parent path literal) even when its
+    sibling dynamic refs resolve to an empty list.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verbatim error: "answer_refs: missing static template refs [''/proc/catalog''];
+    actual refs []. Static refs are grader-required citations — always pass them through."
+    Root cause: codegen built the refs list ONLY from the dynamic matched record_paths
+    and dropped the static literal ''/proc/catalog'' declared in answer_template.refs.
+    Failing fragment: `refs = list(paths)` preceded by comment `# cite record_path
+    of every matched row; exclude static parent directory` — the omission was deliberate.
+    Compounded because the matched SQL returned empty, so paths=[] and the final refs
+    collapsed to []. answer_template.refs lists [''/proc/catalog'', ''$matched.record_path'']:
+    the ''$''-prefixed entry is a dynamic bind, the bare-path entry is a grader-required
+    static citation that must survive regardless of dynamic results. New rule links
+    the failure (dropped static ref) to the technique (pass static template refs through
+    verbatim).'
+  status: active
+- agents_md_anchor: '#important-tools > sql'
+  content: When generating a /bin/sql Exec call, preserve the `:name` parameter placeholders
+    exactly as declared in the tool_plan stdin and supply their values through the
+    binding mechanism; never rewrite them into inline quoted string literals, because
+    /bin/sql resolves params via :name binds and substituting literals yields empty
+    result sets that drop the SELECT/record_path columns the dynamic refs depend on.
+  created: '2026-06-07'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verbatim error: "answer_refs: template/constraints require runtime refs
+    ([''$matched.record_path'']) but actual refs [''/proc/catalog''] contain only
+    static template entries [''/proc/catalog''] — SQL likely returned no rows or row
+    parsing dropped the path column; check `:name` bindings on /bin/sql and the SELECT
+    columns". Root cause: SCRIPT_CODE deviated from the tool_plan binding contract
+    — tool_plan ops declared `IN (:category_nut_bolt, :category_washer)` but the script''s
+    `q()` helper inlined quoted literals (`WHERE category IN (" + q(cat_nb) + ", "
+    + q(cat_w) + ")`), justified by a wrong comment "/bin/sql rejects :name binds".
+    All three Exec calls — including the param-free schema discovery — returned <empty>,
+    so `matched` produced zero record_paths and refs collapsed to the static [''/proc/catalog''],
+    tripping the runtime-ref check. Failing fragment: `matched_sql = "...WHERE category
+    IN (" + q(cat_nb) + ", " + q(cat_w) + ");"`. Rule linkage: existing r001/r003
+    cover treating empty results as failure and not fabricating success, and in-session
+    covers emitting refs; none address the generation-side defect of discarding the
+    tool_plan''s :name bindings. New rule fills that gap by mandating verbatim preservation
+    of declared :name placeholders.'
+  status: active
+- content: null
+  created: '2026-06-07'
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Could not compute Nut Bolt / Washer product count from SQL projection.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /proc/catalog
 last_run:
-  cycles_used: 0
-  date: '2026-06-06'
-  outcome: OUTCOME_NONE_CLARIFICATION
+  cycles_used: 4
+  date: '2026-06-07'
+  outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t49

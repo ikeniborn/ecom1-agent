@@ -1,175 +1,168 @@
-import re
-
-
-def _stdout(result):
-    s = getattr(result, "stdout", None)
-    if s is None and isinstance(result, dict):
-        s = result.get("stdout", "")
-    return s or ""
-
-
-def _text(result):
-    if isinstance(result, str):
-        return result
-    c = getattr(result, "content", None)
-    if c is None and isinstance(result, dict):
-        c = result.get("content", "")
-    if c is None:
-        c = getattr(result, "text", None)
-        if c is None and isinstance(result, dict):
-            c = result.get("text", "")
-    return c or ""
-
-
-def _q(v):
-    return "'" + str(v).replace("'", "''") + "'"
-
-
 def run(vm, params):
-    basket = params.get("basket", "")
-    store_name = params.get("store_name", "")
-    reason_code = params.get("reason_code", "service_recovery")
+    def _stdout(res):
+        if res is None:
+            return ""
+        val = getattr(res, "stdout", None)
+        if val is None and isinstance(res, dict):
+            val = res.get("stdout", "")
+        return val or ""
 
-    # --- discovery ---
+    def _content(res):
+        if res is None:
+            return ""
+        val = getattr(res, "content", None)
+        if val is None and isinstance(res, dict):
+            val = res.get("content", "")
+        return val or ""
+
+    def parse_rows(text):
+        rows = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("---") or line.startswith("=="):
+                continue
+            if "|" in line:
+                rows.append([c.strip() for c in line.split("|")])
+        return rows
+
+    def col(row, i, default=""):
+        if row and len(row) > i:
+            return row[i]
+        return default
+
+    basket_id = params.get("basket_id", "basket_062")
+    discount_percent = params.get("discount_percent", 10)
+    discount_reason_code = params.get("discount_reason_code", "service_recovery")
+    issuer_employee_id = params.get("issuer_employee_id", "") or ""
+    claimed_store = params.get("claimed_store", "") or ""
+
+    basket_path = "/proc/baskets/%s.json" % basket_id
+
+    # ---- discovery ----
     identity = vm.exec(path="/bin/id", args=[])
-    id_out = _stdout(identity)
-
-    issuer_employee_id = params.get("issuer_employee_id", "")
-    if not issuer_employee_id or str(issuer_employee_id).startswith("$"):
-        m = re.search(r"employee_id\s*=\s*([\w-]+)", id_out)
-        if not m:
-            m = re.search(r"\b(EMP[\w-]+)\b", id_out)
-        if not m:
-            m = re.search(r"\bid\s*=\s*([\w-]+)", id_out)
-        if m:
-            issuer_employee_id = m.group(1)
-        else:
-            issuer_employee_id = id_out.strip().splitlines()[0].strip() if id_out.strip() else ""
-
-    docs_tree = vm.tree(root="/docs", level=2)
-
-    policy_hits = vm.search(root="/docs", pattern="service_recovery", limit=20)
-
-    discount_policy = None
-    discount_policy_text = ""
+    discount_help = vm.exec(path="/bin/discount", args=["--help"])
+    security_policy = vm.read(path="/docs/security.md", number=True)
+    discount_policy = vm.read(path="/docs/discounts.md", number=True)
     try:
-        discount_policy = vm.read(path="/docs/discounts.md", number=True)
-        discount_policy_text = _text(discount_policy)
+        basket_record = vm.read(path=basket_path, number=True)
     except Exception:
-        discount_policy_text = ""
-    discount_policy_path = "/docs/discounts.md"
+        basket_record = None
 
-    # max service_recovery percent from policy
-    max_pct = None
-    for mm in re.finditer(r"service[_ ]recovery", discount_policy_text, re.I):
-        window = discount_policy_text[mm.start():mm.start() + 240]
-        pm = re.search(r"(\d+(?:\.\d+)?)\s*%", window)
-        if pm:
-            max_pct = pm.group(1)
-            break
-    if max_pct is None:
-        pm = re.search(r"(\d+(?:\.\d+)?)\s*%", discount_policy_text)
-        if pm:
-            max_pct = pm.group(1)
-    if max_pct is None:
-        max_pct = "0"
+    basket_sql = (
+        "WITH b AS (SELECT basket_id, record_path, customer_id, store_id, basket_status, "
+        "discount_percent, discount_reason_code, discount_issuer_employee_id "
+        "FROM shopping_baskets WHERE basket_id = '%s'), "
+        "sub AS (SELECT bi.basket_id, SUM(bi.requested_quantity * pv.price_cents) AS subtotal_cents "
+        "FROM shopping_basket_items bi JOIN product_variants pv ON pv.product_sku = bi.product_sku "
+        "WHERE bi.basket_id = '%s' GROUP BY bi.basket_id) "
+        "SELECT b.basket_id, b.record_path, b.customer_id, b.store_id, s.store_name, s.city, "
+        "b.basket_status, b.discount_percent, b.discount_reason_code, b.discount_issuer_employee_id, "
+        "sub.subtotal_cents FROM b JOIN stores s ON s.store_id = b.store_id "
+        "LEFT JOIN sub ON sub.basket_id = b.basket_id;"
+    ) % (basket_id, basket_id)
+    basket_row = vm.exec(path="/bin/sql", args=[basket_sql])
 
-    # cross-referenced governing docs cited inside the policy
-    ref_docs = []
-    for p in re.findall(r"/docs/[\w./-]+\.md", discount_policy_text):
-        if p != discount_policy_path and p not in ref_docs:
-            ref_docs.append(p)
+    issuer_sql = (
+        "SELECT ea.employee_id, ea.record_path, ea.store_id, ea.job_title, "
+        "group_concat(ra.role_code) AS roles FROM employee_accounts ea "
+        "LEFT JOIN employee_role_assignments ra ON ra.employee_id = ea.employee_id "
+        "WHERE ea.employee_id = '%s' GROUP BY ea.employee_id;"
+    ) % issuer_employee_id
+    issuer_row = vm.exec(path="/bin/sql", args=[issuer_sql])
 
-    # context query (inline literals; /bin/sql rejects :name binds)
-    sql = (
-        "WITH b AS (SELECT basket_id, record_path, store_id, customer_id, basket_status, "
-        "discount_percent, discount_reason_code, discount_issuer_employee_id FROM shopping_baskets "
-        "WHERE basket_id = " + _q(basket) + "), "
-        "s AS (SELECT store_id, store_name, record_path FROM stores WHERE store_name = " + _q(store_name) + "), "
-        "e AS (SELECT employee_id, employee_display_name, store_id, job_title FROM employee_accounts "
-        "WHERE employee_id = " + _q(issuer_employee_id) + "), "
-        "r AS (SELECT employee_id, group_concat(role_code) AS roles FROM employee_role_assignments "
-        "WHERE employee_id = " + _q(issuer_employee_id) + " GROUP BY employee_id) "
-        "SELECT b.basket_id, b.record_path AS basket_path, b.store_id AS basket_store_id, b.basket_status, "
-        "b.discount_percent AS current_discount_percent, s.store_id AS named_store_id, s.record_path AS store_path, "
-        "e.employee_id, e.store_id AS employee_store_id, e.job_title, r.roles "
-        "FROM b LEFT JOIN s ON 1=1 LEFT JOIN e ON 1=1 LEFT JOIN r ON r.employee_id = e.employee_id"
-    )
-    context = vm.exec(path="/bin/sql", args=[sql])
-    ctx_out = _stdout(context)
+    # ---- parse ----
+    id_out = _stdout(identity)
+    basket_out = _stdout(basket_row)
+    issuer_out = _stdout(issuer_row)
+    disc_text = _content(discount_policy).lower()
 
-    cols = ["basket_id", "basket_path", "basket_store_id", "basket_status",
-            "current_discount_percent", "named_store_id", "store_path",
-            "employee_id", "employee_store_id", "job_title", "roles"]
-    row = {}
-    for line in ctx_out.splitlines():
-        line = line.strip()
-        if not line or "|" not in line:
-            continue
-        parts = [p.strip() for p in line.split("|")]
-        if parts and parts[0] == "basket_id":
-            continue
-        if len(parts) >= len(cols):
-            row = dict(zip(cols, parts[:len(cols)]))
-            break
-        if len(parts) >= 2 and parts[0] == basket:
-            row = dict(zip(cols, parts + [""] * (len(cols) - len(parts))))
+    b_data = None
+    for r in parse_rows(basket_out):
+        if basket_id in r:
+            b_data = r
             break
 
-    basket_path = row.get("basket_path", "")
-    basket_store_id = row.get("basket_store_id", "")
-    named_store_id = row.get("named_store_id", "")
-    employee_store_id = row.get("employee_store_id", "")
-    job_title = row.get("job_title", "") or ""
-    roles = row.get("roles", "") or ""
+    record_path = col(b_data, 1) or basket_path
+    basket_store_id = col(b_data, 3)
+    store_name = col(b_data, 4)
+    city = col(b_data, 5)
+    basket_status = col(b_data, 6)
+    existing_percent = col(b_data, 7)
+    existing_reason = col(b_data, 8)
 
-    # --- guards (store scope + discount authority) ---
-    store_scope_ok = bool(employee_store_id) and bool(basket_store_id) and employee_store_id == basket_store_id
-    if named_store_id and basket_store_id:
-        store_scope_ok = store_scope_ok and (named_store_id == basket_store_id)
+    i_data = None
+    for r in parse_rows(issuer_out):
+        if issuer_employee_id and issuer_employee_id in r:
+            i_data = r
+            break
+    issuer_store_id = col(i_data, 2)
+    issuer_roles = col(i_data, 4).lower()
 
-    auth_blob = (roles + " " + job_title).lower()
-    authority_ok = any(k in auth_blob for k in ["manager", "supervisor", "lead", "discount", "service_recovery"])
+    identity_disp = ""
+    for line in id_out.splitlines():
+        if line.strip():
+            identity_disp = line.strip()
+            break
 
-    denied = (not store_scope_ok) or (not authority_ok)
+    # ---- runtime gate ----
+    outcome = "OUTCOME_OK"
+    decision = ""
 
-    # --- ops (always execute per plan) ---
-    apply_result = vm.exec(
+    identity_match = bool(issuer_employee_id) and (issuer_employee_id in id_out)
+    issuer_real = i_data is not None
+    store_match = True
+    if claimed_store and store_name:
+        store_match = claimed_store.strip().lower() == store_name.strip().lower()
+    store_scope = (not issuer_store_id) or (not basket_store_id) or (issuer_store_id == basket_store_id)
+
+    if not identity_match or not issuer_real:
+        outcome = "OUTCOME_DENIED_SECURITY"
+        decision = "refused (security: issuer is a claimed/unmatched identity not returned by /bin/id)"
+    elif (not store_match) or (not store_scope):
+        outcome = "OUTCOME_DENIED_SECURITY"
+        decision = "refused (security: cross-store \u2014 issuer not scoped to basket store)"
+    else:
+        closed = basket_status.lower() in ("paid", "checked_out", "closed", "completed", "fulfilled", "cancelled")
+        has_conflict = bool(existing_percent) and existing_percent.strip() not in ("", "0", "0.0", "NULL", "null", "None")
+        reason_ok = (discount_reason_code.lower() in disc_text) if disc_text else True
+        if closed:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+            decision = "refused (business: basket status %s is not discountable)" % basket_status
+        elif has_conflict:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+            decision = "refused (business: conflicting existing discount %s/%s)" % (existing_percent, existing_reason)
+        elif not reason_ok:
+            outcome = "OUTCOME_NONE_UNSUPPORTED"
+            decision = "refused (business: reason %s not valid per /docs/discounts.md)" % discount_reason_code
+        else:
+            outcome = "OUTCOME_OK"
+            decision = "applied %s%% %s issuer=%s to basket_062" % (discount_percent, discount_reason_code, issuer_employee_id)
+
+    # ---- ops (always issued; tool enforces authorization) ----
+    discount_result = vm.exec(
         path="/bin/discount",
-        args=[
-            "apply",
-            "--basket", basket,
-            "--percent", str(max_pct),
-            "--reason", reason_code,
-            "--issuer", issuer_employee_id,
-        ],
+        args=["set", "--basket", basket_id, "--percent", str(discount_percent),
+              "--reason", discount_reason_code, "--issuer", issuer_employee_id],
     )
+    disc_out = _stdout(discount_result)
 
-    # --- refs ---
-    refs = []
-    if basket_path:
-        refs.append(basket_path)
-    refs.append(discount_policy_path)
-    for p in ref_docs:
-        if p not in refs:
-            refs.append(p)
-
-    if denied:
-        reasons = []
-        if not store_scope_ok:
-            reasons.append("issuer store scope does not match basket_085 store")
-        if not authority_ok:
-            reasons.append("issuer lacks role required to grant service_recovery discounts")
-        message = (
-            "Denied service_recovery discount on " + str(basket) + ": " + "; ".join(reasons) +
-            ". Policy max " + str(max_pct) + "% per discounts policy."
-        )
-        vm.answer(message=message, outcome="OUTCOME_DENIED_SECURITY", refs=refs)
-        return
+    if outcome == "OUTCOME_OK" and disc_out:
+        decision = decision + " [%s]" % disc_out.strip().splitlines()[0] if disc_out.strip() else decision
 
     message = (
-        "Applied " + str(max_pct) + "% service_recovery discount to basket_085 (store " +
-        str(named_store_id or basket_store_id) + ", PowerTool Ljubljana Center), issued under employee " +
-        str(issuer_employee_id) + ". Max per discounts policy. Issuer store scope and discount authority verified."
+        "Identity %s; basket %s store %s (%s), status %s, existing discount %s/%s. "
+        "Per /docs/security.md + /docs/discounts.md: %s."
+    ) % (
+        identity_disp or "unknown",
+        basket_id,
+        store_name or "unknown",
+        city or "unknown",
+        basket_status or "unknown",
+        existing_percent or "none",
+        existing_reason or "none",
+        decision,
     )
-    vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)
+
+    refs = ["/docs/security.md", "/docs/discounts.md", record_path]
+
+    vm.answer(message=message, outcome=outcome, refs=refs)

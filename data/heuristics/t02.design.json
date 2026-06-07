@@ -1,46 +1,49 @@
 {
-  "intent": "Determine whether a Schneider Electric Extension Cable variant (line 'Schneider Electric Heavy Duty Merten 214-ZHY Extension Cable', color family White, length 3 m) exists in the catalogue.",
+  "intent": "Check whether a Holzmann Compact D 327-RR0 Compressor and Dust Extractor variant with machine type compressor, 230 V, and 3000 W exists in the catalogue.",
   "params": {
-    "brand": "Schneider Electric",
-    "series": "Heavy Duty",
-    "model": "Merten 214-ZHY",
-    "kind_name": "Extension Cable",
-    "color_family": "White",
-    "length_m": 3,
-    "length_text": "3 m"
+    "brand": "Holzmann",
+    "series": "Compact",
+    "model": "D 327-RR0",
+    "kind_name": "Compressor and Dust Extractor",
+    "machine_type": "compressor",
+    "voltage_v": 230,
+    "power_w": 3000
   },
   "success_criteria": [
-    "SQL returns zero or more product_variants rows scoped to brand=Schneider Electric, series=Heavy Duty, model=Merten 214-ZHY with color_family=White and length=3 m.",
-    "Answer states <YES> with the matched variant's record_path if a row exists, else <NO>.",
-    "Every matched variant's record_path is cited in refs."
+    "Catalogue queried for product_variants matching brand Holzmann, series Compact, model D 327-RR0, kind Compressor and Dust Extractor, machine_type compressor, voltage_v 230, power_w 3000",
+    "Answer states YES with the matched variant's record_path if a row exists, else NO with no product reference",
+    "<YES> or <NO> token included in the message"
   ],
   "discovery": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "SELECT v.product_sku, v.product_name, v.brand, v.series, v.model, v.record_path FROM product_variants v JOIN product_kinds k ON k.product_kind_id = v.product_kind_id WHERE v.brand = :brand AND v.series = :series AND v.model = :model AND k.product_kind_name = :kind_name AND EXISTS (SELECT 1 FROM product_variant_properties pc WHERE pc.product_sku = v.product_sku AND pc.property_key = 'color_family' AND LOWER(pc.property_value_text) = LOWER(:color_family)) AND EXISTS (SELECT 1 FROM product_variant_properties pl WHERE pl.product_sku = v.product_sku AND pl.property_key LIKE '%length%' AND (pl.property_value_number = :length_m OR LOWER(pl.property_value_text) = LOWER(:length_text)));"
+        "stdin": "SELECT v.product_sku, v.record_path, v.product_name, v.brand, v.series, v.model, k.product_kind_name, mt.property_value_text AS machine_type, volt.property_value_number AS voltage_v, pw.property_value_number AS power_w FROM product_variants v JOIN product_kinds k ON k.product_kind_id = v.product_kind_id LEFT JOIN product_variant_properties mt ON mt.product_sku = v.product_sku AND mt.property_key = 'machine_type' LEFT JOIN product_variant_properties volt ON volt.product_sku = v.product_sku AND volt.property_key = 'voltage_v' LEFT JOIN product_variant_properties pw ON pw.product_sku = v.product_sku AND pw.property_key = 'power_w' WHERE v.brand = 'Holzmann' AND v.series = 'Compact' AND v.model = 'D 327-RR0' AND k.product_kind_name = 'Compressor and Dust Extractor' AND mt.property_value_text = 'compressor' AND volt.property_value_number = 230 AND pw.property_value_number = 3000;"
       },
-      "bind": "matches"
+      "bind": "match"
     }
   ],
   "ops": [],
   "agents_md_constraints": [
     {
+      "anchor": "#important-things > yes/no tokens",
+      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+    },
+    {
       "anchor": "#important-things > references",
       "rule": "When responding with reference - provide full path in the repo to the object."
     },
     {
-      "anchor": "#important-things > yes/no",
-      "rule": "When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response."
+      "anchor": "#important-things > availability",
+      "rule": "When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores."
     }
   ],
   "answer_template": {
-    "message": "{ '<YES> The Schneider Electric Heavy Duty Merten 214-ZHY Extension Cable in White, 3 m (' + matches[0].product_sku + ') is in the catalogue.' if matches else '<NO> No Schneider Electric Heavy Duty Merten 214-ZHY Extension Cable with color family White and length 3 m is in the catalogue.' }",
+    "message": "{'<YES>' if match else '<NO>'} The Holzmann Compact D 327-RR0 Compressor and Dust Extractor (machine type compressor, 230 V, 3000 W) {'is in the catalogue: ' + match.record_path if match else 'is not in the catalogue.'}",
     "outcome": "OUTCOME_OK",
     "refs": [
-      "$matches[*].record_path"
+      "$record_path"
     ]
   },
   "outcome_override": null
