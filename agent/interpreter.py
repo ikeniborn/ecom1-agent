@@ -15,7 +15,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from .ir_models import IntentSpec, PlanIR, RowSet
-from .predicates import resolve
+from .predicates import evaluate, resolve
 
 
 class InterpretError(RuntimeError):
@@ -102,7 +102,26 @@ def _parse_rowset(text: str, rs: RowSet) -> list[dict]:
     return out
 
 
+def lint_security_first(plan: PlanIR) -> None:
+    """H3: every branch whose label -> DENIED_SECURITY must precede non-DENIED branches."""
+    denied = {lbl for lbl, tmpl in plan.answer.items()
+              if tmpl.outcome == "OUTCOME_DENIED_SECURITY"}
+    last_denied = -1
+    first_nondenied = len(plan.decision.branches)
+    for i, br in enumerate(plan.decision.branches):
+        if br.label in denied:
+            last_denied = i
+        elif first_nondenied == len(plan.decision.branches):
+            first_nondenied = i
+    if last_denied > first_nondenied:
+        raise InterpretError(
+            "security-first violation: a DENIED_SECURITY branch follows a "
+            "non-DENIED branch in the decision tree"
+        )
+
+
 def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResult:
+    lint_security_first(plan)
     env: dict = dict(intent.params or {})
     if facts is not None:
         env["_facts"] = facts
@@ -133,7 +152,15 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
     for ce in plan.custom_extract:
         env[ce.into] = run_parser(ce.name, _payload(env.get(ce.input)), intent.params or {})
 
+    # 5. decision (security branch ordering enforced by lint_security_first)
+    label = plan.decision.default_label
+    for br in plan.decision.branches:
+        if evaluate(br.when, env):
+            label = br.label
+            break
+
     # (compute / custom_extract / decision / ops / answer added in later tasks)
     captured = CapturedAnswer(message="", outcome="OUTCOME_NONE_CLARIFICATION", refs=[])
     return InterpretResult(captured=captured, env=env, observations=observations,
-                           sql_results=sql_results, mutation_landed=mutation_landed)
+                           sql_results=sql_results, mutation_landed=mutation_landed,
+                           label=label)

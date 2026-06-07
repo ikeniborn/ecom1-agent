@@ -63,3 +63,45 @@ def test_custom_extract_writes_rowset():
     res = interpret(plan, _INTENT, vm)
     assert isinstance(res.env["skus"], list) and res.env["skus"]
     assert "normalized" in res.env["skus"][0]
+
+
+import pytest
+from agent.interpreter import lint_security_first, InterpretError
+
+
+def test_decision_picks_first_true_branch():
+    vm = MockVMSpy(fixtures={})
+    plan = _plan(
+        compute=[{"prim": "count", "args": [[1, 2]], "into": "n"}],
+        decision={"branches": [{"when": {"op": "gt", "lhs": "$n", "rhs": 5}, "label": "big"},
+                               {"when": {"op": "gt", "lhs": "$n", "rhs": 1}, "label": "some"}],
+                  "default_label": "none"},
+        answer={"big": {"message": "b", "outcome": "OUTCOME_OK", "refs": []},
+                "some": {"message": "s", "outcome": "OUTCOME_OK", "refs": []},
+                "none": {"message": "n", "outcome": "OUTCOME_OK", "refs": []}},
+    )
+    res = interpret(plan, _INTENT, vm)
+    assert res.label == "some"
+
+
+def test_security_first_lint_rejects_business_before_denied():
+    plan = _plan(
+        decision={"branches": [{"when": {"op": "eq", "lhs": "$x", "rhs": 1}, "label": "ok"},
+                               {"when": {"op": "eq", "lhs": "$y", "rhs": 1}, "label": "deny"}],
+                  "default_label": "ok"},
+        answer={"ok": {"message": "m", "outcome": "OUTCOME_OK", "refs": []},
+                "deny": {"message": "no", "outcome": "OUTCOME_DENIED_SECURITY", "refs": []}},
+    )
+    with pytest.raises(InterpretError):
+        lint_security_first(plan)
+
+
+def test_security_first_lint_accepts_denied_first():
+    plan = _plan(
+        decision={"branches": [{"when": {"op": "eq", "lhs": "$y", "rhs": 1}, "label": "deny"},
+                               {"when": {"op": "eq", "lhs": "$x", "rhs": 1}, "label": "ok"}],
+                  "default_label": "ok"},
+        answer={"deny": {"message": "no", "outcome": "OUTCOME_DENIED_SECURITY", "refs": []},
+                "ok": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}},
+    )
+    lint_security_first(plan)  # no raise
