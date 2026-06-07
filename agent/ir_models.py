@@ -15,7 +15,6 @@ LEAF_OPS = {
     "nonempty", "isnull",
     "contains_any", "in_set", "startswith", "endswith", "regex_match",
 }
-_UNARY_OPS = {"nonempty", "isnull"}
 BOOL_OPS = {"and", "or", "not"}
 
 
