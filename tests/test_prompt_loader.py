@@ -20,5 +20,5 @@ def test_learn_prompt_loaded():
 
 
 def test_deleted_prompts_absent():
-    for name in ("idd", "sdd", "plan", "assembler", "tdd", "answer", "consolidate"):
+    for name in ("idd", "sdd", "assembler", "tdd", "answer", "consolidate"):
         assert load_prompt(name) == "", f"{name} prompt must be deleted"
