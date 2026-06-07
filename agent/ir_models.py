@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 LEAF_OPS = {
     "eq", "ne", "lt", "le", "gt", "ge",
@@ -44,9 +44,6 @@ class PredExpr(BaseModel):
 PredExpr.model_rebuild()
 
 
-from pydantic import Field
-
-
 # --- IntentSpec (IDD layer) -----------------------------------------------
 
 class Constraint(BaseModel):
@@ -54,7 +51,7 @@ class Constraint(BaseModel):
     anchor: str
     rule: str
     security: bool = False
-    deny_when: PredExpr | None = None   # I3: True => must deny (security only)
+    deny_when: PredExpr | None = None   # I3: evaluated True => deny (security only)
 
 
 class AnswerShape(BaseModel):
