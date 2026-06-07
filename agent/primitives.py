@@ -45,6 +45,7 @@ PRIMITIVES: dict[str, Callable[..., Any]] = {
     "column": _column,
     "first": lambda seq: (seq[0] if seq else None),
     "get": lambda obj, key: (obj or {}).get(key) if isinstance(obj, dict) else None,
+    # NOTE: elements must be hashable (strings, numbers); use filter_rows for rows.
     "dedupe": lambda seq: list(dict.fromkeys(seq or [])),
     "concat": lambda a, b: list(a or []) + list(b or []),
     "all_true": lambda seq: all(seq) if seq else False,

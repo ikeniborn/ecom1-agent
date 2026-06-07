@@ -32,6 +32,7 @@ def test_fold_primitives():
     assert run_primitive("all_true", [[True, True, True]]) is True
     assert run_primitive("all_true", [[True, False]]) is False
     assert run_primitive("any_true", [[False, True]]) is True
+    assert run_primitive("all_true", [[]]) is False  # deliberate: empty != vacuous True
 
 
 def test_filter_rows_uses_predicate_engine():
