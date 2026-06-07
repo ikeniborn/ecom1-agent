@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import os
+import re
+
+from pydantic import BaseModel
 
 from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
 from bitgn.vm.ecom.ecom_pb2 import ReadRequest
@@ -92,6 +95,95 @@ def _augment_agents_md(agents_md_text: str, schema_text: str, sample_rows: str =
     return "".join(blocks)
 
 
+class PrePhaseFacts(BaseModel):
+    agents_md: str = ""
+    schema: str = ""
+    sample_rows: str = ""
+    docs_inventory: str = ""
+    policies: dict[str, str] = {}
+    identity: dict = {}
+    target_records: dict[str, str] = {}
+
+
+_ID_RE = re.compile(r"(\w+)=([^\s]+)")
+_RECORD_ID_RE = re.compile(r"\b(basket|payment|return|order)_\w+\b", re.IGNORECASE)
+_POLICY_CAP = 6
+_RECORD_CAP = 3
+
+
+def _parse_identity(stdout: str) -> dict:
+    return {k: v for k, v in _ID_RE.findall(stdout or "")}
+
+
+def _extract_text(r, attr: str) -> str:
+    """Pull a string field from an RPC result (object with `.attr`, or dict).
+
+    Returns "" for anything non-string (e.g. a bare MagicMock attribute) so
+    best-effort gathering degrades cleanly instead of raising downstream.
+    """
+    val = getattr(r, attr, None)
+    if isinstance(val, str):
+        return val
+    if isinstance(r, dict):
+        d = r.get(attr, "")
+        return d if isinstance(d, str) else ""
+    return ""
+
+
+def _sql_stdout_or_exec(vm, path: str) -> str:
+    try:
+        r = vm.exec(path=path, args=[])
+    except Exception:
+        return ""
+    return _extract_text(r, "stdout")
+
+
+def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhaseFacts:
+    schema = _discover_schema(vm)
+    tables = _discover_table_names(vm) if schema else []
+    samples = _discover_sample_rows(vm, tables) if tables else ""
+
+    identity = _parse_identity(_sql_stdout_or_exec(vm, "/bin/id"))
+
+    docs_inventory = ""
+    try:
+        t = vm.tree(root="/docs", level=2)
+        docs_inventory = _extract_text(t, "stdout")
+    except Exception:
+        pass
+
+    policies: dict[str, str] = {}
+    wanted = ["/docs/security.md"]
+    for name in re.findall(r"/docs/[\w/.-]+\.md", (instruction or "") + " " + (agents_md_text or "")):
+        if name not in wanted:
+            wanted.append(name)
+    for path in wanted[:_POLICY_CAP]:
+        try:
+            r = vm.read(path=path)
+            txt = _extract_text(r, "content")
+            if txt:
+                policies[path] = txt
+        except Exception:
+            continue
+
+    target_records: dict[str, str] = {}
+    for m in list(_RECORD_ID_RE.finditer(instruction or ""))[:_RECORD_CAP]:
+        full = m.group(0)
+        for proc in (f"/proc/baskets/{full}.json", f"/proc/payments/{full}.json"):
+            try:
+                r = vm.read(path=proc)
+                txt = _extract_text(r, "content")
+                if txt:
+                    target_records[proc] = txt
+                    break
+            except Exception:
+                continue
+
+    return PrePhaseFacts(agents_md=agents_md_text, schema=schema, sample_rows=samples,
+                         docs_inventory=docs_inventory, policies=policies,
+                         identity=identity, target_records=target_records)
+
+
 def run_agent(
     model_configs: dict,
     harness_url: str,
@@ -103,11 +195,10 @@ def run_agent(
     raw_vm = EcomRuntimeClientSync(harness_url)
     agents_md_text = _read_agents_md(raw_vm)
     vm = VMAdapter(raw_vm)
-    schema_text = _discover_schema(vm)
-    table_names = _discover_table_names(vm) if schema_text else []
-    sample_rows = _discover_sample_rows(vm, table_names) if table_names else ""
-    agents_md_text = _augment_agents_md(agents_md_text, schema_text, sample_rows)
-    metrics = run_pipeline(vm, instruction=task_text, task_id=task_id, agents_md_text=agents_md_text)
+    facts = gather_prephase_facts(vm, task_text, agents_md_text)
+    agents_md_text = _augment_agents_md(agents_md_text, facts.schema, facts.sample_rows)
+    metrics = run_pipeline(vm, instruction=task_text, task_id=task_id,
+                           agents_md_text=agents_md_text, facts=facts)
     return {
         "model_used": os.environ.get("MODEL", ""),
         "task_type": "lookup",

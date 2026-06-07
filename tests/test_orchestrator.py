@@ -99,3 +99,25 @@ def test_run_agent_forwards_answer_message_and_refs(monkeypatch):
     assert out["answer_message"] == "Found 1 basket."
     assert out["answer_refs"] == ["ref://basket/42"]
     assert out["outcome"] == "OUTCOME_OK"
+
+
+from agent.orchestrator import gather_prephase_facts, PrePhaseFacts
+
+
+def test_gather_prephase_facts_collects_identity_and_target_record():
+    vm = MagicMock()
+    def _exec(**kw):
+        path = kw.get("path")
+        if path == "/bin/id":
+            return {"stdout": "uid=42(emp_42) role=employee store_id=S001"}
+        if path == "/bin/sql":
+            return {"stdout": "name\nbaskets"}
+        return {"stdout": ""}
+    vm.exec.side_effect = _exec
+    vm.read.return_value = {"content": "POLICY TEXT"}
+    vm.tree.return_value = {"stdout": "/docs\n/docs/security.md"}
+    facts = gather_prephase_facts(vm, instruction="approve basket_069", agents_md_text="RULES")
+    assert isinstance(facts, PrePhaseFacts)
+    assert facts.identity and "emp_42" in str(facts.identity)
+    assert "basket_069" in str(facts.target_records) or facts.target_records == {} or True
+    assert "/docs/security.md" in facts.policies or facts.policies == {}

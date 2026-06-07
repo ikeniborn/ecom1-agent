@@ -853,6 +853,7 @@ def run_pipeline(
     instruction: str,
     task_id: str,
     agents_md_text: str,
+    facts=None,
 ) -> dict:
     """Per-task pipeline. Exactly one vm.answer() call before returning.
 
@@ -863,7 +864,6 @@ def run_pipeline(
 
     # Deterministic Plan-IR interpreter path (read flag fresh so test setenv works).
     if os.environ.get("INTERPRETER_ENABLED", "0") == "1":
-        facts = getattr(run_pipeline, "_facts", None)  # Task 17 replaces with a real param
         return _run_interpreted(vm, instruction, task_id, agents_md_text, facts)
 
     total_in = 0
