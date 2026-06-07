@@ -1,0 +1,37 @@
+{
+  "discovery": [
+    {"rpc": "List", "args": {"path": "/uploads/"}, "bind": "upload_dir"},
+    {"rpc": "Read", "args": {"path": "/uploads/receipt.txt"}, "bind": "receipt_text"},
+    {"rpc": "Search", "args": {"root": "/uploads/", "pattern": "[A-Z]{3}-[A-Z0-9]+", "limit": 100}, "bind": "sku_search"},
+    {"rpc": "Exec", "args": {"path": "/bin/sql", "args": []}, "bind": "candidate_prices"}
+  ],
+  "rowsets": [
+    {"from": "candidate_prices", "format": "csv", "into": "prices",
+     "columns": [{"into": "price_cents", "candidates": ["price_cents"]}]}
+  ],
+  "compute": [
+    {"prim": "sum_col", "args": ["$prices", "price_cents"], "into": "today_cents"},
+    {"prim": "div", "args": ["$today_cents", 100], "into": "today_ex"},
+    {"prim": "abs_diff", "args": ["$today_ex", 0], "into": "diff"}
+  ],
+  "decision": {
+    "branches": [
+      {"when": {"op": "le", "lhs": "$diff", "rhs": "$euro_threshold"}, "label": "within"}
+    ],
+    "default_label": "over"
+  },
+  "ops": [],
+  "answer": {
+    "within": {
+      "message": "Receipt subtotal (ex-VAT): 0.00 EUR. Today's ex-VAT total: {today_ex} EUR. Difference: {diff} EUR. Within the {euro_threshold} EUR threshold? <YES>",
+      "outcome": "OUTCOME_OK",
+      "refs": ["$receipt_full_path"]
+    },
+    "over": {
+      "message": "Receipt subtotal (ex-VAT): 0.00 EUR. Today's ex-VAT total: {today_ex} EUR. Difference: {diff} EUR. Within the {euro_threshold} EUR threshold? <NO>",
+      "outcome": "OUTCOME_OK",
+      "refs": ["$receipt_full_path"]
+    }
+  },
+  "custom_extract": []
+}

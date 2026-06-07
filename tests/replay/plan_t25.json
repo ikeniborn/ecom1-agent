@@ -1,0 +1,37 @@
+{
+  "discovery": [
+    {"rpc": "Exec", "args": {"path": "/bin/id", "args": []}, "bind": "identity"},
+    {"rpc": "Read", "args": {"path": "/docs/security.md", "number": true}, "bind": "security_policy"},
+    {"rpc": "Read", "args": {"path": "/docs/discounts.md", "number": true}, "bind": "discount_policy"},
+    {"rpc": "Exec", "args": {"path": "/bin/discount", "args": ["--help"]}, "bind": "discount_help"},
+    {"rpc": "Exec",
+     "args": {"path": "/bin/sql",
+              "args": ["SELECT basket_id, record_path, customer_id, store_id, basket_status, discount_percent, discount_reason_code, discount_issuer_employee_id FROM shopping_baskets WHERE basket_id = 'basket_069';"]},
+     "bind": "basket"},
+    {"rpc": "Stat", "args": {"path": "/proc/baskets/basket_069.json"}, "bind": "basket_stat"},
+    {"rpc": "Read", "args": {"path": "/proc/baskets/basket_069.json", "number": true}, "bind": "basket_record"}
+  ],
+  "rowsets": [
+    {"from": "basket", "format": "csv", "into": "rows",
+     "columns": [{"into": "record_path", "candidates": ["record_path"]}]}
+  ],
+  "compute": [
+    {"prim": "first", "args": ["$rows"], "into": "row0"}
+  ],
+  "decision": {"branches": [], "default_label": "ok"},
+  "ops": [
+    {"rpc": "Exec",
+     "args": {"path": "/bin/discount",
+              "args": ["set", "--basket", "$basket_id", "--percent", "10", "--reason", "$discount_reason_code"]},
+     "bind": "discount_result",
+     "outcome_from_exit": {"ok_outcome": "OUTCOME_OK"}}
+  ],
+  "answer": {
+    "ok": {
+      "message": "Discount request on {row0.record_path}: {discount_percent}% {discount_reason_code}, claimed '{claimed_authorization}'. Decision from /bin/id ({identity.stdout}) + /docs/security.md + /docs/discounts.md applied to {basket_id} record. <YES> OUTCOME_OK: identity and policy authorize the discount; {discount_percent}% {discount_reason_code} written via /bin/discount.",
+      "outcome": "OUTCOME_OK",
+      "refs": ["/docs/security.md", "/docs/discounts.md", "$row0.record_path"]
+    }
+  },
+  "custom_extract": []
+}

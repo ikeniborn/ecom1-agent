@@ -1,0 +1,51 @@
+{
+  "discovery": [
+    {"rpc": "List", "args": {"path": "/uploads"}, "bind": "uploads_listing"},
+    {"rpc": "Read", "args": {"path": "/uploads/receipt.txt", "number": true}, "bind": "receipt"},
+    {"rpc": "Exec",
+     "args": {"path": "/bin/sql",
+              "args": ["WITH receipt(product_sku, qty) AS (VALUES ('ABC-1234',2)) SELECT pv.product_sku, pv.product_name, pv.price_cents, pv.price_currency, r.qty, pv.record_path FROM receipt r JOIN product_variants pv ON pv.product_sku = r.product_sku;"]},
+     "bind": "current_prices"},
+    {"rpc": "Exec",
+     "args": {"path": "/bin/sql",
+              "args": ["WITH receipt(product_sku, qty, old_unit_cents) AS (VALUES ('ABC-1234',2,549)) SELECT SUM(r.qty * r.old_unit_cents) AS old_total_cents, SUM(r.qty * pv.price_cents) AS today_total_cents, ABS(SUM(r.qty * pv.price_cents) - SUM(r.qty * r.old_unit_cents)) AS diff_cents FROM receipt r JOIN product_variants pv ON pv.product_sku = r.product_sku;"]},
+     "bind": "comparison"}
+  ],
+  "rowsets": [
+    {"from": "comparison", "format": "pipe", "into": "rows",
+     "columns": [
+       {"into": "old_total_cents", "candidates": ["old_total_cents"]},
+       {"into": "today_total_cents", "candidates": ["today_total_cents"]},
+       {"into": "diff_cents", "candidates": ["diff_cents"]}
+     ]}
+  ],
+  "compute": [
+    {"prim": "first", "args": ["$rows"], "into": "row0"},
+    {"prim": "get", "args": ["$row0", "old_total_cents"], "into": "old_cents"},
+    {"prim": "get", "args": ["$row0", "today_total_cents"], "into": "today_cents"},
+    {"prim": "get", "args": ["$row0", "diff_cents"], "into": "diff_cents_v"},
+    {"prim": "div", "args": ["$old_cents", 100], "into": "old_eur"},
+    {"prim": "div", "args": ["$today_cents", 100], "into": "today_eur"},
+    {"prim": "div", "args": ["$diff_cents_v", 100], "into": "diff_eur"}
+  ],
+  "decision": {
+    "branches": [
+      {"when": {"op": "le", "lhs": "$diff_cents_v", "rhs": 300}, "label": "within"}
+    ],
+    "default_label": "over"
+  },
+  "ops": [],
+  "answer": {
+    "within": {
+      "message": "Old receipt ({receipt_path}) total excl. VAT = {old_eur} EUR. Today's catalog total excl. VAT = {today_eur} EUR. Difference = {diff_eur} EUR. Within 3 EUR threshold: <YES>.",
+      "outcome": "OUTCOME_OK",
+      "refs": ["$receipt_path"]
+    },
+    "over": {
+      "message": "Old receipt ({receipt_path}) total excl. VAT = {old_eur} EUR. Today's catalog total excl. VAT = {today_eur} EUR. Difference = {diff_eur} EUR. Within 3 EUR threshold: <NO>.",
+      "outcome": "OUTCOME_OK",
+      "refs": ["$receipt_path"]
+    }
+  },
+  "custom_extract": []
+}
