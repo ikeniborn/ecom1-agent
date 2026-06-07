@@ -37,6 +37,12 @@ _TDD_ENABLED = os.environ.get("TDD_ENABLED", "0") == "1"
 _TDD_MOCK_ENABLED = os.environ.get("TDD_MOCK_ENABLED", "0") == "1"
 _TDD_FORCE_SUBMIT_AFTER = int(os.environ.get("TDD_FORCE_SUBMIT_AFTER", "3"))
 
+# Deterministic Plan-IR interpreter path. Off by default so the legacy
+# DESIGN→CODEGEN baseline can't regress. Gated on a FRESH os.environ read inside
+# run_pipeline so a test's monkeypatch.setenv takes effect (the module-level
+# constant is evaluated at import time and kept for documentation only).
+_INTERPRETER_ENABLED = os.environ.get("INTERPRETER_ENABLED", "0") == "1"
+
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
@@ -150,21 +156,23 @@ def _is_retryable_vm_error(msg: str) -> bool:
 # Learn + consolidate (merged LLM call)
 # ---------------------------------------------------------------------------
 
-def _learn_consolidate(
+def _learn_consolidate_text(
     task_id: str,
     learn_ctx: list[dict],
-    design: DesignOutput,
+    plan_context: str,
     error: str,
-    script_code: str,
+    artifact: str,
     token_out: dict | None = None,
     observed: list[str] | None = None,
 ) -> None:
-    """Single LLM call. Writes a diff to data/learned/{tid}.yaml and mutates learn_ctx.
+    """Message-building core of LEARN, driven by already-rendered strings.
 
-    `observed` carries RPC stdouts captured during the failed real-VM run so
-    LEARN can see WHY refs were empty (table missing, column wrong, search
-    returned nothing). Without it LEARN only sees the guard error string and
-    tends to write the same rule each cycle.
+    `plan_context` is the rendered "tool plan" (legacy: DesignOutput JSON;
+    interpreted path: IntentSpec JSON). `artifact` is the rendered candidate
+    (legacy: script_code; interpreted path: PlanIR JSON). Writes a diff to
+    data/learned/{tid}.yaml and mutates learn_ctx in-place. `observed` carries
+    RPC stdouts captured during the failed run so LEARN can see WHY refs were
+    empty (table missing, column wrong, search returned nothing).
     """
     guide = load_prompt("learn") or "# PHASE: LEARN"
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
@@ -174,10 +182,10 @@ def _learn_consolidate(
     if observed:
         observed_block = "OBSERVED_RPC_OUTPUTS:\n" + "\n".join(observed) + "\n\n"
     user_msg = (
-        f"TOOL_PLAN:\n{design.model_dump_json(indent=2)}\n\n"
+        f"TOOL_PLAN:\n{plan_context}\n\n"
         f"ERROR:\n{error}\n\n"
         f"{observed_block}"
-        f"SCRIPT_CODE:\n```python\n{script_code}\n```\n\n"
+        f"SCRIPT_CODE:\n```python\n{artifact}\n```\n\n"
         f"EXISTING_RULES:\n{rules_lines}"
     )
 
@@ -207,6 +215,33 @@ def _learn_consolidate(
             "agents_md_anchor": out.agents_md_anchor,
         })
 
+
+def _learn_consolidate(
+    task_id: str,
+    learn_ctx: list[dict],
+    design: DesignOutput,
+    error: str,
+    script_code: str,
+    token_out: dict | None = None,
+    observed: list[str] | None = None,
+) -> None:
+    """Single LLM call. Writes a diff to data/learned/{tid}.yaml and mutates learn_ctx.
+
+    Thin wrapper over `_learn_consolidate_text`: renders the DesignOutput and
+    script to strings, then handles the legacy oracle-distill opt-in.
+
+    `observed` carries RPC stdouts captured during the failed real-VM run so
+    LEARN can see WHY refs were empty (table missing, column wrong, search
+    returned nothing). Without it LEARN only sees the guard error string and
+    tends to write the same rule each cycle.
+    """
+    _learn_consolidate_text(
+        task_id, learn_ctx,
+        plan_context=design.model_dump_json(indent=2),
+        error=error, artifact=script_code,
+        token_out=token_out, observed=observed,
+    )
+
     # Opt-in: distill a general candidate atom for the knowledge oracle (never raises).
     if (os.environ.get("ORACLE_ENABLED", "1") != "0"
             and os.environ.get("ORACLE_DISTILL", "0") == "1"):
@@ -220,6 +255,136 @@ def _learn_consolidate(
             )
         except Exception as e:
             print(f"{CLI_YELLOW}[pipeline] oracle distill skipped: {e}{CLI_CLR}")
+
+
+# ---------------------------------------------------------------------------
+# Interpreted-path LEARN seam + artifact persistence
+# ---------------------------------------------------------------------------
+
+def _ilearn(task_id, learn_ctx, intent, plan_text, error, observed=None):
+    """LEARN seam for the interpreted path - reuses _learn_consolidate's LLM call.
+
+    The interpreted path passes the IntentSpec JSON as the 'plan context' and the
+    PlanIR JSON as the 'artifact'. The distilled rule still lands in data/learned/{tid}.yaml.
+    """
+    tk: dict = {}
+    _learn_consolidate_text(task_id, learn_ctx,
+                            plan_context=intent.model_dump_json(indent=2),
+                            error=error, artifact=plan_text, token_out=tk, observed=observed)
+
+
+def _persist_artifacts(task_id, intent, plan):
+    heur = Path("data/heuristics"); heur.mkdir(parents=True, exist_ok=True)
+    (heur / f"{task_id}.intent.json").write_text(intent.model_dump_json(indent=2), encoding="utf-8")
+    (heur / f"{task_id}.plan.json").write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Interpreted pipeline branch (INTERPRETER_ENABLED)
+# ---------------------------------------------------------------------------
+
+def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, facts) -> dict:
+    """INTENT (frozen, retried) -> loop[ PLAN -> lint -> interpret -> verify ->
+    answer-once ] with LEARN between cycles. Mirrors the spec's error->LEARN table.
+
+    Returns the same metrics dict shape as run_pipeline. Calls vm.answer exactly once.
+    """
+    from .interpreter import InterpretError, interpret, lint_security_first
+    from .reason import IntentError, PlanError, run_intent, run_plan
+    from .verify import verify
+
+    learn_ctx = load_entries(task_id)
+    total_in = total_out = 0
+
+    def _accum(tk):
+        nonlocal total_in, total_out
+        total_in += int(tk.get("input", 0) or 0)
+        total_out += int(tk.get("output", 0) or 0)
+
+    oracle_atoms: list = []
+    try:
+        from .oracle import KnowledgeOracle
+        oracle_atoms = KnowledgeOracle().retrieve(instruction)
+    except Exception:
+        pass
+
+    # INTENT (frozen, retried on transient parse/empty)
+    intent = None
+    for _ in range(_DESIGN_MAX_ATTEMPTS):
+        tk = {}
+        try:
+            intent = run_intent(facts, instruction, token_out=tk); _accum(tk); break
+        except IntentError:
+            _accum(tk)
+    if intent is None:
+        save_last_run(task_id, "failure", "OUTCOME_NONE_CLARIFICATION", 0)
+        _terminal_clarification(vm, "INTENT failed")
+        return {"cycles_used": 0, "outcome": "OUTCOME_NONE_CLARIFICATION",
+                "status": "failure", "input_tokens": total_in, "output_tokens": total_out}
+
+    last_error = None
+    cycle = 0
+    for cycle in range(1, _MAX_STEPS + 1):
+        print(f"{CLI_BLUE}[pipeline] interpreted cycle {cycle}/{_MAX_STEPS}{CLI_CLR}")
+        tk = {}
+        plan = None
+        try:
+            plan = run_plan(intent, facts, learn_ctx, last_error,
+                            token_out=tk, oracle_atoms=oracle_atoms); _accum(tk)
+            lint_security_first(plan)
+        except (PlanError, InterpretError) as e:
+            last_error = f"plan: {e}"; _accum(tk)
+            _ilearn(task_id, learn_ctx, intent,
+                    plan.model_dump_json() if plan is not None else "", last_error)
+            continue
+
+        try:
+            result = interpret(plan, intent, vm, facts)
+        except InterpretError as e:
+            last_error = f"interpret: {e}"
+            _ilearn(task_id, learn_ctx, intent, plan.model_dump_json(), last_error,
+                    observed=None)
+            if getattr(e, "mutation_landed", False):
+                break
+            continue
+        except Exception as e:                                   # real-VM exception
+            last_error = f"real_vm: {e}"
+            _ilearn(task_id, learn_ctx, intent, plan.model_dump_json(), last_error)
+            # A mutating plan may have landed a Write/Delete/bin-mutation before the
+            # raise - retry only when the plan is read-only (mirrors legacy has_mutations).
+            plan_mutates = any(
+                op.rpc in {"Write", "Delete"}
+                or (op.rpc == "Exec" and str(op.args.get("path", "")).startswith("/bin/")
+                    and op.args.get("path") != "/bin/sql")
+                for op in plan.ops
+            )
+            if _is_retryable_vm_error(str(e)) and not plan_mutates:
+                continue
+            break
+
+        ok, verr = verify(result, intent)
+        if ok:
+            ans = result.captured
+            refs = _ground_security_refs(ans.outcome, list(ans.refs))
+            vm.answer(message=ans.message[:800], outcome=ans.outcome, refs=refs)
+            _persist_artifacts(task_id, intent, plan)
+            status = "success" if ans.outcome == "OUTCOME_OK" else "failure"
+            save_last_run(task_id, status, ans.outcome, cycle)
+            return {"cycles_used": cycle, "outcome": ans.outcome, "status": status,
+                    "input_tokens": total_in, "output_tokens": total_out,
+                    "answer_message": ans.message, "answer_refs": refs}
+
+        last_error = f"verify: {verr}"
+        print(f"{CLI_YELLOW}[pipeline] verify fail: {verr[:160]}{CLI_CLR}")
+        if result.mutation_landed:
+            break
+        _ilearn(task_id, learn_ctx, intent, plan.model_dump_json(), last_error,
+                observed=result.observations)
+
+    save_last_run(task_id, "failure", "OUTCOME_NONE_CLARIFICATION", cycle)
+    _terminal_clarification(vm, last_error or "interpreter cycles exhausted")
+    return {"cycles_used": cycle, "outcome": "OUTCOME_NONE_CLARIFICATION",
+            "status": "failure", "input_tokens": total_in, "output_tokens": total_out}
 
 
 # ---------------------------------------------------------------------------
@@ -683,6 +848,11 @@ def run_pipeline(
     """
     # main.py already emits log_header for this task; pipeline doesn't re-emit.
     learn_ctx = load_entries(task_id)
+
+    # Deterministic Plan-IR interpreter path (read flag fresh so test setenv works).
+    if os.environ.get("INTERPRETER_ENABLED", "0") == "1":
+        facts = getattr(run_pipeline, "_facts", None)  # Task 17 replaces with a real param
+        return _run_interpreted(vm, instruction, task_id, agents_md_text, facts)
 
     total_in = 0
     total_out = 0
