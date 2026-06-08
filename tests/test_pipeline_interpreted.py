@@ -96,6 +96,36 @@ def test_interpreted_verify_fail_then_learn_then_exhaust():
     assert m["outcome"] == "OUTCOME_NONE_CLARIFICATION"
 
 
+def test_interpreted_ignores_legacy_learned_rules(monkeypatch, tmp_path):
+    # _enabled autouse fixture already sets INTERPRETER_ENABLED + chdir + _LEARNED_DIR=tmp_path.
+    # Seed a legacy codegen-era rule for the task; confirm it never reaches the PLAN prompt.
+    import yaml as _yaml
+    from agent import learned_store
+
+    SENTINEL = "LEGACY_CODEGEN_BAKED_PATH_RULE_ZZZ"
+    (tmp_path / "t_iso.yaml").write_text(_yaml.safe_dump({
+        "entries": [{"id": "r1", "active": True, "status": "active", "content": SENTINEL}],
+        "last_run": {},
+    }))
+
+    captured = []
+
+    def _rec(system, user, *a, **kw):
+        captured.append(user)
+        # first call → INTENT, subsequent → PLAN
+        return _INTENT if len(captured) == 1 else _PLAN
+
+    vm = MagicMock()
+    vm.exec.return_value = {"stdout": "cnt\n5"}
+    with patch("agent.pipeline.call_llm_raw", side_effect=_rec):
+        run_pipeline(vm, instruction="x", task_id="t_iso", agents_md_text="A")
+
+    assert captured, "no LLM calls captured"
+    assert all(SENTINEL not in u for u in captured), (
+        "legacy codegen-era learned rule leaked into an IR PLAN prompt"
+    )
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader

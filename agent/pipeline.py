@@ -293,7 +293,12 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
     from .reason import IntentError, PlanError, run_intent, run_plan
     from .verify import verify
 
-    learn_ctx = load_entries(task_id)
+    # The IR PLAN LLM must not inherit codegen-era learned rules: they reference the
+    # old codegen surface (tool_plan/vm.answer/script/fidelity) and some bake literal
+    # paths/ids, which sabotages grounding under per-run re-seeding. Start clean; the
+    # interpreter self-corrects within a run via the per-cycle prev_error fed to run_plan
+    # (and any IR-distilled rules accumulate in-memory across this run's cycles).
+    learn_ctx: list = []
     total_in = total_out = 0
 
     def _accum(tk):
