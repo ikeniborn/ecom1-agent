@@ -99,7 +99,15 @@ Args are resolved: `$name` → env lookup; anything else → literal.
 **`answer`** — keyed by decision label. Each `AnswerTemplateIR`:
 - `message` — f-string-style template; `{slot}` resolves from env (same as `$slot`).
 - `outcome` — one of the `Outcome` enum values.
-- `refs` — grounding paths; use `$name` for runtime-bound paths.
+- `refs` — the concrete evidence the answer is grounded in. ALWAYS cite both:
+  (1) the runtime record path(s) the answer reports — use `$name` for runtime-bound
+  paths (e.g. a `$row.record_path` bound from discovery); and
+  (2) the documentation/policy file(s) the decision or reported value depends on —
+  the relevant `/docs/...` paths present in the pre-phase facts (`docs_inventory`,
+  `policies`). Graders reject an answer that omits the policy/doc basis it relied on.
+  When the answer rests on a documented rule, count, or procedure, add a read-only
+  `discovery` step that `Read`/`Find`s that `/docs/...` file and cite its exact path
+  in `refs`. Cite only paths that exist in the facts — never invent a path.
 
 **`custom_extract`** — named-parser escape hatch (H2). Dispatches to `PARSERS[name]`
 with `(text, params)` → `list[dict]`; result stored at `into`.
