@@ -1,163 +1,198 @@
-import re
-
-
 def run(vm, params):
-    def _get(obj, name, default=""):
-        v = getattr(obj, name, None)
-        if v is None and isinstance(obj, dict):
-            v = obj.get(name, None)
-        return default if v is None else v
+    import re
 
-    def _stdout(res):
-        return _get(res, "stdout", "") or ""
+    if not isinstance(params, dict):
+        params = {}
+    uploads_dir = params.get("uploads_dir", "/uploads/") or "/uploads/"
+    try:
+        threshold = float(params.get("threshold_eur", 1))
+    except Exception:
+        threshold = 1.0
 
-    def _list_entries(res):
-        for name in ("entries", "items", "files", "names"):
-            v = getattr(res, name, None)
-            if v is None and isinstance(res, dict):
-                v = res.get(name, None)
+    def canon(s):
+        s = s.upper()
+        m = {'O': '0', 'I': '1', 'S': '5', 'B': '8', 'Z': '2'}
+        return ''.join(m.get(c, c) for c in s)
+
+    def get_list(res, names):
+        for attr in names:
+            v = getattr(res, attr, None)
             if callable(v):
                 continue
             if isinstance(v, (list, tuple)):
                 return list(v)
+        if isinstance(res, dict):
+            for attr in names:
+                v = res.get(attr)
+                if isinstance(v, (list, tuple)):
+                    return list(v)
         return []
 
-    uploads_dir = params.get("uploads_dir", "/uploads")
+    def get_str(obj, names):
+        for attr in names:
+            v = getattr(obj, attr, None)
+            if isinstance(v, str) and v:
+                return v
+        if isinstance(obj, dict):
+            for attr in names:
+                v = obj.get(attr)
+                if isinstance(v, str) and v:
+                    return v
+        if isinstance(obj, str):
+            return obj
+        return ""
 
-    # --- discovery 1: List /uploads ---
+    # 1. DISCOVERY: List uploads dir
     uploads_listing = vm.list(path=uploads_dir)
-    entries = _list_entries(uploads_listing)
+    entries = get_list(uploads_listing, ["entries", "items", "files", "nodes", "children"])
+
+    candidates = []
+    for e in entries:
+        nm = get_str(e, ["name", "path"])
+        if not nm:
+            continue
+        kind = ""
+        kv = getattr(e, "kind", None)
+        if kv is None and isinstance(e, dict):
+            kv = e.get("kind")
+        if kv is not None:
+            kind = str(kv).upper()
+        full = nm if nm.startswith("/") else uploads_dir.rstrip("/") + "/" + nm
+        if "DIR" in kind or full.endswith("/"):
+            continue
+        candidates.append(full)
 
     receipt_path = None
-    for e in entries:
-        # entry may be a message with .path/.name/.kind or a plain string
-        if isinstance(e, str):
-            nm = e
-            kind = ""
-            pth = nm if nm.startswith("/") else uploads_dir.rstrip("/") + "/" + nm
-        else:
-            nm = _get(e, "name", "") or _get(e, "path", "")
-            kind = str(_get(e, "kind", ""))
-            pth = _get(e, "path", "") or (uploads_dir.rstrip("/") + "/" + nm)
-        base = nm.rsplit("/", 1)[-1]
-        is_file = ("FILE" in kind.upper()) or ("." in base)
-        if not is_file:
-            continue
-        if receipt_path is None:
-            receipt_path = pth
-        if "receipt" in base.lower():
-            receipt_path = pth
+    for c in candidates:
+        if "receipt" in c.lower():
+            receipt_path = c
             break
-
-    if receipt_path is None and entries:
-        e0 = entries[0]
-        if isinstance(e0, str):
-            receipt_path = e0 if e0.startswith("/") else uploads_dir.rstrip("/") + "/" + e0
-        else:
-            receipt_path = _get(e0, "path", "") or (uploads_dir.rstrip("/") + "/" + _get(e0, "name", ""))
+    if receipt_path is None:
+        for c in candidates:
+            if c.lower().endswith(".txt"):
+                receipt_path = c
+                break
+    if receipt_path is None and candidates:
+        receipt_path = candidates[0]
     if receipt_path is None:
         receipt_path = uploads_dir.rstrip("/") + "/receipt.txt"
 
-    # --- discovery 2: Read receipt ---
-    receipt = vm.read(path=receipt_path, number=True)
-    receipt_text = _get(receipt, "content", "") or _get(receipt, "text", "") or ""
+    # 2. DISCOVERY: Read receipt file (never the directory)
+    receipt_text = ""
+    try:
+        receipt = vm.read(path=receipt_path, number=False)
+        receipt_text = get_str(receipt, ["content", "text", "data", "stdout"])
+    except Exception:
+        receipt_text = ""
 
-    # --- parse line items: SKU, qty, old unit price (cents) ---
-    sku_re = re.compile(r"[A-Z0-9]+(?:-[A-Z0-9]+)+")
-    line_items = []  # (sku, qty, old_unit_cents)
-    seen = set()
+    def strip_lineno(line):
+        return re.sub(r'^\s*\d+\s*[:|\t]\s?', '', line)
+
+    subtotal = None
+    items = []
+    fallback_sum = 0.0
     for raw in receipt_text.splitlines():
-        line = re.sub(r"^\s*\d+\s*[|:]?\s*", "", raw)  # strip line-number prefix
-        m = sku_re.search(line)
-        if not m:
+        line = strip_lineno(raw)
+        compact = canon(re.sub(r'[^A-Za-z0-9]', '', line.upper()))
+        if 'SUBT0TAL' in compact:
+            nums = re.findall(r'\d+[.,]\d{2}', line)
+            if nums:
+                try:
+                    subtotal = float(nums[-1].replace(',', '.'))
+                except Exception:
+                    pass
             continue
-        sku = m.group(0)
-        rest = line[m.end():]
-        qm = re.search(r"(\d+)\s*[xX\u00d7]", rest)
-        qty = int(qm.group(1)) if qm else 1
-        prices = re.findall(r"\d+[.,]\d{2}", rest)
-        if not prices:
+        tokens = re.findall(r'[A-Za-z0-9][A-Za-z0-9\-/]{2,}', line)
+        sku = None
+        for t in tokens:
+            tu = t.upper()
+            has_alpha = any(ch.isalpha() for ch in tu)
+            has_digit = any(ch.isdigit() for ch in tu)
+            if (has_alpha and has_digit) or ('-' in tu and len(tu) >= 4):
+                sku = tu.strip('-/')
+                break
+        if not sku:
             continue
-        unit = prices[0].replace(",", ".")
-        old_unit_cents = int(round(float(unit) * 100))
-        key = (sku, qty, old_unit_cents)
-        if key in seen:
-            continue
-        seen.add(key)
-        line_items.append((sku, qty, old_unit_cents))
-
-    skus = sorted({li[0] for li in line_items})
-
-    def sql_lit(s):
-        return "'" + str(s).replace("'", "''") + "'"
-
-    # --- discovery 3: current prices from catalog ---
-    if skus:
-        in_list = ", ".join(sql_lit(s) for s in skus)
-        prices_sql = (
-            "SELECT product_sku, product_name, price_cents, price_currency "
-            "FROM product_variants WHERE product_sku IN (" + in_list + ");"
-        )
-    else:
-        prices_sql = (
-            "SELECT product_sku, product_name, price_cents, price_currency "
-            "FROM product_variants WHERE 1=0;"
-        )
-    current_prices = vm.exec(path="/bin/sql", args=[prices_sql], stdin=prices_sql)
-
-    # --- ops: comparison via inlined VALUES ---
-    old_total_cents = 0
-    new_total_cents = 0
-    diff_cents = 0
-    within = False
-    if line_items:
-        values = ", ".join(
-            "(" + sql_lit(sku) + ", " + str(qty) + ", " + str(oc) + ")"
-            for (sku, qty, oc) in line_items
-        )
-        comp_sql = (
-            "WITH receipt(product_sku, qty, old_unit_cents) AS (VALUES " + values + "), "
-            "today AS (SELECT r.product_sku, r.qty, r.old_unit_cents, "
-            "COALESCE(v.price_cents, 0) AS new_unit_cents "
-            "FROM receipt r LEFT JOIN product_variants v ON v.product_sku = r.product_sku) "
-            "SELECT SUM(qty*old_unit_cents) AS old_total_cents, "
-            "SUM(qty*new_unit_cents) AS new_total_cents, "
-            "SUM(qty*new_unit_cents) - SUM(qty*old_unit_cents) AS diff_cents, "
-            "CASE WHEN ABS(SUM(qty*new_unit_cents) - SUM(qty*old_unit_cents)) <= 100 "
-            "THEN 1 ELSE 0 END AS within_one_eur FROM today;"
-        )
-        comparison = vm.exec(path="/bin/sql", args=[comp_sql], stdin=comp_sql)
-        out = _stdout(comparison).strip()
-        rows = [ln for ln in out.splitlines() if ln.strip()]
-        data_row = rows[-1] if rows else ""
-        cells = [c.strip() for c in re.split(r"[|\t]", data_row) if c.strip() != ""]
-        nums = []
-        for c in cells:
+        qty = None
+        mx = re.search(r'(\d+)\s*[xX@]', line)
+        if mx:
             try:
-                nums.append(int(float(c)))
-            except ValueError:
+                qty = int(mx.group(1))
+            except Exception:
+                qty = None
+        if qty is None:
+            ml = re.match(r'\s*(\d{1,3})\b(?![\d.,])', line)
+            if ml:
+                try:
+                    qty = int(ml.group(1))
+                except Exception:
+                    qty = None
+        if qty is None:
+            qty = 1
+        items.append((sku, qty))
+        prices = re.findall(r'\d+[.,]\d{2}', line)
+        if prices:
+            try:
+                fallback_sum += float(prices[-1].replace(',', '.'))
+            except Exception:
                 pass
-        if len(nums) >= 4:
-            old_total_cents, new_total_cents, diff_cents, w = nums[0], nums[1], nums[2], nums[3]
-            within = bool(w)
-        elif len(nums) >= 3:
-            old_total_cents, new_total_cents, diff_cents = nums[0], nums[1], nums[2]
-            within = abs(diff_cents) <= 100
-    else:
-        comp_sql = "SELECT 0 AS old_total_cents, 0 AS new_total_cents, 0 AS diff_cents, 1 AS within_one_eur;"
-        comparison = vm.exec(path="/bin/sql", args=[comp_sql], stdin=comp_sql)
-        within = True
 
-    old_eur = old_total_cents / 100.0
-    new_eur = new_total_cents / 100.0
-    diff_eur = diff_cents / 100.0
-    token = "<YES>" if within else "<NO>"
+    # 3. DISCOVERY: query catalogue prices via /bin/sql
+    sql = "SELECT product_sku, record_path, price_cents FROM product_variants;"
+    catalogue_prices = vm.exec(path="/bin/sql", args=[sql], stdin=sql)
+    stdout = getattr(catalogue_prices, "stdout", "")
+    if not isinstance(stdout, str):
+        stdout = ""
+    if not stdout and isinstance(catalogue_prices, dict):
+        stdout = catalogue_prices.get("stdout", "") or ""
+
+    cat_exact = {}
+    cat_canon = {}
+    for row in stdout.splitlines():
+        row = row.strip()
+        if not row or '|' not in row:
+            continue
+        parts = [p.strip() for p in row.split('|')]
+        if len(parts) < 3:
+            continue
+        sku_v = parts[0]
+        if sku_v.lower() in ('product_sku', 'sku'):
+            continue
+        try:
+            pc = int(float(parts[2]))
+        except Exception:
+            continue
+        skuU = sku_v.upper()
+        cat_exact[skuU] = pc
+        cat_canon.setdefault(canon(skuU), pc)
+
+    today_cents = 0
+    for sku, qty in items:
+        skuU = sku.upper()
+        if skuU in cat_exact:
+            pc = cat_exact[skuU]
+        elif canon(skuU) in cat_canon:
+            pc = cat_canon[canon(skuU)]
+        else:
+            pc = 0
+        today_cents += qty * pc
+    today_ex = today_cents / 100.0
+
+    old_ex = subtotal if subtotal is not None else round(fallback_sum, 2)
+
+    today_ex_r = round(today_ex, 2)
+    old_ex_r = round(old_ex, 2)
+    diff_r = round(abs(today_ex - old_ex), 2)
+    within = diff_r <= threshold
+    tok = "<YES>" if within else "<NO>"
+
+    thr_disp = int(threshold) if float(threshold).is_integer() else threshold
 
     message = (
-        "Old receipt " + receipt_path + " total (excl VAT) = " + ("%.2f" % old_eur) + " EUR; "
-        "today's catalog total (excl VAT) = " + ("%.2f" % new_eur) + " EUR; "
-        "difference = " + ("%.2f" % diff_eur) + " EUR. Within 1 EUR: " + token + "."
+        "Old receipt ex-VAT subtotal = %s EUR; today's catalogue ex-VAT total "
+        "for the same items = %s EUR; diff = %s EUR (threshold %s EUR). %s"
+        % (old_ex_r, today_ex_r, diff_r, thr_disp, tok)
     )
 
-    refs = [receipt_path, "/proc/catalog"]
+    refs = [receipt_path] if receipt_path else []
     vm.answer(message=message, outcome="OUTCOME_OK", refs=refs)

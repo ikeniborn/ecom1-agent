@@ -108,6 +108,11 @@ Args are resolved: `$name` → env lookup; anything else → literal.
   When the answer rests on a documented rule, count, or procedure, add a read-only
   `discovery` step that `Read`/`Find`s that `/docs/...` file and cite its exact path
   in `refs`. Cite only paths that exist in the facts — never invent a path.
+  Record paths, document paths, and ids are RE-SEEDED every run: never reuse a path
+  remembered from a prior run, an example, or a learned rule. Resolve the correct
+  current path by matching the task's entities against THIS run's `docs_inventory` /
+  discovery output, and bind it at runtime (a `$ref`) rather than hard-coding a literal
+  whenever discovery can yield it.
 
 **`custom_extract`** — named-parser escape hatch (H2). Dispatches to `PARSERS[name]`
 with `(text, params)` → `list[dict]`; result stored at `into`.

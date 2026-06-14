@@ -69,7 +69,7 @@ def run_codegen(
     user_msg = "\n\n".join(parts)
 
     model = _resolve_model_for_phase("codegen", os.environ.get("MODEL", ""))
-    raw = _call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_CODEGEN, token_out=token_out)
+    raw = _call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_CODEGEN, token_out=token_out, phase="CODEGEN")
     if not raw:
         raise CodegenError("CODEGEN LLM returned empty response")
 

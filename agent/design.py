@@ -54,7 +54,7 @@ def run_design(
     user_msg = "\n\n".join(parts)
 
     model = _resolve_model_for_phase("design", os.environ.get("MODEL", ""))
-    raw = _call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_DESIGN, token_out=token_out)
+    raw = _call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_DESIGN, token_out=token_out, phase="DESIGN")
     if not raw:
         raise DesignError("DESIGN LLM returned empty response")
 

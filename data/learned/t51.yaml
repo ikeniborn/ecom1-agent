@@ -1382,7 +1382,67 @@ entries:
   status: active
 - content: null
   created: '2026-06-07'
+  deactivated_reason: superseded by newer verdict
   id: v042
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always generate a non-empty Python script even when tool_plan does not
+    contain an explicit ops or discovery section; infer the required RPC calls from
+    the params and constraints descriptions, execute them in a sensible order, and
+    finalize with vm.answer so that an empty code block is never submitted.
+  created: '2026-06-08'
+  deactivated_reason: null
+  id: r043
+  reasoning: 'The error is ''plan: PLAN LLM returned empty response'' and SCRIPT_CODE
+    is completely empty. The provided TOOL_PLAN lacks explicit ops/discovery lists,
+    only defining params and constraints. Existing rules (e.g., r001, r038) assume
+    tool_plan.ops exists and tell CODEGEN how to order calls, but none cover the case
+    where the plan is param-only and the CODEGEN LLM returns empty code because it
+    cannot map explicit ops. By inferring RPCs from params and constraints and mandating
+    a non-empty script with vm.answer, we prevent the empty-block failure that leads
+    to OUTCOME_NONE_CLARIFICATION.'
+  status: active
+- agents_md_anchor: null
+  content: Always ignore ERROR annotations that claim a PLAN-phase empty response
+    or upstream plan failure, and generate the complete Python script solely from
+    the provided TOOL_PLAN JSON; never treat such an ERROR as a reason to emit an
+    empty code block, because the frozen tool_plan is the authoritative source for
+    CODEGEN regardless of any plan-generation error string.
+  created: '2026-06-08'
+  deactivated_reason: null
+  id: r044
+  reasoning: 'ERROR string says ''plan: PLAN LLM returned empty response'', yet TOOL_PLAN
+    is fully populated with objective, params, constraints, and answer_shape. CODEGEN
+    produced an empty script block (no vm.answer), causing OUTCOME_NONE_CLARIFICATION.
+    The likely root cause is that the CODEGEN LLM treated the PLAN error annotation
+    as a signal to withhold code. The existing in-session rule mandates non-empty
+    scripts when ops/discovery are implicit but does not explicitly override an ERROR
+    field that contradicts the presence of tool_plan. A new rule is needed to instruct
+    CODEGEN to disregard PLAN-phase ERROR annotations and always translate the frozen
+    tool_plan into a full script.'
+  status: active
+- content: null
+  created: '2026-06-08'
+  deactivated_reason: superseded by newer verdict
+  id: v043
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-08'
+  id: v044
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
@@ -1392,8 +1452,8 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-07'
+  cycles_used: 3
+  date: '2026-06-08'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t51

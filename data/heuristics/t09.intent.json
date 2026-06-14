@@ -1,0 +1,47 @@
+{
+  "objective": "Report the count of catalogue products whose product kind is \"Nut Bolt and Washer\".",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "target_kind_name": "literal product kind name 'Nut Bolt and Washer'",
+    "kind_id": "lookup product_kinds.product_kind_id WHERE product_kind_name = 'Nut Bolt and Washer'",
+    "product_count": "count rows in product_variants WHERE product_kind_id = (SELECT product_kind_id FROM product_kinds WHERE product_kind_name = 'Nut Bolt and Washer')"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [
+    {
+      "anchor": "#Important things",
+      "rule": "When responding with reference - provide full path in the repo to the object.",
+      "security": false,
+      "deny_when": null
+    },
+    {
+      "anchor": "#Important tools",
+      "rule": "see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session.",
+      "security": false,
+      "deny_when": null
+    }
+  ],
+  "success_criteria": [
+    {
+      "op": "nonempty",
+      "lhs": "$kind_id",
+      "rhs": null,
+      "args": []
+    },
+    {
+      "op": "ge",
+      "lhs": "$product_count",
+      "rhs": 0,
+      "args": []
+    }
+  ],
+  "answer_shape": {
+    "msg_skeleton": "{product_count}",
+    "required_ref_kinds": [
+      "runtime"
+    ]
+  }
+}

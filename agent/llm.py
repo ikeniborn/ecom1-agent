@@ -537,20 +537,48 @@ def call_llm_raw(
     plain_text: bool = False,
     token_out: dict | None = None,
     logprobs: bool = False,
+    phase: str = "llm",
 ) -> str | None:
-    """Call LLM with MODEL_FALLBACK retry (FIX-417). Primary model through all tiers first."""
+    """Call LLM with MODEL_FALLBACK retry (FIX-417). Primary model through all tiers first.
+
+    Single funnel for every phase — if a TraceLogger is attached (per-task trace),
+    mirror the system prompt + user message + assistant reply into an `llm_call`
+    record so traces show the prompts sent and the model's response.
+    """
+    from .trace import current_cycle, get_trace
+
+    _tok = token_out if token_out is not None else {}
+    _t0 = time.monotonic()
     result = _call_raw_single_model(
         system, user_msg, model, cfg,
         max_tokens=max_tokens, think=think, max_retries=max_retries,
-        plain_text=plain_text, token_out=token_out, logprobs=logprobs,
+        plain_text=plain_text, token_out=_tok, logprobs=logprobs,
     )
     if result is None and _FALLBACK_MODEL and _FALLBACK_MODEL != model:
         print(f"[llm] Primary exhausted — retrying with MODEL_FALLBACK={_FALLBACK_MODEL}")
         result = _call_raw_single_model(
             system, user_msg, _FALLBACK_MODEL, {},
             max_tokens=max_tokens, think=think, max_retries=1,
-            plain_text=plain_text, token_out=token_out, logprobs=logprobs,
+            plain_text=plain_text, token_out=_tok, logprobs=logprobs,
         )
+
+    _tr = get_trace()
+    if _tr is not None:
+        try:
+            _tr.log_llm_call(
+                phase=phase,
+                cycle=current_cycle(),
+                system=system,
+                user_msg=user_msg,
+                raw_response=result or "",
+                parsed_output=None,
+                tokens_in=_tok.get("input", 0),
+                tokens_out=_tok.get("output", 0),
+                duration_ms=int((time.monotonic() - _t0) * 1000),
+            )
+        except Exception:
+            pass
+
     return result
 
 

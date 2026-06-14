@@ -18,6 +18,15 @@ def set_trace(logger: "TraceLogger | None") -> None:
     _tl.logger = logger
 
 
+def set_cycle(n: int) -> None:
+    """Record the active pipeline cycle so funnel-logged llm_call records are tagged."""
+    _tl.cycle = n
+
+
+def current_cycle() -> int:
+    return getattr(_tl, "cycle", 0)
+
+
 class TraceLogger:
     def __init__(self, path: Path, task_id: str) -> None:
         self._fh = path.open("w", buffering=1, encoding="utf-8")
@@ -71,7 +80,7 @@ class TraceLogger:
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
             "duration_ms": duration_ms,
-            "success": parsed_output is not None,
+            "success": parsed_output is not None or bool(raw_response),
         })
 
     def log_gate_check(

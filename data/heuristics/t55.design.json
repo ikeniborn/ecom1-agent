@@ -1,0 +1,56 @@
+{
+  "intent": "List /proc/incoming/payments, identify the most recent transaction file, read it, and return all of its details with the file path cited.",
+  "params": {
+    "incoming_dir": "/proc/incoming/payments"
+  },
+  "success_criteria": [
+    "The incoming payments directory is listed (not read directly) to enumerate its transaction files",
+    "The last/most-recent transaction file is selected (by name ordering or by latest timestamp inside the records)",
+    "All fields of that transaction record are returned",
+    "refs cites the exact file path of the selected last transaction"
+  ],
+  "discovery": [
+    {
+      "rpc": "Stat",
+      "args": {
+        "path": "/proc/incoming/payments"
+      },
+      "bind": "dir_stat"
+    },
+    {
+      "rpc": "List",
+      "args": {
+        "path": "/proc/incoming/payments"
+      },
+      "bind": "listing"
+    }
+  ],
+  "ops": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "$last_file",
+        "number": true
+      },
+      "bind": "last_txn"
+    }
+  ],
+  "agents_md_constraints": [
+    {
+      "anchor": "#important-things > references",
+      "rule": "When responding with reference - provide full path in the repo to the object."
+    },
+    {
+      "anchor": "#founding-principles > paths",
+      "rule": "All paths are / rooted (pass as such to tools and OS ops)."
+    }
+  ],
+  "answer_template": {
+    "message": "Last transaction in /proc/incoming/payments: {last_file}. Details: {last_txn}.",
+    "outcome": "OUTCOME_OK",
+    "refs": [
+      "$last_file"
+    ]
+  },
+  "outcome_override": null
+}

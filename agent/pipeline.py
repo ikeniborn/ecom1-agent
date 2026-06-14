@@ -20,6 +20,7 @@ from .models import DesignOutput, LearnConsolidateOutput, TestSpec
 from .prompt import load_prompt
 from .sql_security import check_retry_loop  # noqa: F401  (retained for backward import compat)
 from .testgen import TestGenError, run_test_gen
+from .trace import set_cycle
 from .test_runner import run_tests
 
 _MAX_STEPS = int(os.environ.get("MAX_STEPS", "3"))
@@ -190,7 +191,7 @@ def _learn_consolidate_text(
     )
 
     model = _resolve_model_for_phase("learn", os.environ.get("MODEL", ""))
-    raw = call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_LEARN, token_out=token_out)
+    raw = call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_LEARN, token_out=token_out, phase="LEARN")
     if not raw:
         print(f"{CLI_YELLOW}[pipeline] LEARN: empty response, skipping{CLI_CLR}")
         return
@@ -330,6 +331,7 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
     last_error = None
     cycle = 0
     for cycle in range(1, _MAX_STEPS + 1):
+        set_cycle(cycle)
         print(f"{CLI_BLUE}[pipeline] interpreted cycle {cycle}/{_MAX_STEPS}{CLI_CLR}")
         tk = {}
         plan = None
@@ -469,7 +471,7 @@ def _compact_learn_ctx(
     user_msg = "\n".join(_format_entry(e) for e in older)
 
     model = _resolve_model_for_phase("learn", os.environ.get("MODEL", ""))
-    raw = call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_LEARN, token_out=token_out)
+    raw = call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_LEARN, token_out=token_out, phase="COMPACTION")
     summary = (raw or "").strip()
     if not summary:
         print(f"{CLI_YELLOW}[pipeline] compaction: empty response, keeping full ctx{CLI_CLR}")
@@ -975,6 +977,7 @@ def run_pipeline(
     test_fail_streak = 0
 
     for cycle in range(1, _MAX_STEPS + 1):
+        set_cycle(cycle)
         print(f"{CLI_BLUE}[pipeline] cycle {cycle}/{_MAX_STEPS}{CLI_CLR}")
 
         try:

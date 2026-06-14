@@ -180,12 +180,13 @@ entries:
   - /docs/security.md
 - content: null
   created: '2026-06-06'
+  deactivated_reason: superseded by newer verdict
   id: v004
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Checked identity (user=cust_069, customer=cust_069) against
     payment pay_018 for basket_218 (3ds_status=3ds-status2, attempts 2/3). Per /docs/security.md
     and /docs/payments/3ds.md: 3DS recovery ineligible (non-recoverable failure reason
@@ -196,9 +197,40 @@ entries:
   - /docs/payments/3ds.md
   - /proc/payments/pay_018.json
   - /proc/baskets/basket_218.json
+- agents_md_anchor: null
+  content: Always translate a frozen TOOL_PLAN JSON directly into a complete executable
+    Python script by mapping each security constraint to an explicit guard clause
+    that branches to the denial outcome, emitting every discovery and ops RPC unconditionally,
+    and verifying success criteria before answering; never emit an empty script block
+    when the TOOL_PLAN is present and non-empty.
+  created: '2026-06-08'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'The error ''plan: PLAN LLM returned empty response'' resulted in an
+    empty SCRIPT_CODE block and verdict OUTCOME_NONE_UNSUPPORTED instead of OUTCOME_OK.
+    The root cause is that CODEGEN failed to turn the provided TOOL_PLAN into any
+    executable statements. The frozen TOOL_PLAN already contains all required structure—objective,
+    params, constraints with deny_when checks, success criteria, and answer_shape—so
+    CODEGEN must render these directly into Python without waiting for an intermediate
+    natural-language plan. Specifically, the script should begin with the required
+    /bin/id discovery, evaluate each security guard, perform SQL lookups, invoke the
+    payments tool, and call vm.answer. Returning an empty block skips every RPC and
+    guard, guaranteeing failure.'
+  status: active
+- content: null
+  created: '2026-06-08'
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-06'
-  outcome: OUTCOME_NONE_UNSUPPORTED
+  cycles_used: 3
+  date: '2026-06-08'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t27
