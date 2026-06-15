@@ -345,3 +345,30 @@ def diagram2() -> Diagram:
         Edge("d2-learn", "d2-codegen", dashed=True, label="next cycle"),
     ]
     return Diagram("Diagram 2 — Pipeline loop + gates (legacy, default branch)", rows, edges)
+
+
+def diagram3() -> Diagram:
+    """INTERPRETER_ENABLED branch: INTENT/PLAN -> lint -> deterministic interpret."""
+    rows = [
+        [Node("d3-deepread", "prephase facts + deep_read", "gate")],
+        [Node("d3-intent", "run_intent (LLM -> IntentSpec)", "llm")],
+        [Node("d3-plan", "run_plan (LLM -> PlanIR)", "llm")],
+        [Node("d3-planir", "ir_models.PlanIR", "gate")],
+        [Node("d3-lint", "lint_security_first", "gate")],
+        [Node("d3-interpret", "interpret() — no LLM in loop", "gate")],
+        [Node("d3-captured", "CapturedAnswer", "gate")],
+        [Node("d3-ok", "OUTCOME_OK", "terminal"),
+         Node("d3-clar", "OUTCOME_NONE_CLARIFICATION", "terminal")],
+    ]
+    edges = [
+        Edge("d3-deepread", "d3-intent"),
+        Edge("d3-intent", "d3-plan"),
+        Edge("d3-plan", "d3-planir"),
+        Edge("d3-planir", "d3-lint"),
+        Edge("d3-lint", "d3-interpret"),
+        Edge("d3-interpret", "d3-captured"),
+        Edge("d3-captured", "d3-ok"),
+        Edge("d3-captured", "d3-clar"),
+        Edge("d3-interpret", "d3-plan", dashed=True, label="re-plan next cycle"),
+    ]
+    return Diagram("Diagram 3 — Deterministic interpreter (INTERPRETER_ENABLED)", rows, edges)

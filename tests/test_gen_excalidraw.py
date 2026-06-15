@@ -180,3 +180,16 @@ def test_diagram2_structure():
     assert len(terminals) >= 3
     # LEARN feedback edges are dashed
     assert any(e.dashed and e.dst == "d2-learn" for e in d.edges)
+
+
+def test_diagram3_structure():
+    d = gx.diagram3()
+    assert "interpreter" in d.name.lower()
+    ids = {n.id for row in d.rows for n in row}
+    for e in d.edges:
+        assert e.src in ids and e.dst in ids
+    # Plan-IR path landmarks
+    assert {"d3-planir", "d3-lint", "d3-interpret", "d3-captured"} <= ids
+    # no free-form CODEGEN retry loop: interpret is a deterministic (grey) gate
+    kinds = {n.id: n.kind for row in d.rows for n in row}
+    assert kinds["d3-interpret"] == "gate"
