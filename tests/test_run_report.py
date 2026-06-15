@@ -43,3 +43,52 @@ def test_normalize_error_key():
     # no-op on a clean grader line (comma preserved, deterministic)
     assert rr.normalize_error_key("expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION") == \
            "expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION"
+
+
+def test_parse_run_results_cycles_and_error_dedup(tmp_path):
+    run_dir = tmp_path / "20260615_120000_m"
+    run_dir.mkdir()
+    # t01: clean OK, 2 cycles, no score_detail
+    _write(run_dir / "t01.jsonl", [
+        {"type": "header", "task_text": "do x", "task_id": "t01"},
+        {"type": "task_result", "outcome": "OUTCOME_OK", "cycles_used": 2,
+         "score_detail": [], "task_id": "t01"},
+    ])
+    # t02: CLARIFY, 3 cycles, two score_detail lines that normalize to ONE key
+    _write(run_dir / "t02.jsonl", [
+        {"type": "header", "task_text": "do y", "task_id": "t02"},
+        {"type": "task_result", "outcome": "OUTCOME_NONE_CLARIFICATION", "cycles_used": 3,
+         "score_detail": [
+             "answer missing required reference '/proc/a.json'",
+             "answer missing required reference '/proc/b.json'",   # dup category
+             "expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION",
+         ], "task_id": "t02"},
+    ])
+    # t03: interrupted — header + llm_call only, no task_result/answer
+    _write(run_dir / "t03.jsonl", [
+        {"type": "header", "task_text": "do z", "task_id": "t03"},
+        {"type": "llm_call", "phase": "CODEGEN", "cycle": 1, "task_id": "t03"},
+    ])
+
+    run = rr.discover_runs(tmp_path)[0]
+    cells = rr.parse_run(run)
+
+    assert cells["t01"].status == "OK" and cells["t01"].cycles == 2
+    assert cells["t02"].status == "CLARIFY" and cells["t02"].cycles == 3
+    assert cells["t03"].status == "INCOMPLETE"
+    assert len(rr.cell_error_keys(cells["t02"])) == 2   # dedup'd to 2 distinct keys
+    assert rr.cell_error_keys(cells["t01"]) == set()
+
+
+def test_parse_run_picks_latest_training_cycle(tmp_path):
+    run_dir = tmp_path / "20260615_120000_m"
+    run_dir.mkdir()
+    _write(run_dir / "t01.jsonl", [
+        {"type": "task_result", "outcome": "OUTCOME_NONE_CLARIFICATION",
+         "cycles_used": 1, "score_detail": [], "task_id": "t01"}])
+    _write(run_dir / "t01.c2.jsonl", [
+        {"type": "task_result", "outcome": "OUTCOME_OK",
+         "cycles_used": 1, "score_detail": [], "task_id": "t01"}])
+
+    cells = rr.parse_run(rr.discover_runs(tmp_path)[0])
+    assert cells["t01"].status == "OK"   # c2 (latest cycle) wins

@@ -66,3 +66,64 @@ def normalize_error_key(raw: str) -> str:
     s = _DIGITS.sub("", s)                                   # (4)
     s = " ".join(s.split())                                  # (5)
     return s
+
+
+@dataclass
+class TaskCell:
+    task_id: str
+    status: str
+    cycles: "int | None"
+    errors: list
+
+
+_TASK_FILE_RE = re.compile(r"^(t\d+)(?:\.c(\d+))?$")
+
+
+def _task_id_and_cycle(name: str) -> "tuple[str, int]":
+    base = name[:-len(".jsonl")]
+    m = _TASK_FILE_RE.match(base)
+    if not m:
+        return base, 1
+    return m.group(1), int(m.group(2) or 1)
+
+
+def _parse_task_file(task_id: str, path: Path) -> TaskCell:
+    records = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    tr = next((r for r in reversed(records) if r.get("type") == "task_result"), None)
+    ans = next((r for r in reversed(records) if r.get("type") == "answer"), None)
+
+    if tr is not None:
+        outcome = tr.get("outcome") or ""
+        cycles = tr.get("cycles_used")
+        errors = list(tr.get("score_detail") or [])
+    elif ans is not None:
+        outcome = ans.get("outcome") or ""
+        cycles = ans.get("cycle")
+        errors = []
+    else:
+        outcome, cycles, errors = "", None, []
+
+    if tr is not None or ans is not None:
+        status = "OK" if outcome == "OUTCOME_OK" else "CLARIFY"
+    else:
+        status = "INCOMPLETE"
+
+    if not cycles:
+        seen = [r["cycle"] for r in records if isinstance(r.get("cycle"), int)]
+        cycles = max(seen) if seen else None
+
+    return TaskCell(task_id=task_id, status=status, cycles=cycles, errors=errors)
+
+
+def parse_run(run: Run) -> "dict[str, TaskCell]":
+    latest: "dict[str, tuple[Path, int]]" = {}
+    for p in sorted(run.dir.glob("t*.jsonl")):
+        tid, cyc = _task_id_and_cycle(p.name)
+        cur = latest.get(tid)
+        if cur is None or cyc >= cur[1]:
+            latest[tid] = (p, cyc)
+    return {tid: _parse_task_file(tid, p) for tid, (p, _) in latest.items()}
+
+
+def cell_error_keys(cell: TaskCell) -> set:
+    return {k for k in (normalize_error_key(e) for e in cell.errors) if k}
