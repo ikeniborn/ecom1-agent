@@ -251,7 +251,13 @@ def _shapes_by_frame(doc):
 
 
 def _gap(a, b):
-    """Minimum axis gap between two non-overlapping boxes (0 if they touch/overlap)."""
+    """Separation gap between two non-overlapping boxes.
+
+    Returns the positive separation on whichever axis the boxes are apart on:
+    for coaxial pairs the shared axis is negative overlap, so max() picks the
+    real gap; for diagonal pairs it returns the larger axis separation. Only
+    meaningful after _overlap(a, b) is False.
+    """
     ax0, ay0, ax1, ay1 = _bbox(a)
     bx0, by0, bx1, by1 = _bbox(b)
     dx = max(bx0 - ax1, ax0 - bx1)   # >0 if separated on x
@@ -261,7 +267,10 @@ def _gap(a, b):
 
 def test_layout_no_overlap_and_min_gap_within_frame():
     doc = gx.assemble()
-    for fid, shapes in _shapes_by_frame(doc).items():
+    by_frame = _shapes_by_frame(doc)
+    # guard against vacuous pass if frameId propagation ever regresses
+    assert len(by_frame) == 5 and all(len(v) >= 2 for v in by_frame.values())
+    for fid, shapes in by_frame.items():
         for i in range(len(shapes)):
             for j in range(i + 1, len(shapes)):
                 a, b = shapes[i], shapes[j]
@@ -279,7 +288,9 @@ def test_layout_everything_grid_snapped():
 def test_layout_nodes_inside_their_frame():
     doc = gx.assemble()
     frames = {e["id"]: e for e in doc["elements"] if e["type"] == "frame"}
-    for fid, shapes in _shapes_by_frame(doc).items():
+    by_frame = _shapes_by_frame(doc)
+    assert len(by_frame) == 5 and all(len(v) >= 2 for v in by_frame.values())
+    for fid, shapes in by_frame.items():
         fx0, fy0, fx1, fy1 = _bbox(frames[fid])
         for s in shapes:
             sx0, sy0, sx1, sy1 = _bbox(s)
@@ -296,10 +307,14 @@ def test_layout_arrows_do_not_cross_frames_unless_labeled():
     for e in doc["elements"]:
         if e["type"] == "text" and e.get("containerId", "").startswith("e-"):
             labeled.add(e["containerId"])
-    for e in doc["elements"]:
-        if e["type"] != "arrow":
+    # the label-detection must actually find the known labeled edges, and there
+    # must be arrows to check — otherwise this test would pass vacuously
+    assert labeled, "expected at least one labeled (containerId 'e-*') edge"
+    arrows = [e for e in doc["elements"] if e["type"] == "arrow"]
+    assert arrows, "expected arrows in the assembled doc"
+    for e in arrows:
+        sb, eb = e.get("startBinding"), e.get("endBinding")
+        if not sb or not eb:
             continue
-        sf = shape_frame.get(e["startBinding"]["elementId"])
-        ef = shape_frame.get(e["endBinding"]["elementId"])
-        if sf != ef:
+        if shape_frame.get(sb["elementId"]) != shape_frame.get(eb["elementId"]):
             assert e["id"] in labeled, f"unlabeled cross-frame arrow {e['id']}"
