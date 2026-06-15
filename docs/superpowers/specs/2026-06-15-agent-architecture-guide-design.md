@@ -1,3 +1,27 @@
+---
+review:
+  spec_hash: efdb8ce5d2e45fc4
+  last_run: 2026-06-15
+  phases:
+    structure:    { status: passed }
+    coverage:     { status: passed }
+    clarity:      { status: passed }
+    consistency:  { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: INFO
+      section: Production approach
+      section_hash: 76a2a7b229458a8f
+      text: >-
+        Layout quality ("красиво" / "clean") has no measurable DoD. Inherently
+        subjective; structural validity is covered by the Verification section.
+      verdict: fixed
+      verdict_at: 2026-06-15
+chain:
+  intent: null
+---
+
 # Agent Architecture Guide — Design Spec
 
 **Date:** 2026-06-15
@@ -29,7 +53,8 @@ math and arrow bindings so layout stays clean and reproducible.
 
 Hand-author the `.excalidraw` JSON via a Python generator script (`tools/gen_excalidraw.py`).
 
-Rationale: full control over layout ("красиво"), deterministic output, no browser/node
+Rationale: full control over layout (against the measurable layout rules in the
+Verification section), deterministic output, no browser/node
 tooling (the project avoids browser tools), and the resulting file remains editable in
 excalidraw.app afterward. Rejected alternatives: `@excalidraw/mermaid-to-excalidraw`
 (needs node/jsdom, rougher auto-layout, less control) and mermaid-in-markdown-only
@@ -102,3 +127,8 @@ Tone: dense, reference-style; technical terms used without expansion.
   (schema check: `type`, `version`, `elements[]` with unique ids, valid arrow bindings).
 - Every `file:line` reference in the Markdown guide resolves to a real location at write time.
 - All four diagrams + legend are present on the canvas.
+- Layout quality is measurable (not subjective):
+  - no two element bounding boxes overlap within a frame;
+  - adjacent boxes keep a gap of at least 40px and snap to a shared grid step;
+  - every diagram's elements fit inside their frame (no element extends past frame bounds);
+  - an arrow crosses a frame boundary only when it is an explicitly labeled cross-diagram reference.
