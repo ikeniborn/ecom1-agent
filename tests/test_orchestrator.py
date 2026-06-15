@@ -182,10 +182,37 @@ def test_search_paths_empty_on_no_matches():
     assert _search_paths({"matches": []}) == []
 
 
-def test_proc_candidates_maps_prefix_to_plural_dir():
-    assert _proc_candidates("store_S001") == ["/proc/stores/store_S001.json"]
-    assert _proc_candidates("basket_069") == ["/proc/baskets/basket_069.json"]
-    assert _proc_candidates("unknown_xx") == []   # unmapped prefix -> no probe
+def test_proc_candidates_uses_discovered_subdirs_no_static_map():
+    # subdirs are LISTED from /proc, not mapped by a frozen singular->plural dict.
+    subdirs = ["stores", "baskets", "incoming"]
+    assert _proc_candidates(subdirs, "store_S001") == ["/proc/stores/store_S001.json"]
+    assert _proc_candidates(subdirs, "basket_069") == ["/proc/baskets/basket_069.json"]
+    assert _proc_candidates(subdirs, "unknown_xx") == []   # no matching subdir -> no probe
+
+
+def test_gather_target_records_matches_discovered_subdir():
+    import agent.orchestrator as orch
+    from bitgn.vm.ecom.ecom_pb2 import NodeKind
+    vm = MagicMock()
+    vm.exec.return_value = _NS(stdout="", stderr="", exit_code=0)
+    vm.search.return_value = _NS(matches=[])
+    vm.tree.side_effect = RuntimeError("no docs")
+    vm.stat.return_value = _NS(kind=NodeKind.NODE_KIND_UNSPECIFIED)
+
+    def _list(path=None):
+        if path == "/proc":
+            return _NS(entries=[_NS(path="/proc/baskets"), _NS(path="/proc/payments")])
+        return _NS(entries=[])
+    vm.list.side_effect = _list
+
+    def _read(path=None):
+        if path == "/proc/baskets/basket_069.json":
+            return _NS(content='{"id":"basket_069"}')
+        return _NS(content="")
+    vm.read.side_effect = _read
+
+    facts = orch.gather_prephase_facts(vm, instruction="approve basket_069", agents_md_text="")
+    assert "/proc/baskets/basket_069.json" in facts.target_records
 
 
 from agent.orchestrator import gather_prephase_facts, PrePhaseFacts
@@ -203,6 +230,13 @@ def test_gather_prephase_facts_collects_identity_and_target_record():
     vm.exec.side_effect = _exec
     vm.read.return_value = {"content": "POLICY TEXT"}
     vm.tree.return_value = {"stdout": "/docs\n/docs/security.md"}
+
+    def _list(path=None):
+        if path == "/proc":
+            return _NS(entries=[_NS(path="/proc/baskets")])
+        return _NS(entries=[])
+    vm.list.side_effect = _list
+
     facts = gather_prephase_facts(vm, instruction="approve basket_069", agents_md_text="RULES")
     assert isinstance(facts, PrePhaseFacts)
     assert facts.identity and "emp_42" in str(facts.identity)

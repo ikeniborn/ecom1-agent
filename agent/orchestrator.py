@@ -222,15 +222,9 @@ class PrePhaseFacts(BaseModel):
 
 
 _ID_SPLIT_RE = re.compile(r"[\s,]+")
-# P3 (S1-R6): widen record discovery beyond baskets/payments.
-_RECORD_ID_RE = re.compile(
-    r"\b(basket|payment|return|order|store|employee|product)_\w+\b", re.IGNORECASE
-)
-_PROC_DIR = {
-    "basket": "baskets", "payment": "payments", "return": "returns",
-    "order": "orders", "store": "stores", "employee": "employees",
-    "product": "products",
-}
+# Structural id-shape only (H1): <prefix>_<rest>. The /proc listing + DDL decide
+# which prefixes are real — no entity-prefix allowlist, no singular->plural map.
+_RECORD_ID_RE = re.compile(r"\b([A-Za-z]+)_\w+\b")
 _QUOTED_RE = re.compile(r'"([^"]+)"')
 # Two or more Capitalized words in a row (hyphens kept: "Non-Bladed Workshop").
 _CAP_SEQ_RE = re.compile(r"\b([A-Z][\w-]*(?:\s+[A-Z][\w-]*)+)\b")
@@ -289,11 +283,16 @@ def _search_paths(resp) -> list[str]:
     return out
 
 
-def _proc_candidates(record_id: str) -> list[str]:
-    """Map `<prefix>_<id>` to its `/proc/<plural>/<id>.json` probe path(s)."""
+def _proc_candidates(proc_subdirs: list[str], record_id: str) -> list[str]:
+    """`/proc/<subdir>/<id>.json` for each DISCOVERED subdir matching the id prefix.
+
+    Plural/dir is discovered (`_list_entries(vm, "/proc")`), never a static map.
+    `name.startswith(prefix)` catches singular->plural (payment -> payments); a
+    spurious match is harmless — the caller reads the file and keeps it only if non-empty.
+    """
     prefix = record_id.split("_", 1)[0].lower()
-    plural = _PROC_DIR.get(prefix)
-    return [f"/proc/{plural}/{record_id}.json"] if plural else []
+    return [f"/proc/{name}/{record_id}.json"
+            for name in proc_subdirs if name.startswith(prefix)]
 
 
 def _extract_text(r, attr: str) -> str:
@@ -442,17 +441,23 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhase
         if picked and policies:
             status["policies"] = "ok"
 
-    # target_records (P3 wider — S1-R6)
+    # target_records (H1 — VM-discovered subdirs; no static prefix list / plural map)
     target_records: dict[str, str] = {}
+    proc_subdirs = [d.rstrip("/").rsplit("/", 1)[-1].lower()
+                    for d in _list_entries(vm, "/proc")]
     seen_ids: list[str] = []
     for m in _RECORD_ID_RE.finditer(instruction or ""):
         full = m.group(0)
+        prefix = full.split("_", 1)[0].lower()
+        # structural id-shape; the /proc listing decides which prefixes are real
+        if not any(name.startswith(prefix) for name in proc_subdirs):
+            continue
         if full in seen_ids:
             continue
         seen_ids.append(full)
         if len(seen_ids) > _RECORD_CAP:
             break
-        for proc in _proc_candidates(full):
+        for proc in _proc_candidates(proc_subdirs, full):
             try:
                 txt = _extract_text(vm.read(path=proc), "content")
                 if txt:
