@@ -1,3 +1,25 @@
+---
+review:
+  spec_hash: 3aa6ff401a40a7e0
+  last_run: 2026-06-15
+  phases:
+    structure:   { status: passed }
+    coverage:    { status: passed }
+    clarity:     { status: passed }
+    consistency: { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: WARNING
+      section: "1.2 / 1.3"
+      section_hash: 9c746827215c348c
+      text: "Numeric constants (literal-path cap, sample LIMIT, byte-budget) lack explicit default values / DoD. Intentionally deferred per the 'no magic N' principle, but a reader cannot verify a concrete acceptance criterion from the spec body."
+      verdict: fixed
+      verdict_at: 2026-06-15
+chain:
+  intent: null
+---
+
 # Pre-phase / loop / security hardening — design (2026-06-15)
 
 Branch `heuristics`. Closes the gaps left open after Approach A (S1/S2 series) and
@@ -258,6 +280,29 @@ Integration:
 - `scripts/probe_t55_refs.py` as in D4.
 - Existing suite stays green (note: `test_t09_replay_matches_known_good` is a known
   pre-existing stale-fixture red, not a regression).
+
+## Constants & budgets
+
+All numeric knobs have a default and an env override (`PREPHASE_*`); none is a
+load-bearing magic number — behavior is gated by relevance + LEARN (see "Design
+principle" and `prephase_deep_read`). Defaults:
+
+| Constant | Default | Env | Role |
+|---|---|---|---|
+| `_PATH_LITERAL_CAP` | 3 | `PREPHASE_PATH_LITERALS` | max literal `/proc` paths probed per instruction |
+| `_PATH_LISTING_BUDGET` | 4096 (bytes) | `PREPHASE_LISTING_BYTES` | byte cap on a rendered dir listing; overflow → `… +N skipped` |
+| `_SAMPLE_ROWS_PER_TABLE` | 3 | `PREPHASE_SAMPLE_ROWS` | `LIMIT` per sampled table |
+| `_SAMPLE_ROW_MAX_CHARS` | 400 | `PREPHASE_SAMPLE_ROW_CHARS` | per-row byte cap (safety rail) |
+| `_INTERPRETER_MAX_STEPS` | 6 | `INTERPRETER_MAX_STEPS` | interpreter cycle ceiling (R5) |
+
+Table names + DDL: uncapped (Tier-1). `_SAMPLE_TABLES_MAX` is removed; the sampled
+**set** = relevance (table name / entity token present in the instruction, ∪ FK-adjacent
+one hop) ∪ learned `prephase_deep_read[tid]`. When relevance yields nothing, pre-phase
+stays metadata-only and logs the omission (no silent truncation).
+
+DoD: each constant is read via `os.environ.get(...)` with the default above; a unit
+test asserts both the default and one override per constant; every overflow path emits
+the documented skip marker.
 
 ## Validation gate (findings §7.7)
 
