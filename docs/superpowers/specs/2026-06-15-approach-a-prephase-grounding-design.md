@@ -1,6 +1,6 @@
 ---
 review:
-  spec_hash: 0d9ba390c2b7a1c2
+  spec_hash: ea9e2096f04da0cd
   last_run: 2026-06-15
   phases:
     structure:   { status: passed }
@@ -198,9 +198,12 @@ Approach A целит корень (под-граундленный acceptance),
 | Файл | Slice | Изменение |
 |------|-------|-----------|
 | `agent/orchestrator.py` | 1 | `_discover_docs`, `_extract_entity_tokens`, policies Search, gather_status, P3, P4 |
+| `agent/reason.py` | 1 | `_facts_block` surfaces `gather_status` (S1-R5) |
 | `agent/pipeline.py` | 1 | P7: facts в legacy DESIGN |
 | `agent/ir_models.py` | 2 | `RefSpec`, `IntentSpec.required_refs`, drop `required_ref_kinds` |
 | `data/prompts/intent.md` | 2 | required_refs per-outcome; structural success_criteria |
 | `data/prompts/plan.md` | 2 | drop PLAN-authored refs; read rule from policies |
 | `agent/interpreter.py` | 2 | ref-projection; refuse-invariant |
 | `agent/verify.py` | 2 | I1 rewrite; delete /docs heuristic |
+| `tests/replay/conftest.py` | 2 | `run_plan` derives `required_refs` from golden plan — parity shim (refs now projected from INTENT, not authored in plan JSON) |
+| `tests/` (unit) | 1,2 | migrate IntentSpec constructions off `required_ref_kinds`; new pre-phase + `RefSpec` + ref-projection tests |
