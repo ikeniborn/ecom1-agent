@@ -188,3 +188,54 @@ def _frame(fid: str, x: float, y: float, w: float, h: float, name: str) -> dict:
     f = _base(fid, "frame", x, y, w, h, None)
     f["name"] = name
     return f
+
+
+@dataclass
+class Diagram:
+    name: str
+    rows: list[list[Node]]
+    edges: list[Edge] = field(default_factory=list)
+
+
+def render_diagram(d: Diagram, origin_y: float, frame_id: str) -> tuple[list[dict], float]:
+    """Place rows top->down, wrap them in a frame, wire edges.
+
+    Returns (elements, frame_bottom_y). Frame element is first in the list so it
+    renders behind its children. The frame box is derived from the actual placed
+    node extents + FRAME_PAD, guaranteeing every node fits inside the frame.
+    """
+    shapes: list[dict] = []
+    texts: list[dict] = []
+    by_id: dict[str, dict] = {}
+
+    row_w = [sum(_node_size(n.kind)[0] for n in r) + COL_GAP * (len(r) - 1)
+             for r in d.rows]
+    content_w = max(row_w) if row_w else NODE_W
+
+    y = snap(origin_y + FRAME_PAD + TITLE_BAND)
+    for ri, row in enumerate(d.rows):
+        row_h = max(_node_size(n.kind)[1] for n in row)
+        x = FRAME_X + FRAME_PAD + (content_w - row_w[ri]) / 2
+        for n in row:
+            w, h = _node_size(n.kind)
+            shape, text = make_node(n, x, y + (row_h - h) / 2, frame_id)
+            shapes.append(shape)
+            texts.append(text)
+            by_id[n.id] = shape
+            x += w + COL_GAP
+        y = snap(y + row_h + ROW_GAP)
+
+    minx = min(s["x"] for s in shapes)
+    maxr = max(s["x"] + s["width"] for s in shapes)
+    maxb = max(s["y"] + s["height"] for s in shapes)
+    fx = snap(minx - FRAME_PAD)
+    fy = snap(origin_y)
+    fw = snap(maxr + FRAME_PAD - fx)
+    fh = snap(maxb + FRAME_PAD - fy)
+    frame = _frame(frame_id, fx, fy, fw, fh, d.name)
+
+    edges: list[dict] = []
+    for e in d.edges:
+        edges += make_arrow(by_id[e.src], by_id[e.dst], e.dashed, e.label)
+
+    return [frame, *shapes, *texts, *edges], fy + fh

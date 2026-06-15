@@ -83,3 +83,41 @@ def test_frame_builder():
     assert f["type"] == "frame"
     assert f["name"] == "Diagram 1 — x"
     assert f.get("frameId") is None
+
+
+def _bbox(e):
+    return e["x"], e["y"], e["x"] + e["width"], e["y"] + e["height"]
+
+
+def _overlap(a, b):
+    ax0, ay0, ax1, ay1 = _bbox(a)
+    bx0, by0, bx1, by1 = _bbox(b)
+    return ax0 < bx1 and bx0 < ax1 and ay0 < by1 and by0 < ay1
+
+
+def test_render_diagram_wraps_nodes_in_frame_and_returns_bottom():
+    d = gx.Diagram(
+        name="Diagram T — test",
+        rows=[[gx.Node("t-a", "A", "gate")],
+              [gx.Node("t-b", "B", "llm"), gx.Node("t-c", "C", "store")]],
+        edges=[gx.Edge("t-a", "t-b")],
+    )
+    elems, bottom = gx.render_diagram(d, origin_y=0, frame_id="frame-T")
+    frame = next(e for e in elems if e["type"] == "frame")
+    shapes = [e for e in elems if e["type"] in ("rectangle", "diamond", "ellipse")]
+    # every node shape sits fully inside the frame box
+    fx0, fy0, fx1, fy1 = _bbox(frame)
+    for s in shapes:
+        sx0, sy0, sx1, sy1 = _bbox(s)
+        assert fx0 <= sx0 and sx1 <= fx1 and fy0 <= sy0 and sy1 <= fy1
+    # no two node shapes overlap
+    for i in range(len(shapes)):
+        for j in range(i + 1, len(shapes)):
+            assert not _overlap(shapes[i], shapes[j])
+    assert bottom == frame["y"] + frame["height"]
+
+
+def test_render_diagram_frame_first_in_array():
+    d = gx.Diagram("D", rows=[[gx.Node("z", "Z", "gate")]], edges=[])
+    elems, _ = gx.render_diagram(d, 0, "frame-Z")
+    assert elems[0]["type"] == "frame"   # drawn behind its children
