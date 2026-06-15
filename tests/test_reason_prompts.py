@@ -16,3 +16,11 @@ def test_plan_prompt_loads_and_documents_ir():
     assert g and "PlanIR" in g and "decision" in g and "discovery" in g
     assert "ALWAYS cite both" not in g          # PLAN no longer authors refs
     assert "facts.policies" in g                # PLAN reads the eligibility rule
+
+
+def test_ilearn_prompt_loads_and_is_planir_framed():
+    from agent.prompt import load_prompt
+    txt = load_prompt("ilearn")
+    assert txt and "PLAN" in txt.upper()
+    assert "prephase_deep_read" in txt
+    assert "fidelity" not in txt.lower()           # no codegen framing
