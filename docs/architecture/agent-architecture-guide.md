@@ -12,7 +12,7 @@ Each benchmark task runs `main.py` harness → `agent/orchestrator.py:run_agent`
 → `agent/pipeline.py:run_pipeline`, which forks on `INTERPRETER_ENABLED` between
 the legacy DESIGN→CODEGEN loop (Diagram 2) and the deterministic Plan-IR
 interpreter (Diagram 3). LLM-call budget per task: **1** (hard-stop), **2** (best
-happy path), **7** (worst, `MAX_STEPS=3`).
+happy path), **7** (worst, `MAX_STEPS=3`) (the knowledge oracle's re-rank adds +1 when `ORACLE_RANK_ENABLED=1`, the default).
 
 ## Diagram 1 — End-to-end flow (harness → pipeline)
 
@@ -37,9 +37,7 @@ learned deep-read paths) before dispatching the pipeline.
 terminal answer. The loop (`cycle = 1..MAX_STEPS`) runs CODEGEN, then three gates
 — AST lint, `check_retry_loop`, fidelity (subprocess) — before the terminal
 `ANSWER` one-shot via `_AnswerGuard`. Gate failures route through
-`LEARN + CONSOLIDATE` (dashed) into the next cycle. The ANSWER script and an
-`outcome_override` can each emit any of OUTCOME_OK / NONE_CLARIFICATION /
-NONE_UNSUPPORTED / DENIED_SECURITY.
+`LEARN + CONSOLIDATE` (dashed) into the next cycle. The ANSWER script can emit any of the four outcomes (OUTCOME_OK / NONE_CLARIFICATION / NONE_UNSUPPORTED / DENIED_SECURITY); an `outcome_override` short-circuits to one of the three non-OK outcomes.
 
 - `agent/pipeline.py:984` — DESIGN call; `outcome_override` exit at `agent/pipeline.py:1008`
 - `agent/pipeline.py:1052` — CODEGEN + ANSWER retry loop (`MAX_STEPS` counter)
@@ -55,7 +53,7 @@ NONE_UNSUPPORTED / DENIED_SECURITY.
 The interpreter branch emits *data*, not code: `run_intent` → `run_plan` build a
 `PlanIR`, which is linted security-first and then executed by a deterministic
 `interpret()` (no LLM inside the loop). The result is a `CapturedAnswer` the
-pipeline submits after verification; its outcome is plan-driven and can be any of
+pipeline submits after `verify()`; its outcome is plan-driven and can be any of
 the four terminal outcomes.
 
 - `agent/pipeline.py:338` — `_run_interpreted`; dispatched from `agent/pipeline.py:944`
@@ -63,6 +61,7 @@ the four terminal outcomes.
 - `agent/ir_models.py:81` — `IntentSpec`; `agent/ir_models.py:171` — `PlanIR`
 - `agent/interpreter.py:191` — `lint_security_first`
 - `agent/interpreter.py:209` — `interpret`; `agent/interpreter.py:53` — `CapturedAnswer`
+- `agent/verify.py:12` — `verify` (independent re-check of the CapturedAnswer before submit)
 
 ## Diagram 4 — Cross-cutting subsystems
 
