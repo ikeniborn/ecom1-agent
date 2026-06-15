@@ -382,7 +382,7 @@ def diagram3() -> Diagram:
 def diagram4() -> Diagram:
     """Cross-cutting subsystems: LEARN store, knowledge oracle, LLM routing."""
     rows = [
-        [Node("d4-learn", "LEARN / learned_store", "llm"),
+        [Node("d4-learn", "LEARN phase (pipeline.py)", "llm"),
          Node("d4-oracle", "Knowledge oracle (oracle.py)", "llm"),
          Node("d4-route", "LLM routing (llm.py)", "gate")],
         [Node("d4-yaml", "data/learned/{tid}.yaml", "store"),
