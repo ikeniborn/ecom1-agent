@@ -14,8 +14,6 @@ from typing import IO
 _task_local = threading.local()
 _run_dir: "Path | None" = None
 _stats_fh: "IO[str] | None" = None  # opened by _setup_logging()
-_task_trace_fhs: "dict[str, IO[str]]" = {}  # per-task terminal mirror ({task_id}.trace.log)
-_trace_lock = threading.Lock()  # guards lazy per-task fh creation under ThreadPoolExecutor
 _ansi_re = re.compile(r"\x1B\[[0-9;]*[A-Za-z]")
 
 
@@ -61,34 +59,13 @@ def _setup_logging() -> None:
     _stats_fh.write(f"[LOG] {run_path}/  (LOG_LEVEL={log_level})\n")
     _stats_fh.flush()
 
-    def _tee_task_trace(task_id: str, text: str) -> None:
-        # Per-task terminal mirror ({task_id}.trace.log) so concurrent tasks don't
-        # interleave. Lazily opened, keyed by task_id; the file is already
-        # task-scoped so the [task_id] prefix is dropped. ANSI stripped for readability.
-        if not text:
-            return
-        fh = _task_trace_fhs.get(task_id)
-        if fh is None:
-            with _trace_lock:
-                fh = _task_trace_fhs.get(task_id)
-                if fh is None:
-                    fh = open(run_path / f"{task_id}.trace.log", "a", buffering=1, encoding="utf-8")
-                    _task_trace_fhs[task_id] = fh
-        try:
-            fh.write(_ansi_re.sub("", text))
-        except Exception:
-            pass
-
     _orig = sys.stdout
-    _orig_err = sys.stderr
 
     class _PrefixWriter:
         def write(self, data: str) -> None:
             prefix = getattr(_task_local, "task_id", None)
             out = f"[{prefix}] {data}" if (prefix and data and data != "\n") else data
             _orig.write(out)
-            if prefix:
-                _tee_task_trace(prefix, data)
 
         def writelines(self, lines) -> None:
             for line in lines:
@@ -104,30 +81,7 @@ def _setup_logging() -> None:
         def encoding(self) -> str:
             return _orig.encoding
 
-    class _StderrTee:
-        """Mirror stderr (tracebacks/warnings) into the active task's trace file."""
-        def write(self, data: str) -> None:
-            _orig_err.write(data)
-            prefix = getattr(_task_local, "task_id", None)
-            if prefix:
-                _tee_task_trace(prefix, data)
-
-        def writelines(self, lines) -> None:
-            for line in lines:
-                self.write(line)
-
-        def flush(self) -> None:
-            _orig_err.flush()
-
-        def isatty(self) -> bool:
-            return _orig_err.isatty()
-
-        @property
-        def encoding(self) -> str:
-            return _orig_err.encoding
-
     sys.stdout = _PrefixWriter()
-    sys.stderr = _StderrTee()
     print(f"[LOG] {run_path}/  (LOG_LEVEL={log_level})")
 
 
@@ -312,6 +266,15 @@ def _run_one_pass(client, task_filter: list, train_cycle: int):
                 if filtered:
                     continue
                 pending[task_id] = (trial_id, task_elapsed, token_stats, trace)
+                # live progress into main.log as each task finishes (score arrives at
+                # SubmitRun, so it is not known yet — the final table fills it in).
+                _ts_now = datetime.datetime.now().strftime("%H:%M:%S")
+                _log_stats(
+                    f"[{_ts_now}] done {task_id:<10} {task_elapsed:>6.1f}s  "
+                    f"in={token_stats.get('input_tokens', 0):>8,} "
+                    f"out={token_stats.get('output_tokens', 0):>8,} "
+                    f"cycles={token_stats.get('cycles_used', 0)}  (score @submit)"
+                )
     finally:
         print(f"\n{CLI_GREEN}>>>> Submitting run... <<<<{CLI_CLR}")
         result = client.submit_run(SubmitRunRequest(run_id=run.run_id, force=True))
