@@ -53,7 +53,8 @@ def _stable_seed(eid: str) -> int:
     return h
 
 
-def _base(eid, etype, x, y, w, h, frame_id=None):
+def _base(eid: str, etype: str, x: float, y: float,
+          w: float, h: float, frame_id: str | None = None) -> dict:
     """Common Excalidraw element fields shared by every element type."""
     return {
         "id": eid,

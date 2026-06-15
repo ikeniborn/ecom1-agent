@@ -39,6 +39,7 @@ def test_base_element_has_required_excalidraw_keys():
 def test_stable_seed_is_pure():
     assert gx._stable_seed("el-1") == gx._stable_seed("el-1")
     assert gx._stable_seed("el-1") != gx._stable_seed("el-2")
+    assert gx._stable_seed("el-1") == 4265279278   # pins FNV-1a, guards byte-identical output
 
 
 def test_make_node_emits_shape_and_bound_text_with_reciprocal_refs():
@@ -81,3 +82,4 @@ def test_frame_builder():
     f = gx._frame("frame-1", 0, 0, 400, 300, "Diagram 1 — x")
     assert f["type"] == "frame"
     assert f["name"] == "Diagram 1 — x"
+    assert f.get("frameId") is None
