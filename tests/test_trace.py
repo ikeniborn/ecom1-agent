@@ -141,6 +141,7 @@ def test_log_test_gen(tmp_path):
     set_trace(logger)
     logger.log_test_gen("def test_sql(results): pass", "def test_answer(sql_results, answer): pass")
     logger.close()
+    set_trace(None)
     records = [json.loads(l) for l in log_file.read_text().splitlines() if l.strip()]
     tg = next(r for r in records if r["type"] == "test_gen")
     assert tg["sql_tests"] == "def test_sql(results): pass"
@@ -156,6 +157,7 @@ def test_log_test_run(tmp_path):
     logger.log_test_run(1, "sql", True, "")
     logger.log_test_run(2, "answer", False, "AssertionError: wrong outcome")
     logger.close()
+    set_trace(None)
     records = [json.loads(l) for l in log_file.read_text().splitlines() if l.strip()]
     runs = [r for r in records if r["type"] == "test_run"]
     assert runs[0]["cycle"] == 1 and runs[0]["suite"] == "sql" and runs[0]["passed"] is True
@@ -183,6 +185,106 @@ def test_thread_isolation(tmp_path):
         th.join()
     for tid, recs in results.items():
         assert recs[0]["task_id"] == tid
+
+
+def test_log_facts_record_and_caps(tmp_path):
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    big = "x" * 5000
+    t.log_facts({
+        "docs_inventory": "/docs/a.md\n/docs/b.md",
+        "policies": {"/docs/a.md": big},
+        "schema": big,
+        "sample_rows": "h\n1",
+        "identity": {"role": "employee"},
+        "target_records": {"/proc/p.json": big},
+        "gather_status": {"policies": "ok", "schema": "ok"},
+    })
+    t.close()
+    r = _read_records(p)[0]
+    assert r["type"] == "facts"
+    assert r["docs_inventory"] == "/docs/a.md\n/docs/b.md"
+    assert r["identity"] == {"role": "employee"}
+    assert r["gather_status"]["policies"] == "ok"
+    # 2000-char cap applied to policy/schema/target bodies
+    assert len(r["policies"]["/docs/a.md"]) <= 2000 + 40
+    assert "[+" in r["policies"]["/docs/a.md"]
+    assert len(r["schema"]) <= 2000 + 40
+    assert "[+" in r["target_records"]["/proc/p.json"]
+
+
+def test_log_vm_call_record_filters_args_and_caps(tmp_path):
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    t.log_vm_call(2, "EXEC", "Exec",
+                  {"path": "/bin/sql", "args": ["SELECT 1"], "secret": "drop"},
+                  "n\n" + "9" * 4000, mutated=False)
+    t.close()
+    r = _read_records(p)[0]
+    assert r["type"] == "vm_call" and r["cycle"] == 2 and r["phase"] == "EXEC"
+    assert r["rpc"] == "Exec"
+    assert r["args"] == {"path": "/bin/sql", "args": ["SELECT 1"]}  # 'secret' dropped
+    assert len(r["result_head"]) <= 1000 + 40 and "[+" in r["result_head"]
+    assert r["mutated"] is False
+
+
+def test_log_answer_keeps_refs_full(tmp_path):
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    refs = ["/docs/x.md", "/proc/incoming/payments/inpay_eojzdRua.json"]
+    t.log_answer(1, "1", "OUTCOME_OK", refs)
+    t.close()
+    r = _read_records(p)[0]
+    assert r["type"] == "answer" and r["message"] == "1"
+    assert r["outcome"] == "OUTCOME_OK" and r["refs"] == refs
+
+
+def test_trace_logger_exposes_path(tmp_path):
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    assert t.path == p
+    t.close()
+
+
+def test_render_trace_sections_and_no_color():
+    from agent.trace import render_trace
+    records = [
+        {"type": "header", "task_id": "t55", "model": "sonnet", "task_text": "last txn"},
+        {"type": "facts", "docs_inventory": "/docs/a.md\n/docs/b.md",
+         "policies": {"/docs/a.md": "RULE BODY"}, "schema": "CREATE TABLE x",
+         "sample_rows": "", "identity": {"role": "emp"},
+         "target_records": {}, "gather_status": {"policies": "ok"}},
+        {"type": "vm_call", "cycle": 1, "phase": "EXEC", "rpc": "Exec",
+         "args": {"path": "/bin/sql", "args": ["SELECT COUNT(*) n"]},
+         "result_head": "n\n1", "mutated": False},
+        {"type": "answer", "cycle": 1, "message": "1", "outcome": "OUTCOME_OK",
+         "refs": ["/proc/incoming/payments/inpay_X.json"]},
+        {"type": "task_result", "outcome": "OUTCOME_OK", "score": 1.0,
+         "cycles_used": 1, "total_tokens_in": 10, "total_tokens_out": 20,
+         "elapsed_ms": 100, "score_detail": []},
+    ]
+    text = render_trace(records, color=False)
+    assert "PRE-PHASE FACTS" in text
+    assert "/docs/a.md" in text and "RULE BODY" in text
+    assert "[Exec /bin/sql" in text and "n\n1" in text or "-> n" in text
+    assert "ANSWER" in text and "inpay_X.json" in text
+    assert "RESULT" in text
+    assert "\x1b[" not in text  # color=False -> no ANSI escapes
+
+
+def test_detail_log_written_live_before_close(tmp_path):
+    p = tmp_path / "t01.jsonl"
+    detail = tmp_path / "t01.detail.log"
+    t = TraceLogger(p, "t01")
+    t.log_header("last txn", "sonnet")
+    assert detail.exists()  # materialises on the FIRST record, not at close
+    t.log_facts({"docs_inventory": "/docs/a.md", "gather_status": {"schema": "ok"}})
+    t.log_vm_call(1, "EXEC", "Exec", {"path": "/bin/sql", "args": ["SELECT 1"]}, "n\n1", False)
+    t.log_answer(1, "1", "OUTCOME_OK", ["/docs/a.md"])
+    mid = detail.read_text()  # readable mid-run, before close()
+    assert "PRE-PHASE FACTS" in mid and "[Exec /bin/sql" in mid and "ANSWER" in mid
+    assert "\x1b[" not in mid  # plain text
+    t.close()
 
 
 def test_log_schema_refresh(tmp_path):

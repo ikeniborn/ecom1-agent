@@ -20,7 +20,7 @@ from .models import DesignOutput, LearnConsolidateOutput, TestSpec
 from .prompt import load_prompt
 from .sql_security import check_retry_loop  # noqa: F401  (retained for backward import compat)
 from .testgen import TestGenError, run_test_gen
-from .trace import set_cycle
+from .trace import current_cycle, get_trace, set_cycle
 from .test_runner import run_tests
 
 _MAX_STEPS = int(os.environ.get("MAX_STEPS", "3"))
@@ -713,6 +713,10 @@ class _AnswerGuard:
             try:
                 self._record(rpc, kwargs, result)
                 self._capture_fixture(rpc, kwargs, result)
+                _t = get_trace()
+                if _t is not None:
+                    _t.log_vm_call(current_cycle(), "EXEC", rpc.capitalize(), kwargs,
+                                   self._extract_payload(result), mutated=rpc in ("write", "delete"))
             except Exception:
                 pass
             return result
@@ -796,6 +800,12 @@ class _AnswerGuard:
     def _emit(self, message: str, outcome: str, refs_list: list) -> None:
         """Capture the answer; submit to the real VM now unless deferred."""
         self._captured = {"message": message, "outcome": outcome, "refs": refs_list}
+        _t = get_trace()
+        if _t is not None:
+            try:                                # observability must never break a run
+                _t.log_answer(current_cycle(), message, outcome, refs_list)
+            except Exception:
+                pass
         if not self._defer_submit:
             self._vm.answer(message=message, outcome=outcome, refs=refs_list)
 

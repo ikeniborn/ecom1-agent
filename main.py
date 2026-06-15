@@ -237,6 +237,8 @@ def _finalize_task_trace(
         elapsed_ms=int(elapsed * 1000),
         score_detail=detail,
     )
+    # {tid}.detail.log is refreshed live by TraceLogger on every record (incl. this
+    # task_result), so it is already complete here — just close the handles.
     trace.close()
 
 

@@ -17,6 +17,33 @@ from pydantic import BaseModel
 
 from .ir_models import IntentSpec, PlanIR, RowSet
 from .predicates import evaluate, resolve
+from .trace import current_cycle, get_trace
+
+
+def _trace_vm(phase: str, rpc: str, kwargs: dict, payload: str, mutated: bool) -> None:
+    """Best-effort VM-call trace; no-op when no TraceLogger is attached (tests).
+
+    Tracing is pure observability and must NEVER break execution — any logger
+    error (e.g. a stale/closed handle) is swallowed.
+    """
+    t = get_trace()
+    if t is None:
+        return
+    try:
+        t.log_vm_call(current_cycle(), phase, rpc, kwargs, payload, mutated)
+    except Exception:
+        pass
+
+
+def _trace_answer(message: str, outcome: str, refs: list) -> None:
+    """Best-effort answer trace (see `_trace_vm`)."""
+    t = get_trace()
+    if t is None:
+        return
+    try:
+        t.log_answer(current_cycle(), message, outcome, refs)
+    except Exception:
+        pass
 
 
 class InterpretError(RuntimeError):
@@ -195,6 +222,7 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
         if step.bind:
             env[step.bind] = result
         pay = _payload(result)
+        _trace_vm("INTERPRET", step.rpc, kwargs, pay, mutated=False)
         observations.append(f"[{step.rpc} {kwargs.get('path', kwargs.get('root', ''))}] {pay[:_OBS_PER_CALL]}")
         if step.rpc == "Exec" and kwargs.get("path") == "/bin/sql":
             sql_results.append(pay)
@@ -227,9 +255,11 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
         result = getattr(vm, op.rpc.lower())(**kwargs)
         if op.bind:
             env[op.bind] = result
-        if op.rpc in _MUTATING or (op.rpc == "Exec" and str(kwargs.get("path", "")).startswith("/bin/")
-                                   and kwargs.get("path") != "/bin/sql"):
+        _mut = op.rpc in _MUTATING or (op.rpc == "Exec" and str(kwargs.get("path", "")).startswith("/bin/")
+                                       and kwargs.get("path") != "/bin/sql")
+        if _mut:
             mutation_landed = True
+        _trace_vm("INTERPRET", op.rpc, kwargs, _payload(result), mutated=_mut)
         if op.rpc == "Exec" and kwargs.get("path") == "/bin/sql":
             sql_results.append(_payload(result))
         if op.outcome_from_exit is not None:           # mutate-then-classify
@@ -246,6 +276,7 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
     #    resolve carries mutation_landed so the pipeline routes to terminal.
     if outcome == "OUTCOME_OK" and unresolved:
         raise _refuse(f"unresolved required ref(s) {unresolved!r} on OK answer", mutation_landed)
+    _trace_answer(message, outcome, refs)
     captured = CapturedAnswer(message=message, outcome=outcome, refs=refs)
     return InterpretResult(captured=captured, env=env, observations=observations,
                            sql_results=sql_results, mutation_landed=mutation_landed,

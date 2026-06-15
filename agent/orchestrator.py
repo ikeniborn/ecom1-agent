@@ -12,6 +12,7 @@ from bitgn.vm.ecom.ecom_pb2 import ReadRequest
 from agent.json_extract import _extract_json_from_text
 from agent.llm import _resolve_model_for_phase, call_llm_raw
 from agent.pipeline import run_pipeline
+from agent.trace import get_trace
 from agent.vm_adapter import VMAdapter
 
 
@@ -413,6 +414,12 @@ def run_agent(
     agents_md_text = _read_agents_md(raw_vm)
     vm = VMAdapter(raw_vm)
     facts = gather_prephase_facts(vm, task_text, agents_md_text)
+    _t = get_trace()
+    if _t is not None:
+        try:                                    # observability must never break a run
+            _t.log_facts(facts)
+        except Exception:
+            pass
     agents_md_text = _augment_agents_md(agents_md_text, facts.schema, facts.sample_rows)
     metrics = run_pipeline(vm, instruction=task_text, task_id=task_id,
                            agents_md_text=agents_md_text, facts=facts)

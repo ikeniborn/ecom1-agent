@@ -27,8 +27,26 @@ def current_cycle() -> int:
     return getattr(_tl, "cycle", 0)
 
 
+# Truncation caps for the deterministic-execution records (keep traces analysis-sized).
+_VM_HEAD_CAP = 1000
+_FACT_HEAD_CAP = 2000
+_VM_ARG_KEYS = ("path", "root", "pattern", "args", "stdin")
+
+
+def _head(text: str, cap: int) -> str:
+    text = text or ""
+    if cap and len(text) > cap:
+        return text[:cap] + f"… [+{len(text) - cap} chars]"
+    return text
+
+
 class TraceLogger:
     def __init__(self, path: Path, task_id: str) -> None:
+        self.path = path
+        # Readable digest, refreshed live after every record so it is watchable
+        # mid-run (tail -f) — not just at task end.
+        self._detail_path = path.with_suffix(".detail.log")
+        self._records: list[dict] = []
         self._fh = path.open("w", buffering=1, encoding="utf-8")
         self._task_id = task_id
         self._seen_sha: set[str] = set()
@@ -40,6 +58,19 @@ class TraceLogger:
         record.setdefault("ts", self._ts())
         record.setdefault("task_id", self._task_id)
         self._fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+        self._records.append(record)
+        self._refresh_detail()
+
+    def _refresh_detail(self) -> None:
+        """Re-render the readable {tid}.detail.log live (best-effort).
+
+        Cheap — a task emits only tens of records; re-rendering on each keeps the
+        digest current so it can be `tail`-watched while the task runs.
+        """
+        try:
+            self._detail_path.write_text(render_trace(self._records, color=False), encoding="utf-8")
+        except Exception:
+            pass
 
     def _sys_sha256(self, system: "str | list[dict]") -> str:
         raw = json.dumps(system, ensure_ascii=False, sort_keys=True)
@@ -174,6 +205,49 @@ class TraceLogger:
             "added_tables": list(added_tables),
         })
 
+    def log_facts(self, facts) -> None:
+        """Pre-phase grounding facts (docs/policies/schema/identity/status).
+
+        Accepts a `PrePhaseFacts` (model_dump) or a plain dict. Long doc/schema
+        bodies are truncated to `_FACT_HEAD_CAP` so the trace stays analysis-sized.
+        """
+        data = facts.model_dump() if hasattr(facts, "model_dump") else dict(facts or {})
+        policies = {k: _head(v, _FACT_HEAD_CAP) for k, v in (data.get("policies") or {}).items()}
+        targets = {k: _head(v, _FACT_HEAD_CAP) for k, v in (data.get("target_records") or {}).items()}
+        self._write({
+            "type": "facts",
+            "docs_inventory": data.get("docs_inventory", ""),
+            "policies": policies,
+            "schema": _head(data.get("schema", ""), _FACT_HEAD_CAP),
+            "sample_rows": _head(data.get("sample_rows", ""), _FACT_HEAD_CAP),
+            "identity": data.get("identity", {}),
+            "target_records": targets,
+            "gather_status": data.get("gather_status", {}),
+        })
+
+    def log_vm_call(self, cycle: int, phase: str, rpc: str, args: dict,
+                    result: str, mutated: bool = False) -> None:
+        """One VM RPC: which call (filtered args) and the head of its result."""
+        self._write({
+            "type": "vm_call",
+            "cycle": cycle,
+            "phase": phase,
+            "rpc": rpc,
+            "args": {k: v for k, v in (args or {}).items() if k in _VM_ARG_KEYS},
+            "result_head": _head(str(result or ""), _VM_HEAD_CAP),
+            "mutated": bool(mutated),
+        })
+
+    def log_answer(self, cycle: int, message: str, outcome: str, refs: list) -> None:
+        """The final answer submitted to the grader — refs kept in full (small)."""
+        self._write({
+            "type": "answer",
+            "cycle": cycle,
+            "message": message,
+            "outcome": outcome,
+            "refs": list(refs or []),
+        })
+
     def log_task_result(
         self,
         outcome: str,
@@ -198,3 +272,161 @@ class TraceLogger:
     def close(self) -> None:
         self._fh.flush()
         self._fh.close()
+
+
+# ---------------------------------------------------------------------------
+# Rendering — shared by scripts/trace_view.py (CLI) and the auto {tid}.detail.log
+# ---------------------------------------------------------------------------
+
+_PALETTE = {
+    "reset": "\x1b[0m", "dim": "\x1b[2m", "bold": "\x1b[1m", "red": "\x1b[31m",
+    "green": "\x1b[32m", "yellow": "\x1b[33m", "blue": "\x1b[34m",
+    "magenta": "\x1b[35m", "cyan": "\x1b[36m",
+}
+
+
+def _flatten_system(blocks) -> str:
+    if isinstance(blocks, str):
+        return blocks
+    return "\n".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in (blocks or []))
+
+
+def render_trace(source, *, color: bool = False, max_chars: int = 0, phase: str | None = None,
+                 no_system: bool = False, full_system: bool = False, llm_only: bool = False) -> str:
+    """Render a per-task trace (jsonl path or record list) to readable text.
+
+    Returns a plain string (no trailing print). Pass `color=False` for files
+    (the auto {tid}.detail.log) and `color=True` for an interactive terminal.
+    """
+    if isinstance(source, (str, Path)):
+        records = [json.loads(l) for l in Path(source).read_text(encoding="utf-8").splitlines() if l.strip()]
+    else:
+        records = list(source)
+
+    def c(text: str, key: str) -> str:
+        return f"{_PALETTE[key]}{text}{_PALETTE['reset']}" if color else text
+
+    def indent(text: str) -> str:
+        body = text if not max_chars or len(text) <= max_chars else (
+            text[:max_chars] + c(f"\n… [truncated {len(text) - max_chars} chars]", "dim"))
+        return "\n".join("    " + line for line in body.splitlines()) or "    (empty)"
+
+    systems = {r["sha256"]: r.get("blocks") for r in records if r.get("type") == "header_system"}
+    shown: set[str] = set()
+    out: list[str] = []
+    bar = "━" * 72
+
+    def llm_call(rec: dict) -> None:
+        cyc, ph = rec.get("cycle", 0), rec.get("phase", "?")
+        mark = c("OK", "green") if rec.get("success") else c("FAIL", "red")
+        out.append(c(bar, "blue"))
+        out.append(f"{c('cycle ' + str(cyc), 'bold')} · {c(ph, 'magenta')} · "
+                   f"{rec.get('duration_ms', 0)}ms · tokens {rec.get('tokens_in', 0)}/"
+                   f"{rec.get('tokens_out', 0)} · {mark}")
+        sha = rec.get("system_sha256", "")
+        if not no_system:
+            if full_system or sha not in shown:
+                shown.add(sha)
+                out.append(c(f"┌ SYSTEM ({sha[:8]})", "cyan"))
+                out.append(indent(_flatten_system(systems.get(sha))))
+            else:
+                out.append(c(f"┌ SYSTEM ({sha[:8]}) — same as above", "dim"))
+        out.append(c("├ USER", "yellow"))
+        out.append(indent(rec.get("user_msg", "")))
+        out.append(c("└ ASSISTANT", "green"))
+        out.append(indent(rec.get("raw_response", "")))
+        out.append("")
+
+    def facts(rec: dict) -> None:
+        out.append(c("═══ PRE-PHASE FACTS ═══", "bold"))
+        inv = [p for p in (rec.get("docs_inventory") or "").splitlines() if p]
+        out.append(f"docs_inventory ({len(inv)}):")
+        out.extend(f"    {p}" for p in inv)
+        out.append(f"gather_status: {json.dumps(rec.get('gather_status') or {}, ensure_ascii=False)}")
+        if rec.get("identity"):
+            out.append(f"identity: {json.dumps(rec['identity'], ensure_ascii=False)}")
+        for label in ("policies", "target_records"):
+            block = rec.get(label) or {}
+            if block:
+                out.append(c(f"{label}:", "cyan"))
+                for path, body in block.items():
+                    out.append(c(f"  ┌ {path}", "dim"))
+                    out.append(indent(body))
+        for label in ("schema", "sample_rows"):
+            if rec.get(label):
+                out.append(c(f"{label}:", "cyan"))
+                out.append(indent(rec[label]))
+        out.append("")
+
+    def vm_call(rec: dict) -> None:
+        a = rec.get("args") or {}
+        loc = a.get("path") or a.get("root") or a.get("pattern") or ""
+        sql = ""
+        if rec.get("rpc") == "Exec" and a.get("args"):
+            sql = " " + " ".join(str(x) for x in a["args"])[:120]
+        mut = c(" [MUTATED]", "red") if rec.get("mutated") else ""
+        head = (rec.get("result_head") or "").strip()
+        first = head.splitlines()[0] if head else "<empty>"
+        out.append(c(f"  · [{rec.get('rpc')} {loc}{sql}]{mut} -> {first}", "dim"))
+        rest = head.splitlines()[1:]
+        out.extend("      " + line for line in rest)
+
+    def answer(rec: dict) -> None:
+        out.append(c(f"═══ ANSWER (cycle {rec.get('cycle', 0)}) ═══", "bold"))
+        out.append(f"  msg={rec.get('message')!r}  {rec.get('outcome')}  "
+                   f"refs={rec.get('refs')!r}")
+        out.append("")
+
+    def event(rec: dict) -> None:
+        t = rec["type"]
+        pre = c(f"  · [{t}]", "dim")
+        cyc = rec.get("cycle", "")
+        if t == "gate_check":
+            out.append(f"{pre} c{cyc} {rec.get('gate_type')} "
+                       f"{'BLOCKED' if rec.get('blocked') else 'pass'} {rec.get('error') or ''}")
+        elif t == "sql_execute":
+            out.append(f"{pre} c{cyc} {rec.get('duration_ms')}ms data={rec.get('has_data')} "
+                       f"{rec.get('query', '')[:70]}")
+        elif t == "test_run":
+            s = c("pass", "green") if rec.get("passed") else c("FAIL", "red")
+            out.append(f"{pre} c{cyc} {rec.get('suite')} {s} {rec.get('error', '')[:80]}")
+        elif t == "test_gen":
+            out.append(f"{pre} sql+answer tests generated")
+        elif t == "schema_refresh":
+            out.append(f"{pre} c{cyc} +tables {rec.get('added_tables')}")
+        else:
+            payload = {k: v for k, v in rec.items() if k not in ("ts", "task_id", "type")}
+            out.append(f"{pre} {json.dumps(payload, ensure_ascii=False)[:120]}")
+
+    for r in records:
+        t = r.get("type")
+        if t == "header":
+            out.append(c("═" * 72, "bold"))
+            out.append(c(f"TASK {r.get('task_id')}  ·  model={r.get('model')}", "bold"))
+            out.append(f"  {r.get('task_text', '')}")
+            out.append(c("═" * 72, "bold"))
+            out.append("")
+        elif t == "header_system":
+            continue
+        elif t == "facts":
+            facts(r)
+        elif t == "llm_call":
+            if phase and r.get("phase") != phase:
+                continue
+            llm_call(r)
+        elif t == "vm_call":
+            vm_call(r)
+        elif t == "answer":
+            answer(r)
+        elif t == "task_result":
+            out.append(c("═" * 72, "bold"))
+            out.append(c("RESULT", "bold") + f"  {r.get('outcome')}  score={r.get('score')}  "
+                       f"cycles={r.get('cycles_used')}  tokens {r.get('total_tokens_in')}/"
+                       f"{r.get('total_tokens_out')}  {r.get('elapsed_ms')}ms")
+            for line in (r.get("score_detail") or []):
+                out.append(f"  - {line}")
+            out.append(c("═" * 72, "bold"))
+        elif not llm_only:
+            event(r)
+
+    return "\n".join(out)

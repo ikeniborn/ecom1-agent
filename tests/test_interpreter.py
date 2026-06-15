@@ -190,6 +190,38 @@ def test_refuse_after_mutation_tags_mutation_landed():
         assert e.mutation_landed is True
 
 
+def test_interpret_emits_vm_call_and_answer_when_trace_attached(tmp_path):
+    import json as _json
+
+    from agent.trace import TraceLogger, set_trace
+
+    fx = {fixture_key("Exec", "/bin/sql", ["Q"]): {"stdout": "sku|record_path\nA|/proc/catalog/A.json"}}
+    vm = MockVMSpy(fixtures=fx)
+    intent = IntentSpec(
+        objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"], answer_shape={},
+        required_refs={"OUTCOME_OK": [{"kind": "record_path", "source": "$row0.record_path"}]},
+    )
+    plan = _plan(
+        discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "args": ["Q"]}, "bind": "raw"}],
+        rowsets=[{"from": "raw", "format": "auto_delim", "into": "rows", "columns": []}],
+        compute=[{"prim": "first", "args": ["$rows"], "into": "row0"}],
+        answer={"ok": {"message": "Found {row0.sku}", "outcome": "OUTCOME_OK", "refs": []}},
+    )
+    p = tmp_path / "tX.jsonl"
+    t = TraceLogger(p, "tX")
+    set_trace(t)
+    try:
+        interpret(plan, intent, vm)
+    finally:
+        set_trace(None)
+        t.close()
+    recs = [_json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+    vc = next(r for r in recs if r["type"] == "vm_call")
+    assert vc["rpc"] == "Exec" and vc["phase"] == "INTERPRET" and "/bin/sql" in str(vc["args"])
+    ans = next(r for r in recs if r["type"] == "answer")
+    assert ans["outcome"] == "OUTCOME_OK" and ans["refs"] == ["/proc/catalog/A.json"]
+
+
 def test_refuse_when_runtime_ref_required_but_unresolved():
     vm = MockVMSpy(fixtures={})
     intent = IntentSpec(objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
