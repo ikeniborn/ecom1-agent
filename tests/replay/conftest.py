@@ -27,9 +27,28 @@ def run_old_script(tid: str, fixtures: dict, params: dict) -> dict:
     return {"message": "", "outcome": "", "refs": []}
 
 
+def _required_refs_from_plan(plan) -> dict:
+    """Transitional parity shim: derive required_refs from a golden plan's
+    answer refs so the new projection reproduces the old script's refs."""
+    rr: dict = {}
+    for tmpl in plan.answer.values():
+        bucket = rr.setdefault(tmpl.outcome, [])
+        for r in tmpl.refs:
+            spec = ({"kind": "record_path", "source": r}
+                    if isinstance(r, str) and r.startswith("$")
+                    else {"kind": "policy_doc", "path": str(r)})
+            if spec not in bucket:
+                bucket.append(spec)
+    return rr
+
+
 def run_plan(tid: str, fixtures: dict, params: dict, intent=_MINIMAL_INTENT) -> dict:
     plan = PlanIR(**json.loads((_REPLAY / f"plan_{tid}.json").read_text()))
     spy = MockVMSpy(fixtures=fixtures)
-    res = interpret(plan, intent.model_copy(update={"params": params}), spy)
+    d = intent.model_dump()
+    d["params"] = params
+    d["required_refs"] = _required_refs_from_plan(plan)
+    intent = IntentSpec.model_validate(d)
+    res = interpret(plan, intent, spy)
     return {"message": res.captured.message, "outcome": res.captured.outcome,
             "refs": sorted(res.captured.refs)}

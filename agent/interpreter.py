@@ -92,18 +92,25 @@ def _fill_slots(message: str, env: dict) -> str:
     return _SLOT_RE.sub(repl, message)
 
 
-def _resolve_refs(refs: list, env: dict) -> tuple[list[str], list[str]]:
-    """Return (resolved, unresolved_tokens)."""
+def _project_required_refs(intent: "IntentSpec", outcome: str, env: dict) -> tuple[list[str], list[str]]:
+    """Build answer.refs from intent.required_refs[outcome]. Return (refs, unresolved).
+
+    policy_doc -> literal `path`; record_path -> resolve(`source`, env).
+    A record_path that resolves to None/"" lands in `unresolved`.
+    """
     out, unresolved = [], []
-    for r in refs:
-        if isinstance(r, str) and r.startswith("$"):
-            val = resolve(r, env)
+    for r in intent.required_refs.get(outcome, []):
+        if r.kind == "policy_doc":
+            if r.path:
+                out.append(r.path)
+            else:
+                unresolved.append(f"policy_doc:{r.kind}")
+        else:  # record_path
+            val = resolve(r.source, env)
             if val in (None, ""):
-                unresolved.append(r)
+                unresolved.append(r.source)
             else:
                 out.append(str(val))
-        else:
-            out.append(str(r))
     return out, unresolved
 
 
@@ -228,23 +235,17 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
         if op.outcome_from_exit is not None:           # mutate-then-classify
             exit_outcome = _classify_from_exit(op.outcome_from_exit, result)
 
-    # 7. answer assembly
+    # 7. answer assembly — refs are PROJECTED from intent.required_refs[outcome],
+    #    not authored by PLAN (tmpl.refs is ignored).
     tmpl = plan.answer.get(label) or next(iter(plan.answer.values()))
     outcome = exit_outcome or tmpl.outcome
     message = _fill_slots(tmpl.message, env)
-    refs, unresolved = _resolve_refs(tmpl.refs, env)
+    refs, unresolved = _project_required_refs(intent, outcome, env)
 
-    # 8. refuse invariant (mirrors the deleted _AnswerGuard). A refusal raised after
-    #    a mutation already landed carries mutation_landed so the pipeline routes to
-    #    terminal (retry unsafe) instead of re-planning.
-    if outcome == "OUTCOME_OK":
-        if unresolved:
-            raise _refuse(f"unresolved runtime ref(s) {unresolved!r} on OK answer", mutation_landed)
-        if "runtime" in intent.answer_shape.required_ref_kinds:
-            static_refs = {str(r) for r in tmpl.refs if not (isinstance(r, str) and r.startswith("$"))}
-            if not any(r not in static_refs for r in refs):
-                raise _refuse("OK answer carries only static refs but a runtime ref is required",
-                              mutation_landed)
+    # 8. refuse invariant: an OK answer whose required record_path ref did not
+    #    resolve carries mutation_landed so the pipeline routes to terminal.
+    if outcome == "OUTCOME_OK" and unresolved:
+        raise _refuse(f"unresolved required ref(s) {unresolved!r} on OK answer", mutation_landed)
     captured = CapturedAnswer(message=message, outcome=outcome, refs=refs)
     return InterpretResult(captured=captured, env=env, observations=observations,
                            sql_results=sql_results, mutation_landed=mutation_landed,

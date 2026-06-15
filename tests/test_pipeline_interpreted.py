@@ -82,7 +82,8 @@ def test_interpreted_verify_fail_then_learn_then_exhaust():
         "objective": "o", "desired_outcome": "d", "params": {},
         "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
         "constraints": [], "success_criteria": [],
-        "answer_shape": {"required_ref_kinds": ["runtime"]},
+        "answer_shape": {"required_ref_kinds": []},
+        "required_refs": {"OUTCOME_OK": [{"kind": "record_path", "source": "$missing"}]},
     })
     learn = json.dumps({"rule_content": "Always bind a runtime $ref for OK answers",
                         "reasoning": "verify failed", "deactivate_ids": [], "skip": False})
