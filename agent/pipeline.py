@@ -107,7 +107,8 @@ def _fold_facts_into_agents_md(agents_md_text: str, facts) -> str:
         return agents_md_text
     data = facts.model_dump() if hasattr(facts, "model_dump") else dict(facts)
     blocks: list[str] = [agents_md_text or ""]
-    for key in ("docs_inventory", "policies", "identity", "target_records", "gather_status"):
+    for key in ("docs_inventory", "policies", "identity", "target_records",
+                "path_listings", "gather_status"):
         val = data.get(key)
         if val:
             blocks.append(f"\n\n## {key} (pre-phase)\n{val}")

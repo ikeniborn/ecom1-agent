@@ -29,6 +29,14 @@ def _call_llm_raw(*args, **kwargs):
     return _pipeline.call_llm_raw(*args, **kwargs)
 
 
+def _facts_sufficiency(facts: Any) -> list[str]:
+    """gather_status keys whose value is not 'ok' (empty or error) — P8 signal."""
+    if hasattr(facts, "model_dump"):
+        facts = facts.model_dump()
+    status = facts.get("gather_status", {}) if isinstance(facts, dict) else {}
+    return [k for k, v in status.items() if v != "ok"]
+
+
 def _facts_block(facts: Any) -> str:
     if facts is None:
         return ""
@@ -36,11 +44,17 @@ def _facts_block(facts: Any) -> str:
         facts = facts.model_dump()
     parts = []
     for key in ("agents_md", "schema", "sample_rows", "docs_inventory",
-                "policies", "identity", "target_records", "gather_status"):
+                "policies", "identity", "target_records", "path_listings",
+                "gather_status"):
         val = facts.get(key) if isinstance(facts, dict) else None
         if val:
             parts.append(f"## {key}\n{val if isinstance(val, str) else val}")
-    return "PRE-PHASE FACTS:\n" + "\n\n".join(str(p) for p in parts)
+    block = "PRE-PHASE FACTS:\n" + "\n\n".join(str(p) for p in parts)
+    nonok = _facts_sufficiency(facts)
+    if nonok:
+        status = facts.get("gather_status", {}) if isinstance(facts, dict) else {}
+        block += "\n\nFACT_STATUS (non-ok): " + ", ".join(f"{k}={status.get(k)}" for k in nonok)
+    return block
 
 
 def run_intent(facts, instruction: str, token_out: dict | None = None) -> IntentSpec:
