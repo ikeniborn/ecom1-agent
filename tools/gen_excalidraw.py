@@ -267,3 +267,35 @@ def arrow_bindings_valid(doc: dict) -> bool:
             if b and b["elementId"] not in ids:
                 return False
     return True
+
+
+def diagram1() -> Diagram:
+    """Harness -> orchestrator -> pipeline, with the TRAIN_MAX_CYCLES feedback edge."""
+    rows = [
+        [Node("d1-start", "main.py: StartRun", "gate")],
+        [Node("d1-trial", "trials loop -> run_agent", "gate")],
+        [Node("d1-open", "open VM + read /AGENTS.MD", "gate")],
+        [Node("d1-schema", "schema discovery", "gate"),
+         Node("d1-samples", "sample rows", "gate"),
+         Node("d1-docs", "docs inventory", "gate"),
+         Node("d1-deepread", "prephase_deep_read", "gate")],
+        [Node("d1-pipeline", "run_pipeline", "gate")],
+        [Node("d1-branch", "INTERPRETER_ENABLED?", "branch")],
+        [Node("d1-submit", "SubmitRun + EndTrial", "gate")],
+        [Node("d1-learn", "learn_from_grader", "llm")],
+    ]
+    edges = [
+        Edge("d1-start", "d1-trial"),
+        Edge("d1-trial", "d1-open"),
+        Edge("d1-open", "d1-schema"),
+        Edge("d1-open", "d1-samples"),
+        Edge("d1-open", "d1-docs"),
+        Edge("d1-open", "d1-deepread"),
+        Edge("d1-schema", "d1-pipeline"),
+        Edge("d1-pipeline", "d1-branch"),
+        Edge("d1-branch", "d1-submit"),
+        Edge("d1-submit", "d1-learn"),
+        # dashed training-loop feedback: distil grader feedback, re-run next cycle
+        Edge("d1-learn", "d1-start", dashed=True, label="TRAIN_MAX_CYCLES"),
+    ]
+    return Diagram("Diagram 1 — End-to-end flow (harness -> pipeline)", rows, edges)

@@ -150,3 +150,17 @@ def test_arrow_bindings_valid_helper():
     assert gx.arrow_bindings_valid(ok) is True
     arrow_bad = dict(arrow, startBinding={"elementId": "ghost", "focus": 0, "gap": 8})
     assert gx.arrow_bindings_valid({"elements": [a, b, arrow_bad]}) is False
+
+
+def test_diagram1_structure():
+    d = gx.diagram1()
+    assert isinstance(d, gx.Diagram)
+    assert "End-to-end" in d.name
+    ids = {n.id for row in d.rows for n in row}
+    # every edge references nodes that exist in the diagram (no cross-diagram leak)
+    for e in d.edges:
+        assert e.src in ids and e.dst in ids
+    # the training feedback edge is dashed
+    assert any(e.dashed for e in d.edges)
+    # prephase is expanded into sub-steps
+    assert {"d1-schema", "d1-samples", "d1-docs", "d1-deepread"} <= ids
