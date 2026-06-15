@@ -76,6 +76,15 @@ class TaskCell:
     errors: list
 
 
+@dataclass
+class Rule:
+    task_id: str
+    id: str
+    created: str
+    status: str
+    surface: str
+
+
 _TASK_FILE_RE = re.compile(r"^(t\d+)(?:\.c(\d+))?$")
 
 
@@ -127,3 +136,19 @@ def parse_run(run: Run) -> "dict[str, TaskCell]":
 
 def cell_error_keys(cell: TaskCell) -> set:
     return {k for k in (normalize_error_key(e) for e in cell.errors) if k}
+
+
+def parse_learned(learned_dir) -> list:
+    rules: list = []
+    for p in sorted(Path(learned_dir).glob("*.yaml")):
+        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        tid = data.get("task_id") or p.stem
+        for e in (data.get("entries") or []):
+            rules.append(Rule(
+                task_id=tid,
+                id=str(e.get("id") or ""),
+                created=str(e.get("created") or ""),
+                status=str(e.get("status") or ""),
+                surface=str(e.get("surface") or ""),
+            ))
+    return rules

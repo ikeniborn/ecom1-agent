@@ -92,3 +92,29 @@ def test_parse_run_picks_latest_training_cycle(tmp_path):
 
     cells = rr.parse_run(rr.discover_runs(tmp_path)[0])
     assert cells["t01"].status == "OK"   # c2 (latest cycle) wins
+
+
+def test_parse_learned(tmp_path):
+    (tmp_path / "t01.yaml").write_text(
+        "task_id: t01\n"
+        "entries:\n"
+        "- id: r001\n"
+        "  created: '2026-06-15'\n"
+        "  status: active\n"
+        "  surface: codegen\n"
+        "- id: v001\n"
+        "  created: '2026-06-14'\n"
+        "  status: inactive\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "t02.yaml").write_text(
+        "task_id: t02\nentries: []\n", encoding="utf-8")
+
+    rules = rr.parse_learned(tmp_path)
+
+    assert len(rules) == 2
+    by_id = {r.id: r for r in rules}
+    assert by_id["r001"].task_id == "t01"
+    assert by_id["r001"].created == "2026-06-15"
+    assert by_id["r001"].surface == "codegen"
+    assert by_id["v001"].status == "inactive"
