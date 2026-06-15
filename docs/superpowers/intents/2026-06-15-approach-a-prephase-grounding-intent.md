@@ -1,3 +1,18 @@
+---
+review:
+  intent_hash: 302425cda944abd9
+  date: 2026-06-15
+  phases:
+    structure: {status: passed, findings: 0}
+    completeness: {status: passed, findings: 0}
+    clarity: {status: passed, findings: 2}
+    consistency: {status: passed, findings: 0}
+    alignment: {status: passed, findings: 0}
+  findings:
+    - {id: F-001, severity: WARNING, section: "Desired Outcomes", verdict: resolved}
+    - {id: F-002, severity: WARNING, section: "Health Metrics", verdict: resolved}
+---
+
 # Intent: Approach A — pre-phase grounding для качественного frozen INTENT
 
 **Date:** 2026-06-15
@@ -30,17 +45,19 @@ cite-doc-path превращает prod 0.00 в **1.0** (probe v4, `scripts/prob
   rule applied → doc cited.
 - **Bucket-B задачи (policy/counting/grounding) растут; зелёные задачи остаются зелёными**; общий
   score ≥ baseline ~32%.
-- **`docs_inventory` непустой**: discovery через Search/tree-walk (не `tree`.`stdout`) → INTENT реально
-  видит кандидат-доки; `gather_status` показывает `ok`/`empty`/`error` на факт (нет silent `""`).
-- **refs ПРОЕКТИРУЮТСЯ из INTENT.required_refs per-outcome**, PLAN поставляет только bindings →
-  G1 (под-цитирование) и G2 (пере-цитирование) исчезают структурно.
+- **INTENT видит релевантные доки**: в pre-phase trace кандидат-доки непусты, нужный topic-док
+  (напр. catalogue-counting addenda для t09) присутствует; каждый факт помечен `ok`/`empty`/`error`
+  (нет silent `""`). *(Механизм Search/tree-walk → Hard constraints.)*
+- **Грейдер не жалуется на refs**: `answer.refs` точно совпадает с required для выбранного outcome —
+  ни missing ref (G1), ни extra ref (G2). Наблюдаемо как отсутствие ref-претензий живого грейдера.
+  *(Структурно — refs проектируются из INTENT.required_refs, PLAN поставляет только bindings.)*
 
 ## Health Metrics
 
 - **Зелёные задачи остаются зелёными** — задачи со score 1.0 не регрессируют; baseline score ≥ ~32%.
 - **Бюджет LLM-вызовов** — discovery детерминирована (Search, 0 LLM в типичном случае); DOC-SELECT
   fallback только когда Search пуст (cap 4). Не раздуваем 1/2/7 budget.
-- **Время прогона** — ~3ч/прогон на 54 задачи не растёт значимо; pre-phase caps (≈4KB/doc, ≤3 hits)
+- **Время прогона** — прирост ≤10% к ~3ч baseline на 54 задачи; pre-phase caps (≈4KB/doc, ≤3 hits)
   держат контекст.
 - **Re-seed устойчивость** — INTENT не запекает literals (kind_id/city/doc-path); всё резолвится из
   текущего StartRun. Правила = методы, не значения.
