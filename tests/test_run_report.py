@@ -24,3 +24,22 @@ def test_discover_runs_parses_dirname(tmp_path):
     assert runs[0].model == "ollama-qwen"
     assert runs[1].time == "103000"
     assert runs[1].label == "2026-06-15 10:30 anthropic-claude-sonnet-4-6"
+
+
+def test_normalize_error_key():
+    # quoted path stripped; no truncation (F-001)
+    assert rr.normalize_error_key(
+        "answer missing required reference '/proc/catalog/FST-APSRIZJW.json'"
+    ) == "answer missing required reference"
+    # two messages differing only by quoted path collapse to one key
+    assert rr.normalize_error_key("answer missing required reference '/a/b.json'") == \
+           rr.normalize_error_key("answer missing required reference '/c/d.json'")
+    # [pipeline] prefix dropped, digits removed, whitespace collapsed
+    assert rr.normalize_error_key("[pipeline]  loop broken at cycle 3") == \
+           "loop broken at cycle"
+    # bare unquoted path token dropped
+    assert rr.normalize_error_key("real_vm_exec: read failed /docs/policy.md") == \
+           "real_vm_exec: read failed"
+    # no-op on a clean grader line (comma preserved, deterministic)
+    assert rr.normalize_error_key("expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION") == \
+           "expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION"

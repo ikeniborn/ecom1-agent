@@ -46,3 +46,23 @@ def discover_runs(logs_dir) -> list[Run]:
         runs.append(Run(dir=d, date=date, time=hms, model=model, label=label))
     runs.sort(key=lambda r: (r.date, r.time))
     return runs
+
+
+_QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
+_DIGITS = re.compile(r"\d+")
+
+
+def normalize_error_key(raw: str) -> str:
+    """Deterministic category key. Strip rules, in order (no truncation — F-001):
+    (1) drop leading '[pipeline] '; (2) remove quoted strings; (3) drop path-like
+    tokens (any non-space run containing '/'); (4) remove digit runs; (5) collapse
+    whitespace and strip. The result is the category verbatim.
+    """
+    s = raw or ""
+    if s.startswith("[pipeline] "):
+        s = s[len("[pipeline] "):]
+    s = _QUOTED.sub("", s)                                   # (2)
+    s = " ".join(tok for tok in s.split() if "/" not in tok)  # (3) + partial collapse
+    s = _DIGITS.sub("", s)                                   # (4)
+    s = " ".join(s.split())                                  # (5)
+    return s
