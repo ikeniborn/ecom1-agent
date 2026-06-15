@@ -82,6 +82,51 @@ def _discover_sample_rows(vm: VMAdapter, tables: list[str]) -> str:
     return "\n\n".join(parts)
 
 
+def _entry_children(node) -> list:
+    ch = getattr(node, "children", None)
+    if ch is None and isinstance(node, dict):
+        ch = node.get("children")
+    return list(ch or [])
+
+
+def _entry_name(node) -> str:
+    name = getattr(node, "name", None)
+    if name is None and isinstance(node, dict):
+        name = node.get("name")
+    return (name or "").strip("/")
+
+
+def _discover_docs(vm, root_path: str = "/docs") -> list[str]:
+    """Absolute file paths under `root_path`, walked from `TreeResponse.root`.
+
+    Uses the ecom Entry tree (`name`/`kind`/`children`), NOT `tree.stdout`
+    (absent in proto) and NOT `Find(kind=...)` (int32 mismatch yields empty).
+    A node with no children is a leaf file; a node with children is a dir.
+    """
+    try:
+        resp = vm.tree(root=root_path, level=0)
+    except Exception:
+        return []
+    root = getattr(resp, "root", None)
+    if root is None and isinstance(resp, dict):
+        root = resp.get("root")
+    if root is None:
+        return []
+
+    out: list[str] = []
+
+    def _walk(node, prefix: str) -> None:
+        children = _entry_children(node)
+        if not children:
+            out.append(prefix)
+            return
+        for ch in children:
+            _walk(ch, prefix.rstrip("/") + "/" + _entry_name(ch))
+
+    _walk(root, root_path)
+    return [p for p in out if p != root_path]
+
+
 def _augment_agents_md(agents_md_text: str, schema_text: str, sample_rows: str = "") -> str:
     if not schema_text and not sample_rows:
         return agents_md_text

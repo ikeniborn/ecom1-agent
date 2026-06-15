@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from types import SimpleNamespace as _NS
 from unittest.mock import MagicMock
 
 from agent.orchestrator import (
     _augment_agents_md,
+    _discover_docs,
     _discover_sample_rows,
     _discover_schema,
     _discover_table_names,
@@ -59,6 +61,36 @@ def test_discover_sample_rows_skips_empty_table():
     vm = MagicMock()
     vm.exec.return_value = _exec_returning("")
     assert _discover_sample_rows(vm, ["empty"]) == ""
+
+
+def _entry(name, kind="file", children=None):
+    # Mirrors ecom TreeResponse.Entry{name, kind, content_type, children}.
+    return _NS(name=name, kind=kind, content_type="", children=children or [])
+
+
+def test_discover_docs_walks_entry_tree_not_stdout():
+    root = _entry("docs", kind="dir", children=[
+        _entry("security.md"),
+        _entry("catalogue", kind="dir", children=[
+            _entry("counting.md"),
+            _entry("addenda.md"),
+        ]),
+    ])
+    vm = MagicMock()
+    # .stdout intentionally set: _discover_docs must IGNORE it (proto has no stdout).
+    vm.tree.return_value = _NS(root=root, stdout="SHOULD_BE_IGNORED")
+    paths = _discover_docs(vm)
+    assert paths == [
+        "/docs/security.md",
+        "/docs/catalogue/counting.md",
+        "/docs/catalogue/addenda.md",
+    ]
+
+
+def test_discover_docs_empty_on_tree_exception():
+    vm = MagicMock()
+    vm.tree.side_effect = RuntimeError("boom")
+    assert _discover_docs(vm) == []
 
 
 def test_augment_agents_md_includes_both_blocks():
