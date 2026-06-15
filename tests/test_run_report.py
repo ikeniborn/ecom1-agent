@@ -118,3 +118,30 @@ def test_parse_learned(tmp_path):
     assert by_id["r001"].created == "2026-06-15"
     assert by_id["r001"].surface == "codegen"
     assert by_id["v001"].status == "inactive"
+
+
+def test_parse_oracle(tmp_path):
+    atoms = tmp_path / "atoms.yaml"
+    atoms.write_text(
+        "- id: a1\n"
+        "  domain: [sql, pricing]\n"
+        "  status: validated\n"
+        "  source_task: t51\n"
+        "- id: a2\n"
+        "  domain: [sql]\n"
+        "  status: candidate\n"
+        "  source_task: t38\n",
+        encoding="utf-8",
+    )
+    stats = rr.parse_oracle(atoms)
+
+    assert stats.total == 2
+    assert stats.by_status == {"validated": 1, "candidate": 1}
+    assert stats.by_source_task == {"t51": 1, "t38": 1}
+    assert stats.top_domains[0] == ("sql", 2)   # sorted desc by count
+
+
+def test_parse_oracle_missing(tmp_path):
+    stats = rr.parse_oracle(tmp_path / "nope.yaml")
+    assert stats.total == 0
+    assert stats.by_status == {} and stats.top_domains == []

@@ -152,3 +152,34 @@ def parse_learned(learned_dir) -> list:
                 surface=str(e.get("surface") or ""),
             ))
     return rules
+
+
+@dataclass
+class OracleStats:
+    total: int
+    by_status: dict
+    by_source_task: dict
+    top_domains: list
+
+
+def parse_oracle(atoms_path) -> OracleStats:
+    p = Path(atoms_path)
+    if not p.exists():
+        return OracleStats(total=0, by_status={}, by_source_task={}, top_domains=[])
+    data = yaml.safe_load(p.read_text(encoding="utf-8")) or []
+    atoms = data if isinstance(data, list) else (data.get("atoms") or [])
+
+    by_status: dict = {}
+    by_task: dict = {}
+    dom: dict = {}
+    for a in atoms:
+        st = a.get("status") or "?"
+        by_status[st] = by_status.get(st, 0) + 1
+        src = a.get("source_task") or "—"
+        by_task[src] = by_task.get(src, 0) + 1
+        for d in (a.get("domain") or []):
+            dom[d] = dom.get(d, 0) + 1
+
+    top = sorted(dom.items(), key=lambda kv: (-kv[1], kv[0]))
+    return OracleStats(total=len(atoms), by_status=by_status,
+                       by_source_task=by_task, top_domains=top)
