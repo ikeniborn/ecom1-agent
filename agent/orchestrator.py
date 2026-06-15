@@ -7,7 +7,7 @@ import re
 from pydantic import BaseModel
 
 from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
-from bitgn.vm.ecom.ecom_pb2 import ReadRequest
+from bitgn.vm.ecom.ecom_pb2 import NodeKind, ReadRequest
 
 from agent.json_extract import _extract_json_from_text
 from agent.llm import _resolve_model_for_phase, call_llm_raw
@@ -25,6 +25,39 @@ def _read_agents_md(vm: EcomRuntimeClientSync) -> str:
         except Exception:
             continue
     return ""
+
+
+def _list_entries(vm, path: str) -> list[str]:
+    """ListResponse.entries[*].path (proto or dict). NOT `.stdout` (absent in proto)."""
+    try:
+        resp = vm.list(path=path)
+    except Exception:
+        return []
+    entries = getattr(resp, "entries", None)
+    if entries is None and isinstance(resp, dict):
+        entries = resp.get("entries")
+    out: list[str] = []
+    for e in entries or []:
+        p = getattr(e, "path", None)
+        if p is None and isinstance(e, dict):
+            p = e.get("path")
+        if p:
+            out.append(p)
+    return out
+
+
+def _stat_kind(vm, path: str) -> str:
+    """StatResponse.kind -> 'dir' | 'file' | '' (proto enum or dict/string tolerant)."""
+    try:
+        resp = vm.stat(path=path)
+    except Exception:
+        return ""
+    k = getattr(resp, "kind", None)
+    if k is None and isinstance(resp, dict):
+        k = resp.get("kind")
+    if isinstance(k, str):
+        return k if k in ("dir", "file") else ""
+    return {NodeKind.NODE_KIND_DIR: "dir", NodeKind.NODE_KIND_FILE: "file"}.get(k, "")
 
 
 _SAMPLE_TABLES_MAX = 12

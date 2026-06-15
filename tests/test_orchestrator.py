@@ -299,3 +299,42 @@ def test_fallback_does_not_mark_ok_when_reads_yield_nothing(monkeypatch):
     facts = orch.gather_prephase_facts(vm, instruction='see "Topic Name"', agents_md_text="")
     assert facts.policies == {}
     assert facts.gather_status["policies"] != "ok"
+
+
+from bitgn.vm.ecom.ecom_pb2 import NodeKind
+from agent.orchestrator import _list_entries, _stat_kind
+
+
+def test_list_entries_reads_paths_not_stdout():
+    vm = MagicMock()
+    vm.list.return_value = _NS(
+        entries=[_NS(path="/proc/incoming/payments/inpay_a.json"),
+                 _NS(path="/proc/incoming/payments/inpay_b.json")],
+        stdout="SHOULD_BE_IGNORED",
+    )
+    assert _list_entries(vm, "/proc/incoming/payments") == [
+        "/proc/incoming/payments/inpay_a.json",
+        "/proc/incoming/payments/inpay_b.json",
+    ]
+
+
+def test_list_entries_dict_tolerant_and_empty_on_error():
+    vm = MagicMock()
+    vm.list.return_value = {"entries": [{"path": "/x/a"}, {"path": ""}]}
+    assert _list_entries(vm, "/x") == ["/x/a"]
+    vm.list.side_effect = RuntimeError("boom")
+    assert _list_entries(vm, "/x") == []
+
+
+def test_stat_kind_maps_enum_and_string():
+    vm = MagicMock()
+    vm.stat.return_value = _NS(kind=NodeKind.NODE_KIND_DIR)
+    assert _stat_kind(vm, "/proc/incoming/payments") == "dir"
+    vm.stat.return_value = _NS(kind=NodeKind.NODE_KIND_FILE)
+    assert _stat_kind(vm, "/bin/sql") == "file"
+    vm.stat.return_value = {"kind": "dir"}          # dict-tolerant (mock)
+    assert _stat_kind(vm, "/x") == "dir"
+    vm.stat.return_value = _NS(kind=NodeKind.NODE_KIND_UNSPECIFIED)
+    assert _stat_kind(vm, "/nope") == ""
+    vm.stat.side_effect = RuntimeError("boom")
+    assert _stat_kind(vm, "/nope") == ""
