@@ -304,3 +304,36 @@ def diagram1() -> Diagram:
         Edge("d1-learn", "d1-start", dashed=True, label="TRAIN_MAX_CYCLES"),
     ]
     return Diagram("Diagram 1 — End-to-end flow (harness -> pipeline)", rows, edges)
+
+
+def diagram2() -> Diagram:
+    """Legacy default branch: DESIGN -> CODEGEN/gates loop -> ANSWER -> outcomes."""
+    rows = [
+        [Node("d2-design", "DESIGN (1 LLM call, frozen)", "llm")],
+        [Node("d2-override", "outcome_override?", "branch")],
+        [Node("d2-codegen", "CODEGEN (LLM)", "llm")],
+        [Node("d2-lint", "AST lint (ast.parse)", "gate")],
+        [Node("d2-retry", "check_retry_loop", "gate")],
+        [Node("d2-fidelity", "fidelity gate (subprocess)", "gate")],
+        [Node("d2-answer", "ANSWER one-shot (_AnswerGuard)", "gate")],
+        [Node("d2-learn", "LEARN + CONSOLIDATE", "llm")],
+        [Node("d2-ok", "OUTCOME_OK", "terminal"),
+         Node("d2-clar", "OUTCOME_NONE_CLARIFICATION", "terminal"),
+         Node("d2-deny", "OUTCOME_DENIED_SECURITY", "terminal")],
+    ]
+    edges = [
+        Edge("d2-design", "d2-override"),
+        Edge("d2-override", "d2-codegen"),
+        Edge("d2-codegen", "d2-lint"),
+        Edge("d2-lint", "d2-retry"),
+        Edge("d2-retry", "d2-fidelity"),
+        Edge("d2-fidelity", "d2-answer"),
+        Edge("d2-answer", "d2-ok"),
+        Edge("d2-answer", "d2-clar"),
+        Edge("d2-override", "d2-deny"),
+        # dashed feedback: each gate -> LEARN -> next cycle
+        Edge("d2-lint", "d2-learn", dashed=True),
+        Edge("d2-fidelity", "d2-learn", dashed=True),
+        Edge("d2-learn", "d2-codegen", dashed=True, label="next cycle"),
+    ]
+    return Diagram("Diagram 2 — Pipeline loop + gates (legacy, default branch)", rows, edges)

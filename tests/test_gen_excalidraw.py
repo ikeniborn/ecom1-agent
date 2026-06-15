@@ -164,3 +164,19 @@ def test_diagram1_structure():
     assert any(e.dashed for e in d.edges)
     # prephase is expanded into sub-steps
     assert {"d1-schema", "d1-samples", "d1-docs", "d1-deepread"} <= ids
+
+
+def test_diagram2_structure():
+    d = gx.diagram2()
+    assert "loop" in d.name.lower()
+    ids = {n.id for row in d.rows for n in row}
+    for e in d.edges:
+        assert e.src in ids and e.dst in ids
+    # the four in-loop gates are present
+    assert {"d2-codegen", "d2-lint", "d2-retry", "d2-fidelity"} <= ids
+    # three terminal outcomes
+    kinds = {n.id: n.kind for row in d.rows for n in row}
+    terminals = [i for i, k in kinds.items() if k == "terminal"]
+    assert len(terminals) >= 3
+    # LEARN feedback edges are dashed
+    assert any(e.dashed and e.dst == "d2-learn" for e in d.edges)
