@@ -235,3 +235,71 @@ def test_main_writes_parseable_file(tmp_path):
     gx.main(out=out)
     doc = json.loads(out.read_text())
     assert doc["type"] == "excalidraw" and doc["elements"]
+
+
+# ---------------------------------------------------------------------------
+# Task 10: Measurable layout verification tests
+# ---------------------------------------------------------------------------
+
+def _shapes_by_frame(doc):
+    """Map frameId -> list of node shape elements (excludes text, arrows, frames)."""
+    out = {}
+    for e in doc["elements"]:
+        if e["type"] in ("rectangle", "diamond", "ellipse") and e.get("frameId"):
+            out.setdefault(e["frameId"], []).append(e)
+    return out
+
+
+def _gap(a, b):
+    """Minimum axis gap between two non-overlapping boxes (0 if they touch/overlap)."""
+    ax0, ay0, ax1, ay1 = _bbox(a)
+    bx0, by0, bx1, by1 = _bbox(b)
+    dx = max(bx0 - ax1, ax0 - bx1)   # >0 if separated on x
+    dy = max(by0 - ay1, ay0 - by1)   # >0 if separated on y
+    return max(dx, dy)
+
+
+def test_layout_no_overlap_and_min_gap_within_frame():
+    doc = gx.assemble()
+    for fid, shapes in _shapes_by_frame(doc).items():
+        for i in range(len(shapes)):
+            for j in range(i + 1, len(shapes)):
+                a, b = shapes[i], shapes[j]
+                assert not _overlap(a, b), f"{a['id']} overlaps {b['id']} in {fid}"
+                assert _gap(a, b) >= 40, f"{a['id']}/{b['id']} gap < 40 in {fid}"
+
+
+def test_layout_everything_grid_snapped():
+    doc = gx.assemble()
+    for e in doc["elements"]:
+        for key in ("x", "y"):
+            assert e[key] == gx.snap(e[key]), f"{e['id']}.{key} not grid-snapped"
+
+
+def test_layout_nodes_inside_their_frame():
+    doc = gx.assemble()
+    frames = {e["id"]: e for e in doc["elements"] if e["type"] == "frame"}
+    for fid, shapes in _shapes_by_frame(doc).items():
+        fx0, fy0, fx1, fy1 = _bbox(frames[fid])
+        for s in shapes:
+            sx0, sy0, sx1, sy1 = _bbox(s)
+            assert fx0 <= sx0 and sx1 <= fx1, f"{s['id']} exceeds frame {fid} on x"
+            assert fy0 <= sy0 and sy1 <= fy1, f"{s['id']} exceeds frame {fid} on y"
+
+
+def test_layout_arrows_do_not_cross_frames_unless_labeled():
+    doc = gx.assemble()
+    shape_frame = {e["id"]: e.get("frameId")
+                   for e in doc["elements"]
+                   if e["type"] in ("rectangle", "diamond", "ellipse")}
+    labeled = set()
+    for e in doc["elements"]:
+        if e["type"] == "text" and e.get("containerId", "").startswith("e-"):
+            labeled.add(e["containerId"])
+    for e in doc["elements"]:
+        if e["type"] != "arrow":
+            continue
+        sf = shape_frame.get(e["startBinding"]["elementId"])
+        ef = shape_frame.get(e["endBinding"]["elementId"])
+        if sf != ef:
+            assert e["id"] in labeled, f"unlabeled cross-frame arrow {e['id']}"
