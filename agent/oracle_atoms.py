@@ -54,3 +54,13 @@ def save_atoms(path: str | Path, atoms: list[Atom]) -> None:
         yaml.safe_dump(out, sort_keys=False, allow_unicode=True, width=100),
         encoding="utf-8",
     )
+
+
+def build_oracle_block(oracle_atoms) -> str:
+    """Render retrieved knowledge atoms as a context block for the PLAN prompt."""
+    if not oracle_atoms:
+        return ""
+    lines = ["## VALIDATED KNOWLEDGE (apply when relevant; verified methods)"]
+    for a in oracle_atoms:
+        lines.append(f"- ({', '.join(a.domain)}) {a.content.strip()}")
+    return "\n".join(lines)

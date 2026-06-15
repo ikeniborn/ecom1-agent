@@ -7,6 +7,7 @@ from .json_extract import _extract_json_from_text
 from .learned_store import _format_entry
 from .llm import _resolve_model_for_phase
 from .models import CodegenOutput, DesignOutput
+from .oracle_atoms import build_oracle_block  # re-export: legacy design.py still imports it here
 from .prompt import load_prompt
 
 
@@ -26,15 +27,6 @@ _MAX_TOKENS_CODEGEN = int(os.environ.get("MAX_TOKENS_CODEGEN", "8192"))
 def _design_to_tool_plan_json(d: DesignOutput) -> str:
     return d.model_dump_json(indent=2)
 
-
-def build_oracle_block(oracle_atoms) -> str:
-    """Render retrieved knowledge atoms as a context block for CODEGEN."""
-    if not oracle_atoms:
-        return ""
-    lines = ["## VALIDATED KNOWLEDGE (apply when relevant; verified methods)"]
-    for a in oracle_atoms:
-        lines.append(f"- ({', '.join(a.domain)}) {a.content.strip()}")
-    return "\n".join(lines)
 
 
 def run_codegen(

@@ -1,5 +1,5 @@
 import textwrap
-from agent.oracle_atoms import Atom, load_atoms, save_atoms, content_hash
+from agent.oracle_atoms import Atom, load_atoms, save_atoms, content_hash, build_oracle_block
 
 
 def test_load_parses_atoms(tmp_path):
@@ -48,3 +48,26 @@ def test_save_roundtrip(tmp_path):
     save_atoms(p, atoms)
     again = load_atoms(p)
     assert again[0].id == "x" and again[0].domain == ["sql"]
+
+
+def _atom():
+    return Atom(id="sql-no-name-binds", description="d", domain=["sql"],
+                content="inline quoted literals in IN()", source="s",
+                validated_by="grader", validated_at="d", status="active",
+                embedding_hash="")
+
+
+def test_block_lists_atom_content():
+    block = build_oracle_block([_atom()])
+    assert "VALIDATED KNOWLEDGE" in block
+    assert "inline quoted literals" in block
+
+
+def test_empty_atoms_yields_empty_block():
+    assert build_oracle_block([]) == ""
+
+
+def test_codegen_v2_reexports_build_oracle_block():
+    # design.py imports it from codegen_v2 until Task 5; the re-export must hold.
+    from agent.codegen_v2 import build_oracle_block as via_codegen
+    assert via_codegen([]) == ""

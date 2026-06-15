@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from .codegen_v2 import build_oracle_block
+from .oracle_atoms import build_oracle_block
 from .ir_models import IntentSpec, PlanIR
 from .json_extract import _extract_json_from_text
 from .learned_store import _format_entry
