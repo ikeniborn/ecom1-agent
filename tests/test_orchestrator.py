@@ -383,3 +383,26 @@ def test_stat_kind_maps_enum_and_string():
     assert _stat_kind(vm, "/nope") == ""
     vm.stat.side_effect = RuntimeError("boom")
     assert _stat_kind(vm, "/nope") == ""
+
+
+def test_gather_path_listings_dir_lists_file_existence_nonexistent_skipped():
+    import agent.orchestrator as orch
+    from bitgn.vm.ecom.ecom_pb2 import NodeKind
+    vm = MagicMock()
+    vm.exec.return_value = _NS(stdout="", stderr="", exit_code=0)      # no schema
+    vm.read.return_value = _NS(content="")
+    vm.search.return_value = _NS(matches=[])
+    vm.tree.side_effect = RuntimeError("no docs")
+
+    def _stat(path=None):
+        if path == "/proc/incoming/payments":
+            return _NS(kind=NodeKind.NODE_KIND_DIR)
+        return _NS(kind=NodeKind.NODE_KIND_UNSPECIFIED)
+    vm.stat.side_effect = _stat
+    vm.list.return_value = _NS(entries=[_NS(path="/proc/incoming/payments/inpay_a.json")])
+
+    instr = "All details about the last transaction in /proc/incoming/payments"
+    facts = orch.gather_prephase_facts(vm, instruction=instr, agents_md_text="")
+    assert "/proc/incoming/payments" in facts.path_listings
+    assert "inpay_a.json" in facts.path_listings["/proc/incoming/payments"]
+    assert facts.gather_status.get("path_listings") == "ok"

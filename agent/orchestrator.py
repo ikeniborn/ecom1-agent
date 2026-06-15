@@ -217,6 +217,7 @@ class PrePhaseFacts(BaseModel):
     policies: dict[str, str] = {}
     identity: dict = {}
     target_records: dict[str, str] = {}
+    path_listings: dict[str, str] = {}   # instruction-named dir -> rendered listing (Tier-1)
     gather_status: dict[str, str] = {}   # fact -> ok|empty|error(<msg>)
 
 
@@ -461,10 +462,23 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhase
                 continue
     _mark("target_records", target_records)
 
+    # literal-path listings (1.2) — VM is the filter; no /proc allowlist, no hardcoded roots.
+    path_listings: dict[str, str] = {}
+    for lit in _extract_path_literals(instruction):
+        kind = _stat_kind(vm, lit)
+        if kind == "dir":
+            paths = _list_entries(vm, lit)               # Tier-1, cheap
+            if paths:
+                path_listings[lit] = _render_budget(paths, _PATH_LISTING_BUDGET)
+        elif kind == "file":
+            path_listings[lit] = f"file {lit}"           # existence; body NOT read
+        # kind == "" -> non-existent / non-data path -> skipped
+    _mark("path_listings", path_listings)
+
     return PrePhaseFacts(
         agents_md=agents_md_text, schema=schema, sample_rows=samples,
         docs_inventory=docs_inventory, policies=policies, identity=identity,
-        target_records=target_records, gather_status=status,
+        target_records=target_records, path_listings=path_listings, gather_status=status,
     )
 
 
