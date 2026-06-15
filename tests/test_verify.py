@@ -13,7 +13,8 @@ def _intent(**over):
                 outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY",
                                "OUTCOME_NONE_UNSUPPORTED"],
                 constraints=[], success_criteria=[],
-                answer_shape={"required_ref_kinds": ["runtime"]})
+                answer_shape={"required_ref_kinds": []},   # dropped in Task 12
+                required_refs={})
     base.update(over)
     return IntentSpec(**base)
 
@@ -24,15 +25,30 @@ def test_i1_ok_with_unresolved_dollar_ref_fails():
     assert not ok and "ref" in err.lower()
 
 
-def test_i1_static_only_when_runtime_required_fails():
-    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=["/docs/security.md"]))
-    ok, err = verify(res, _intent())
+def test_i1_ok_missing_a_required_ref_fails():
+    # one record_path required, but the answer carries no refs -> fail
+    intent = _intent(required_refs={"OUTCOME_OK": [
+        {"kind": "record_path", "source": "$row.record_path"}]})
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]))
+    ok, err = verify(res, intent)
     assert not ok
 
 
-def test_i1_ok_with_runtime_ref_passes():
-    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=["/proc/catalog/A.json"]))
-    ok, err = verify(res, _intent(answer_shape={"required_ref_kinds": ["runtime"]}))
+def test_i1_ok_with_all_required_refs_passes():
+    intent = _intent(required_refs={"OUTCOME_OK": [
+        {"kind": "policy_doc", "path": "/docs/counting.md"},
+        {"kind": "record_path", "source": "$row.record_path"}]})
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK",
+                                 refs=["/docs/counting.md", "/proc/catalog/A.json"]))
+    ok, err = verify(res, intent)
+    assert ok, err
+
+
+def test_i1_static_only_docs_ref_no_longer_auto_fails():
+    # regression guard: the deleted /docs-static heuristic must NOT fire.
+    # With required_refs empty, a /docs-only OK answer is acceptable to verify.
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=["/docs/security.md"]))
+    ok, err = verify(res, _intent())
     assert ok, err
 
 

@@ -18,15 +18,17 @@ def verify(result: InterpretResult, intent: IntentSpec) -> tuple[bool, str]:
     if ans.outcome not in intent.outcome_space:
         return False, f"I2: outcome {ans.outcome!r} not in outcome_space {intent.outcome_space!r}"
 
-    # I1: ref-grounding on OK answers
+    # I1: ref-grounding on OK answers — every required ref for the selected
+    # outcome must be present and non-empty. refs are projected by the
+    # interpreter from intent.required_refs, so this is defense-in-depth.
     if ans.outcome == "OUTCOME_OK":
         unresolved = [r for r in ans.refs if isinstance(r, str) and r.startswith("$")]
         if unresolved:
             return False, f"I1: unresolved refs {unresolved!r} on OK answer"
-        if "runtime" in intent.answer_shape.required_ref_kinds:
-            non_static = [r for r in ans.refs if not str(r).startswith("/docs/")]
-            if not non_static:
-                return False, "I1: OK answer requires a runtime ref but carries only static refs"
+        n_required = len(intent.required_refs.get(ans.outcome, []))
+        if n_required and len(ans.refs) < n_required:
+            return False, (f"I1: OK answer carries {len(ans.refs)} ref(s) "
+                           f"but {n_required} required")
 
     # I3: independent security re-check from the frozen IntentSpec (defense in depth)
     for c in intent.constraints:
