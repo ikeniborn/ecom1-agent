@@ -218,6 +218,51 @@ def test_render_html_smoke():
     assert html.rstrip().endswith("</html>")
 
 
+def test_parse_run_tolerates_malformed_line(tmp_path):
+    """Blocker regression: a truncated JSONL line (e.g. from interrupted run) must not
+    crash _parse_task_file; valid task_result must still be read."""
+    run_dir = tmp_path / "20260615_120000_m"
+    run_dir.mkdir()
+    # Write a t01.jsonl whose last line is deliberately invalid JSON
+    (run_dir / "t01.jsonl").write_text(
+        json.dumps({"type": "header", "task_id": "t01"}) + "\n"
+        + json.dumps({"type": "task_result", "outcome": "OUTCOME_OK",
+                      "cycles_used": 2, "score_detail": [], "task_id": "t01"}) + "\n"
+        + '{"type": "llm_call", "cyc'  # truncated / malformed — no trailing newline
+        ,
+        encoding="utf-8",
+    )
+
+    run = rr.discover_runs(tmp_path)[0]
+    cells = rr.parse_run(run)  # must NOT raise
+
+    assert cells["t01"].status == "OK"
+    assert cells["t01"].cycles == 2
+
+
+def test_render_html_escapes_injection():
+    """Security regression: data-derived strings with HTML/JS must be escaped in output."""
+    runs = [rr.Run(dir=Path("logs/20260615_120000_m"), date="2026-06-15",
+                   time="120000", model="<b>badmodel</b>", label="2026-06-15 12:00 <b>badmodel</b>")]
+    injection_error = "<script>alert(1)</script> at /x/y.json"
+    matrix = {
+        "t01": {"2026-06-15 12:00 <b>badmodel</b>": rr.TaskCell(
+            "t01", "CLARIFY", 2, [injection_error])},
+    }
+    learned = []
+    oracle = rr.OracleStats(total=0, by_status={}, by_source_task={}, top_domains=[])
+    errors = rr.build_error_report(matrix)
+
+    html = rr.render_html(runs, matrix, learned, oracle, errors)
+
+    # Raw tags must NOT appear verbatim
+    assert "<script>" not in html
+    assert "<b>badmodel</b>" not in html
+    # Escaped forms MUST be present
+    assert "&lt;script&gt;" in html
+    assert "&lt;b&gt;badmodel&lt;/b&gt;" in html
+
+
 def test_main_writes_report(tmp_path, monkeypatch, capsys):
     logs = tmp_path / "logs"
     run_dir = logs / "20260615_120000_m"

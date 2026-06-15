@@ -98,7 +98,15 @@ def _task_id_and_cycle(name: str) -> "tuple[str, int]":
 
 
 def _parse_task_file(task_id: str, path: Path) -> TaskCell:
-    records = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    records = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
     tr = next((r for r in reversed(records) if r.get("type") == "task_result"), None)
     ans = next((r for r in reversed(records) if r.get("type") == "answer"), None)
 
@@ -319,6 +327,9 @@ def _learned_table(runs, tasks, lcount, target) -> str:
     for tid in tasks:
         cells = []
         for r in runs:
+            # Intentional: a cell lights only when a rule's created date == the run's
+            # calendar date — this is a per-day *creation* heatmap, not a cumulative
+            # active-state heatmap. Do not change to cumulative without updating the spec.
             n = lcount.get((tid, r.date), 0)
             bg = _lerp_hex(n / vmax, target) if n else "#fff"
             txt = str(n) if n else ""
