@@ -193,3 +193,26 @@ def test_build_error_report(tmp_path):
     assert by_key["loop broken at cycle"].total == 1
     # sorted by total desc
     assert report[0].key == "answer missing required reference"
+
+
+def test_render_html_smoke():
+    runs = [rr.Run(dir=Path("logs/20260615_120000_m"), date="2026-06-15",
+                   time="120000", model="m", label="2026-06-15 12:00 m")]
+    matrix = {
+        "t01": {"2026-06-15 12:00 m": rr.TaskCell("t01", "OK", 2, [])},
+        "t02": {"2026-06-15 12:00 m": rr.TaskCell(
+            "t02", "CLARIFY", 3, ["loop broken at cycle 3"])},
+    }
+    learned = [rr.Rule("t01", "r001", "2026-06-15", "active", "codegen")]
+    oracle = rr.OracleStats(total=1, by_status={"validated": 1},
+                            by_source_task={"t51": 1}, top_domains=[("sql", 1)])
+    errors = rr.build_error_report(matrix)
+
+    html = rr.render_html(runs, matrix, learned, oracle, errors)
+
+    assert html.lstrip().startswith("<!DOCTYPE html>")
+    for heading in ("RESULTS", "CYCLES", "ERRORS", "LEARNED", "Oracle", "Error Report"):
+        assert heading in html
+    assert "t01" in html and "t02" in html       # every task row present
+    assert "loop broken at cycle" in html        # error category rendered
+    assert html.rstrip().endswith("</html>")

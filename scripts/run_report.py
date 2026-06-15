@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import html as _html
 import json
 import re
 import sys
@@ -228,3 +229,152 @@ def build_error_report(matrix: dict) -> list:
     ]
     out.sort(key=lambda c: (-c.total, c.key))
     return out
+
+
+# ── HTML rendering ─────────────────────────────────────────────────────────────
+
+_RED = (198, 40, 40)
+_BLUE = (21, 101, 192)
+_STATUS_COLOR = {"OK": "#2e7d32", "CLARIFY": "#f9a825", "INCOMPLETE": "#9e9e9e"}
+
+_HEAD = """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Run Report</title><style>
+body{font:13px/1.4 system-ui,sans-serif;margin:24px;color:#222}
+h2{margin-top:32px;border-bottom:2px solid #ddd;padding-bottom:4px}
+table{border-collapse:collapse;margin:8px 0}
+th,td{border:1px solid #ccc;padding:3px 6px;text-align:center;white-space:nowrap}
+th.task,td.task{text-align:left;font-weight:600;position:sticky;left:0;background:#fafafa}
+th{background:#f0f0f0;font-weight:600}
+.bar{height:14px;background:#1565c0;display:inline-block;vertical-align:middle}
+</style></head><body>
+<h1>Run Report</h1>"""
+
+_FOOT = "</body></html>"
+
+
+def _esc(s) -> str:
+    return _html.escape(str(s))
+
+
+def _lerp_hex(t: float, target: tuple) -> str:
+    t = 0.0 if t < 0 else 1.0 if t > 1 else t
+    r = int(255 + (target[0] - 255) * t)
+    g = int(255 + (target[1] - 255) * t)
+    b = int(255 + (target[2] - 255) * t)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _task_sort_key(tid: str):
+    m = re.search(r"\d+", tid)
+    return (int(m.group()) if m else 9999, tid)
+
+
+def _col_headers(runs: list) -> str:
+    th = "".join(f"<th>{_esc(r.label)}</th>" for r in runs)
+    return f"<tr><th class='task'>task</th>{th}</tr>"
+
+
+def _results_table(runs, matrix, tasks) -> str:
+    rows = []
+    for tid in tasks:
+        cells = []
+        for r in runs:
+            cell = matrix[tid].get(r.label)
+            if cell is None:
+                cells.append("<td></td>")
+            else:
+                color = _STATUS_COLOR.get(cell.status, "#fff")
+                cells.append(f"<td style='background:{color};color:#fff'>{_esc(cell.status)}</td>")
+        rows.append(f"<tr><td class='task'>{_esc(tid)}</td>{''.join(cells)}</tr>")
+    return ("<h2>RESULTS</h2><table>"
+            + _col_headers(runs) + "".join(rows) + "</table>")
+
+
+def _numeric_table(title, runs, matrix, tasks, value_fn, target) -> str:
+    vals = [v for tid in tasks for r in runs
+            if (v := value_fn(matrix[tid].get(r.label))) is not None]
+    vmax = max(vals) if vals else 1
+    vmax = vmax or 1
+    rows = []
+    for tid in tasks:
+        cells = []
+        for r in runs:
+            cell = matrix[tid].get(r.label)
+            v = value_fn(cell) if cell is not None else None
+            if v is None:
+                cells.append("<td></td>")
+            else:
+                bg = _lerp_hex(v / vmax, target)
+                cells.append(f"<td style='background:{bg}'>{_esc(v)}</td>")
+        rows.append(f"<tr><td class='task'>{_esc(tid)}</td>{''.join(cells)}</tr>")
+    return (f"<h2>{title}</h2><table>"
+            + _col_headers(runs) + "".join(rows) + "</table>")
+
+
+def _learned_table(runs, tasks, lcount, target) -> str:
+    vmax = max(lcount.values()) if lcount else 1
+    vmax = vmax or 1
+    rows = []
+    for tid in tasks:
+        cells = []
+        for r in runs:
+            n = lcount.get((tid, r.date), 0)
+            bg = _lerp_hex(n / vmax, target) if n else "#fff"
+            txt = str(n) if n else ""
+            cells.append(f"<td style='background:{bg}'>{txt}</td>")
+        rows.append(f"<tr><td class='task'>{_esc(tid)}</td>{''.join(cells)}</tr>")
+    return ("<h2>LEARNED</h2><table>"
+            + _col_headers(runs) + "".join(rows) + "</table>")
+
+
+def _oracle_section(oracle) -> str:
+    if oracle.total == 0:
+        return "<h2>Oracle</h2><p>No atoms (data/oracle/atoms.yaml absent or empty).</p>"
+    dmax = oracle.top_domains[0][1] if oracle.top_domains else 1
+    bars = "".join(
+        f"<div>{_esc(tag)} ({n}) "
+        f"<span class='bar' style='width:{int(200 * n / dmax)}px'></span></div>"
+        for tag, n in oracle.top_domains[:15]
+    )
+
+    def _kv_table(title, d):
+        rows = "".join(f"<tr><td class='task'>{_esc(k)}</td><td>{v}</td></tr>"
+                       for k, v in sorted(d.items(), key=lambda kv: (-kv[1], kv[0])))
+        return f"<h3>{title}</h3><table>{rows}</table>"
+
+    return ("<h2>Oracle</h2>"
+            f"<p>total atoms: {oracle.total}</p>{bars}"
+            + _kv_table("by status", oracle.by_status)
+            + _kv_table("by source_task", oracle.by_source_task))
+
+
+def _error_report(errors) -> str:
+    head = ("<tr><th class='task'>category</th><th>total</th><th>tasks</th>"
+            "<th>runs</th><th>example</th></tr>")
+    rows = "".join(
+        f"<tr><td class='task'>{_esc(c.key)}</td><td>{c.total}</td><td>{c.tasks}</td>"
+        f"<td>{len(c.runs)}</td><td>{_esc(c.example)}</td></tr>"
+        for c in errors
+    )
+    if not rows:
+        rows = "<tr><td colspan='5'>no errors recorded</td></tr>"
+    return f"<h2>Error Report</h2><table>{head}{rows}</table>"
+
+
+def render_html(runs, matrix, learned, oracle, errors) -> str:
+    tasks = sorted(matrix.keys(), key=_task_sort_key)
+    lcount: dict = {}
+    for rule in learned:
+        lcount[(rule.task_id, rule.created)] = lcount.get((rule.task_id, rule.created), 0) + 1
+    parts = [
+        _HEAD,
+        _results_table(runs, matrix, tasks),
+        _numeric_table("CYCLES", runs, matrix, tasks, lambda c: c.cycles, _RED),
+        _numeric_table("ERRORS", runs, matrix, tasks,
+                       lambda c: len(cell_error_keys(c)), _RED),
+        _learned_table(runs, tasks, lcount, _BLUE),
+        _oracle_section(oracle),
+        _error_report(errors),
+        _FOOT,
+    ]
+    return "\n".join(parts)
