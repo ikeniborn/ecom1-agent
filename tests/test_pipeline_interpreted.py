@@ -179,6 +179,65 @@ def test_interpreter_max_steps_default_and_override(monkeypatch):
     assert int(os.environ.get("INTERPRETER_MAX_STEPS", "6")) == 9     # override resolves
 
 
+def test_plan_signature_normalizes_sql_and_rpcs():
+    from agent.pipeline import _plan_signature
+    from agent.ir_models import PlanIR
+    a = PlanIR(**json.loads(_PLAN))
+    b = PlanIR(**json.loads(_PLAN.replace("SELECT 1 AS cnt", "select   1   AS   cnt")))
+    assert _plan_signature(a) == _plan_signature(b)   # whitespace/case-insensitive
+
+
+def test_interpreter_breaks_on_repeated_plan(monkeypatch):
+    from agent import pipeline
+    monkeypatch.setattr(pipeline, "_IMAX_STEPS", 5)
+    # Same plan every cycle, but verify always fails -> 2nd identical sig breaks.
+    intent = json.dumps({
+        "objective": "o", "desired_outcome": "d", "params": {},
+        "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
+        "constraints": [], "success_criteria": [{"op": "eq", "lhs": "$row0.cnt", "rhs": "999"}],
+        "answer_shape": {},
+    })
+    learn = json.dumps({"rule_content": "cnt must be 999 for this task type", "reasoning": "x",
+                        "deactivate_ids": [], "skip": False})
+    vm = MagicMock(); vm.exec.return_value = {"stdout": "cnt\n5"}
+    # INTENT, then PLAN/LEARN pairs; the 2nd identical plan must break before exhausting 5 cycles.
+    seq = [intent, _PLAN, learn, _PLAN, learn, _PLAN, learn, _PLAN, learn, _PLAN, learn]
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(*seq)):
+        m = run_pipeline(vm, instruction="how many", task_id="t_rep", agents_md_text="A")
+    assert m["outcome"] == "OUTCOME_NONE_CLARIFICATION"
+    assert m["cycles_used"] <= 2          # broke on the 2nd identical signature
+
+
+def test_plan_signature_differs_on_nonsql_arg():
+    # Regression: two plans identical in SQL + RPC names but differing only in a
+    # non-SQL step's path arg must produce DIFFERENT signatures so the identical-plan
+    # guard does NOT false-fire and kill a legitimate re-plan (e.g. LEARN changed a
+    # Read/List path). Variant is built by injecting a List discovery step at a
+    # different path into an otherwise identical PlanIR.
+    from agent.pipeline import _plan_signature
+    from agent.ir_models import PlanIR
+
+    base_dict = json.loads(_PLAN)
+
+    # Add a List step with path="/proc/a" to the base plan's discovery.
+    plan_a_dict = dict(base_dict)
+    plan_a_dict["discovery"] = list(base_dict["discovery"]) + [
+        {"rpc": "List", "args": {"path": "/proc/a"}}
+    ]
+
+    # Same structure but with path="/proc/b" — the only difference.
+    plan_b_dict = dict(base_dict)
+    plan_b_dict["discovery"] = list(base_dict["discovery"]) + [
+        {"rpc": "List", "args": {"path": "/proc/b"}}
+    ]
+
+    a = PlanIR(**plan_a_dict)
+    b = PlanIR(**plan_b_dict)
+    assert _plan_signature(a) != _plan_signature(b), (
+        "_plan_signature must distinguish plans that differ only in a non-SQL step arg"
+    )
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader

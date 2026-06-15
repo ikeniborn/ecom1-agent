@@ -97,6 +97,29 @@ def _normalise(sql: str) -> str:
     return _WHITESPACE_RE.sub(" ", sql).strip()
 
 
+def _norm_sql(s: str) -> str:
+    return " ".join(str(s).lower().split())
+
+
+def _plan_signature(plan) -> tuple:
+    """Per-step identity over discovery + ops: SQL is whitespace/case-normalized;
+    non-SQL step args (paths, patterns, branches) are included verbatim so a re-plan
+    that changes only a Read/List path is NOT mistaken for 'no progress'.
+
+    Consecutive-identical signatures => the plan stopped changing (R4 short-circuit).
+    Note: A<->B oscillation is not caught here (consecutive-only); the cycle ceiling
+    bounds that case."""
+    steps = list(plan.discovery) + list(plan.ops)
+    parts: list[tuple] = []
+    for st in steps:
+        if st.rpc == "Exec" and str(st.args.get("path", "")) == "/bin/sql":
+            normed = tuple(sorted(_norm_sql(a) for a in st.args.get("args", []) or []))
+            parts.append((st.rpc, normed))
+        else:
+            parts.append((st.rpc, repr(sorted(st.args.items()))))
+    return tuple(parts)
+
+
 def _fold_facts_into_agents_md(agents_md_text: str, facts) -> str:
     """Append pre-phase grounding facts to agents_md for the legacy DESIGN path.
 
@@ -356,6 +379,7 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
 
     last_error = None
     last_observed = None
+    prev_sig = None
     cycle = 0
     for cycle in range(1, _IMAX_STEPS + 1):
         set_cycle(cycle)
@@ -372,6 +396,13 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
             _ilearn(task_id, learn_ctx, intent,
                     plan.model_dump_json() if plan is not None else "", last_error)
             continue
+
+        sig = _plan_signature(plan)
+        if sig == prev_sig:
+            last_error = "identical plan repeated (no progress)"
+            print(f"{CLI_YELLOW}[pipeline] identical plan repeated -> CLARIFICATION{CLI_CLR}")
+            break
+        prev_sig = sig
 
         try:
             result = interpret(plan, intent, vm, facts)
