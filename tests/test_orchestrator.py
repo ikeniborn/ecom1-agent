@@ -165,6 +165,29 @@ def test_parse_identity_empty_on_blank():
     assert _parse_identity("   ") == {}
 
 
+from agent.orchestrator import _search_paths, _proc_candidates
+
+
+def test_search_paths_unique_ordered_from_matches():
+    resp = _NS(matches=[
+        _NS(path="/docs/a.md", line=1, line_text="x"),
+        _NS(path="/docs/b.md", line=2, line_text="y"),
+        _NS(path="/docs/a.md", line=9, line_text="z"),   # dup path dropped
+    ])
+    assert _search_paths(resp) == ["/docs/a.md", "/docs/b.md"]
+
+
+def test_search_paths_empty_on_no_matches():
+    assert _search_paths(_NS(matches=[])) == []
+    assert _search_paths({"matches": []}) == []
+
+
+def test_proc_candidates_maps_prefix_to_plural_dir():
+    assert _proc_candidates("store_S001") == ["/proc/stores/store_S001.json"]
+    assert _proc_candidates("basket_069") == ["/proc/baskets/basket_069.json"]
+    assert _proc_candidates("unknown_xx") == []   # unmapped prefix -> no probe
+
+
 from agent.orchestrator import gather_prephase_facts, PrePhaseFacts
 
 

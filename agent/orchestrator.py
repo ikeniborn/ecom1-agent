@@ -151,7 +151,15 @@ class PrePhaseFacts(BaseModel):
 
 
 _ID_SPLIT_RE = re.compile(r"[\s,]+")
-_RECORD_ID_RE = re.compile(r"\b(basket|payment|return|order)_\w+\b", re.IGNORECASE)
+# P3 (S1-R6): widen record discovery beyond baskets/payments.
+_RECORD_ID_RE = re.compile(
+    r"\b(basket|payment|return|order|store|employee|product)_\w+\b", re.IGNORECASE
+)
+_PROC_DIR = {
+    "basket": "baskets", "payment": "payments", "return": "returns",
+    "order": "orders", "store": "stores", "employee": "employees",
+    "product": "products",
+}
 _QUOTED_RE = re.compile(r'"([^"]+)"')
 # Two or more Capitalized words in a row (hyphens kept: "Non-Bladed Workshop").
 _CAP_SEQ_RE = re.compile(r"\b([A-Z][\w-]*(?:\s+[A-Z][\w-]*)+)\b")
@@ -191,6 +199,28 @@ def _parse_identity(stdout: str) -> dict:
             if k:
                 out[k] = v
     return out
+
+
+def _search_paths(resp) -> list[str]:
+    """SearchResponse.matches[*].path -> ordered unique list (proto or dict)."""
+    matches = getattr(resp, "matches", None)
+    if matches is None and isinstance(resp, dict):
+        matches = resp.get("matches")
+    out: list[str] = []
+    for m in matches or []:
+        p = getattr(m, "path", None)
+        if p is None and isinstance(m, dict):
+            p = m.get("path")
+        if p and p not in out:
+            out.append(p)
+    return out
+
+
+def _proc_candidates(record_id: str) -> list[str]:
+    """Map `<prefix>_<id>` to its `/proc/<plural>/<id>.json` probe path(s)."""
+    prefix = record_id.split("_", 1)[0].lower()
+    plural = _PROC_DIR.get(prefix)
+    return [f"/proc/{plural}/{record_id}.json"] if plural else []
 
 
 def _extract_text(r, attr: str) -> str:
