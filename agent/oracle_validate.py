@@ -50,3 +50,26 @@ def grade_candidate(task_id, answer_builder):
             pass
     res = c.submit_run(H.SubmitRunRequest(run_id=run.run_id, force=True))
     return parse_score(res, task_id)
+
+
+def validate_atom_via_grader(atom, task_id, intent, plan, min_score: float = 1.0) -> bool:
+    """Re-run `plan` on a fresh StartRun and report whether the grader score
+    meets `min_score`. Best-effort: any failure (no live grader, replay error)
+    returns False so the atom stays candidate — never raises.
+
+    Limitation: the fresh-VM replay runs `interpret(plan, intent, vm, facts=None)`.
+    Plans whose predicates read `$_facts.*` (pre-phase grounding) degrade on the
+    fresh VM and may under-promote; this is conservative by design.
+    """
+    try:
+        from agent.interpreter import interpret
+
+        def _builder(vm):
+            res = interpret(plan, intent, vm, facts=None)
+            a = res.captured
+            return a.message[:800], a.outcome, list(a.refs)
+
+        score, _detail = grade_candidate(task_id, _builder)
+        return score is not None and score >= min_score
+    except Exception:
+        return False

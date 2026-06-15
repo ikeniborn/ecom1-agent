@@ -99,13 +99,13 @@ def test_interpreted_verify_fail_then_learn_then_exhaust(monkeypatch):
     assert m["outcome"] == "OUTCOME_NONE_CLARIFICATION"
 
 
-def test_interpreted_ignores_legacy_learned_rules(monkeypatch, tmp_path):
+def test_interpreted_surfaces_all_active_learned_rules(monkeypatch, tmp_path):
+    # Surface collapse (D5): ALL active rules (any surface) now reach the PLAN prompt.
     # _enabled autouse fixture already sets INTERPRETER_ENABLED + chdir + _LEARNED_DIR=tmp_path.
-    # Seed a legacy codegen-era rule for the task; confirm it never reaches the PLAN prompt.
     import yaml as _yaml
     from agent import learned_store
 
-    SENTINEL = "LEGACY_CODEGEN_BAKED_PATH_RULE_ZZZ"
+    SENTINEL = "ALL_SURFACES_ACTIVE_RULE_ZZZ"
     (tmp_path / "t_iso.yaml").write_text(_yaml.safe_dump({
         "entries": [{"id": "r1", "active": True, "status": "active", "content": SENTINEL}],
         "last_run": {},
@@ -124,8 +124,9 @@ def test_interpreted_ignores_legacy_learned_rules(monkeypatch, tmp_path):
         run_pipeline(vm, instruction="x", task_id="t_iso", agents_md_text="A")
 
     assert captured, "no LLM calls captured"
-    assert all(SENTINEL not in u for u in captured), (
-        "legacy codegen-era learned rule leaked into an IR PLAN prompt"
+    # After surface collapse, any active rule (regardless of surface tag) must appear in PLAN prompt.
+    assert any(SENTINEL in u for u in captured), (
+        "active learned rule missing from PLAN prompt after surface collapse"
     )
 
 
@@ -146,9 +147,9 @@ def test_ilearn_stamps_ir_surface_and_persists_deep_read():
     assert learned_store.load_prephase_deep_read("t_ir") == ["/proc/incoming/payments"]
 
 
-def test_interpreter_seeds_ir_learn_ctx_and_uses_imax(monkeypatch):
+def test_interpreter_seeds_all_active_rules_and_uses_imax(monkeypatch):
     from agent import learned_store, pipeline
-    # An active IR rule for this tid must reach run_plan's learn_ctx; codegen noise must not.
+    # Surface collapse (D5): ALL active rules reach run_plan's learn_ctx regardless of surface.
     learned_store._write("t_seed", {"task_id": "t_seed", "entries": [
         {"id": "r001", "content": "Always project the record_path ref", "status": "active", "surface": "ir"},
         {"id": "r002", "content": "codegen-era noise", "status": "active", "surface": "codegen"},
@@ -165,7 +166,8 @@ def test_interpreter_seeds_ir_learn_ctx_and_uses_imax(monkeypatch):
     with patch("agent.pipeline.call_llm_raw", side_effect=_seq(_INTENT)), \
          patch("agent.reason.run_plan", side_effect=_capture_plan):
         pipeline.run_pipeline(vm, instruction="how many", task_id="t_seed", agents_md_text="A")
-    assert seen["ctx"] == ["r001"]      # only the IR-surface rule, not codegen noise
+    # After surface collapse both ir- and codegen-surface rules reach PLAN.
+    assert set(seen["ctx"]) == {"r001", "r002"}
 
 
 def test_interpreter_max_steps_default_and_override(monkeypatch):

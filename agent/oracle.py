@@ -122,8 +122,9 @@ class KnowledgeOracle:
     def distill(self, design_intent, error, script_code, source_task=""):
         user = (f"INTENT:\n{design_intent}\n\nERROR:\n{error}\n\n"
                 f"SCRIPT:\n{(script_code or '')[:4000]}\n\nReturn the atom JSON.")
+        from .llm import _resolve_model_for_phase
         out = call_llm_json(self._DISTILL_SYS, user,
-                            os.environ.get("MODEL_LEARN") or os.environ.get("MODEL", ""))
+                            _resolve_model_for_phase("distill", os.environ.get("MODEL", "")))
         if not isinstance(out, dict) or not out.get("content"):
             return None
         atom = Atom(id=out["id"], description=out.get("description", ""),

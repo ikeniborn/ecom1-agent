@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import os
 import re
+from datetime import date
 from pathlib import Path
 
 from .codegen_v2 import CodegenError, run_codegen
@@ -16,6 +17,7 @@ from .llm import (
     OUTCOME_BY_NAME, _resolve_model_for_phase, call_llm_raw,
 )
 from .mock_vm_spy import MockVMSpy, fixture_key
+from .oracle_validate import validate_atom_via_grader
 from .models import DesignOutput, LearnConsolidateOutput, TestSpec
 from .prompt import load_prompt
 from .sql_security import check_retry_loop  # noqa: F401  (retained for backward import compat)
@@ -331,6 +333,43 @@ def _persist_artifacts(task_id, intent, plan):
     (heur / f"{task_id}.plan.json").write_text(plan.model_dump_json(indent=2), encoding="utf-8")
 
 
+def _new_oracle():
+    from .oracle import KnowledgeOracle
+    return KnowledgeOracle()
+
+
+def _distill_call(oracle, intent, plan, task_id, outcome_note):
+    # `error` param is repurposed as a short success note; the distill prompt
+    # strips all run-specific values, so a success note is fine (spec §Distill).
+    return oracle.distill(design_intent=intent.objective,
+                          error=outcome_note,
+                          script_code=plan.model_dump_json(),
+                          source_task=task_id)
+
+
+def _maybe_distill_and_validate(intent, plan, task_id, outcome_note) -> None:
+    """On a successful cycle, distill a candidate atom (ORACLE_DISTILL=1) and,
+    when ORACLE_VALIDATE_INLINE=1, grader-validate then promote. Never raises."""
+    if (os.environ.get("ORACLE_ENABLED", "1") == "0"
+            or os.environ.get("ORACLE_DISTILL", "0") != "1"):
+        return
+    try:
+        oracle = _new_oracle()
+        atom = _distill_call(oracle, intent, plan, task_id, outcome_note)
+    except Exception as e:
+        print(f"{CLI_YELLOW}[pipeline] oracle distill skipped: {e}{CLI_CLR}")
+        return
+    if not atom or os.environ.get("ORACLE_VALIDATE_INLINE", "1") != "1":
+        return
+    try:
+        if validate_atom_via_grader(atom, task_id, intent, plan):
+            oracle.promote(atom.id, validated_by="grader-oracle",
+                           validated_at=str(date.today()))
+            print(f"{CLI_GREEN}[pipeline] atom {atom.id} promoted (grader-validated){CLI_CLR}")
+    except Exception as e:
+        print(f"{CLI_YELLOW}[pipeline] atom promote skipped: {e}{CLI_CLR}")
+
+
 # ---------------------------------------------------------------------------
 # Interpreted pipeline branch (INTERPRETER_ENABLED)
 # ---------------------------------------------------------------------------
@@ -345,10 +384,9 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
     from .reason import IntentError, PlanError, run_intent, run_plan
     from .verify import verify
 
-    # The IR PLAN LLM must not inherit codegen-era learned rules (they reference the old
-    # codegen surface and bake literals). Seed only IR-surface rules for this tid; the
-    # interpreter self-corrects within a run via per-cycle prev_error fed to run_plan.
-    learn_ctx: list = load_entries(task_id, surface="ir")
+    # Surface collapse (D5): PLAN sees all active rules; the grader-feedback
+    # training-mode bug self-heals because learn_from_grader writes the same store.
+    learn_ctx: list = load_entries(task_id)
     total_in = total_out = 0
 
     def _accum(tk):
@@ -435,6 +473,8 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
             refs = _ground_security_refs(ans.outcome, list(ans.refs))
             vm.answer(message=ans.message[:800], outcome=ans.outcome, refs=refs)
             _persist_artifacts(task_id, intent, plan)
+            _maybe_distill_and_validate(intent, plan, task_id,
+                                        f"OK: {verr or 'verify passed'}")
             status = "success" if ans.outcome == "OUTCOME_OK" else "failure"
             save_last_run(task_id, status, ans.outcome, cycle)
             return {"cycles_used": cycle, "outcome": ans.outcome, "status": status,
