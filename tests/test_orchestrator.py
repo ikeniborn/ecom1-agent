@@ -175,7 +175,16 @@ def test_extract_entity_tokens_dedupes_and_handles_empty():
     assert toks.count("Alpha") == 1
 
 
-from agent.orchestrator import _parse_identity
+from agent.orchestrator import _identity_kind, _parse_identity
+
+
+def test_identity_kind_structural():
+    assert _identity_kind({"customer_id": "cust_016"}) == "customer"
+    assert _identity_kind({"id": "cust_001", "store": "s1"}) == "customer"
+    assert _identity_kind({"employee_id": "emp_023", "role": "fulfillment_coordinator"}) == "employee"
+    assert _identity_kind({"id": "wholly_new_role_99"}) == "employee"   # unknown role -> employee (safe)
+    assert _identity_kind({}) == "guest"
+    assert _identity_kind({"store": ""}) == "guest"
 
 
 def test_parse_identity_tolerant_to_commas_and_whitespace():

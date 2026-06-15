@@ -285,6 +285,24 @@ def _parse_identity(stdout: str) -> dict:
     return out
 
 
+def _identity_kind(identity: dict) -> str:
+    """Structural id-shape classification (H3 — no role-name list).
+
+    customer_id / cust_* present -> 'customer'; any other non-empty authenticated
+    id -> 'employee' (operational; the safe default — a new employee role classifies
+    as employee, never silently guest); empty -> 'guest'."""
+    if not identity:
+        return "guest"
+    if (identity.get("customer_id") or "").strip():
+        return "customer"
+    if any(isinstance(v, str) and v.strip().lower().startswith("cust_")
+           for v in identity.values()):
+        return "customer"
+    if any(isinstance(v, str) and v.strip() for v in identity.values()):
+        return "employee"
+    return "guest"
+
+
 def _search_paths(resp) -> list[str]:
     """SearchResponse.matches[*].path -> ordered unique list (proto or dict)."""
     matches = getattr(resp, "matches", None)
@@ -398,6 +416,7 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhase
     try:
         id_out = _sql_stdout_or_exec(vm, "/bin/id")
         identity = _parse_identity(id_out)
+        identity["kind"] = _identity_kind(identity)
         _mark("identity", identity)
     except Exception as e:                       # pragma: no cover - defensive
         identity, _ = {}, _mark("identity", None, str(e))
