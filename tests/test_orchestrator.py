@@ -302,7 +302,52 @@ def test_fallback_does_not_mark_ok_when_reads_yield_nothing(monkeypatch):
 
 
 from bitgn.vm.ecom.ecom_pb2 import NodeKind
+from agent.orchestrator import _extract_path_literals, _render_budget
 from agent.orchestrator import _list_entries, _stat_kind
+
+
+def test_extract_path_literals_any_root_strip_dedup():
+    instr = "details in /proc/incoming/payments and /data/incoming/x.json, also /proc/incoming/payments again"
+    out = _extract_path_literals(instr)
+    assert out == ["/proc/incoming/payments", "/data/incoming/x.json"]  # dedup, trailing comma stripped
+
+
+def test_extract_path_literals_respects_cap(monkeypatch):
+    monkeypatch.setenv("PREPHASE_PATH_LITERALS", "2")
+    import importlib, agent.orchestrator as orch
+    importlib.reload(orch)
+    try:
+        out = orch._extract_path_literals("/a/b /c/d /e/f /g/h")
+        assert out == ["/a/b", "/c/d"]
+    finally:
+        monkeypatch.delenv("PREPHASE_PATH_LITERALS", raising=False)
+        importlib.reload(orch)   # restore default cap for later tests
+
+
+def test_render_budget_marks_overflow():
+    paths = [f"/proc/p/{i}.json" for i in range(100)]
+    rendered = _render_budget(paths, budget=60)
+    assert "skipped" in rendered                       # no silent truncation
+    assert rendered.count("\n") < 100
+
+
+def test_render_budget_within_budget_no_marker():
+    rendered = _render_budget(["/a/b", "/c/d"], budget=4096)
+    assert rendered == "/a/b\n/c/d"
+    assert "skipped" not in rendered
+
+
+def test_prephase_listing_bytes_default_and_override(monkeypatch):
+    # Constants & budgets DoD: assert default AND one env override for this constant.
+    import importlib, agent.orchestrator as orch
+    assert orch._PATH_LISTING_BUDGET == 4096                 # default
+    monkeypatch.setenv("PREPHASE_LISTING_BYTES", "128")
+    importlib.reload(orch)
+    try:
+        assert orch._PATH_LISTING_BUDGET == 128              # override
+    finally:
+        monkeypatch.delenv("PREPHASE_LISTING_BYTES", raising=False)
+        importlib.reload(orch)
 
 
 def test_list_entries_reads_paths_not_stdout():

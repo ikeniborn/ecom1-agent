@@ -60,6 +60,39 @@ def _stat_kind(vm, path: str) -> str:
     return {NodeKind.NODE_KIND_DIR: "dir", NodeKind.NODE_KIND_FILE: "file"}.get(k, "")
 
 
+# Cost safety rails (NOT domain knowledge): bound Stat-probe count + rendered listing size.
+_PATH_LITERAL_RE = re.compile(r"/[\w./-]+")
+_PATH_LITERAL_CAP = int(os.environ.get("PREPHASE_PATH_LITERALS", "3"))
+_PATH_LISTING_BUDGET = int(os.environ.get("PREPHASE_LISTING_BYTES", "4096"))
+
+
+def _extract_path_literals(instruction: str) -> list[str]:
+    """Any absolute-path literal in the instruction, deduped, trailing-punct stripped.
+
+    No root allowlist: Stat() (the caller's filter) decides which paths exist.
+    The cap bounds Stat-probe cost only — a safety rail, not domain knowledge.
+    """
+    out: list[str] = []
+    for m in _PATH_LITERAL_RE.findall(instruction or ""):
+        lit = m.rstrip(".,;:)'\"")
+        if lit and lit not in out:
+            out.append(lit)
+    return out[:_PATH_LITERAL_CAP]
+
+
+def _render_budget(paths: list[str], budget: int) -> str:
+    """Join paths under a byte budget; overflow -> '… +N skipped' (no silent truncation)."""
+    lines: list[str] = []
+    used = 0
+    for i, p in enumerate(paths):
+        if used + len(p) + 1 > budget:
+            lines.append(f"… +{len(paths) - i} skipped")
+            break
+        lines.append(p)
+        used += len(p) + 1
+    return "\n".join(lines)
+
+
 _SAMPLE_TABLES_MAX = 12
 _SAMPLE_ROWS_PER_TABLE = 3
 _SAMPLE_ROW_MAX_CHARS = 400
