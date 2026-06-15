@@ -353,12 +353,14 @@ def diagram3() -> Diagram:
         [Node("d3-deepread", "prephase facts + deep_read", "gate")],
         [Node("d3-intent", "run_intent (LLM -> IntentSpec)", "llm")],
         [Node("d3-plan", "run_plan (LLM -> PlanIR)", "llm")],
-        [Node("d3-planir", "ir_models.PlanIR", "gate")],
+        [Node("d3-planir", "PlanIR (run_plan output)", "gate")],
         [Node("d3-lint", "lint_security_first", "gate")],
         [Node("d3-interpret", "interpret() — no LLM in loop", "gate")],
         [Node("d3-captured", "CapturedAnswer", "gate")],
         [Node("d3-ok", "OUTCOME_OK", "terminal"),
-         Node("d3-clar", "OUTCOME_NONE_CLARIFICATION", "terminal")],
+         Node("d3-clar", "OUTCOME_NONE_CLARIFICATION", "terminal"),
+         Node("d3-unsupported", "OUTCOME_NONE_UNSUPPORTED", "terminal"),
+         Node("d3-deny", "OUTCOME_DENIED_SECURITY", "terminal")],
     ]
     edges = [
         Edge("d3-deepread", "d3-intent"),
@@ -367,8 +369,11 @@ def diagram3() -> Diagram:
         Edge("d3-planir", "d3-lint"),
         Edge("d3-lint", "d3-interpret"),
         Edge("d3-interpret", "d3-captured"),
+        # CapturedAnswer carries the plan-chosen outcome; verify() forwards it
         Edge("d3-captured", "d3-ok"),
         Edge("d3-captured", "d3-clar"),
+        Edge("d3-captured", "d3-unsupported"),
+        Edge("d3-captured", "d3-deny"),
         Edge("d3-interpret", "d3-plan", dashed=True, label="re-plan next cycle"),
     ]
     return Diagram("Diagram 3 — Deterministic interpreter (INTERPRETER_ENABLED)", rows, edges)
