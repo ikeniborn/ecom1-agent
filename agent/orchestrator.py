@@ -93,9 +93,8 @@ def _render_budget(paths: list[str], budget: int) -> str:
     return "\n".join(lines)
 
 
-_SAMPLE_TABLES_MAX = 12
-_SAMPLE_ROWS_PER_TABLE = 3
-_SAMPLE_ROW_MAX_CHARS = 400
+_SAMPLE_ROWS_PER_TABLE = int(os.environ.get("PREPHASE_SAMPLE_ROWS", "3"))
+_SAMPLE_ROW_MAX_CHARS = int(os.environ.get("PREPHASE_SAMPLE_ROW_CHARS", "400"))
 
 
 def _sql_stdout(vm: VMAdapter, sql: str) -> str:
@@ -124,8 +123,7 @@ def _discover_table_names(vm: VMAdapter) -> list[str]:
     text = _sql_stdout(vm, sql)
     if not text:
         return []
-    names = [line.strip() for line in text.splitlines() if line.strip()]
-    return names[:_SAMPLE_TABLES_MAX]
+    return [line.strip() for line in text.splitlines() if line.strip()]
 
 
 def _discover_sample_rows(vm: VMAdapter, tables: list[str]) -> str:
@@ -149,6 +147,25 @@ def _discover_sample_rows(vm: VMAdapter, tables: list[str]) -> str:
         if rows:
             parts.append(f"-- {name}\n" + "\n".join(rows))
     return "\n\n".join(parts)
+
+
+def _relevant_tables(tables: list[str], instruction: str,
+                     deep_read: tuple[str, ...] = ()) -> list[str]:
+    """Tables to sample (Tier-2): name/entity token present in the instruction,
+    UNION learned `prephase_deep_read` for this tid. NOT 'first N alphabetical'.
+
+    Lexical match only (singular form too); FK-adjacency and synonym widening are
+    handled by the oracle / LEARN loop, not a static rule (see spec H2)."""
+    instr = (instruction or "").lower()
+    out: list[str] = []
+    for t in tables:
+        tl = t.lower()
+        if tl in instr or tl.rstrip("s") in instr:
+            out.append(t)
+    for t in deep_read:
+        if t in tables and t not in out:
+            out.append(t)
+    return out
 
 
 def _entry_children(node) -> list:
@@ -365,11 +382,16 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhase
         else:
             status[key] = "empty"
 
-    # schema + sample rows (unchanged discovery)
+    # schema + sample rows (P5 tier split: names/DDL uncapped; samples relevance-gated)
     schema = _discover_schema(vm)
     _mark("schema", schema)
     tables = _discover_table_names(vm) if schema else []
-    samples = _discover_sample_rows(vm, tables) if tables else ""
+    sample_set = _relevant_tables(tables, instruction)
+    samples = _discover_sample_rows(vm, sample_set) if sample_set else ""
+    skipped = [t for t in tables if t not in sample_set]
+    if skipped:                                  # no silent truncation
+        print(f"[prephase] sample_rows: {len(skipped)} table(s) not relevant, not sampled: "
+              + ", ".join(skipped[:10]) + (" …" if len(skipped) > 10 else ""))
     _mark("sample_rows", samples)
 
     # identity (P4 robust parse)

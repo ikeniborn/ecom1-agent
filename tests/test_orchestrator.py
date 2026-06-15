@@ -12,6 +12,7 @@ from agent.orchestrator import (
     _discover_schema,
     _discover_table_names,
 )
+from agent.orchestrator import _relevant_tables
 
 
 def _exec_returning(stdout: str):
@@ -30,13 +31,37 @@ def test_discover_schema_empty_on_exception():
     assert _discover_schema(vm) == ""
 
 
-def test_discover_table_names_parses_and_caps():
+def test_discover_table_names_uncapped():
     vm = MagicMock()
     names = "\n".join(f"t{i}" for i in range(20))
     vm.exec.return_value = _exec_returning(names)
     out = _discover_table_names(vm)
-    assert len(out) == 12  # _SAMPLE_TABLES_MAX
+    assert len(out) == 20            # Tier-1: no cap
     assert out[0] == "t0"
+
+
+def test_relevant_tables_lexical_and_deep_read():
+    tables = ["payments", "orders", "payment_transaction_items", "customers"]
+    # "payment" appears -> payments matches; deep_read adds an indirect table.
+    got = _relevant_tables(tables, "show the payment for cust", deep_read=("payment_transaction_items",))
+    assert "payments" in got
+    assert "payment_transaction_items" in got
+    assert "orders" not in got and "customers" not in got
+
+
+def test_prephase_sample_constants_default_and_override(monkeypatch):
+    # Constants & budgets DoD: default AND one env override for each sample-tier constant.
+    import importlib, agent.orchestrator as orch
+    assert (orch._SAMPLE_ROWS_PER_TABLE, orch._SAMPLE_ROW_MAX_CHARS) == (3, 400)   # defaults
+    monkeypatch.setenv("PREPHASE_SAMPLE_ROWS", "1")
+    monkeypatch.setenv("PREPHASE_SAMPLE_ROW_CHARS", "50")
+    importlib.reload(orch)
+    try:
+        assert (orch._SAMPLE_ROWS_PER_TABLE, orch._SAMPLE_ROW_MAX_CHARS) == (1, 50)  # overrides
+    finally:
+        monkeypatch.delenv("PREPHASE_SAMPLE_ROWS", raising=False)
+        monkeypatch.delenv("PREPHASE_SAMPLE_ROW_CHARS", raising=False)
+        importlib.reload(orch)
 
 
 def test_discover_sample_rows_per_table():
@@ -219,6 +244,7 @@ from agent.orchestrator import gather_prephase_facts, PrePhaseFacts
 
 
 def test_gather_prephase_facts_collects_identity_and_target_record():
+    import agent.orchestrator as orch
     vm = MagicMock()
     def _exec(**kw):
         path = kw.get("path")
@@ -237,8 +263,8 @@ def test_gather_prephase_facts_collects_identity_and_target_record():
         return _NS(entries=[])
     vm.list.side_effect = _list
 
-    facts = gather_prephase_facts(vm, instruction="approve basket_069", agents_md_text="RULES")
-    assert isinstance(facts, PrePhaseFacts)
+    facts = orch.gather_prephase_facts(vm, instruction="approve basket_069", agents_md_text="RULES")
+    assert isinstance(facts, orch.PrePhaseFacts)
     assert facts.identity and "emp_42" in str(facts.identity)
     assert "basket_069" in str(facts.target_records) or facts.target_records == {} or True
     assert "/docs/security.md" in facts.policies or facts.policies == {}
