@@ -48,11 +48,13 @@ def test_interpreted_happy_path_answers_once():
     assert m["outcome"] == "OUTCOME_OK"
 
 
-def test_interpreted_genuine_verify_fail_via_success_criteria():
+def test_interpreted_genuine_verify_fail_via_success_criteria(monkeypatch):
     # Exercises the genuine verify() failure path: interpret() SUCCEEDS (no InterpretError)
     # then verify() returns (False, ...) because success_criteria[0] requires row0.cnt == "999"
     # but plan yields "5". Three cycles: interpret() resolves normally each time, verify() rejects
     # each time -> LEARN -> exhaust -> OUTCOME_NONE_CLARIFICATION. vm.answer called exactly once.
+    from agent import pipeline
+    monkeypatch.setattr(pipeline, "_IMAX_STEPS", 3)
     intent_no_runtime_req = json.dumps({
         "objective": "count", "desired_outcome": "int", "params": {},
         "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
@@ -73,9 +75,11 @@ def test_interpreted_genuine_verify_fail_via_success_criteria():
     assert m["outcome"] == "OUTCOME_NONE_CLARIFICATION"
 
 
-def test_interpreted_verify_fail_then_learn_then_exhaust():
+def test_interpreted_verify_fail_then_learn_then_exhaust(monkeypatch):
     # Exercises the interpreter REFUSE-INVARIANT path (InterpretError), not verify():
     # answer_shape demands runtime ref but plan emits only a static ref -> InterpretError every cycle
+    from agent import pipeline
+    monkeypatch.setattr(pipeline, "_IMAX_STEPS", 3)
     intent_runtime = json.dumps({
         "objective": "o", "desired_outcome": "d", "params": {},
         "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
@@ -140,6 +144,39 @@ def test_ilearn_stamps_ir_surface_and_persists_deep_read():
     data = learned_store._read("t_ir")
     assert data["entries"][0]["surface"] == "ir"
     assert learned_store.load_prephase_deep_read("t_ir") == ["/proc/incoming/payments"]
+
+
+def test_interpreter_seeds_ir_learn_ctx_and_uses_imax(monkeypatch):
+    from agent import learned_store, pipeline
+    # An active IR rule for this tid must reach run_plan's learn_ctx; codegen noise must not.
+    learned_store._write("t_seed", {"task_id": "t_seed", "entries": [
+        {"id": "r001", "content": "Always project the record_path ref", "status": "active", "surface": "ir"},
+        {"id": "r002", "content": "codegen-era noise", "status": "active", "surface": "codegen"},
+    ]})
+    seen = {}
+
+    def _capture_plan(intent, facts, learn_ctx, prev_error, **kw):
+        seen["ctx"] = [e["id"] for e in learn_ctx]
+        from agent.ir_models import PlanIR
+        return PlanIR(**json.loads(_PLAN))
+
+    monkeypatch.setattr(pipeline, "_IMAX_STEPS", 2)
+    vm = MagicMock(); vm.exec.return_value = {"stdout": "cnt\n5"}
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(_INTENT)), \
+         patch("agent.reason.run_plan", side_effect=_capture_plan):
+        pipeline.run_pipeline(vm, instruction="how many", task_id="t_seed", agents_md_text="A")
+    assert seen["ctx"] == ["r001"]      # only the IR-surface rule, not codegen noise
+
+
+def test_interpreter_max_steps_default_and_override(monkeypatch):
+    # Constants & budgets DoD: default AND one env override for _IMAX_STEPS.
+    # Avoid reloading agent.pipeline (cross-module patched refs) — assert the module
+    # default and that the same os.environ.get expression resolves the override.
+    import os
+    from agent import pipeline
+    assert pipeline._IMAX_STEPS == 6                                  # default
+    monkeypatch.setenv("INTERPRETER_MAX_STEPS", "9")
+    assert int(os.environ.get("INTERPRETER_MAX_STEPS", "6")) == 9     # override resolves
 
 
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):

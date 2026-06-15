@@ -24,6 +24,7 @@ from .trace import current_cycle, get_trace, set_cycle
 from .test_runner import run_tests
 
 _MAX_STEPS = int(os.environ.get("MAX_STEPS", "3"))
+_IMAX_STEPS = int(os.environ.get("INTERPRETER_MAX_STEPS", "6"))
 _MAX_TOKENS_LEARN = int(os.environ.get("MAX_TOKENS_LEARN", "2048"))
 _FIDELITY_TIMEOUT_S = int(os.environ.get("FIDELITY_TIMEOUT_S", "30"))
 # Retries for transient DESIGN parse/empty failures (CC subprocess truncation).
@@ -321,12 +322,10 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
     from .reason import IntentError, PlanError, run_intent, run_plan
     from .verify import verify
 
-    # The IR PLAN LLM must not inherit codegen-era learned rules: they reference the
-    # old codegen surface (tool_plan/vm.answer/script/fidelity) and some bake literal
-    # paths/ids, which sabotages grounding under per-run re-seeding. Start clean; the
-    # interpreter self-corrects within a run via the per-cycle prev_error fed to run_plan
-    # (and any IR-distilled rules accumulate in-memory across this run's cycles).
-    learn_ctx: list = []
+    # The IR PLAN LLM must not inherit codegen-era learned rules (they reference the old
+    # codegen surface and bake literals). Seed only IR-surface rules for this tid; the
+    # interpreter self-corrects within a run via per-cycle prev_error fed to run_plan.
+    learn_ctx: list = load_entries(task_id, surface="ir")
     total_in = total_out = 0
 
     def _accum(tk):
@@ -357,9 +356,9 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
 
     last_error = None
     cycle = 0
-    for cycle in range(1, _MAX_STEPS + 1):
+    for cycle in range(1, _IMAX_STEPS + 1):
         set_cycle(cycle)
-        print(f"{CLI_BLUE}[pipeline] interpreted cycle {cycle}/{_MAX_STEPS}{CLI_CLR}")
+        print(f"{CLI_BLUE}[pipeline] interpreted cycle {cycle}/{_IMAX_STEPS}{CLI_CLR}")
         tk = {}
         plan = None
         try:
