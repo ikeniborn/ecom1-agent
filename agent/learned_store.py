@@ -61,13 +61,22 @@ def _format_entry(e: dict) -> str:
     return f"  - [{e.get('id', '?')}] {e.get('content', '')}"
 
 
-def load_entries(tid: str) -> list[dict]:
-    """Return active entries only."""
+def load_entries(tid: str, surface: str | None = None) -> list[dict]:
+    """Active entries; optionally filtered by `surface` ('ir'|'codegen').
+
+    Untagged legacy entries default to 'codegen' (honors the codegen-era warning)."""
     data = _read(tid)
-    return [e for e in data.get("entries", []) if e.get("status") == "active"]
+    out: list[dict] = []
+    for e in data.get("entries", []):
+        if e.get("status") != "active":
+            continue
+        if surface is not None and (e.get("surface") or "codegen") != surface:
+            continue
+        out.append(e)
+    return out
 
 
-def apply_learn_diff(tid: str, out: LearnConsolidateOutput) -> None:
+def apply_learn_diff(tid: str, out: LearnConsolidateOutput, surface: str = "codegen") -> None:
     """Append new rule + deactivate listed ids. Skip path writes nothing."""
     if not tid or out.skip:
         return
@@ -91,6 +100,7 @@ def apply_learn_diff(tid: str, out: LearnConsolidateOutput) -> None:
         "agents_md_anchor": out.agents_md_anchor,
         "reasoning": (out.reasoning or "").strip(),
         "status": "active",
+        "surface": surface,
         "created": str(date.today()),
         "deactivated_reason": None,
     })
@@ -118,6 +128,24 @@ def save_last_run(
         "date": str(date.today()),
     }
     _write(tid, data)
+
+
+def append_prephase_deep_read(tid: str, items: list[str]) -> None:
+    """Union new deep-read hints (table names or /literal/paths) into the tid store."""
+    if not tid or not items:
+        return
+    data = _read(tid)
+    cur = list(data.get("prephase_deep_read", []))
+    for it in items:
+        if it and it not in cur:
+            cur.append(it)
+    data["task_id"] = tid
+    data["prephase_deep_read"] = cur
+    _write(tid, data)
+
+
+def load_prephase_deep_read(tid: str) -> list[str]:
+    return list(_read(tid).get("prephase_deep_read", []))
 
 
 def write_verdict(

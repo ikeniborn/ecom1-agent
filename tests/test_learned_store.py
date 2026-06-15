@@ -174,3 +174,32 @@ def test_format_entry_verdict(tid_dir):
 def test_format_entry_verdict_no_detail(tid_dir):
     e = {"id": "v002", "source": "verdict", "score": 0.0, "score_detail": [], "content": None}
     assert learned_store._format_entry(e) == "  - [v002] VERDICT score=0.0: "
+
+
+def test_load_entries_surface_filter(tid_dir):
+    _seed(tid_dir, "t10", entries=[
+        {"id": "r001", "content": "ir rule", "status": "active", "surface": "ir"},
+        {"id": "r002", "content": "codegen rule", "status": "active", "surface": "codegen"},
+        {"id": "r003", "content": "legacy untagged", "status": "active"},  # no surface
+    ])
+    assert [e["id"] for e in learned_store.load_entries("t10", surface="ir")] == ["r001"]
+    # untagged defaults to codegen
+    assert {e["id"] for e in learned_store.load_entries("t10", surface="codegen")} == {"r002", "r003"}
+    assert len(learned_store.load_entries("t10")) == 3  # no filter -> all active
+
+
+def test_apply_learn_diff_stamps_surface(tid_dir):
+    _seed(tid_dir, "t11", entries=[])
+    out = LearnConsolidateOutput(rule_content="Always bind a runtime ref for OK answers",
+                                 reasoning="r", deactivate_ids=[], skip=False)
+    learned_store.apply_learn_diff("t11", out, surface="ir")
+    data = yaml.safe_load((tid_dir / "t11.yaml").read_text())
+    assert data["entries"][0]["surface"] == "ir"
+
+
+def test_prephase_deep_read_round_trip(tid_dir):
+    learned_store.append_prephase_deep_read("t12", ["payment_transaction_items", "/proc/incoming/payments"])
+    learned_store.append_prephase_deep_read("t12", ["payment_transaction_items"])  # dedup
+    assert learned_store.load_prephase_deep_read("t12") == [
+        "payment_transaction_items", "/proc/incoming/payments"]
+    assert learned_store.load_prephase_deep_read("t_none") == []

@@ -54,6 +54,7 @@ class LearnConsolidateOutput(BaseModel):
     deactivate_reason: str | None = None
     skip: bool = False
     skip_reason: str | None = None
+    prephase_deep_read: list[str] = []   # table names / literal paths to read eagerly next run (IR)
 
 
 class AnswerOutput(BaseModel):
