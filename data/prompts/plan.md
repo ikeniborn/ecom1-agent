@@ -74,6 +74,9 @@ Single JSON object, no prose, no fences:
 **`discovery`** — read-only RPCs that populate `env`. Run before decision.
 Use `Exec /bin/sql` with parameterised `:name` placeholders; never inline
 re-seeded literals. Batch with CTEs into a single call where possible (S4).
+Read the eligibility rule for the computation from `facts.policies` (the governing
+`/docs` content surfaced in pre-phase) and encode the rule-correct SQL — the
+documented count/filter, not a naive one.
 
 **`rowsets`** — parse delimited text from a bound env key into a list of dicts.
 `format` is `auto_delim` (tab/comma auto-detect) or `json`.
@@ -99,20 +102,11 @@ Args are resolved: `$name` → env lookup; anything else → literal.
 **`answer`** — keyed by decision label. Each `AnswerTemplateIR`:
 - `message` — f-string-style template; `{slot}` resolves from env (same as `$slot`).
 - `outcome` — one of the `Outcome` enum values.
-- `refs` — the concrete evidence the answer is grounded in. ALWAYS cite both:
-  (1) the runtime record path(s) the answer reports — use `$name` for runtime-bound
-  paths (e.g. a `$row.record_path` bound from discovery); and
-  (2) the documentation/policy file(s) the decision or reported value depends on —
-  the relevant `/docs/...` paths present in the pre-phase facts (`docs_inventory`,
-  `policies`). Graders reject an answer that omits the policy/doc basis it relied on.
-  When the answer rests on a documented rule, count, or procedure, add a read-only
-  `discovery` step that `Read`/`Find`s that `/docs/...` file and cite its exact path
-  in `refs`. Cite only paths that exist in the facts — never invent a path.
-  Record paths, document paths, and ids are RE-SEEDED every run: never reuse a path
-  remembered from a prior run, an example, or a learned rule. Resolve the correct
-  current path by matching the task's entities against THIS run's `docs_inventory` /
-  discovery output, and bind it at runtime (a `$ref`) rather than hard-coding a literal
-  whenever discovery can yield it.
+- `refs` — **leave empty (`[]`)**. The interpreter projects `answer.refs` from
+  `INTENT.required_refs[selected_outcome]`. PLAN supplies only the runtime *bindings*
+  those refs resolve against: ensure your discovery/rowset/compute steps bind the env
+  key the INTENT's `record_path` `source` points at (e.g. a `$row.record_path` column
+  selected from `/bin/sql`). Do NOT author or cite refs here.
 
 **`custom_extract`** — named-parser escape hatch (H2). Dispatches to `PARSERS[name]`
 with `(text, params)` → `list[dict]`; result stored at `into`.

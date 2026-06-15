@@ -14,3 +14,5 @@ def test_intent_prompt_loads_and_is_general():
 def test_plan_prompt_loads_and_documents_ir():
     g = load_prompt("plan")
     assert g and "PlanIR" in g and "decision" in g and "discovery" in g
+    assert "ALWAYS cite both" not in g          # PLAN no longer authors refs
+    assert "facts.policies" in g                # PLAN reads the eligibility rule
