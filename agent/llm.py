@@ -63,21 +63,51 @@ _HTTP_TIMEOUT = httpx.Timeout(
     connect=_HTTP_CONNECT_TIMEOUT_S,
 )
 
-# Per-phase model overrides — enable LLM routing by execution phase.
-# Active phases only (design, codegen, learn). Add new entries when introducing
-# additional phases; never re-introduce removed ones (idd/sdd/plan/executor/
-# assembler/consolidate) — they belong to the pre-90f6920 pipeline.
-_PHASE_MODEL_MAP: dict[str, str | None] = {
-    "design":  os.environ.get("MODEL_DESIGN") or None,
-    "codegen": os.environ.get("MODEL_CODEGEN") or None,
-    "learn":   os.environ.get("MODEL_LEARN") or None,
-    "test":    os.environ.get("MODEL_TEST") or None,
+# Phase → model tier. Reason where the phase reasons; fast where it is light.
+# Phases not listed default to the reason tier for model resolution, but to
+# think=None (unchanged) so probe/compaction calls are not perturbed.
+_PHASE_TIER: dict[str, str] = {
+    "intent":    "reason",
+    "plan":      "reason",
+    "ilearn":    "reason",
+    "learn":     "reason",
+    "distill":   "reason",
+    "docselect": "fast",
+    "rerank":    "fast",
 }
+_TIER_ENV = {"reason": "MODEL_REASON", "fast": "MODEL_FAST", "embed": "EMBED_MODEL"}
+
+
+def _norm_phase(phase: str) -> str:
+    return (phase or "").lower().replace("_", "")
 
 
 def _resolve_model_for_phase(phase: str, default_model: str) -> str:
-    """Return per-phase model from env, or default_model if not configured."""
-    return _PHASE_MODEL_MAP.get(phase) or default_model
+    """Resolve a model id for a phase, read live from os.environ:
+    MODEL_<PHASE> → tier env (MODEL_REASON/MODEL_FAST/EMBED_MODEL) → default_model.
+
+    Live read so a test's monkeypatch.setenv applies without reloading the module.
+    With only MODEL set, every phase resolves to MODEL (back-compatible)."""
+    p = _norm_phase(phase)
+    per_phase = os.environ.get(f"MODEL_{p.upper()}")
+    if per_phase:
+        return per_phase
+    tier_env = _TIER_ENV.get(_PHASE_TIER.get(p, "reason"))
+    if tier_env:
+        tier_model = os.environ.get(tier_env)
+        if tier_model:
+            return tier_model
+    return default_model
+
+
+def _think_for_phase(phase: str) -> bool | None:
+    """Reason tier → think on; fast tier → think off; unlisted → None (unchanged)."""
+    tier = _PHASE_TIER.get(_norm_phase(phase))
+    if tier == "reason":
+        return True
+    if tier == "fast":
+        return False
+    return None
 
 # Primary: Anthropic SDK for Claude models
 anthropic_client: anthropic.Anthropic | None = (
@@ -447,8 +477,9 @@ def _call_raw_single_model(
 
     # --- Tier 3: Ollama (local fallback) ---
     ollama_model = cfg.get("ollama_model") or os.environ.get("OLLAMA_MODEL", model)
-    # explicit think= overrides cfg; None means use cfg default
-    _think_flag = think if think is not None else cfg.get("ollama_think")
+    # models.json ollama_think overrides the per-call/tier think; else use think.
+    _cfg_think = cfg.get("ollama_think")
+    _think_flag = _cfg_think if _cfg_think is not None else think
     _ollama_extra: dict = {}
     if _think_flag is not None:
         _ollama_extra["think"] = _think_flag
@@ -546,6 +577,9 @@ def call_llm_raw(
     record so traces show the prompts sent and the model's response.
     """
     from .trace import current_cycle, get_trace
+
+    if think is None:
+        think = _think_for_phase(phase)
 
     _tok = token_out if token_out is not None else {}
     _t0 = time.monotonic()

@@ -372,7 +372,7 @@ def _doc_select_fallback(doc_paths: list[str], instruction: str, tokens: list[st
     user = (f"INSTRUCTION:\n{instruction}\n\n"
             f"ENTITIES:\n{', '.join(tokens)}\n\n"
             f"DOC_INVENTORY:\n{inventory}")
-    model = _resolve_model_for_phase("learn", os.environ.get("MODEL", ""))
+    model = _resolve_model_for_phase("docselect", os.environ.get("MODEL", ""))
     try:
         raw = call_llm_raw(system, user, model, {}, max_tokens=256, phase="DOC_SELECT")
     except Exception:

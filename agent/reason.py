@@ -61,7 +61,7 @@ def run_intent(facts, instruction: str, token_out: dict | None = None) -> Intent
     guide = load_prompt("intent") or "# PHASE: INTENT"
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
     user = "\n\n".join(p for p in [_facts_block(facts), f"INSTRUCTION:\n{instruction}"] if p)
-    model = _resolve_model_for_phase("design", os.environ.get("MODEL", ""))
+    model = _resolve_model_for_phase("intent", os.environ.get("MODEL", ""))
     raw = _call_llm_raw(system, user, model, {}, max_tokens=_MAX_TOKENS_INTENT, token_out=token_out, phase="INTENT")
     if not raw:
         raise IntentError("INTENT LLM returned empty response")
@@ -92,7 +92,7 @@ def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str |
     if prev_error:
         parts.append(f"PREVIOUS_ERROR:\n{prev_error}")
     user = "\n\n".join(p for p in parts if p)
-    model = _resolve_model_for_phase("codegen", os.environ.get("MODEL", ""))
+    model = _resolve_model_for_phase("plan", os.environ.get("MODEL", ""))
     raw = _call_llm_raw(system, user, model, {}, max_tokens=_MAX_TOKENS_PLAN, token_out=token_out, phase="PLAN")
     if not raw:
         raise PlanError("PLAN LLM returned empty response")
