@@ -9,11 +9,13 @@ from agent.pipeline import (
     _AnswerRefsError,
     _detect_zero_row_miss,
     _extract_sql_literals,
+    _fold_facts_into_agents_md,
     _identical_sql_set,
     learn_from_grader,
     run_pipeline,
 )
 from agent.models import DesignOutput
+from agent.orchestrator import PrePhaseFacts
 
 
 _GOOD_DESIGN = {
@@ -615,3 +617,25 @@ def test_learn_consolidate_sends_full_script(tmp_path, monkeypatch):
         _learn_consolidate("t10", [], design, "some error", long_script)
 
     assert unique_sentinel in captured["user_msg"]   # sentinel survived — no truncation
+
+
+# ---------------------------------------------------------------------------
+# T8: _fold_facts_into_agents_md
+# ---------------------------------------------------------------------------
+
+
+def test_fold_facts_appends_policies_and_status():
+    facts = PrePhaseFacts(
+        agents_md="RULES", policies={"/docs/p.md": "POLICY BODY"},
+        docs_inventory="/docs/p.md", identity={"role": "employee"},
+        gather_status={"policies": "ok"},
+    )
+    out = _fold_facts_into_agents_md("# AGENTS\n", facts)
+    assert out.startswith("# AGENTS")
+    assert "POLICY BODY" in out
+    assert "/docs/p.md" in out
+    assert "gather_status" in out
+
+
+def test_fold_facts_noop_when_facts_none():
+    assert _fold_facts_into_agents_md("# AGENTS\n", None) == "# AGENTS\n"

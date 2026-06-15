@@ -96,6 +96,24 @@ def _normalise(sql: str) -> str:
     return _WHITESPACE_RE.sub(" ", sql).strip()
 
 
+def _fold_facts_into_agents_md(agents_md_text: str, facts) -> str:
+    """Append pre-phase grounding facts to agents_md for the legacy DESIGN path.
+
+    Schema/sample_rows are already folded by orchestrator._augment_agents_md, so
+    this adds only docs_inventory/policies/identity/target_records/gather_status.
+    Keeps the strict DESIGN signature intact (P7: fair A/B vs the interpreter).
+    """
+    if facts is None:
+        return agents_md_text
+    data = facts.model_dump() if hasattr(facts, "model_dump") else dict(facts)
+    blocks: list[str] = [agents_md_text or ""]
+    for key in ("docs_inventory", "policies", "identity", "target_records", "gather_status"):
+        val = data.get(key)
+        if val:
+            blocks.append(f"\n\n## {key} (pre-phase)\n{val}")
+    return "".join(blocks)
+
+
 def _identical_sql_set(a: list[str], b: list[str]) -> bool:
     """Multiset equality after whitespace collapse + strip; case-sensitive."""
     return sorted(_normalise(s) for s in a) == sorted(_normalise(s) for s in b)
@@ -872,6 +890,9 @@ def run_pipeline(
     # Deterministic Plan-IR interpreter path (read flag fresh so test setenv works).
     if os.environ.get("INTERPRETER_ENABLED", "0") == "1":
         return _run_interpreted(vm, instruction, task_id, agents_md_text, facts)
+
+    # P7: legacy DESIGN sees the same grounding facts the interpreter does.
+    agents_md_text = _fold_facts_into_agents_md(agents_md_text, facts)
 
     total_in = 0
     total_out = 0
