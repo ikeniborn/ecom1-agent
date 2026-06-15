@@ -133,6 +133,23 @@ def test_run_agent_forwards_answer_message_and_refs(monkeypatch):
     assert out["outcome"] == "OUTCOME_OK"
 
 
+from agent.orchestrator import _extract_entity_tokens
+
+
+def test_extract_entity_tokens_quoted_and_capitalized():
+    instr = 'How many "Tool Box and Bag" products are Non-Bladed Workshop items?'
+    toks = _extract_entity_tokens(instr)
+    assert "Tool Box and Bag" in toks          # quoted literal
+    assert "Non" not in toks                    # single cap word excluded
+    assert any(t.startswith("Non-Bladed") or "Bladed Workshop" in t for t in toks)
+
+
+def test_extract_entity_tokens_dedupes_and_handles_empty():
+    assert _extract_entity_tokens("") == []
+    toks = _extract_entity_tokens('"Alpha" then "Alpha" again')
+    assert toks.count("Alpha") == 1
+
+
 from agent.orchestrator import gather_prephase_facts, PrePhaseFacts
 
 

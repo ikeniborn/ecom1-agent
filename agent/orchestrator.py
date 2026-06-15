@@ -152,8 +152,29 @@ class PrePhaseFacts(BaseModel):
 
 _ID_RE = re.compile(r"(\w+)=([^\s]+)")
 _RECORD_ID_RE = re.compile(r"\b(basket|payment|return|order)_\w+\b", re.IGNORECASE)
+_QUOTED_RE = re.compile(r'"([^"]+)"')
+# Two or more Capitalized words in a row (hyphens kept: "Non-Bladed Workshop").
+_CAP_SEQ_RE = re.compile(r"\b([A-Z][\w-]*(?:\s+[A-Z][\w-]*)+)\b")
 _POLICY_CAP = 6
 _RECORD_CAP = 3
+
+
+def _extract_entity_tokens(instruction: str) -> list[str]:
+    """Quoted strings + Capitalized n-grams (length >= 2) from the instruction.
+
+    Deterministic (0 LLM). Each token becomes one Search pattern in S1-R3.
+    """
+    text = instruction or ""
+    toks: list[str] = []
+    for m in _QUOTED_RE.findall(text):
+        t = m.strip()
+        if t and t not in toks:
+            toks.append(t)
+    for m in _CAP_SEQ_RE.findall(text):
+        t = m.strip()
+        if t and t not in toks:
+            toks.append(t)
+    return toks
 
 
 def _parse_identity(stdout: str) -> dict:
