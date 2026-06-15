@@ -292,7 +292,8 @@ def _results_table(runs, matrix, tasks) -> str:
 
 def _numeric_table(title, runs, matrix, tasks, value_fn, target) -> str:
     vals = [v for tid in tasks for r in runs
-            if (v := value_fn(matrix[tid].get(r.label))) is not None]
+            if (c := matrix[tid].get(r.label)) is not None
+            and (v := value_fn(c)) is not None]
     vmax = max(vals) if vals else 1
     vmax = vmax or 1
     rows = []
@@ -378,3 +379,44 @@ def render_html(runs, matrix, learned, oracle, errors) -> str:
         _FOOT,
     ]
     return "\n".join(parts)
+
+
+_REPO = Path(__file__).resolve().parent.parent
+_DEF_LEARNED = _REPO / "data" / "learned"
+_DEF_ATOMS = _REPO / "data" / "oracle" / "atoms.yaml"
+_DEF_HISTORY = _REPO / "data" / "oracle" / "history.jsonl"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="HTML run-report over logs/.")
+    ap.add_argument("--logs", default=str(_REPO / "logs"), help="root holding run dirs")
+    ap.add_argument("--out", default=str(_REPO / "logs" / "report.html"), help="output HTML")
+    ap.add_argument("--learned", default=str(_DEF_LEARNED), help="data/learned dir")
+    ap.add_argument("--atoms", default=str(_DEF_ATOMS), help="oracle atoms.yaml")
+    ap.add_argument("--history", default=str(_DEF_HISTORY), help="oracle history.jsonl")
+    args = ap.parse_args()
+
+    runs = discover_runs(args.logs)
+    if not runs:
+        print(f"no run dirs under {args.logs}", file=sys.stderr)
+        return 1
+
+    matrix: dict = {}
+    for run in runs:
+        for tid, cell in parse_run(run).items():
+            matrix.setdefault(tid, {})[run.label] = cell
+
+    learned = parse_learned(args.learned)
+    oracle = parse_oracle(args.atoms)
+    snapshot_oracle(oracle, args.history, date=runs[-1].date)
+    errors = build_error_report(matrix)
+
+    html_doc = render_html(runs, matrix, learned, oracle, errors)
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.out).write_text(html_doc, encoding="utf-8")
+    print(f"wrote {args.out}  ({len(runs)} runs, {len(matrix)} tasks, {len(errors)} error categories)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -216,3 +216,34 @@ def test_render_html_smoke():
     assert "t01" in html and "t02" in html       # every task row present
     assert "loop broken at cycle" in html        # error category rendered
     assert html.rstrip().endswith("</html>")
+
+
+def test_main_writes_report(tmp_path, monkeypatch, capsys):
+    logs = tmp_path / "logs"
+    run_dir = logs / "20260615_120000_m"
+    run_dir.mkdir(parents=True)
+    _write(run_dir / "t01.jsonl", [
+        {"type": "task_result", "outcome": "OUTCOME_OK", "cycles_used": 1,
+         "score_detail": [], "task_id": "t01"}])
+
+    learned = tmp_path / "learned"
+    learned.mkdir()
+    (learned / "t01.yaml").write_text(
+        "task_id: t01\nentries:\n- id: r001\n  created: '2026-06-15'\n"
+        "  status: active\n  surface: codegen\n", encoding="utf-8")
+
+    out = tmp_path / "report.html"
+    hist = tmp_path / "history.jsonl"
+
+    monkeypatch.setattr(sys, "argv", [
+        "run_report.py",
+        "--logs", str(logs), "--out", str(out),
+        "--learned", str(learned), "--atoms", str(tmp_path / "atoms.yaml"),
+        "--history", str(hist),
+    ])
+    rc = rr.main()
+
+    assert rc == 0
+    assert out.exists() and "<!DOCTYPE html>" in out.read_text(encoding="utf-8")
+    assert "RESULTS" in out.read_text(encoding="utf-8")
+    assert hist.exists()                          # snapshot appended
