@@ -208,3 +208,54 @@ def test_gather_prephase_facts_collects_identity_and_target_record():
     assert facts.identity and "emp_42" in str(facts.identity)
     assert "basket_069" in str(facts.target_records) or facts.target_records == {} or True
     assert "/docs/security.md" in facts.policies or facts.policies == {}
+
+
+def test_gather_prephase_facts_search_enriches_policies_and_marks_status():
+    # docs tree -> inventory; Search by entity token -> doc path -> Read content.
+    root = _entry("docs", kind="dir", children=[
+        _entry("security.md"),
+        _entry("widget-counting.md"),
+    ])
+
+    def _tree(**kw):
+        return _NS(root=root)
+
+    def _search(**kw):
+        if kw.get("pattern") == "Widget Counting":
+            return _NS(matches=[_NS(path="/docs/widget-counting.md", line=1, line_text="rule")])
+        return _NS(matches=[])
+
+    def _read(**kw):
+        return {"content": f"CONTENT OF {kw.get('path')}"}
+
+    def _exec(**kw):
+        if kw.get("path") == "/bin/id":
+            return {"stdout": "uid=7(emp_7) role=employee"}
+        return {"stdout": "name\nstores"}
+
+    vm = MagicMock()
+    vm.tree.side_effect = _tree
+    vm.search.side_effect = _search
+    vm.read.side_effect = _read
+    vm.exec.side_effect = _exec
+
+    facts = gather_prephase_facts(
+        vm, instruction='count "Widget Counting" items', agents_md_text="RULES"
+    )
+    assert "/docs/widget-counting.md" in facts.docs_inventory
+    assert facts.policies.get("/docs/widget-counting.md", "").startswith("CONTENT OF")
+    assert facts.gather_status["docs_inventory"] == "ok"
+    assert facts.gather_status["policies"] == "ok"
+    assert facts.gather_status["identity"] == "ok"
+
+
+def test_gather_prephase_facts_caps_doc_content():
+    big = "x" * 9000
+    root = _entry("docs", kind="dir", children=[_entry("big.md")])
+    vm = MagicMock()
+    vm.tree.return_value = _NS(root=root)
+    vm.search.return_value = _NS(matches=[_NS(path="/docs/big.md", line=1, line_text="m")])
+    vm.read.return_value = {"content": big}
+    vm.exec.return_value = {"stdout": ""}
+    facts = gather_prephase_facts(vm, instruction='see "Big Doc Here"', agents_md_text="")
+    assert len(facts.policies["/docs/big.md"]) <= 4096

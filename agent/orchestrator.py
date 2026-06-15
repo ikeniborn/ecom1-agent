@@ -148,6 +148,7 @@ class PrePhaseFacts(BaseModel):
     policies: dict[str, str] = {}
     identity: dict = {}
     target_records: dict[str, str] = {}
+    gather_status: dict[str, str] = {}   # fact -> ok|empty|error(<msg>)
 
 
 _ID_SPLIT_RE = re.compile(r"[\s,]+")
@@ -165,6 +166,8 @@ _QUOTED_RE = re.compile(r'"([^"]+)"')
 _CAP_SEQ_RE = re.compile(r"\b([A-Z][\w-]*(?:\s+[A-Z][\w-]*)+)\b")
 _POLICY_CAP = 6
 _RECORD_CAP = 3
+_DOC_HITS_PER_TOKEN = 3
+_DOC_CONTENT_CAP = 4096
 
 
 def _extract_entity_tokens(instruction: str) -> list[str]:
@@ -246,20 +249,46 @@ def _sql_stdout_or_exec(vm, path: str) -> str:
     return _extract_text(r, "stdout")
 
 
+def _doc_select_fallback(doc_paths: list[str], instruction: str, tokens: list[str]) -> list[str]:
+    return []   # replaced with a real LLM call in Task 6
+
+
 def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhaseFacts:
+    status: dict[str, str] = {}
+
+    def _mark(key: str, value, err: str = "") -> None:
+        if err:
+            status[key] = f"error({err})"
+        elif value:
+            status[key] = "ok"
+        else:
+            status[key] = "empty"
+
+    # schema + sample rows (unchanged discovery)
     schema = _discover_schema(vm)
+    _mark("schema", schema)
     tables = _discover_table_names(vm) if schema else []
     samples = _discover_sample_rows(vm, tables) if tables else ""
+    _mark("sample_rows", samples)
 
-    identity = _parse_identity(_sql_stdout_or_exec(vm, "/bin/id"))
-
-    docs_inventory = ""
+    # identity (P4 robust parse)
     try:
-        t = vm.tree(root="/docs", level=2)
-        docs_inventory = _extract_text(t, "stdout")
-    except Exception:
-        pass
+        id_out = _sql_stdout_or_exec(vm, "/bin/id")
+        identity = _parse_identity(id_out)
+        _mark("identity", identity)
+    except Exception as e:                       # pragma: no cover - defensive
+        identity, _ = {}, _mark("identity", None, str(e))
 
+    # doc inventory (S1-R1)
+    try:
+        doc_paths = _discover_docs(vm)
+        docs_inventory = "\n".join(doc_paths)
+        _mark("docs_inventory", docs_inventory)
+    except Exception as e:                       # pragma: no cover - defensive
+        doc_paths, docs_inventory = [], ""
+        _mark("docs_inventory", None, str(e))
+
+    # policies: security.md + path-named docs (existing behaviour)
     policies: dict[str, str] = {}
     wanted = ["/docs/security.md"]
     for name in re.findall(r"/docs/[\w/.-]+\.md", (instruction or "") + " " + (agents_md_text or "")):
@@ -267,29 +296,75 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhase
             wanted.append(name)
     for path in wanted[:_POLICY_CAP]:
         try:
-            r = vm.read(path=path)
-            txt = _extract_text(r, "content")
+            txt = _extract_text(vm.read(path=path), "content")
             if txt:
-                policies[path] = txt
+                policies[path] = txt[:_DOC_CONTENT_CAP]
         except Exception:
             continue
 
-    target_records: dict[str, str] = {}
-    for m in list(_RECORD_ID_RE.finditer(instruction or ""))[:_RECORD_CAP]:
-        full = m.group(0)
-        for proc in (f"/proc/baskets/{full}.json", f"/proc/payments/{full}.json"):
+    # policies enrichment via entity-token Search (S1-R3)
+    tokens = _extract_entity_tokens(instruction)
+    search_hit = False
+    search_err = ""
+    for tok in tokens:
+        try:
+            hits = _search_paths(vm.search(root="/docs", pattern=tok, limit=30))
+        except Exception as e:
+            search_err = str(e)
+            continue
+        if hits:
+            search_hit = True
+        for p in hits[:_DOC_HITS_PER_TOKEN]:
+            if p in policies:
+                continue
             try:
-                r = vm.read(path=proc)
-                txt = _extract_text(r, "content")
+                txt = _extract_text(vm.read(path=p), "content")
+                if txt:
+                    policies[p] = txt[:_DOC_CONTENT_CAP]
+            except Exception:
+                continue
+    _mark("policies", policies, search_err if (not policies and search_err) else "")
+
+    # LLM DOC-SELECT fallback (S1-R4) — only when Search found nothing.
+    if not search_hit and tokens and doc_paths:
+        picked = _doc_select_fallback(doc_paths, instruction, tokens)
+        for p in picked:
+            if p in policies:
+                continue
+            try:
+                txt = _extract_text(vm.read(path=p), "content")
+                if txt:
+                    policies[p] = txt[:_DOC_CONTENT_CAP]
+            except Exception:
+                continue
+        if picked:
+            status["policies"] = "ok"
+
+    # target_records (P3 wider — S1-R6)
+    target_records: dict[str, str] = {}
+    seen_ids: list[str] = []
+    for m in _RECORD_ID_RE.finditer(instruction or ""):
+        full = m.group(0)
+        if full in seen_ids:
+            continue
+        seen_ids.append(full)
+        if len(seen_ids) > _RECORD_CAP:
+            break
+        for proc in _proc_candidates(full):
+            try:
+                txt = _extract_text(vm.read(path=proc), "content")
                 if txt:
                     target_records[proc] = txt
                     break
             except Exception:
                 continue
+    _mark("target_records", target_records)
 
-    return PrePhaseFacts(agents_md=agents_md_text, schema=schema, sample_rows=samples,
-                         docs_inventory=docs_inventory, policies=policies,
-                         identity=identity, target_records=target_records)
+    return PrePhaseFacts(
+        agents_md=agents_md_text, schema=schema, sample_rows=samples,
+        docs_inventory=docs_inventory, policies=policies, identity=identity,
+        target_records=target_records, gather_status=status,
+    )
 
 
 def run_agent(
