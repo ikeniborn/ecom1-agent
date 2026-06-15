@@ -150,6 +150,21 @@ def test_extract_entity_tokens_dedupes_and_handles_empty():
     assert toks.count("Alpha") == 1
 
 
+from agent.orchestrator import _parse_identity
+
+
+def test_parse_identity_tolerant_to_commas_and_whitespace():
+    d = _parse_identity("uid=42(emp_42)   role=employee,  store_id=S001")
+    assert d["uid"] == "42(emp_42)"
+    assert d["role"] == "employee"
+    assert d["store_id"] == "S001"
+
+
+def test_parse_identity_empty_on_blank():
+    assert _parse_identity("") == {}
+    assert _parse_identity("   ") == {}
+
+
 from agent.orchestrator import gather_prephase_facts, PrePhaseFacts
 
 

@@ -150,7 +150,7 @@ class PrePhaseFacts(BaseModel):
     target_records: dict[str, str] = {}
 
 
-_ID_RE = re.compile(r"(\w+)=([^\s]+)")
+_ID_SPLIT_RE = re.compile(r"[\s,]+")
 _RECORD_ID_RE = re.compile(r"\b(basket|payment|return|order)_\w+\b", re.IGNORECASE)
 _QUOTED_RE = re.compile(r'"([^"]+)"')
 # Two or more Capitalized words in a row (hyphens kept: "Non-Bladed Workshop").
@@ -178,7 +178,19 @@ def _extract_entity_tokens(instruction: str) -> list[str]:
 
 
 def _parse_identity(stdout: str) -> dict:
-    return {k: v for k, v in _ID_RE.findall(stdout or "")}
+    """Parse `/bin/id` into key=value pairs, tolerant to whitespace/commas/order.
+
+    Empty result ONLY when stdout is genuinely blank — recorded as empty/error
+    in gather_status by the caller, never a silent {}.
+    """
+    out: dict = {}
+    for tok in _ID_SPLIT_RE.split((stdout or "").strip()):
+        if "=" in tok:
+            k, _, v = tok.partition("=")
+            k, v = k.strip(), v.strip()
+            if k:
+                out[k] = v
+    return out
 
 
 def _extract_text(r, attr: str) -> str:
