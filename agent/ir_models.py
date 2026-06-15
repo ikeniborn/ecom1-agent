@@ -60,6 +60,25 @@ class AnswerShape(BaseModel):
     required_ref_kinds: list[str] = []  # subset of {"static","runtime"}
 
 
+class RefSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: str                  # "policy_doc" | "record_path"
+    path: str | None = None    # literal /docs/...md, known at INTENT (from discovery)
+    source: str | None = None  # $ref binding, resolved at runtime (record_path)
+
+    @model_validator(mode="after")
+    def _check(self) -> "RefSpec":
+        if self.kind == "policy_doc":
+            if not self.path or self.source:
+                raise ValueError("policy_doc RefSpec requires `path` and no `source`")
+        elif self.kind == "record_path":
+            if not self.source or self.path:
+                raise ValueError("record_path RefSpec requires `source` and no `path`")
+        else:
+            raise ValueError(f"unknown RefSpec kind {self.kind!r}")
+        return self
+
+
 class IntentSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
     objective: str
@@ -69,6 +88,7 @@ class IntentSpec(BaseModel):
     constraints: list[Constraint] = []
     success_criteria: list[PredExpr] = []
     answer_shape: AnswerShape
+    required_refs: dict[str, list[RefSpec]] = {}   # keyed by outcome
 
 
 # --- PlanIR (SDD layer) ----------------------------------------------------

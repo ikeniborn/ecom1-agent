@@ -87,3 +87,46 @@ def test_constraint_security_deny_when():
     c = Constraint(anchor="#sec", rule="no override", security=True,
                    deny_when={"op": "contains_any", "lhs": "$tags", "rhs": ["override"]})
     assert c.security and c.deny_when.op == "contains_any"
+
+
+# --- Task 9: RefSpec + IntentSpec.required_refs ---
+
+from agent.ir_models import RefSpec
+
+
+def test_refspec_policy_doc_requires_path():
+    r = RefSpec(kind="policy_doc", path="/docs/x.md")
+    assert r.path == "/docs/x.md" and r.source is None
+
+
+def test_refspec_record_path_requires_source():
+    r = RefSpec(kind="record_path", source="$row0.record_path")
+    assert r.source == "$row0.record_path" and r.path is None
+
+
+def test_refspec_policy_doc_with_source_rejected():
+    with pytest.raises(ValidationError):
+        RefSpec(kind="policy_doc", path="/docs/x.md", source="$y")
+
+
+def test_refspec_record_path_without_source_rejected():
+    with pytest.raises(ValidationError):
+        RefSpec(kind="record_path")
+
+
+def test_refspec_unknown_kind_rejected():
+    with pytest.raises(ValidationError):
+        RefSpec(kind="mystery", path="/docs/x.md")
+
+
+def test_intentspec_required_refs_keyed_by_outcome():
+    spec = IntentSpec(
+        objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
+        answer_shape={"required_ref_kinds": []},   # still accepted in Task 9
+        required_refs={"OUTCOME_OK": [
+            {"kind": "policy_doc", "path": "/docs/counting.md"},
+            {"kind": "record_path", "source": "$row0.record_path"},
+        ]},
+    )
+    assert len(spec.required_refs["OUTCOME_OK"]) == 2
+    assert spec.required_refs["OUTCOME_OK"][0].kind == "policy_doc"
