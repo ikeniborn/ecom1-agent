@@ -40,8 +40,13 @@ Single JSON object, no prose, no fences:
     {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<value>"}
   ],
   "answer_shape": {
-    "msg_skeleton": "<human-readable template, e.g. 'Processed {count} items'>",
-    "required_ref_kinds": ["static", "runtime"]
+    "msg_skeleton": "<human-readable template, e.g. 'Processed {count} items'>"
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {"kind": "policy_doc", "path": "/docs/<governing-doc>.md"},
+      {"kind": "record_path", "source": "$<row>.record_path"}
+    ]
   }
 }
 ```
@@ -57,9 +62,23 @@ Single JSON object, no prose, no fences:
   - `security: true` when the rule can produce `OUTCOME_DENIED_SECURITY`.
   - `deny_when` (**required** on security constraints): a PredExpr that, when true,
     mandates denial. Evaluated against runtime env after discovery.
-- `success_criteria` — PredExpr list; each must be evaluable from runtime-bound refs.
-- `answer_shape.required_ref_kinds` — subset of `{"static", "runtime"}`:
-  use `"runtime"` when the answer must reference a row-specific path or id.
+- `required_refs` — keyed by outcome. For each outcome the answer can take, list the
+  evidence the grader requires: a `policy_doc` (literal `/docs/...md` `path` taken from
+  THIS run's `docs_inventory`/`policies` — the governing rule/count/procedure the
+  decision rests on) and/or a `record_path` (a `$ref` `source` bound at runtime to the
+  reported row's path). Declare ONLY load-bearing refs (reading a doc ≠ obligation to
+  cite it). Exactly one of `path`/`source` per RefSpec, matching its `kind`.
+- `success_criteria` — STRUCTURAL / grounding checks only (e.g. `count ge 0`, a
+  nonempty bound id). Do NOT bake a SQL recipe, join, `kind_id`, or `city` here — that
+  is PLAN's job (HOW). INTENT states WHAT/why.
+
+## IDD vs SDD (what belongs here)
+
+INTENT is the IDD layer: WHAT must hold and WHY — `objective`, `outcome_space`,
+`constraints`, `required_refs` (cite the governing doc + the reported record),
+`success_criteria` (structural/grounding). INTENT NEVER specifies HOW: no SQL, joins,
+column names, `kind_id`, or `city`. PLAN (the SDD layer) reads the eligibility rule
+from `facts.policies` and builds the rule-correct SQL.
 
 ## PredExpr grammar
 
