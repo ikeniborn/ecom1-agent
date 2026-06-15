@@ -57,7 +57,6 @@ class Constraint(BaseModel):
 class AnswerShape(BaseModel):
     model_config = ConfigDict(extra="forbid")
     msg_skeleton: str = ""
-    required_ref_kinds: list[str] = []  # subset of {"static","runtime"}
 
 
 class RefSpec(BaseModel):

@@ -13,7 +13,7 @@ def _intent(**over):
                 outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY",
                                "OUTCOME_NONE_UNSUPPORTED"],
                 constraints=[], success_criteria=[],
-                answer_shape={"required_ref_kinds": []},   # dropped in Task 12
+                answer_shape={},
                 required_refs={})
     base.update(over)
     return IntentSpec(**base)
@@ -54,13 +54,13 @@ def test_i1_static_only_docs_ref_no_longer_auto_fails():
 
 def test_i2_outcome_outside_space_fails():
     res = _result(CapturedAnswer(message="m", outcome="OUTCOME_ERR_INTERNAL", refs=["x"]))
-    ok, err = verify(res, _intent(answer_shape={"required_ref_kinds": []}))
+    ok, err = verify(res, _intent(answer_shape={}))
     assert not ok
 
 
 def test_i3_security_deny_when_true_but_outcome_ok_fails():
     intent = _intent(
-        answer_shape={"required_ref_kinds": []},
+        answer_shape={},
         constraints=[{"anchor": "#sec", "rule": "no override", "security": True,
                       "deny_when": {"op": "contains_any", "lhs": "$tags", "rhs": ["override"]}}],
     )
@@ -72,7 +72,7 @@ def test_i3_security_deny_when_true_but_outcome_ok_fails():
 
 def test_i3_security_deny_when_true_and_denied_passes():
     intent = _intent(
-        answer_shape={"required_ref_kinds": []},
+        answer_shape={},
         constraints=[{"anchor": "#sec", "rule": "no override", "security": True,
                       "deny_when": {"op": "contains_any", "lhs": "$tags", "rhs": ["override"]}}],
     )
@@ -83,7 +83,7 @@ def test_i3_security_deny_when_true_and_denied_passes():
 
 
 def test_success_criteria_must_hold():
-    intent = _intent(answer_shape={"required_ref_kinds": []},
+    intent = _intent(answer_shape={},
                      success_criteria=[{"op": "nonempty", "lhs": "$answer.message"}])
     res_bad = _result(CapturedAnswer(message="", outcome="OUTCOME_OK", refs=["x"]))
     ok, _ = verify(res_bad, intent)

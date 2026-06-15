@@ -11,7 +11,7 @@ _FACTS = {"schema": "CREATE TABLE x(...)", "agents_md": "RULES", "policies": {},
 _INTENT_JSON = json.dumps({
     "objective": "count", "desired_outcome": "int", "params": {"k": "v"},
     "outcome_space": ["OUTCOME_OK"], "constraints": [], "success_criteria": [],
-    "answer_shape": {"required_ref_kinds": ["static"]},
+    "answer_shape": {},
 })
 _PLAN_JSON = json.dumps({
     "discovery": [], "rowsets": [], "compute": [],

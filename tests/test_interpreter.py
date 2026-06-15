@@ -5,7 +5,7 @@ from agent.mock_vm_spy import MockVMSpy, fixture_key
 
 _INTENT = IntentSpec(objective="o", desired_outcome="d",
                      outcome_space=["OUTCOME_OK"],
-                     answer_shape={"required_ref_kinds": ["static"]})
+                     answer_shape={})
 
 
 def _plan(**over):
@@ -154,7 +154,7 @@ def test_answer_resolves_slots_and_refs():
     fx = {fixture_key("Exec", "/bin/sql", ["Q"]): {"stdout": "sku|record_path\nA|/proc/catalog/A.json"}}
     vm = MockVMSpy(fixtures=fx)
     intent = IntentSpec(objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
-                        answer_shape={"required_ref_kinds": []},
+                        answer_shape={},
                         required_refs={"OUTCOME_OK": [{"kind": "record_path", "source": "$row0.record_path"}]})
     plan = _plan(
         discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "args": ["Q"]}, "bind": "raw"}],
@@ -175,7 +175,7 @@ def test_refuse_after_mutation_tags_mutation_landed():
     fx = {fixture_key("Write", "/proc/x", None): {"stdout": "", "exit_code": 0}}
     vm = MockVMSpy(fixtures=fx)
     intent = IntentSpec(objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
-                        answer_shape={"required_ref_kinds": []},
+                        answer_shape={},
                         required_refs={"OUTCOME_OK": [{"kind": "record_path", "source": "$w.record_path"}]})
     plan = _plan(
         decision={"branches": [], "default_label": "ok"},
@@ -193,7 +193,7 @@ def test_refuse_after_mutation_tags_mutation_landed():
 def test_refuse_when_runtime_ref_required_but_unresolved():
     vm = MockVMSpy(fixtures={})
     intent = IntentSpec(objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
-                        answer_shape={"required_ref_kinds": []},
+                        answer_shape={},
                         required_refs={"OUTCOME_OK": [{"kind": "record_path", "source": "$row0.record_path"}]})
     plan = _plan(
         compute=[{"prim": "first", "args": [[]], "into": "row0"}],
@@ -207,7 +207,7 @@ def test_refuse_when_ok_has_only_static_refs_but_runtime_required():
     # Now equivalent to: a required record_path ref resolves empty alongside a policy_doc.
     vm = MockVMSpy(fixtures={})
     intent = IntentSpec(objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
-                        answer_shape={"required_ref_kinds": []},
+                        answer_shape={},
                         required_refs={"OUTCOME_OK": [
                             {"kind": "policy_doc", "path": "/docs/security.md"},
                             {"kind": "record_path", "source": "$missing"},
@@ -223,7 +223,7 @@ def test_refs_projected_from_required_refs_per_outcome():
     vm = MockVMSpy(fixtures=fx)
     intent = IntentSpec(
         objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
-        answer_shape={"required_ref_kinds": []},
+        answer_shape={},
         required_refs={"OUTCOME_OK": [
             {"kind": "policy_doc", "path": "/docs/counting.md"},
             {"kind": "record_path", "source": "$row0.record_path"},
@@ -243,7 +243,7 @@ def test_required_record_path_unresolved_refuses_on_ok():
     vm = MockVMSpy(fixtures={})
     intent = IntentSpec(
         objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
-        answer_shape={"required_ref_kinds": []},
+        answer_shape={},
         required_refs={"OUTCOME_OK": [{"kind": "record_path", "source": "$missing"}]},
     )
     plan = _plan(answer={"ok": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}})

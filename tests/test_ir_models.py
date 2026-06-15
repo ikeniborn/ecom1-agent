@@ -52,7 +52,7 @@ _GOLDEN_INTENT = {
     "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
     "constraints": [],
     "success_criteria": [{"op": "nonempty", "lhs": "$answer.message"}],
-    "answer_shape": {"msg_skeleton": "{cnt}", "required_ref_kinds": ["static"]},
+    "answer_shape": {"msg_skeleton": "{cnt}"},
 }
 
 _GOLDEN_PLAN = {
@@ -72,7 +72,7 @@ _GOLDEN_PLAN = {
 def test_intentspec_parses_golden():
     spec = IntentSpec(**_GOLDEN_INTENT)
     assert spec.success_criteria[0].op == "nonempty"
-    assert spec.answer_shape.required_ref_kinds == ["static"]
+    assert spec.answer_shape.msg_skeleton == "{cnt}"
 
 
 def test_planir_parses_golden_with_from_alias():
@@ -122,7 +122,7 @@ def test_refspec_unknown_kind_rejected():
 def test_intentspec_required_refs_keyed_by_outcome():
     spec = IntentSpec(
         objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
-        answer_shape={"required_ref_kinds": []},   # still accepted in Task 9
+        answer_shape={},
         required_refs={"OUTCOME_OK": [
             {"kind": "policy_doc", "path": "/docs/counting.md"},
             {"kind": "record_path", "source": "$row0.record_path"},
@@ -130,3 +130,9 @@ def test_intentspec_required_refs_keyed_by_outcome():
     )
     assert len(spec.required_refs["OUTCOME_OK"]) == 2
     assert spec.required_refs["OUTCOME_OK"][0].kind == "policy_doc"
+
+
+def test_answer_shape_rejects_dropped_field():
+    from agent.ir_models import AnswerShape
+    with pytest.raises(ValidationError):
+        AnswerShape(required_ref_kinds=["static"])

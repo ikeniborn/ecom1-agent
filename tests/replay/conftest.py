@@ -11,7 +11,7 @@ _MINIMAL_INTENT = IntentSpec(objective="o", desired_outcome="d",
                              outcome_space=["OUTCOME_OK", "OUTCOME_NONE_UNSUPPORTED",
                                             "OUTCOME_DENIED_SECURITY",
                                             "OUTCOME_NONE_CLARIFICATION"],
-                             answer_shape={"required_ref_kinds": []})
+                             answer_shape={})
 
 
 def run_old_script(tid: str, fixtures: dict, params: dict) -> dict:

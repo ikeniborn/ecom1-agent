@@ -18,7 +18,7 @@ _INTENT = json.dumps({
     "objective": "count", "desired_outcome": "int", "params": {},
     "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
     "constraints": [], "success_criteria": [],
-    "answer_shape": {"required_ref_kinds": ["static"]},
+    "answer_shape": {},
 })
 _PLAN = json.dumps({
     "discovery": [{"rpc": "Exec", "args": {"path": "/bin/sql", "args": ["SELECT 1 AS cnt"]}, "bind": "raw"}],
@@ -50,18 +50,16 @@ def test_interpreted_happy_path_answers_once():
 
 def test_interpreted_genuine_verify_fail_via_success_criteria():
     # Exercises the genuine verify() failure path: interpret() SUCCEEDS (no InterpretError)
-    # because required_ref_kinds=[] so the refuse-invariant never fires, then verify() returns
-    # (False, ...) because success_criteria[0] requires row0.cnt == "999" but plan yields "5".
-    # Three cycles: interpret() resolves normally each time, verify() rejects each time -> LEARN
-    # -> exhaust -> OUTCOME_NONE_CLARIFICATION. vm.answer called exactly once (terminal clarify).
+    # then verify() returns (False, ...) because success_criteria[0] requires row0.cnt == "999"
+    # but plan yields "5". Three cycles: interpret() resolves normally each time, verify() rejects
+    # each time -> LEARN -> exhaust -> OUTCOME_NONE_CLARIFICATION. vm.answer called exactly once.
     intent_no_runtime_req = json.dumps({
         "objective": "count", "desired_outcome": "int", "params": {},
         "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
         "constraints": [],
         # success_criteria: row0.cnt must equal "999", but plan produces "5" -> always False
         "success_criteria": [{"op": "eq", "lhs": "$row0.cnt", "rhs": "999"}],
-        # required_ref_kinds=[] -> interpreter refuse-invariant never fires for static-only refs
-        "answer_shape": {"required_ref_kinds": []},
+        "answer_shape": {},
     })
     learn = json.dumps({"rule_content": "cnt must be 999", "reasoning": "verify failed",
                         "deactivate_ids": [], "skip": False})
@@ -82,7 +80,7 @@ def test_interpreted_verify_fail_then_learn_then_exhaust():
         "objective": "o", "desired_outcome": "d", "params": {},
         "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
         "constraints": [], "success_criteria": [],
-        "answer_shape": {"required_ref_kinds": []},
+        "answer_shape": {},
         "required_refs": {"OUTCOME_OK": [{"kind": "record_path", "source": "$missing"}]},
     })
     learn = json.dumps({"rule_content": "Always bind a runtime $ref for OK answers",
