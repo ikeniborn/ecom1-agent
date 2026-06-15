@@ -193,3 +193,21 @@ def test_diagram3_structure():
     # no free-form CODEGEN retry loop: interpret is a deterministic (grey) gate
     kinds = {n.id: n.kind for row in d.rows for n in row}
     assert kinds["d3-interpret"] == "gate"
+
+
+def test_diagram4_structure():
+    d = gx.diagram4()
+    assert "cross-cutting" in d.name.lower()
+    ids = {n.id for row in d.rows for n in row}
+    for e in d.edges:
+        assert e.src in ids and e.dst in ids
+    # three subsystems each have a storage node
+    kinds = {n.id: n.kind for row in d.rows for n in row}
+    assert sum(1 for k in kinds.values() if k == "store") >= 3
+
+
+def test_legend_covers_all_five_kinds():
+    d = gx.legend()
+    assert "Legend" in d.name
+    kinds = {n.kind for row in d.rows for n in row}
+    assert {"llm", "gate", "store", "branch", "terminal"} <= kinds

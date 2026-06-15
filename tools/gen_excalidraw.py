@@ -377,3 +377,39 @@ def diagram3() -> Diagram:
         Edge("d3-interpret", "d3-plan", dashed=True, label="re-plan next cycle"),
     ]
     return Diagram("Diagram 3 — Deterministic interpreter (INTERPRETER_ENABLED)", rows, edges)
+
+
+def diagram4() -> Diagram:
+    """Cross-cutting subsystems: LEARN store, knowledge oracle, LLM routing."""
+    rows = [
+        [Node("d4-learn", "LEARN / learned_store", "llm"),
+         Node("d4-oracle", "Knowledge oracle (oracle.py)", "llm"),
+         Node("d4-route", "LLM routing (llm.py)", "gate")],
+        [Node("d4-yaml", "data/learned/{tid}.yaml", "store"),
+         Node("d4-atoms", "data/oracle/atoms.yaml", "store"),
+         Node("d4-trace", "trace JSONL (trace.py)", "store")],
+        [Node("d4-pipeline", "pipeline (CODEGEN / interpret)", "gate")],
+    ]
+    edges = [
+        Edge("d4-learn", "d4-yaml"),
+        Edge("d4-oracle", "d4-atoms"),
+        Edge("d4-route", "d4-trace"),
+        Edge("d4-yaml", "d4-pipeline", dashed=True, label="active rules"),
+        Edge("d4-atoms", "d4-pipeline", dashed=True, label="K atoms"),
+        Edge("d4-route", "d4-pipeline", label="tier + fallback"),
+    ]
+    return Diagram("Diagram 4 — Cross-cutting subsystems", rows, edges)
+
+
+def legend() -> Diagram:
+    """Shape/color vocabulary, one swatch per legend row."""
+    rows = [
+        [Node("lg-llm", "Blue rectangle = LLM call", "llm")],
+        [Node("lg-gate", "Grey rectangle = deterministic step / gate", "gate")],
+        [Node("lg-store", "Green ellipse = storage (yaml / json / atoms)", "store")],
+        [Node("lg-branch", "Yellow diamond = branch / condition", "branch")],
+        [Node("lg-term", "Red rounded = terminal outcome", "terminal")],
+        [Node("lg-solid", "-> solid arrow = control flow", "gate")],
+        [Node("lg-dashed", "--> dashed arrow = feedback / learning", "gate")],
+    ]
+    return Diagram("Legend", rows, edges=[])
