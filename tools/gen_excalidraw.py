@@ -319,6 +319,7 @@ def diagram2() -> Diagram:
         [Node("d2-learn", "LEARN + CONSOLIDATE", "llm")],
         [Node("d2-ok", "OUTCOME_OK", "terminal"),
          Node("d2-clar", "OUTCOME_NONE_CLARIFICATION", "terminal"),
+         Node("d2-unsupported", "OUTCOME_NONE_UNSUPPORTED", "terminal"),
          Node("d2-deny", "OUTCOME_DENIED_SECURITY", "terminal")],
     ]
     edges = [
@@ -328,10 +329,17 @@ def diagram2() -> Diagram:
         Edge("d2-lint", "d2-retry"),
         Edge("d2-retry", "d2-fidelity"),
         Edge("d2-fidelity", "d2-answer"),
+        # ANSWER script may emit any outcome; OUTCOME_OK is the happy path
         Edge("d2-answer", "d2-ok"),
         Edge("d2-answer", "d2-clar"),
+        Edge("d2-answer", "d2-unsupported"),
+        Edge("d2-answer", "d2-deny"),
+        # DESIGN's outcome_override short-circuits to any of the three non-OK terminals
+        Edge("d2-override", "d2-clar"),
+        Edge("d2-override", "d2-unsupported"),
         Edge("d2-override", "d2-deny"),
-        # dashed feedback: each gate -> LEARN -> next cycle
+        # dashed feedback: codegen-fail / lint / fidelity -> LEARN -> next cycle
+        Edge("d2-codegen", "d2-learn", dashed=True),
         Edge("d2-lint", "d2-learn", dashed=True),
         Edge("d2-fidelity", "d2-learn", dashed=True),
         Edge("d2-learn", "d2-codegen", dashed=True, label="next cycle"),
