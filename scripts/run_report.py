@@ -197,3 +197,34 @@ def snapshot_oracle(stats: OracleStats, hist_path, date: str) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("a", encoding="utf-8") as f:
         f.write(json.dumps(line, ensure_ascii=False) + "\n")
+
+
+@dataclass
+class ErrorCategory:
+    key: str
+    total: int
+    tasks: int
+    runs: list
+    example: str
+
+
+def build_error_report(matrix: dict) -> list:
+    agg: dict = {}
+    for task_id, run_cells in matrix.items():
+        for run_label, cell in run_cells.items():
+            for raw in cell.errors:
+                key = normalize_error_key(raw)
+                if not key:
+                    continue
+                a = agg.setdefault(
+                    key, {"total": 0, "tasks": set(), "runs": set(), "example": raw})
+                a["total"] += 1
+                a["tasks"].add(task_id)
+                a["runs"].add(run_label)
+    out = [
+        ErrorCategory(key=k, total=v["total"], tasks=len(v["tasks"]),
+                      runs=sorted(v["runs"]), example=v["example"])
+        for k, v in agg.items()
+    ]
+    out.sort(key=lambda c: (-c.total, c.key))
+    return out

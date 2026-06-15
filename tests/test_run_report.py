@@ -161,3 +161,35 @@ def test_snapshot_oracle_appends(tmp_path):
     assert lines[0]["total"] == 2
     assert lines[0]["by_status"] == {"validated": 1, "candidate": 1}
     assert lines[0]["top_domains"][0] == ["sql", 2]
+
+
+def test_build_error_report(tmp_path):
+    matrix = {
+        "t01": {
+            "run-A": rr.TaskCell("t01", "CLARIFY", 3, [
+                "answer missing required reference '/proc/a.json'",
+            ]),
+            "run-B": rr.TaskCell("t01", "CLARIFY", 3, [
+                "answer missing required reference '/proc/b.json'",   # same key, run-B
+            ]),
+        },
+        "t02": {
+            "run-A": rr.TaskCell("t02", "CLARIFY", 2, [
+                "answer missing required reference '/proc/c.json'",   # same key, task t02
+                "loop broken at cycle 3",
+            ]),
+        },
+        "t03": {"run-A": rr.TaskCell("t03", "OK", 1, [])},            # no errors
+    }
+
+    report = rr.build_error_report(matrix)
+    by_key = {c.key: c for c in report}
+
+    miss = by_key["answer missing required reference"]
+    assert miss.total == 3                      # 3 occurrences across cells
+    assert miss.tasks == 2                       # t01 + t02
+    assert miss.runs == ["run-A", "run-B"]
+    assert miss.example.startswith("answer missing required reference")
+    assert by_key["loop broken at cycle"].total == 1
+    # sorted by total desc
+    assert report[0].key == "answer missing required reference"
