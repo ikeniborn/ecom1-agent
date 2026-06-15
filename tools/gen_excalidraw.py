@@ -413,3 +413,32 @@ def legend() -> Diagram:
         [Node("lg-dashed", "--> dashed arrow = feedback / learning", "gate")],
     ]
     return Diagram("Legend", rows, edges=[])
+
+
+OUT_PATH = (Path(__file__).resolve().parent.parent
+            / "docs" / "architecture" / "agent-architecture.excalidraw")
+
+
+def assemble() -> dict:
+    """Stack all diagrams + legend into one schema-valid document."""
+    diagrams = [diagram1(), diagram2(), diagram3(), diagram4(), legend()]
+    elements: list[dict] = []
+    y = 0.0
+    for i, d in enumerate(diagrams, start=1):
+        elems, bottom = render_diagram(d, y, f"frame-{i}")
+        elements += elems
+        y = bottom + FRAME_VGAP
+    return build_document(elements)
+
+
+def main(out: Path = OUT_PATH) -> Path:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    doc = assemble()
+    out.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
+                   encoding="utf-8")
+    return out
+
+
+if __name__ == "__main__":
+    written = main()
+    print(f"wrote {written}")

@@ -211,3 +211,27 @@ def test_legend_covers_all_five_kinds():
     assert "Legend" in d.name
     kinds = {n.kind for row in d.rows for n in row}
     assert {"llm", "gate", "store", "branch", "terminal"} <= kinds
+
+
+def test_assemble_has_five_frames_and_valid_bindings():
+    doc = gx.assemble()
+    frame_names = [e["name"] for e in doc["elements"] if e["type"] == "frame"]
+    assert len(frame_names) == 5                       # 4 diagrams + legend
+    assert any("Diagram 1" in n for n in frame_names)
+    assert any("Diagram 4" in n for n in frame_names)
+    assert any("Legend" in n for n in frame_names)
+    assert gx.unique_ids(doc)
+    assert gx.arrow_bindings_valid(doc)
+
+
+def test_assemble_is_deterministic():
+    a = json.dumps(gx.assemble(), sort_keys=True)
+    b = json.dumps(gx.assemble(), sort_keys=True)
+    assert a == b
+
+
+def test_main_writes_parseable_file(tmp_path):
+    out = tmp_path / "out.excalidraw"
+    gx.main(out=out)
+    doc = json.loads(out.read_text())
+    assert doc["type"] == "excalidraw" and doc["elements"]
