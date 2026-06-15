@@ -36,7 +36,7 @@ def _facts_block(facts: Any) -> str:
         facts = facts.model_dump()
     parts = []
     for key in ("agents_md", "schema", "sample_rows", "docs_inventory",
-                "policies", "identity", "target_records"):
+                "policies", "identity", "target_records", "gather_status"):
         val = facts.get(key) if isinstance(facts, dict) else None
         if val:
             parts.append(f"## {key}\n{val if isinstance(val, str) else val}")

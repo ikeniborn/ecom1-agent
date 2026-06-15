@@ -3,7 +3,7 @@ import json
 from unittest.mock import patch
 import pytest
 
-from agent.reason import run_intent, run_plan, IntentError, PlanError
+from agent.reason import run_intent, run_plan, IntentError, PlanError, _facts_block
 from agent.ir_models import IntentSpec
 
 _FACTS = {"schema": "CREATE TABLE x(...)", "agents_md": "RULES", "policies": {}, "identity": {}}
@@ -45,3 +45,14 @@ def test_run_plan_bad_json_raises():
     with patch("agent.pipeline.call_llm_raw", return_value="not json"):
         with pytest.raises(PlanError):
             run_plan(spec, _FACTS, [], None)
+
+
+def test_facts_block_surfaces_gather_status():
+    facts = {
+        "schema": "CREATE TABLE x(...)",
+        "docs_inventory": "/docs/a.md",
+        "gather_status": {"docs_inventory": "ok", "policies": "empty"},
+    }
+    block = _facts_block(facts)
+    assert "gather_status" in block
+    assert "policies" in block and "empty" in block
