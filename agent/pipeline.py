@@ -184,6 +184,8 @@ def _learn_consolidate_text(
     artifact: str,
     token_out: dict | None = None,
     observed: list[str] | None = None,
+    prompt_name: str = "learn",
+    surface: str = "codegen",
 ) -> None:
     """Message-building core of LEARN, driven by already-rendered strings.
 
@@ -194,7 +196,7 @@ def _learn_consolidate_text(
     RPC stdouts captured during the failed run so LEARN can see WHY refs were
     empty (table missing, column wrong, search returned nothing).
     """
-    guide = load_prompt("learn") or "# PHASE: LEARN"
+    guide = load_prompt(prompt_name) or "# PHASE: LEARN"
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
 
     rules_lines = "\n".join(_format_entry(e) for e in learn_ctx) or "(none)"
@@ -226,13 +228,19 @@ def _learn_consolidate_text(
         print(f"{CLI_YELLOW}[pipeline] LEARN: validation failed: {e}{CLI_CLR}")
         return
 
-    apply_learn_diff(task_id, out)
+    apply_learn_diff(task_id, out, surface=surface)
+
+    deep = getattr(out, "prephase_deep_read", None)
+    if surface == "ir" and deep:
+        from .learned_store import append_prephase_deep_read
+        append_prephase_deep_read(task_id, deep)
 
     if not out.skip and out.rule_content:
         learn_ctx.append({
             "id": "in-session",
             "content": out.rule_content,
             "agents_md_anchor": out.agents_md_anchor,
+            "surface": surface,
         })
 
 
@@ -282,15 +290,15 @@ def _learn_consolidate(
 # ---------------------------------------------------------------------------
 
 def _ilearn(task_id, learn_ctx, intent, plan_text, error, observed=None):
-    """LEARN seam for the interpreted path - reuses _learn_consolidate's LLM call.
-
-    The interpreted path passes the IntentSpec JSON as the 'plan context' and the
-    PlanIR JSON as the 'artifact'. The distilled rule still lands in data/learned/{tid}.yaml.
-    """
+    """LEARN seam for the interpreted path — uses the PlanIR-framed ilearn.md prompt,
+    stamps surface='ir', and persists any prephase_deep_read hints."""
     tk: dict = {}
-    _learn_consolidate_text(task_id, learn_ctx,
-                            plan_context=intent.model_dump_json(indent=2),
-                            error=error, artifact=plan_text, token_out=tk, observed=observed)
+    _learn_consolidate_text(
+        task_id, learn_ctx,
+        plan_context=intent.model_dump_json(indent=2),
+        error=error, artifact=plan_text, token_out=tk, observed=observed,
+        prompt_name="ilearn", surface="ir",
+    )
 
 
 def _persist_artifacts(task_id, intent, plan):

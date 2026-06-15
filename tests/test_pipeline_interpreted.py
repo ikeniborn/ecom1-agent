@@ -125,6 +125,23 @@ def test_interpreted_ignores_legacy_learned_rules(monkeypatch, tmp_path):
     )
 
 
+def test_ilearn_stamps_ir_surface_and_persists_deep_read():
+    from agent import learned_store, pipeline
+    from agent.ir_models import IntentSpec
+    intent = IntentSpec(objective="o", desired_outcome="d", outcome_space=["OUTCOME_OK"],
+                        answer_shape={})
+    learn_json = json.dumps({
+        "rule_content": "Always list the instruction-named directory before projecting refs",
+        "reasoning": "missing ref", "deactivate_ids": [], "skip": False,
+        "prephase_deep_read": ["/proc/incoming/payments"],
+    })
+    with patch("agent.pipeline.call_llm_raw", return_value=learn_json):
+        pipeline._ilearn("t_ir", [], intent, "{}", "verify: missing ref", observed=["[List /x] a"])
+    data = learned_store._read("t_ir")
+    assert data["entries"][0]["surface"] == "ir"
+    assert learned_store.load_prephase_deep_read("t_ir") == ["/proc/incoming/payments"]
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader
