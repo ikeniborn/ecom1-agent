@@ -453,10 +453,10 @@ def _call_raw_single_model(
     if _think_flag is not None:
         _ollama_extra["think"] = _think_flag
     _opts = cfg.get("ollama_options")
-    if _opts is not None:  # None=not configured; {}=valid (though empty) — use `is not None`
-        _ollama_extra["options"] = _opts
+    if _opts:  # flatten to top level: the LiteLLM proxy drops a nested "options" blob, but
+        _ollama_extra.update(_opts)  # forwards top-level sampling params (num_predict proven)
     if logprobs:
-        _ollama_extra.setdefault("options", {})["logprobs"] = 1
+        _ollama_extra["logprobs"] = 1
     for attempt in range(max_retries + 1):
         try:
             # Do not pass max_tokens to Ollama — output is short (~8 tokens); the model stops

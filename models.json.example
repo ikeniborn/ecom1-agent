@@ -2,14 +2,12 @@
   "_comment": "Model capability configs. Key = model ID as used in env vars. Copy to models.json.",
   "_fields": {
     "provider": "Explicit provider: 'anthropic' | 'openrouter' | 'ollama'. If omitted, inferred from model name (name:tag → ollama, anthropic/... or claude → anthropic, else openrouter).",
-    "max_completion_tokens": "Max tokens the model may generate per step",
-    "response_format_hint": "Hint for OpenRouter tier: 'json_object' or 'json_schema'",
+    "response_format_hint": "Hint for OpenRouter tier only: 'json_object' or 'json_schema'",
     "ollama_think": "Enable <think> blocks for Ollama models that support it",
-    "ollama_options": "Ollama-specific options passed via extra_body.options (e.g. {num_ctx: 16384})",
-    "seed": "Random seed for reproducible sampling (Ollama only); fixes the RNG state so identical prompt+seed always produces identical output. Use with temperature=0 for full determinism (classifier), or with low temperature to stabilize code generation (coder)",
+    "ollama_options": "Ollama sampling params, flattened to top-level request fields (LiteLLM forwards them; a nested 'options' blob is dropped). E.g. {num_ctx, temperature, seed, top_k, top_p, repeat_penalty}",
+    "seed": "Random seed for reproducible sampling (inside ollama_options); fixes the RNG state so identical prompt+seed always produces identical output. Use with temperature=0 for full determinism (classifier), or with low temperature to stabilize code generation (coder)",
     "cc_model": "Model alias passed as --model to iclaude CLI (e.g. 'haiku', 'sonnet', 'opus'). Provider='claude-code' only.",
     "cc_options": "Inline dict. Recognised keys: cc_effort (low|medium|high|xhigh|max), cc_timeout_s (int), cc_fallback_model (string → --fallback-model), cc_exclude_dynamic (bool → --exclude-dynamic-system-prompt-sections, improves cross-run prompt-cache reuse), cc_json_schema (raw JSON schema → --json-schema, used by classifier). --bare is intentionally NOT exposed (it breaks OAuth auth).",
-    "ctx_window": "Context window size in tokens (input limit). Used by _compact_log for token-aware compaction threshold.",
     "kind": "Model role: omit for chat/completion; 'embedding' for vector-embedding models used by the knowledge-oracle (agent/oracle.py)"
   },
   "_section_embeddings": "--- Embedding model for the knowledge-oracle (EMBED_MODEL). Called via Ollama /v1/embeddings, returns a dense vector, not chat. ---",
@@ -20,7 +18,7 @@
     "ollama_options": { "num_ctx": 8192 }
   },
   "_ollama_options_ref": {
-    "_doc": "All keys are optional. Passed as extra_body={options:{...}} to Ollama /v1/chat/completions. Source: https://docs.ollama.com/modelfile",
+    "_doc": "All keys are optional. Flattened to top-level request fields by agent/llm.py (a nested 'options' blob is dropped by the LiteLLM proxy). Source: https://docs.ollama.com/modelfile",
     "_context": {
       "num_ctx": "int    | default: 2048  | Context window size in tokens. Set to 16384+ for long docs/AGENTS.MD",
       "num_keep": "int    | default: 0     | Tokens from initial prompt to always keep when context slides"
@@ -31,7 +29,7 @@
       "top_p": "float  | default: 0.9   | Nucleus sampling: cumulative prob cutoff. Works with top_k",
       "min_p": "float  | default: 0.0   | Min prob relative to top token. Alternative to top_p",
       "seed": "int    | default: 0     | Fixed seed for reproducible outputs (0=random)",
-      "num_predict": "int    | default: -1    | Max output tokens (-1=unlimited). Overrides max_completion_tokens for Ollama"
+      "num_predict": "int    | default: -1    | Max output tokens (-1=unlimited). Use this to cap Ollama output"
     },
     "_repetition": {
       "repeat_penalty": "float  | default: 1.1   | Penalise repeated tokens. 1.0=off, 1.1=mild, 1.5=strict",
@@ -86,70 +84,60 @@
   },
   "_section_ollama_local": "--- Ollama local (OLLAMA_BASE_URL=http://localhost:11434/v1) ---",
   "qwen3.5:0.8b": {
-    "max_completion_tokens": 2000,
     "ollama_think": false,
     "ollama_options": {
       "num_ctx": 16384
     }
   },
   "qwen3.5:2b": {
-    "max_completion_tokens": 2000,
     "ollama_think": false,
     "ollama_options": {
       "num_ctx": 16384
     }
   },
   "qwen3.5:4b": {
-    "max_completion_tokens": 4000,
     "ollama_think": false,
     "ollama_options": {
       "num_ctx": 16384
     }
   },
   "qwen3.5:9b": {
-    "max_completion_tokens": 4000,
     "ollama_think": true,
     "ollama_options": {
       "num_ctx": 16384
     }
   },
   "qwen3.5:32b": {
-    "max_completion_tokens": 4000,
     "ollama_think": true,
     "ollama_options": {
       "num_ctx": 16384
     }
   },
   "llama3.2:3b": {
-    "max_completion_tokens": 4000,
     "ollama_think": false,
     "ollama_options": {
       "num_ctx": 16384
     }
   },
   "llama3.3:70b": {
-    "max_completion_tokens": 4000,
     "ollama_think": false,
     "ollama_options": {
       "num_ctx": 16384
     }
   },
   "deepseek-r1:7b": {
-    "max_completion_tokens": 4000,
     "ollama_think": true,
     "ollama_options": {
       "num_ctx": 16384
     }
   },
   "deepseek-r1:14b": {
-    "max_completion_tokens": 4000,
     "ollama_think": true,
     "ollama_options": {
       "num_ctx": 16384
     }
   },
   "deepseek-r1:32b": {
-    "max_completion_tokens": 4000,
     "ollama_think": true,
     "ollama_options": {
       "num_ctx": 16384
@@ -158,7 +146,6 @@
   "_section_ollama_cloud": "--- Ollama cloud endpoint (OLLAMA_BASE_URL=https://your-cloud/v1) ---",
   "qwen3.5:cloud": {
     "provider": "ollama",
-    "max_completion_tokens": 16000,
     "ollama_think": true,
     "ollama_options": {
       "num_ctx": 16384,
@@ -168,12 +155,10 @@
       "repeat_last_n": 256,
       "top_k": 30,
       "top_p": 0.9
-    },
-    "ctx_window": 16384
+    }
   },
   "qwen3.5:397b-cloud": {
     "provider": "ollama",
-    "max_completion_tokens": 16000,
     "ollama_think": true,
     "ollama_options": {
       "num_ctx": 16384,
@@ -183,12 +168,10 @@
       "repeat_last_n": 256,
       "top_k": 30,
       "top_p": 0.9
-    },
-    "ctx_window": 16384
+    }
   },
   "deepseek-v3.1:671b-cloud": {
     "provider": "ollama",
-    "max_completion_tokens": 16000,
     "ollama_think": false,
     "ollama_options": {
       "num_ctx": 16384,
@@ -198,12 +181,10 @@
       "repeat_last_n": 256,
       "top_k": 30,
       "top_p": 0.9
-    },
-    "ctx_window": 16384
+    }
   },
   "deepseek-r1:671b-cloud": {
     "provider": "ollama",
-    "max_completion_tokens": 16000,
     "ollama_think": true,
     "ollama_options": {
       "num_ctx": 16384,
@@ -213,42 +194,28 @@
       "repeat_last_n": 256,
       "top_k": 30,
       "top_p": 0.9
-    },
-    "ctx_window": 16384
+    }
   },
   "_section_openrouter": "--- OpenRouter (OPENROUTER_API_KEY required) ---",
   "qwen/qwen3.5-9b": {
     "provider": "openrouter",
-    "max_completion_tokens": 16000,
     "response_format_hint": "json_object",
-    "temperature": 0.35,
-    "ctx_window": 131072
+    "temperature": 0.35
   },
   "meta-llama/llama-3.3-70b-instruct": {
     "provider": "openrouter",
-    "max_completion_tokens": 16000,
     "response_format_hint": "json_object",
-    "temperature": 0.35,
-    "ctx_window": 131072
+    "temperature": 0.35
   },
   "_section_anthropic": "--- Anthropic (ANTHROPIC_API_KEY required) ---",
   "anthropic/claude-haiku-4.5": {
-    "provider": "anthropic",
-    "max_completion_tokens": 16384,
-    "response_format_hint": "json_object",
-    "ctx_window": 200000
+    "provider": "anthropic"
   },
   "anthropic/claude-sonnet-4.6": {
-    "provider": "anthropic",
-    "max_completion_tokens": 16384,
-    "response_format_hint": "json_object",
-    "ctx_window": 200000
+    "provider": "anthropic"
   },
   "anthropic/claude-opus-4.7": {
-    "provider": "anthropic",
-    "max_completion_tokens": 16384,
-    "response_format_hint": "json_object",
-    "ctx_window": 200000
+    "provider": "anthropic"
   },
   "_section_claude_code": "--- Claude Code CLI (iclaude subprocess, OAuth) ---",
   "claude-code/haiku": {
@@ -258,10 +225,7 @@
       "cc_effort": "low",
       "cc_timeout_s": 120,
       "cc_exclude_dynamic": true
-    },
-    "max_completion_tokens": 16384,
-    "response_format_hint": "json_object",
-    "ctx_window": 200000
+    }
   },
   "claude-code/sonnet": {
     "provider": "claude-code",
@@ -270,10 +234,7 @@
       "cc_effort": "medium",
       "cc_timeout_s": 180,
       "cc_exclude_dynamic": true
-    },
-    "max_completion_tokens": 16384,
-    "response_format_hint": "json_object",
-    "ctx_window": 200000
+    }
   },
   "claude-code/opus": {
     "provider": "claude-code",
@@ -282,9 +243,6 @@
       "cc_effort": "high",
       "cc_timeout_s": 240,
       "cc_exclude_dynamic": true
-    },
-    "max_completion_tokens": 16384,
-    "response_format_hint": "json_object",
-    "ctx_window": 200000
+    }
   }
 }
