@@ -239,3 +239,31 @@ def render_diagram(d: Diagram, origin_y: float, frame_id: str) -> tuple[list[dic
         edges += make_arrow(by_id[e.src], by_id[e.dst], e.dashed, e.label)
 
     return [frame, *shapes, *texts, *edges], fy + fh
+
+
+def build_document(elements: list[dict]) -> dict:
+    """Wrap elements in a schema-valid Excalidraw document envelope."""
+    return {
+        "type": "excalidraw",
+        "version": 2,
+        "source": "tools/gen_excalidraw.py",
+        "elements": elements,
+        "appState": {"gridSize": GRID, "viewBackgroundColor": "#ffffff"},
+        "files": {},
+    }
+
+
+def unique_ids(doc: dict) -> bool:
+    ids = [e["id"] for e in doc["elements"]]
+    return len(ids) == len(set(ids))
+
+
+def arrow_bindings_valid(doc: dict) -> bool:
+    ids = {e["id"] for e in doc["elements"]}
+    for e in doc["elements"]:
+        if e["type"] != "arrow":
+            continue
+        for b in (e.get("startBinding"), e.get("endBinding")):
+            if b and b["elementId"] not in ids:
+                return False
+    return True

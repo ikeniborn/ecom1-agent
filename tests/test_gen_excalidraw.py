@@ -121,3 +121,32 @@ def test_render_diagram_frame_first_in_array():
     d = gx.Diagram("D", rows=[[gx.Node("z", "Z", "gate")]], edges=[])
     elems, _ = gx.render_diagram(d, 0, "frame-Z")
     assert elems[0]["type"] == "frame"   # drawn behind its children
+
+
+def test_build_document_envelope():
+    d = gx.Diagram("D", rows=[[gx.Node("only", "X", "llm")]], edges=[])
+    elems, _ = gx.render_diagram(d, 0, "frame-1")
+    doc = gx.build_document(elems)
+    assert doc["type"] == "excalidraw"
+    assert doc["version"] == 2
+    assert isinstance(doc["elements"], list) and doc["elements"]
+    assert "appState" in doc
+    # serializes as valid JSON
+    json.loads(json.dumps(doc))
+
+
+def test_unique_ids_helper():
+    good = {"elements": [{"id": "a"}, {"id": "b"}]}
+    bad = {"elements": [{"id": "a"}, {"id": "a"}]}
+    assert gx.unique_ids(good) is True
+    assert gx.unique_ids(bad) is False
+
+
+def test_arrow_bindings_valid_helper():
+    a = gx.make_node(gx.Node("s", "A", "gate"), 0, 0, "f")[0]
+    b = gx.make_node(gx.Node("d", "B", "gate"), 0, 200, "f")[0]
+    arrow = gx.make_arrow(a, b)[0]
+    ok = {"elements": [a, b, arrow]}
+    assert gx.arrow_bindings_valid(ok) is True
+    arrow_bad = dict(arrow, startBinding={"elementId": "ghost", "focus": 0, "gap": 8})
+    assert gx.arrow_bindings_valid({"elements": [a, b, arrow_bad]}) is False
