@@ -42,3 +42,148 @@ STROKE = "#1e1e1e"
 def snap(v: float) -> float:
     """Snap a coordinate to the nearest grid step."""
     return round(v / GRID) * GRID
+
+
+# ── Deterministic ids ──────────────────────────────────────────────────────
+def _stable_seed(eid: str) -> int:
+    """Pure pseudo-seed derived from the element id (no randomness)."""
+    h = 2166136261
+    for ch in eid:
+        h = ((h ^ ord(ch)) * 16777619) & 0xFFFFFFFF
+    return h
+
+
+def _base(eid, etype, x, y, w, h, frame_id=None):
+    """Common Excalidraw element fields shared by every element type."""
+    return {
+        "id": eid,
+        "type": etype,
+        "x": float(snap(x)),
+        "y": float(snap(y)),
+        "width": float(w),
+        "height": float(h),
+        "angle": 0,
+        "strokeColor": STROKE,
+        "backgroundColor": "transparent",
+        "fillStyle": "solid",
+        "strokeWidth": 2,
+        "strokeStyle": "solid",
+        "roughness": 0,
+        "opacity": 100,
+        "groupIds": [],
+        "frameId": frame_id,
+        "roundness": None,
+        "seed": _stable_seed(eid),
+        "version": 1,
+        "versionNonce": _stable_seed(eid + "#n"),
+        "isDeleted": False,
+        "boundElements": [],
+        "updated": 1,
+        "link": None,
+        "locked": False,
+    }
+
+
+# ── Declarative node/edge specs ────────────────────────────────────────────
+@dataclass
+class Node:
+    id: str          # unique across the whole document
+    label: str
+    kind: str        # one of KIND
+
+
+@dataclass
+class Edge:
+    src: str
+    dst: str
+    dashed: bool = False
+    label: str = ""
+
+
+def _node_size(kind: str) -> tuple[int, int]:
+    shape = KIND[kind]["shape"]
+    if shape == "diamond":
+        return DIAMOND, DIAMOND
+    if shape == "ellipse":
+        return ELLIPSE_W, ELLIPSE_H
+    return NODE_W, NODE_H
+
+
+def make_node(node: Node, x: float, y: float, frame_id: str) -> tuple[dict, dict]:
+    """Build a shape element and its bound text label (top-left at x, y)."""
+    spec = KIND[node.kind]
+    w, h = _node_size(node.kind)
+    shape = _base(node.id, spec["shape"], x, y, w, h, frame_id)
+    shape["backgroundColor"] = spec["bg"]
+    if spec.get("round"):
+        shape["roundness"] = {"type": 3}
+
+    tid = f"{node.id}-t"
+    text = _base(tid, "text", x, y, w, h, frame_id)
+    text.update({
+        "text": node.label,
+        "fontSize": 16,
+        "fontFamily": 1,
+        "textAlign": "center",
+        "verticalAlign": "middle",
+        "containerId": node.id,
+        "originalText": node.label,
+        "lineHeight": 1.25,
+        "baseline": 12,
+        "autoResize": True,
+    })
+    shape["boundElements"] = [{"type": "text", "id": tid}]
+    return shape, text
+
+
+def _center(e: dict) -> tuple[float, float]:
+    return e["x"] + e["width"] / 2, e["y"] + e["height"] / 2
+
+
+def _anchor(a: dict, b: dict) -> tuple[float, float]:
+    """Point on a's bounding box facing b's center (orthogonal exit)."""
+    ax, ay = _center(a)
+    bx, by = _center(b)
+    if abs(by - ay) >= abs(bx - ax):                      # mostly vertical
+        return ax, (a["y"] + a["height"] if by > ay else a["y"])
+    return (a["x"] + a["width"] if bx > ax else a["x"]), ay   # mostly horizontal
+
+
+def make_arrow(a: dict, b: dict, dashed: bool = False, label: str = "") -> list[dict]:
+    """Bound arrow from shape a to shape b, with reciprocal boundElements."""
+    sx, sy = _anchor(a, b)
+    ex, ey = _anchor(b, a)
+    aid = f"e-{a['id']}-{b['id']}"
+    arrow = _base(aid, "arrow", sx, sy, abs(ex - sx) or 1.0, abs(ey - sy) or 1.0,
+                  a.get("frameId"))
+    arrow.update({
+        "points": [[0.0, 0.0], [float(ex - sx), float(ey - sy)]],
+        "lastCommittedPoint": None,
+        "startBinding": {"elementId": a["id"], "focus": 0, "gap": 8},
+        "endBinding": {"elementId": b["id"], "focus": 0, "gap": 8},
+        "startArrowhead": None,
+        "endArrowhead": "arrow",
+        "strokeStyle": "dashed" if dashed else "solid",
+    })
+    a["boundElements"].append({"type": "arrow", "id": aid})
+    b["boundElements"].append({"type": "arrow", "id": aid})
+    out = [arrow]
+    if label:
+        lid = f"{aid}-lbl"
+        mx, my = (sx + ex) / 2, (sy + ey) / 2
+        lt = _base(lid, "text", mx, my, max(40, len(label) * 9), 20, a.get("frameId"))
+        lt.update({
+            "text": label, "fontSize": 14, "fontFamily": 1,
+            "textAlign": "center", "verticalAlign": "middle",
+            "containerId": aid, "originalText": label,
+            "lineHeight": 1.25, "baseline": 12, "autoResize": True,
+        })
+        arrow["boundElements"] = [{"type": "text", "id": lid}]
+        out.append(lt)
+    return out
+
+
+def _frame(fid: str, x: float, y: float, w: float, h: float, name: str) -> dict:
+    f = _base(fid, "frame", x, y, w, h, None)
+    f["name"] = name
+    return f

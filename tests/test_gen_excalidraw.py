@@ -22,3 +22,62 @@ def test_palette_covers_every_legend_kind():
     for kind, spec in gx.KIND.items():
         assert spec["shape"] in {"rectangle", "diamond", "ellipse"}
         assert spec["bg"].startswith("#")
+
+
+def test_base_element_has_required_excalidraw_keys():
+    e = gx._base("el-1", "rectangle", 0, 0, 240, 60)
+    for key in ("id", "type", "x", "y", "width", "height", "angle",
+                "strokeColor", "backgroundColor", "fillStyle", "strokeWidth",
+                "strokeStyle", "roughness", "opacity", "groupIds", "frameId",
+                "roundness", "seed", "version", "versionNonce", "isDeleted",
+                "boundElements", "updated", "link", "locked"):
+        assert key in e, f"missing base key {key}"
+    assert e["isDeleted"] is False
+    assert e["updated"] == 1   # constant -> deterministic
+
+
+def test_stable_seed_is_pure():
+    assert gx._stable_seed("el-1") == gx._stable_seed("el-1")
+    assert gx._stable_seed("el-1") != gx._stable_seed("el-2")
+
+
+def test_make_node_emits_shape_and_bound_text_with_reciprocal_refs():
+    node = gx.Node(id="d1-x", label="hello", kind="llm")
+    shape, text = gx.make_node(node, x=0, y=0, frame_id="frame-1")
+    assert shape["type"] == "rectangle"
+    assert shape["backgroundColor"] == "#a5d8ff"
+    assert text["type"] == "text" and text["text"] == "hello"
+    # reciprocity: text -> container, container -> text
+    assert text["containerId"] == shape["id"]
+    assert {"type": "text", "id": text["id"]} in shape["boundElements"]
+    assert shape["frameId"] == "frame-1" and text["frameId"] == "frame-1"
+
+
+def test_make_node_shapes_match_kind():
+    assert gx.make_node(gx.Node("a", "x", "branch"), 0, 0, "f")[0]["type"] == "diamond"
+    assert gx.make_node(gx.Node("b", "x", "store"), 0, 0, "f")[0]["type"] == "ellipse"
+    term = gx.make_node(gx.Node("c", "x", "terminal"), 0, 0, "f")[0]
+    assert term["roundness"] == {"type": 3}
+
+
+def test_make_arrow_binds_both_ends_and_back_references_shapes():
+    a = gx.make_node(gx.Node("src", "A", "gate"), 0, 0, "f")[0]
+    b = gx.make_node(gx.Node("dst", "B", "gate"), 0, 200, "f")[0]
+    arrows = gx.make_arrow(a, b, dashed=True, label="retry")
+    arrow = arrows[0]
+    assert arrow["type"] == "arrow"
+    assert arrow["strokeStyle"] == "dashed"
+    assert arrow["startBinding"]["elementId"] == "src"
+    assert arrow["endBinding"]["elementId"] == "dst"
+    # connected shapes back-reference the arrow
+    assert {"type": "arrow", "id": arrow["id"]} in a["boundElements"]
+    assert {"type": "arrow", "id": arrow["id"]} in b["boundElements"]
+    # labeled arrow produces a bound label text element
+    assert any(el["type"] == "text" and el.get("containerId") == arrow["id"]
+               for el in arrows)
+
+
+def test_frame_builder():
+    f = gx._frame("frame-1", 0, 0, 400, 300, "Diagram 1 — x")
+    assert f["type"] == "frame"
+    assert f["name"] == "Diagram 1 — x"
