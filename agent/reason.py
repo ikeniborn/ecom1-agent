@@ -75,7 +75,8 @@ def run_intent(facts, instruction: str, token_out: dict | None = None) -> Intent
 
 
 def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str | None,
-             token_out: dict | None = None, oracle_atoms: list | None = None) -> PlanIR:
+             token_out: dict | None = None, oracle_atoms: list | None = None,
+             observed: list[str] | None = None) -> PlanIR:
     guide = load_prompt("plan") or "# PHASE: PLAN"
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
     parts = []
@@ -86,6 +87,8 @@ def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str |
     parts.append(_facts_block(facts))
     if learn_ctx:
         parts.append("LEARNED_RULES (active):\n" + "\n".join(_format_entry(e) for e in learn_ctx))
+    if observed:
+        parts.append("OBSERVED_RPC_OUTPUTS:\n" + "\n".join(observed))
     if prev_error:
         parts.append(f"PREVIOUS_ERROR:\n{prev_error}")
     user = "\n\n".join(p for p in parts if p)

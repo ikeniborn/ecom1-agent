@@ -78,3 +78,17 @@ def test_facts_block_includes_path_listings_and_status():
 def test_facts_sufficiency_lists_non_ok():
     facts = {"gather_status": {"a": "ok", "b": "empty", "c": "error(x)"}}
     assert set(_facts_sufficiency(facts)) == {"b", "c"}
+
+
+def test_run_plan_renders_observed_block():
+    spec = IntentSpec(**json.loads(_INTENT_JSON))
+    captured = {}
+
+    def _fake(system, user, model, cfg, **kw):
+        captured["user"] = user
+        return _PLAN_JSON
+
+    with patch("agent.pipeline.call_llm_raw", side_effect=_fake):
+        run_plan(spec, _FACTS, [], None, observed=["[Exec /bin/sql] cnt 5", "[List /proc] /proc/x"])
+    assert "OBSERVED_RPC_OUTPUTS:" in captured["user"]
+    assert "/proc/x" in captured["user"]

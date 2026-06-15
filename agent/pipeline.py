@@ -355,6 +355,7 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
                 "status": "failure", "input_tokens": total_in, "output_tokens": total_out}
 
     last_error = None
+    last_observed = None
     cycle = 0
     for cycle in range(1, _IMAX_STEPS + 1):
         set_cycle(cycle)
@@ -363,7 +364,8 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
         plan = None
         try:
             plan = run_plan(intent, facts, learn_ctx, last_error,
-                            token_out=tk, oracle_atoms=oracle_atoms); _accum(tk)
+                            token_out=tk, oracle_atoms=oracle_atoms,
+                            observed=last_observed); _accum(tk)
             lint_security_first(plan)
         except (PlanError, InterpretError) as e:
             last_error = f"plan: {e}"; _accum(tk)
@@ -395,6 +397,7 @@ def _run_interpreted(vm, instruction: str, task_id: str, agents_md_text: str, fa
                 continue
             break
 
+        last_observed = result.observations
         ok, verr = verify(result, intent)
         if ok:
             ans = result.captured
