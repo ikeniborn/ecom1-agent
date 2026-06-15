@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
 from bitgn.vm.ecom.ecom_pb2 import ReadRequest
 
+from agent.json_extract import _extract_json_from_text
+from agent.llm import _resolve_model_for_phase, call_llm_raw
 from agent.pipeline import run_pipeline
 from agent.vm_adapter import VMAdapter
 
@@ -249,8 +251,40 @@ def _sql_stdout_or_exec(vm, path: str) -> str:
     return _extract_text(r, "stdout")
 
 
+_DOC_SELECT_CAP = 4
+
+
 def _doc_select_fallback(doc_paths: list[str], instruction: str, tokens: list[str]) -> list[str]:
-    return []   # replaced with a real LLM call in Task 6
+    """One cheap LLM pick over the doc inventory when Search returned 0 hits.
+
+    Returns up to `_DOC_SELECT_CAP` paths, filtered to existing inventory paths.
+    Never raises — on any failure returns [] (graceful degrade to path-named
+    policies only). Not invoked in the typical case (Search finds the doc).
+    """
+    inventory = "\n".join(doc_paths)
+    system = [{"type": "text", "text":
+               "Select the /docs files most relevant to the task. "
+               "Respond ONLY with JSON {\"docs\": [\"/docs/....md\", ...]}, "
+               "max 4 paths, chosen verbatim from the inventory."}]
+    user = (f"INSTRUCTION:\n{instruction}\n\n"
+            f"ENTITIES:\n{', '.join(tokens)}\n\n"
+            f"DOC_INVENTORY:\n{inventory}")
+    model = _resolve_model_for_phase("learn", os.environ.get("MODEL", ""))
+    try:
+        raw = call_llm_raw(system, user, model, {}, max_tokens=256, phase="DOC_SELECT")
+    except Exception:
+        return []
+    obj = _extract_json_from_text(raw or "")
+    if not isinstance(obj, dict):
+        return []
+    valid = set(doc_paths)
+    out: list[str] = []
+    for p in obj.get("docs", []) or []:
+        if isinstance(p, str) and p in valid and p not in out:
+            out.append(p)
+        if len(out) >= _DOC_SELECT_CAP:
+            break
+    return out
 
 
 def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhaseFacts:
@@ -337,7 +371,7 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhase
                     policies[p] = txt[:_DOC_CONTENT_CAP]
             except Exception:
                 continue
-        if picked:
+        if picked and policies:
             status["policies"] = "ok"
 
     # target_records (P3 wider — S1-R6)

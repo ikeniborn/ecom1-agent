@@ -259,3 +259,43 @@ def test_gather_prephase_facts_caps_doc_content():
     vm.exec.return_value = {"stdout": ""}
     facts = gather_prephase_facts(vm, instruction='see "Big Doc Here"', agents_md_text="")
     assert len(facts.policies["/docs/big.md"]) <= 4096
+
+
+def test_doc_select_fallback_filters_to_existing_paths(monkeypatch):
+    import agent.orchestrator as orch
+
+    monkeypatch.setattr(orch, "_resolve_model_for_phase", lambda phase, model: "m")
+    monkeypatch.setattr(
+        orch, "call_llm_raw",
+        lambda *a, **kw: '{"docs": ["/docs/real.md", "/docs/hallucinated.md"]}',
+    )
+    out = orch._doc_select_fallback(
+        ["/docs/real.md", "/docs/other.md"], "find the policy", ["Some Policy"]
+    )
+    assert out == ["/docs/real.md"]     # hallucinated path filtered out
+
+
+def test_doc_select_fallback_never_raises(monkeypatch):
+    import agent.orchestrator as orch
+
+    monkeypatch.setattr(orch, "_resolve_model_for_phase", lambda phase, model: "m")
+    monkeypatch.setattr(orch, "call_llm_raw",
+                        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("llm down")))
+    assert orch._doc_select_fallback(["/docs/real.md"], "x", ["T"]) == []
+
+
+def test_fallback_does_not_mark_ok_when_reads_yield_nothing(monkeypatch):
+    import agent.orchestrator as orch
+
+    # docs exist, but Search finds nothing and every read of picked docs is empty.
+    root = _entry("docs", kind="dir", children=[_entry("p.md")])
+    vm = MagicMock()
+    vm.tree.return_value = _NS(root=root)
+    vm.search.return_value = _NS(matches=[])          # Search empty -> fallback path
+    vm.exec.return_value = {"stdout": ""}
+    vm.read.return_value = {"content": ""}            # every read yields nothing
+    monkeypatch.setattr(orch, "_doc_select_fallback", lambda *a, **k: ["/docs/p.md"])
+
+    facts = orch.gather_prephase_facts(vm, instruction='see "Topic Name"', agents_md_text="")
+    assert facts.policies == {}
+    assert facts.gather_status["policies"] != "ok"
