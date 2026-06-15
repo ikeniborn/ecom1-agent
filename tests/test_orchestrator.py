@@ -475,3 +475,25 @@ def test_gather_path_listings_dir_lists_file_existence_nonexistent_skipped():
     assert "/proc/incoming/payments" in facts.path_listings
     assert "inpay_a.json" in facts.path_listings["/proc/incoming/payments"]
     assert facts.gather_status.get("path_listings") == "ok"
+
+
+def test_gather_uses_learned_deep_read(tmp_path, monkeypatch):
+    import agent.orchestrator as orch
+    from agent import learned_store
+    from bitgn.vm.ecom.ecom_pb2 import NodeKind
+    monkeypatch.setattr(learned_store, "_LEARNED_DIR", tmp_path)
+    learned_store._write("t_dr", {"task_id": "t_dr",
+                                  "prephase_deep_read": ["/proc/incoming/payments"]})
+
+    vm = MagicMock()
+    vm.exec.return_value = _NS(stdout="", stderr="", exit_code=0)
+    vm.read.return_value = _NS(content="")
+    vm.search.return_value = _NS(matches=[])
+    vm.tree.side_effect = RuntimeError("no docs")
+    vm.stat.return_value = _NS(kind=NodeKind.NODE_KIND_DIR)     # deep-read path resolves as dir
+    vm.list.return_value = _NS(entries=[_NS(path="/proc/incoming/payments/inpay_z.json")])
+
+    # instruction does NOT name the path — only the learned hint does.
+    facts = orch.gather_prephase_facts(vm, instruction="show the last transaction",
+                                       agents_md_text="", task_id="t_dr")
+    assert "/proc/incoming/payments" in facts.path_listings

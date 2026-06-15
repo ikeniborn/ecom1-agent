@@ -10,6 +10,7 @@ from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
 from bitgn.vm.ecom.ecom_pb2 import NodeKind, ReadRequest
 
 from agent.json_extract import _extract_json_from_text
+from agent.learned_store import load_prephase_deep_read
 from agent.llm import _resolve_model_for_phase, call_llm_raw
 from agent.pipeline import run_pipeline
 from agent.trace import get_trace
@@ -389,7 +390,7 @@ def _doc_select_fallback(doc_paths: list[str], instruction: str, tokens: list[st
     return out
 
 
-def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhaseFacts:
+def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: str = "") -> PrePhaseFacts:
     status: dict[str, str] = {}
 
     def _mark(key: str, value, err: str = "") -> None:
@@ -400,11 +401,15 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhase
         else:
             status[key] = "empty"
 
+    deep_read = load_prephase_deep_read(task_id) if task_id else []
+    deep_paths = [d for d in deep_read if d.startswith("/")]
+    deep_tables = tuple(d for d in deep_read if not d.startswith("/"))
+
     # schema + sample rows (P5 tier split: names/DDL uncapped; samples relevance-gated)
     schema = _discover_schema(vm)
     _mark("schema", schema)
     tables = _discover_table_names(vm) if schema else []
-    sample_set = _relevant_tables(tables, instruction)
+    sample_set = _relevant_tables(tables, instruction, deep_read=deep_tables)
     samples = _discover_sample_rows(vm, sample_set) if sample_set else ""
     skipped = [t for t in tables if t not in sample_set]
     if skipped:                                  # no silent truncation
@@ -510,7 +515,11 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str) -> PrePhase
 
     # literal-path listings (1.2) — VM is the filter; no /proc allowlist, no hardcoded roots.
     path_listings: dict[str, str] = {}
-    for lit in _extract_path_literals(instruction):
+    literals = _extract_path_literals(instruction)
+    for d in deep_paths:
+        if d not in literals:
+            literals.append(d)
+    for lit in literals:
         kind = _stat_kind(vm, lit)
         if kind == "dir":
             paths = _list_entries(vm, lit)               # Tier-1, cheap
@@ -539,7 +548,7 @@ def run_agent(
     raw_vm = EcomRuntimeClientSync(harness_url)
     agents_md_text = _read_agents_md(raw_vm)
     vm = VMAdapter(raw_vm)
-    facts = gather_prephase_facts(vm, task_text, agents_md_text)
+    facts = gather_prephase_facts(vm, task_text, agents_md_text, task_id=task_id)
     _t = get_trace()
     if _t is not None:
         try:                                    # observability must never break a run
