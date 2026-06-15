@@ -1,3 +1,25 @@
+---
+review:
+  spec_hash: e5bca072453d969d
+  last_run: 2026-06-15
+  phases:
+    structure:    { status: passed }
+    coverage:     { status: passed }
+    clarity:      { status: passed }
+    consistency:  { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: WARNING
+      section: "### Error categorization (shared by ERRORS map and Error Report)"
+      section_hash: f11c4ce1ea8c5aaf
+      text: "'truncating to the stable message stem' underspecifies the category key. Strip rules (digits/quotes/paths) are deterministic, but the truncation step is not defined — risks unstable bucketing."
+      verdict: fixed
+      verdict_at: 2026-06-15
+chain:
+  intent: null
+---
+
 # Run-Report Heatmaps — Design
 
 **Date:** 2026-06-15
@@ -73,9 +95,12 @@ a run renders as a blank cell.
 
 ### Error categorization (shared by ERRORS map and Error Report)
 
-Normalize each `[pipeline] … failed` line into a category key by stripping digits,
-quoted strings, and path-like tokens, then truncating to the stable message stem.
-Examples of resulting categories: `answer refs check failed`,
+Normalize each `[pipeline] … failed` line into a category key by, in order:
+(1) drop the leading `[pipeline] ` prefix; (2) remove quoted strings (`'…'`, `"…"`);
+(3) remove path-like tokens (any run of non-space chars containing `/`); (4) remove
+digit runs; (5) collapse internal whitespace to single spaces and strip ends. The
+category key is the resulting string verbatim — no truncation. Examples of resulting
+categories: `answer refs check failed`,
 `real-vm exec failed: read failed`, `loop broken at cycle`. New categories
 (`SyntaxError`, `fidelity drift`, intent-test failures) bucket automatically — no
 hard-coded category list.
