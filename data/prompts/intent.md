@@ -15,7 +15,7 @@ strategy.
 | `sample_rows` | Small row sample per table (method-grounded; values change each run) |
 | `docs_inventory` | Paths of policy docs available under `/docs/` |
 | `policies` | Verbatim content of relevant policy files |
-| `identity` | Output of `/bin/id` — caller role, store, issuer |
+| `identity` | Output of `/bin/id` — caller role, store, issuer; includes a structural `kind`: `customer` \| `employee` \| `guest` |
 | `target_records` | Any specific records named in the instruction |
 
 ## Output format — IntentSpec
@@ -71,6 +71,27 @@ Single JSON object, no prose, no fences:
 - `success_criteria` — STRUCTURAL / grounding checks only (e.g. `count ge 0`, a
   nonempty bound id). Do NOT bake a SQL recipe, join, `kind_id`, or `city` here — that
   is PLAN's job (HOW). INTENT states WHAT/why.
+
+### Security scope — role-aware customer-ownership deny
+
+`facts.identity.kind` is one of `customer`, `employee`, `guest` (structural,
+derived from the `/bin/id` id-shape — not a role-name list). The `security.md`
+customer-ownership clause binds **customers** acting on their own account — NOT
+an employee operational read or action.
+
+Apply a customer-ownership `deny_when` **only when** the caller is a customer:
+
+```json
+{"op":"and","args":[
+  {"op":"eq","lhs":"$_facts.identity.kind","rhs":"customer"},
+  {"op":"ne","lhs":"$record.customer_id","rhs":"$_facts.identity.customer_id"}]}
+```
+
+Do NOT emit an owner-mismatch deny for an `employee`/operational identity — an
+employee reading or acting on a record they do not "own" is not a customer-scope
+violation. Customer-only actions (account recovery, email change per the doc)
+remain a separate class. Ground this in the `security.md` scope + `facts.identity`,
+never a hardcoded role or id.
 
 ## IDD vs SDD (what belongs here)
 

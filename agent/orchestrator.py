@@ -422,6 +422,14 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
         id_out = _sql_stdout_or_exec(vm, "/bin/id")
         identity = _parse_identity(id_out)
         identity["kind"] = _identity_kind(identity)
+        # role-aware deny compares $record.customer_id to $_facts.identity.customer_id;
+        # if the caller is a customer identified only by a cust_* value under another
+        # key (e.g. user=cust_016), surface it as customer_id so the predicate is robust.
+        if identity.get("kind") == "customer" and not (identity.get("customer_id") or "").strip():
+            for _v in identity.values():
+                if isinstance(_v, str) and _v.strip().lower().startswith("cust_"):
+                    identity["customer_id"] = _v.strip()
+                    break
         _mark("identity", identity)
     except Exception as e:                       # pragma: no cover - defensive
         identity, _ = {}, _mark("identity", None, str(e))

@@ -187,6 +187,23 @@ def test_identity_kind_structural():
     assert _identity_kind({"store": ""}) == "guest"
 
 
+def test_gather_normalizes_customer_id_from_cust_value():
+    import agent.orchestrator as orch
+    from bitgn.vm.ecom.ecom_pb2 import NodeKind
+    vm = MagicMock()
+    vm.exec.side_effect = lambda path=None, args=None: (
+        _NS(stdout="user=cust_016 store=store_1", stderr="", exit_code=0)
+        if path == "/bin/id" else _NS(stdout="", stderr="", exit_code=0))
+    vm.read.return_value = _NS(content="")
+    vm.search.return_value = _NS(matches=[])
+    vm.tree.side_effect = RuntimeError("no docs")
+    vm.stat.return_value = _NS(kind=NodeKind.NODE_KIND_UNSPECIFIED)
+    vm.list.return_value = _NS(entries=[])
+    facts = orch.gather_prephase_facts(vm, instruction="show my orders", agents_md_text="")
+    assert facts.identity.get("kind") == "customer"
+    assert facts.identity.get("customer_id") == "cust_016"
+
+
 def test_parse_identity_tolerant_to_commas_and_whitespace():
     d = _parse_identity("uid=42(emp_42)   role=employee,  store_id=S001")
     assert d["uid"] == "42(emp_42)"

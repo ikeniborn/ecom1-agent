@@ -65,3 +65,35 @@ def test_and_or_not():
         PredExpr(op="eq", lhs="$role", rhs="manager"),
         PredExpr(op="eq", lhs="$x", rhs=5),
     ]), e)
+
+
+def _deny():
+    # the role-aware customer-ownership predicate from intent.md (D2)
+    return PredExpr(op="and", args=[
+        PredExpr(op="eq", lhs="$_facts.identity.kind", rhs="customer"),
+        PredExpr(op="ne", lhs="$record.customer_id", rhs="$_facts.identity.customer_id"),
+    ])
+
+
+def test_deny_when_employee_does_not_fire():
+    env = {"_facts": {"identity": {"kind": "employee"}},
+           "record": {"customer_id": "cust_016"}}
+    assert evaluate(_deny(), env) is False
+
+
+def test_deny_when_customer_mismatch_fires():
+    env = {"_facts": {"identity": {"kind": "customer", "customer_id": "cust_001"}},
+           "record": {"customer_id": "cust_016"}}
+    assert evaluate(_deny(), env) is True
+
+
+def test_deny_when_customer_owns_record_does_not_fire():
+    env = {"_facts": {"identity": {"kind": "customer", "customer_id": "cust_016"}},
+           "record": {"customer_id": "cust_016"}}
+    assert evaluate(_deny(), env) is False
+
+
+def test_deny_when_guest_does_not_fire():
+    env = {"_facts": {"identity": {"kind": "guest"}},
+           "record": {"customer_id": "cust_016"}}
+    assert evaluate(_deny(), env) is False
