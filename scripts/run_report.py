@@ -183,3 +183,17 @@ def parse_oracle(atoms_path) -> OracleStats:
     top = sorted(dom.items(), key=lambda kv: (-kv[1], kv[0]))
     return OracleStats(total=len(atoms), by_status=by_status,
                        by_source_task=by_task, top_domains=top)
+
+
+def snapshot_oracle(stats: OracleStats, hist_path, date: str) -> None:
+    """Append one growth-series line to data/oracle/history.jsonl (created if absent)."""
+    line = {
+        "date": date,
+        "total": stats.total,
+        "by_status": stats.by_status,
+        "top_domains": stats.top_domains[:10],
+    }
+    p = Path(hist_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(line, ensure_ascii=False) + "\n")

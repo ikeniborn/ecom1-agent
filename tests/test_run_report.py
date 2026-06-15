@@ -145,3 +145,19 @@ def test_parse_oracle_missing(tmp_path):
     stats = rr.parse_oracle(tmp_path / "nope.yaml")
     assert stats.total == 0
     assert stats.by_status == {} and stats.top_domains == []
+
+
+def test_snapshot_oracle_appends(tmp_path):
+    hist = tmp_path / "history.jsonl"
+    stats = rr.OracleStats(total=2, by_status={"validated": 1, "candidate": 1},
+                           by_source_task={"t51": 1}, top_domains=[("sql", 2), ("pricing", 1)])
+
+    rr.snapshot_oracle(stats, hist, date="2026-06-15")
+    rr.snapshot_oracle(stats, hist, date="2026-06-16")
+
+    lines = [json.loads(l) for l in hist.read_text(encoding="utf-8").splitlines()]
+    assert len(lines) == 2                       # appended, not overwritten
+    assert lines[0]["date"] == "2026-06-15"
+    assert lines[0]["total"] == 2
+    assert lines[0]["by_status"] == {"validated": 1, "candidate": 1}
+    assert lines[0]["top_domains"][0] == ["sql", 2]
