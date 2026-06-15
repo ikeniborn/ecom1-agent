@@ -32,7 +32,7 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `FIDELITY_TIMEOUT_S` | Subprocess timeout for fidelity gate (default 30) |
 | `COMPACTION_THRESHOLD` | Entry count in `learn_ctx` that triggers in-memory LLM compaction (default 15) |
 | `COMPACTION_KEEP_RECENT` | Recent `learn_ctx` entries kept verbatim after compaction (default 5) |
-| `MAX_STEPS` | Pipeline cycle limit per task (default 3) |
+| `MAX_STEPS` | Legacy-pipeline cycle limit (default 3). The interpreter uses `INTERPRETER_MAX_STEPS`. |
 | `LOG_LEVEL=DEBUG` | Full LLM response logging |
 | `OLLAMA_BASE_URL` | Ollama endpoint (default `http://localhost:11434/v1`) |
 | `CC_ENABLED=1` | Enable Claude Code CLI tier (iclaude subprocess, OAuth) |
@@ -47,6 +47,12 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `MODEL_RANK` | Model for stage-2 re-rank; falls back to `MODEL` |
 | `ORACLE_RANK_ENABLED` | `0` → skip LLM re-rank, use cosine top-k (default 1) |
 | `ORACLE_DISTILL` | `1` → auto-distill candidate atoms after LEARN (default 0) |
+| `INTERPRETER_ENABLED` | `1` → run the deterministic Plan-IR interpreter branch (default 0) |
+| `INTERPRETER_MAX_STEPS` | Interpreter cycle ceiling (default 6). `MAX_STEPS` is legacy-path only and no longer drives the interpreter loop. |
+| `PREPHASE_PATH_LITERALS` | Cap on path literals extracted from the instruction text (default 3); learned deep-read paths are probed in addition |
+| `PREPHASE_LISTING_BYTES` | Byte cap on a rendered dir listing; overflow → `… +N skipped` (default 4096) |
+| `PREPHASE_SAMPLE_ROWS` | `LIMIT` per sampled table — Tier-2 (default 3) |
+| `PREPHASE_SAMPLE_ROW_CHARS` | Per-row byte cap — Tier-2 safety rail (default 400) |
 
 Credentials (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `OLLAMA_API_KEY`) belong in `.secrets`, not `.env`.
 
