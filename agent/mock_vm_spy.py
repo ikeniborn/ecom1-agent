@@ -1,4 +1,4 @@
-"""Recording mock VM used inside the fidelity gate."""
+"""Recording mock VM: replays canned RPC fixtures for the interpreter and replay tests."""
 from __future__ import annotations
 
 from typing import Any
@@ -15,8 +15,8 @@ _DEFAULT_STUB = {"stdout": "", "stderr": "", "content": "", "entries": [], "node
 class MockVMSpy:
     """Records every RPC call. Looks up canned responses from `fixtures`.
 
-    Designed for use inside the deterministic fidelity test produced by
-    `agent.fidelity.generate_fidelity_test`. NOT for production VM dispatch.
+    Used by the deterministic interpreter and replay tests to drive a PlanIR
+    against pre-recorded RPC outputs. NOT for production VM dispatch.
     """
 
     def __init__(self, fixtures: dict[str, Any]) -> None:
@@ -29,9 +29,9 @@ class MockVMSpy:
     def _lookup(self, rpc: str, path: str, args: list[str] | None = None) -> Any:
         return self.fixtures.get(fixture_key(rpc, path, args), _DEFAULT_STUB)
 
-    # Signatures accept **kwargs so the fidelity gate doesn't reject scripts
-    # that pass valid proto fields the spy didn't pre-declare (e.g. read(number=True),
-    # find(limit=20)). The gate compares RPC multiset, not arg signatures.
+    # Signatures accept **kwargs so the spy doesn't reject calls that pass valid
+    # proto fields it didn't pre-declare (e.g. read(number=True), find(limit=20)).
+    # Only the RPC name + key args drive the fixture lookup, not arg signatures.
 
     def read(self, path: str = "", **kwargs: Any) -> Any:
         self._record("Read", path=path, **kwargs)

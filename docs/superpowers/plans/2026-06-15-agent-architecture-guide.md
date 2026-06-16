@@ -1,6 +1,6 @@
 ---
 review:
-  plan_hash: bb53c64ef75aa8a2
+  plan_hash: e6d11e1c0436c896
   spec_hash: efdb8ce5d2e45fc4
   last_run: 2026-06-15
   phases:

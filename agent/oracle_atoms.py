@@ -15,7 +15,7 @@ class Atom:
     domain: list[str]
     content: str
     source: str            # investigation | distilled | verdict
-    validated_by: str      # manual | grader | fidelity
+    validated_by: str      # manual | grader | grader-oracle
     validated_at: str
     status: str            # active | candidate
     embedding_hash: str = ""

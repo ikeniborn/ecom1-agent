@@ -4,6 +4,43 @@ date: 2026-06-16
 status: approved
 supersedes_runtime_of:
   - 2026-06-07-deterministic-plan-interpreter-design.md
+chain:
+  intent: null
+review:
+  spec_hash: 106f6b1fa68d0b85
+  last_run: 2026-06-16
+  phases:
+    structure:    { status: passed }
+    coverage:     { status: passed }
+    clarity:      { status: passed }
+    consistency:  { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: WARNING
+      section: "### Knowledge contour"
+      section_hash: 54982a8923bb8073
+      text: >-
+        "they age out as new IR rules accumulate" (and the same claim in §Risks)
+        implies an automatic decay mechanism for stale surface=codegen rules, but
+        none is defined — the only described mechanism is a manual one-line
+        deactivate script (§Risks). Either define the aging mechanism or drop the
+        "age out" framing.
+      verdict: fixed
+      verdict_at: 2026-06-16
+    - id: F-002
+      phase: consistency
+      severity: WARNING
+      section: "## Risks"
+      section_hash: b698f02bea92f62b
+      text: >-
+        ORACLE_VALIDATE_INLINE default is "1" (ON) in the distill snippet (line
+        132), but §Risks said "default off for bulk benchmark runs". Reconcile the
+        intended default, and note that inline validation is only reachable when
+        ORACLE_DISTILL=1 (default 0) — so the cost concern is already gated and the
+        "default off for bulk" wording is redundant/confusing as written.
+      verdict: fixed
+      verdict_at: 2026-06-16
 ---
 
 # Pipeline Unification
@@ -117,8 +154,10 @@ Rules:
 `_run_interpreted` calls `load_entries(task_id)` (no surface). `_ilearn` writes without a
 surface filter distinction. `learn_from_grader` reads/writes the same single surface — the
 training-mode bug self-heals. Existing `surface=codegen` entries in `data/learned/*.yaml`
-become visible to PLAN (accepted risk; they age out as new IR rules accumulate). The
-`surface` column may remain in the YAML for back-compat but is no longer a filter key.
+become visible to PLAN (accepted risk: there is **no automatic decay** — these entries
+persist and are simply outweighed as IR rules accumulate; the only removal path is a manual
+one-line deactivate script, see §Risks). The `surface` column may remain in the YAML for
+back-compat but is no longer a filter key.
 
 **Distill wiring (D2/D3/D4).** After a successful cycle, when `ORACLE_DISTILL=1`:
 
@@ -232,8 +271,10 @@ Must return zero hits in `agent/` and `main.py` (test deletions covered above).
 
 ## Risks
 
-- **Inline atom validation cost** — one StartRun per atom. Bounded by `ORACLE_VALIDATE_INLINE`;
-  default off for bulk benchmark runs if it dominates wall-clock.
-- **Surface collapse exposes stale codegen rules to PLAN** — accepted; they age out. If they
-  measurably mislead PLAN, a one-line deactivate script is the fallback.
+- **Inline atom validation cost** — one StartRun per atom, and only when `ORACLE_DISTILL=1`
+  (default 0), so normal benchmark runs are unaffected. When distilling, `ORACLE_VALIDATE_INLINE`
+  defaults to 1 (validate inline, matching the snippet above); set it to 0 for bulk distill
+  runs to accumulate candidates cheaply for an offline promote.
+- **Surface collapse exposes stale codegen rules to PLAN** — accepted; there is no automatic
+  decay, so if they measurably mislead PLAN, the fallback is a one-line deactivate script.
 - **`build_oracle_block` move** is the only ordering hazard; Commit 1 isolates it.
