@@ -1,4 +1,26 @@
-# Run Report — Failures / Correct-Answers Section
+---
+review:
+  spec_hash: 1c88947dbf3bbd92
+  last_run: 2026-06-16
+  phases:
+    structure:   { status: passed }
+    coverage:    { status: passed }
+    clarity:     { status: passed }
+    consistency: { status: passed }
+  findings:
+    - id: F-001
+      phase: clarity
+      severity: INFO
+      section: "Decisions (confirmed)"
+      section_hash: 6d8da30a92ae9194
+      text: "Section named three ways: 'Failures' (Decisions), 'Failures — Correct Answers' (H2 in New function/Wiring), 'Failures / Correct-Answers Section' (doc title). Cosmetic; pick one canonical name in the plan."
+      verdict: fixed
+      verdict_at: 2026-06-16
+chain:
+  intent: null
+---
+
+# Run Report: Failures — Correct Answers
 
 **Date:** 2026-06-16
 **Component:** `scripts/run_report.py`
@@ -29,7 +51,7 @@ what each failed task should have produced.
 | Question | Decision |
 |----------|----------|
 | Source of "correct answer" | Raw `score_detail` (only signal the platform returns) |
-| Placement | New dedicated **Failures** section |
+| Placement | New dedicated **Failures — Correct Answers** section |
 | Scope | Every failing `(task, run)` pair with non-empty `score_detail` |
 | Submitted answer alongside? | No — raw `score_detail` only (keep minimal) |
 
@@ -115,7 +137,7 @@ contiguous, and sits the per-(task,run) detail next to its aggregated companion
    - `grep -F "Answer should contain &#x27;&lt;NO&gt;&#x27;" logs/report.html`
      matches — t01 feedback rendered verbatim through `_esc`
      (`html.escape` with `quote=True`: `'` → `&#x27;`, `<`/`>` → `&lt;`/`&gt;`).
-3. Visual: open `logs/report.html`, confirm the Failures table lists failing
+3. Visual: open `logs/report.html`, confirm the Failures — Correct Answers table lists failing
    `(task, run)` rows with readable grader feedback, and shows
    `no failures recorded` when there are none.
 
