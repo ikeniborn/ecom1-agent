@@ -373,6 +373,29 @@ def _error_report(errors) -> str:
     return f"<h2>Error Report</h2><table>{head}{rows}</table>"
 
 
+def _failures_table(runs, matrix, tasks) -> str:
+    """Per failing (task, run) pair, render the raw grader score_detail — the
+    'correct answer' the platform returned. A cell is a failure iff cell.errors
+    is non-empty (grader only populates score_detail when score < 1.0). Raw, not
+    passed through normalize_error_key, so quoted expected values survive."""
+    rows = []
+    for tid in tasks:
+        for r in runs:
+            cell = matrix[tid].get(r.label)
+            if cell is None or not cell.errors:
+                continue
+            detail = "<br>".join(_esc(e) for e in cell.errors)
+            rows.append(
+                f"<tr><td class='task'>{_esc(tid)}</td>"
+                f"<td>{_esc(r.label)}</td>"
+                f"<td style='text-align:left'>{detail}</td></tr>"
+            )
+    body = "".join(rows) or "<tr><td colspan='3'>no failures recorded</td></tr>"
+    head = ("<tr><th class='task'>task</th><th>run</th>"
+            "<th>grader feedback (correct answer)</th></tr>")
+    return f"<h2>Failures — Correct Answers</h2><table>{head}{body}</table>"
+
+
 def render_html(runs, matrix, learned, oracle, errors) -> str:
     tasks = sorted(matrix.keys(), key=_task_sort_key)
     lcount: dict = {}
@@ -387,6 +410,7 @@ def render_html(runs, matrix, learned, oracle, errors) -> str:
         _learned_table(runs, tasks, lcount, _BLUE),
         _oracle_section(oracle),
         _error_report(errors),
+        _failures_table(runs, matrix, tasks),
         _FOOT,
     ]
     return "\n".join(parts)
