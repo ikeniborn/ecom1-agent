@@ -1,3 +1,28 @@
+---
+review:
+  plan_hash: dbdd8e399b54777b
+  spec_hash: 1c88947dbf3bbd92
+  last_run: 2026-06-16
+  phases:
+    structure:     { status: passed }
+    coverage:      { status: passed }
+    dependencies:  { status: passed }
+    verifiability: { status: passed }
+    consistency:   { status: passed }
+  findings:
+    - id: F-001
+      phase: structure
+      severity: INFO
+      section: "Task 2: Wire _failures_table into render_html"
+      section_hash: 1077ee0ce96a5b0a
+      text: "Duplicate step heading 'Step 2: Static-check syntax' in Task 1 and Task 2. Cosmetic — different tasks, identical action."
+      verdict: fixed
+      verdict_at: 2026-06-16
+chain:
+  intent: null
+  spec: docs/superpowers/specs/2026-06-16-run-report-failures-section-design.md
+---
+
 # Run Report: Failures — Correct Answers — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -47,7 +72,7 @@ def _failures_table(runs, matrix, tasks) -> str:
     return f"<h2>Failures — Correct Answers</h2><table>{head}{body}</table>"
 ```
 
-- [ ] **Step 2: Static-check syntax**
+- [ ] **Step 2: py_compile + ruff check after adding the function**
 
 Run: `uv run python -m py_compile scripts/run_report.py`
 Expected: no output, exit 0.
@@ -85,7 +110,7 @@ Change it to insert the new section after `_error_report(errors)` and before `_F
 
 `runs`, `matrix`, and `tasks` are all already in scope inside `render_html` (same variables passed to `_results_table` two lines above).
 
-- [ ] **Step 2: Static-check syntax**
+- [ ] **Step 2: py_compile check after wiring**
 
 Run: `uv run python -m py_compile scripts/run_report.py`
 Expected: no output, exit 0.
