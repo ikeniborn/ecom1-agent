@@ -6,12 +6,11 @@
 sync:
 	uv sync
 
-# FIX-388: graph health gate. Set GRAPH_HEALTH=0 to skip (e.g. CI rebuilding from scratch).
-graph-health:
-	uv run python scripts/check_graph_health.py
-
 run:
 	uv run python main.py
+
+report:
+	uv run python scripts/run_report.py
 
 task:
 	@if [ -z "$(TASKS)" ]; then echo "usage: make task TASKS='t01 t03'"; exit 1; fi
