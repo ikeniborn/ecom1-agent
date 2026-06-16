@@ -897,3 +897,99 @@
   status: candidate
   embedding_hash: 8f7823eccc72686f654b7ed08638a9b6bc291e65b0f7d97b8139f0697397f802
   source_task: t_int
+- id: scalar-sql-cli-extraction
+  description: Extract a scalar value from an external SQL command-line query by parsing its textual output
+    as a delimited rowset and reading the first row's aliased column.
+  domain:
+  - sql
+  - database
+  - workflow
+  - cli-integration
+  - data-extraction
+  content: When integrating a database query through an external SQL interpreter invoked as a subprocess,
+    pass the SQL statement via command arguments and capture the raw text output. Parse that output into
+    a structured rowset using an auto-detected delimiter. Isolate the first record and read the target
+    column—usually the alias specified in the SELECT projection—to retrieve the scalar result for downstream
+    responses or computations.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 671776d5ae94c207d21f5d839ce96d89465e1f7bff1385786227bd9b76e2ceaa
+  source_task: t_iso
+- id: constant-select-alias-schema-contract
+  description: Satisfy downstream SQL schema expectations by selecting a constant expression with an explicit
+    alias when real table data is not required.
+  domain:
+  - sql
+  - scripting
+  - automation
+  - schema-contract
+  content: When an automated pipeline expects to extract a named column from a SQL result set but does
+    not require actual persisted data, use `SELECT <constant> AS <column_name>`. This produces a minimal,
+    single-row result set with a guaranteed schema, allowing downstream steps to reference `<row>.<column_name>`
+    without accessing tables, indexes, or runtime values. It is especially useful for lightweight verification,
+    connectivity checks, and template rendering where only structural conformity matters.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: c9ab880c4f9c22e25dd2d966d55a46bbc12cdae03fa42ae521478e00e7f2d893
+  source_task: t_int
+- id: extract_scalar_from_tabular_output
+  description: Pattern to retrieve a single scalar value from an external command that produces header-led,
+    delimited tabular output by inferring columns, selecting the first row, and templating the field into
+    the response.
+  domain:
+  - scripting
+  - data-extraction
+  - tabular-parsing
+  - templating
+  content: 'When an external command or query returns tabular data and the goal is to surface a single
+    scalar value: execute the command and bind the raw text output; parse that output into a rowset using
+    automatic delimiter detection so columns are inferred from the header row; compute the first row from
+    the resulting rowset; then reference the desired field from that first row inside the answer message
+    template to present the value.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 738a0c18096ab4ff0a176b94649e0b8ce01153e34481cf9d150517cd21213a9a
+  source_task: t_iso
+- id: extract-scalar-sql-result-from-delimited-pipeline
+  description: Surface a scalar SQL value in a workflow whose query node returns raw delimited text by
+    parsing rows, isolating the first record, and interpolating the desired column into the final template.
+  domain:
+  - workflow-engine
+  - sql-integration
+  - data-extraction
+  - templating
+  content: 'When a query executor returns raw text instead of structured objects, retrieve a single scalar
+    value by chaining four stages: (1) execute the statement and capture the raw payload; (2) parse that
+    payload into a rowset using automatic delimiter detection; (3) select the first element of the resulting
+    array and bind it to a record variable; (4) reference the target column of that record variable inside
+    the success-response message template using brace interpolation.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 8f43ad69558a4efe46c29515aa685d1292aab49eeb2ac6eab086928e7ef2c657
+  source_task: t_seed
+- id: extract-scalar-from-cli-table
+  description: Retrieve a single scalar value from command-line tabular output by parsing rows and reading
+    the first record's field.
+  domain:
+  - data-processing
+  - cli-integration
+  - sql
+  - parsing
+  content: 'To extract a scalar value from a command-line tool that emits a delimited table (such as a
+    SQL CLI): capture the raw output, parse it as an auto-delimited rowset to create an array of record
+    objects, take the first record from the array, and access the target value as a named property on
+    that record.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: eb5c935862e86a35bad3346f22a73edfbdadde8d4ec8bf21b8460427089eb487
+  source_task: t_int
