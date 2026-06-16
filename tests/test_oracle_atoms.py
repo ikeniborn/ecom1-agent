@@ -65,9 +65,3 @@ def test_block_lists_atom_content():
 
 def test_empty_atoms_yields_empty_block():
     assert build_oracle_block([]) == ""
-
-
-def test_codegen_v2_reexports_build_oracle_block():
-    # design.py imports it from codegen_v2 until Task 5; the re-export must hold.
-    from agent.codegen_v2 import build_oracle_block as via_codegen
-    assert via_codegen([]) == ""
