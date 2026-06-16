@@ -168,31 +168,31 @@ def test_diagram1_structure():
 
 def test_diagram2_structure():
     d = gx.diagram2()
-    assert "loop" in d.name.lower()
+    assert "pipeline" in d.name.lower() and "cycle" in d.name.lower()
     ids = {n.id for row in d.rows for n in row}
     for e in d.edges:
         assert e.src in ids and e.dst in ids
-    # the four in-loop gates are present
-    assert {"d2-codegen", "d2-lint", "d2-retry", "d2-fidelity"} <= ids
-    # three terminal outcomes
+    # the IR-only cycle landmarks (no DESIGN/CODEGEN/fidelity any more)
+    assert {"d2-intent", "d2-plan", "d2-lint", "d2-interpret", "d2-verify"} <= ids
+    # four terminal outcomes
     kinds = {n.id: n.kind for row in d.rows for n in row}
     terminals = [i for i, k in kinds.items() if k == "terminal"]
-    assert len(terminals) >= 3
+    assert len(terminals) >= 4
     # LEARN feedback edges are dashed
     assert any(e.dashed and e.dst == "d2-learn" for e in d.edges)
 
 
 def test_diagram3_structure():
     d = gx.diagram3()
-    assert "interpreter" in d.name.lower()
+    assert "interpret" in d.name.lower()
     ids = {n.id for row in d.rows for n in row}
     for e in d.edges:
         assert e.src in ids and e.dst in ids
-    # Plan-IR path landmarks
-    assert {"d3-planir", "d3-lint", "d3-interpret", "d3-captured"} <= ids
-    # no free-form CODEGEN retry loop: interpret is a deterministic (grey) gate
+    # interpret()+verify() execution landmarks
+    assert {"d3-plan", "d3-resolve", "d3-steps", "d3-captured", "d3-verify"} <= ids
+    # verify is a deterministic (grey) gate
     kinds = {n.id: n.kind for row in d.rows for n in row}
-    assert kinds["d3-interpret"] == "gate"
+    assert kinds["d3-verify"] == "gate"
 
 
 def test_diagram4_structure():
