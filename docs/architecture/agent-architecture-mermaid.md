@@ -23,6 +23,7 @@ Shape/colour vocabulary (shared by every diagram):
 ## Diagram 1 — End-to-end flow (harness → pipeline)
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'transparent','lineColor':'#888888','primaryColor':'#e9ecef','primaryTextColor':'#1e1e1e','primaryBorderColor':'#1e1e1e'}}}%%
 flowchart TD
   classDef llm fill:#a5d8ff,stroke:#1e1e1e,color:#1e1e1e
   classDef gate fill:#e9ecef,stroke:#1e1e1e,color:#1e1e1e
@@ -30,12 +31,11 @@ flowchart TD
   start["main.py: StartRun"]:::gate
   trial["StartTrial → run_agent"]:::gate
   open["open VM + read /AGENTS.MD"]:::gate
-  subgraph prephase["gather_prephase_facts"]
+  subgraph prephase["gather_prephase_facts (best-effort)"]
     direction LR
-    schema["schema discovery"]:::gate
-    samples["sample rows"]:::gate
-    docs["docs inventory"]:::gate
-    deepread["prephase_deep_read"]:::gate
+    schema["schema + table names"]:::gate --> samples["sample rows (relevance-gated)"]:::gate
+    samples --> identity["agent identity (/bin/id)"]:::gate
+    identity --> docs["docs inventory + policies"]:::gate
   end
   pipeline["run_pipeline (IR-only)"]:::gate
   endtrial["EndTrial (per trial)"]:::gate
@@ -50,6 +50,7 @@ flowchart TD
 ## Diagram 2 — IR pipeline cycle + gates
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'transparent','lineColor':'#888888','primaryColor':'#e9ecef','primaryTextColor':'#1e1e1e','primaryBorderColor':'#1e1e1e'}}}%%
 flowchart TD
   classDef llm fill:#a5d8ff,stroke:#1e1e1e,color:#1e1e1e
   classDef gate fill:#e9ecef,stroke:#1e1e1e,color:#1e1e1e
@@ -69,11 +70,12 @@ flowchart TD
   unsup(["OUTCOME_NONE_UNSUPPORTED"]):::terminal
   deny(["OUTCOME_DENIED_SECURITY"]):::terminal
 
+  intent -. "INTENT hard fail" .-> clar
   intent --> plan --> lint --> ident
   ident -- "new" --> interpret --> verify
   ident -- "identical" --> clar
-  verify -- "ok" --> answer
-  answer --> ok & clar & unsup & deny
+  verify -- "ok (captured outcome)" --> answer
+  answer --> ok & unsup & deny
   lint -. "plan/lint err" .-> learn
   interpret -. "interpret err" .-> learn
   verify -. "verify fail" .-> learn
@@ -84,6 +86,7 @@ flowchart TD
 ## Diagram 3 — `interpret()` + `verify()` internals
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'transparent','lineColor':'#888888','primaryColor':'#e9ecef','primaryTextColor':'#1e1e1e','primaryBorderColor':'#1e1e1e'}}}%%
 flowchart TD
   classDef gate fill:#e9ecef,stroke:#1e1e1e,color:#1e1e1e
   classDef terminal fill:#ffc9c9,stroke:#1e1e1e,color:#1e1e1e
@@ -107,6 +110,7 @@ flowchart TD
 ## Diagram 4 — Cross-cutting subsystems
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'transparent','lineColor':'#888888','primaryColor':'#e9ecef','primaryTextColor':'#1e1e1e','primaryBorderColor':'#1e1e1e'}}}%%
 flowchart TD
   classDef llm fill:#a5d8ff,stroke:#1e1e1e,color:#1e1e1e
   classDef gate fill:#e9ecef,stroke:#1e1e1e,color:#1e1e1e
@@ -132,6 +136,7 @@ flowchart TD
 ## Legend
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'background':'transparent','lineColor':'#888888','primaryColor':'#e9ecef','primaryTextColor':'#1e1e1e','primaryBorderColor':'#1e1e1e'}}}%%
 flowchart LR
   classDef llm fill:#a5d8ff,stroke:#1e1e1e,color:#1e1e1e
   classDef gate fill:#e9ecef,stroke:#1e1e1e,color:#1e1e1e

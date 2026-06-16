@@ -1,55 +1,51 @@
 # Pipeline Phases
 
-Each pipeline cycle executes phases in fixed order. Phase failures route to LEARN; LEARN failure increments cycle. All phases produce structured Pydantic output parsed from LLM JSON.
+One INTENT call is frozen for the run; the cycle loop then runs PLAN → lint → interpret → verify, with LEARN between failing cycles.
 
-## IDD — Intent-Driven Development
+INTENT and PLAN are the only per-cycle LLM calls (plus LEARN on failure); lint, interpret, and verify are deterministic (no LLM).
 
-IDD is Layer 1: extracts WHAT and WHY before SDD decides HOW. Fires before SDD every cycle.
+## INTENT
 
-Receives `unified_context` + `idd.md` guide. Produces `IddOutput` with `intent_type`, `reformulated_task`, `success_criteria`, `scope_estimate`, and `decision`.
+`reason.py:run_intent(facts, instruction)` — one LLM call (reason tier), system prompt `data/prompts/intent.md`. Produces `IntentSpec`. See [[data-models]].
 
-`decision = "hard_stop"` calls `vm.answer()` immediately with `stop_code` and skips SDD. `decision = "proceed"` passes `IddOutput` to SDD as structured context. `scope_estimate.files_to_read` drives adaptive batch cap: `ceil(files / remaining_cycles) + 5`, clamped to [24, 80].
-
-## SDD — Structured Decision Design
-
-SDD receives `unified_context` + `sdd.md` + `IddOutput`-derived user message. Produces `SddOutput`.
-
-`error_code = "DENIED_SECURITY"` → immediate `vm.answer()` with security outcome. `error_code = "UNSUPPORTED"` → immediate `vm.answer()` with unsupported outcome. On success, `actions` list drives PLAN selection.
+`IntentSpec` fields: objective, desired_outcome, params, outcome_space, constraints, success_criteria, answer_shape, required_refs. Frozen for the whole run; retried up to `DESIGN_MAX_ATTEMPTS` on transient empty/parse failure. Hard failure → terminal `OUTCOME_NONE_CLARIFICATION` (no cycles run).
 
 ## PLAN
 
-PLAN selects a single `action` string from SDD candidates. Receives `unified_context` + `plan.md` + SDD JSON.
+`reason.py:run_plan(intent, facts, learn_ctx, prev_error, oracle_atoms, observed)` — one LLM call per cycle (reason tier), system prompt `data/prompts/plan.md`. Produces `PlanIR`.
 
-`PlanOutput.action` is coerced from list to scalar if LLM returns an array.
+`PlanIR` parts: discovery, rowsets, compute, decision, ops, answer, custom_extract. PLAN sees all active learned rules + retrieved oracle atoms + the prior cycle's error and observed RPC outputs.
 
-## EXECUTE
+## lint
 
-`_run_execute()` infers action type from string prefix and dispatches to the correct VM call.
+`interpreter.py:lint_security_first(plan)` — no LLM. Static security-first ordering check on the plan: a deny path must precede any mutating op. `PlanError` / `InterpretError` → `_ilearn` → next cycle. See [[security-lint]].
 
-`SELECT` → sql (EXPLAIN pre-check first), `/path` → read, `list:` → list, `search:` → search, `find:` → find, `tree:` → tree, else → exec. Returns `ExecuteOutput` or error string.
+## plan-signature short-circuit
 
-Empty results from data-returning actions (sql, read, search, list, find, tree) trigger LEARN. Exec-type (`/bin/`) may return empty on success — not an error.
+`pipeline.py:_plan_signature(plan)` over discovery + ops (SQL whitespace/case-normalized, other step args verbatim). Identical to the prior cycle → break with CLARIFICATION. This is the only anti-infinite-loop guard. See [[constraints]].
 
-## Batch Execute
+## interpret
 
-After primary EXECUTE succeeds, extra candidates are executed in the same cycle when action is read/tree/list/search/find.
+`interpreter.py:interpret(plan, intent, vm, facts)` — no LLM. Executes the plan against the VM: resolve columns → run discovery + RPC ops → classify outcome → project `required_refs` → build `CapturedAnswer`. See [[vm-protocol]].
 
-Sources: SDD `actions` extras, search-match paths, tree-discovered files. Adaptive cap from `scope_estimate`.
+RPC steps dispatch via `getattr(vm, step.rpc.lower())`. `InterpretError` → `_ilearn` → retry (break if a mutation landed). A real-VM `Exception` → `_ilearn`, then retry only when the plan is read-only AND the error is retryable (`_is_retryable_vm_error`), else break.
 
-## ANSWER
+## verify
 
-ANSWER formats final response. Receives `unified_context` + `answer.md` + `ExecuteOutput` + all prior results.
+`verify.py:verify(result, intent)` — no LLM, deterministic. Checks built-in invariants (I1 ref-grounding, I3 security re-check) + `IntentSpec.success_criteria`. See [[security-lint]].
 
-Produces `AnswerOutput` with `message`, `outcome`, and `grounding_refs`. On `OUTCOME_NONE_CLARIFICATION` with cycles remaining, retries without calling `vm.answer()`. LEARN fires only when output is empty or signals incomplete reads.
+Pass → `vm.answer()` once + `_persist_artifacts` + optional distill→validate→promote. Fail → `_ilearn(error + observed RPC outputs)` → next cycle (break if a mutation landed).
 
 ## LEARN
 
-`_run_learn()` fires on any phase failure. Appends new rule to `learn_ctx` and YAML.
+`pipeline.py:_ilearn()` wraps `_learn_consolidate_text()` (system prompt `data/prompts/ilearn.md`). Distils a `LearnConsolidateOutput` and writes a diff to `data/learned/{tid}.yaml` via `apply_learn_diff`.
 
-Receives error context + phase outputs + existing learned entries. `error_type = "llm_fail"` skips rule extraction and restarts cycle. `agents_md_anchor` triggers vault section lookup instead of new rule.
+It also mutates the in-session `learn_ctx` and persists `prephase_deep_read` hints. `learn_from_grader()` reuses the same call on grader feedback between training cycles.
 
-## CONSOLIDATE
+## Outcomes
 
-`_run_consolidate()` fires after every LEARN when ≥2 active entries exist.
+`vm.answer()` is called exactly once with one of:
 
-Merges redundant rules via LLM, deactivates originals in YAML, keeps `learn_ctx` in sync.
+- `OUTCOME_OK` — success (verify passed, captured outcome OK).
+- `OUTCOME_NONE_UNSUPPORTED` / `OUTCOME_DENIED_SECURITY` — classified by interpret, emitted on a passing verify.
+- `OUTCOME_NONE_CLARIFICATION` — terminal only: INTENT failure, identical-plan no-progress, or cycles exhausted.

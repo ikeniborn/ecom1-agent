@@ -1,47 +1,43 @@
 # Data Models
 
-All pipeline phase outputs are Pydantic models in `agent/models.py`. Each model maps to one LLM call's parsed JSON response.
+Pipeline models are Pydantic. IR models (`agent/ir_models.py`) define the interpreter contract; `agent/models.py` holds the LEARN and answer outputs. All IR models use `extra="forbid"`.
 
-## IddOutput
+## IntentSpec (`ir_models.py`)
 
-Intent layer output: captures WHAT, WHY, gate decision, and scope estimate.
+Frozen INTENT output.
 
-Fields: `intent_objective` (WHAT+WHY), `reformulated_task` (explicit, no pronouns), `intent_type` (read/write/security_check/compute), `extracted_params`. Gate: `decision` (proceed/hard_stop), `stop_code`, `stop_message`, `stop_refs`. Performance: `scope_estimate` with `files_to_read` and `estimated_cycles`. Expectation contract: `success_criteria`, `stop_rules`, `health_metrics`.
+Fields: `objective`, `desired_outcome`, `params`, `outcome_space` (allowed outcomes), `constraints` (list of `Constraint`), `success_criteria` (list of `PredExpr`), `answer_shape` (`AnswerShape.msg_skeleton`), `required_refs` (dict keyed by outcome → list of `RefSpec`).
 
-## SddOutput
+- `Constraint` — `anchor`, `rule`, `security` flag, `deny_when` (`PredExpr`; True ⇒ I3 deny, security only).
+- `RefSpec` — `kind` (`policy_doc` literal `path` | `record_path` runtime `source`).
 
-`spec_goal`: one-line execution objective. `success_criteria`: observable conditions. `plan`: reasoning steps. `actions`: ordered candidate action strings for PLAN. `error_code`: `"DENIED_SECURITY"`, `"UNSUPPORTED"`, or empty.
+## PlanIR (`ir_models.py`)
 
-## PlanOutput
+Per-cycle PLAN output.
 
-`approach`: reasoning. `steps`: execution steps. `action`: selected action string.
+Fields: `discovery` (list of `Step`), `rowsets` (list of `RowSet`), `compute` (list of `ComputeStep`), `decision` (`DecisionTree`), `ops` (list of `GuardedOp`), `answer` (dict outcome → `AnswerTemplateIR`), `custom_extract` (list of `CustomExtract`).
 
-Model validator coerces `action` from list to scalar — guards against LLM returning array.
+- `Step` / `GuardedOp` — `rpc`, `args`, `bind`; `GuardedOp` adds `guard_label` + `outcome_from_exit` (`OutcomeFromExit`: `ok_outcome` + `keyword_buckets` + `default_outcome`).
+- `RowSet` — `from` / `format` / `into` + `columns` (`ColResolve`: alias first present header from `candidates`).
+- `ComputeStep` — `prim`, `args`, `into`. `CustomExtract` — `name`, `input`, `into`.
+- `DecisionTree` — `branches` (`Branch`: `when` PredExpr + `label`) + `default_label`.
 
-## ExecuteOutput
+## PredExpr (`ir_models.py`)
 
-`results`: list of dicts with `"output"` key. `action`: executed string. Constructed by pipeline code, not LLM.
+Single predicate language shared by `decision`, `success_criteria`, and security `deny_when`.
 
-## LearnOutput
+Leaf ops: `eq/ne/lt/le/gt/ge`, `nonempty/isnull`, `contains_any/in_set/startswith/endswith/regex_match`. Bool ops: `and/or/not`. A string starting with `$` is a ref into `env`; anything else is a literal.
 
-Encodes rule extraction result. Uses `extra="forbid"` to catch hallucinated fields.
+## LearnConsolidateOutput (`models.py`)
 
-`rule_content`: rule text to persist. `reasoning`: why this rule. `conclusion`: summary. `agents_md_anchor`: if set, triggers vault section lookup. `deactivate`: entry IDs to mark inactive. `skip`/`skip_reason`: signals no new rule needed.
+LEARN output. Fields: `rule_content?`, `agents_md_anchor?`, `reasoning`, `deactivate_ids`, `deactivate_reason?`, `skip`, `skip_reason?`, `prephase_deep_read`. Null `rule_content` allowed when `skip=True` or only deactivating prior rules.
 
-## ConsolidateOutput / ConsolidationItem
+## AnswerOutput (`models.py`)
 
-`skip`: LLM signals no consolidation needed. `consolidations`: list of `ConsolidationItem`.
+`message`, `outcome` (one of `OUTCOME_OK` / `OUTCOME_NONE_CLARIFICATION` / `OUTCOME_NONE_UNSUPPORTED` / `OUTCOME_DENIED_SECURITY`), `grounding_refs`.
 
-Each `ConsolidationItem`: `deactivate` (IDs to remove), `merged_rule` (replacement), `merged_reasoning`.
+## Learned YAML
 
-## AnswerOutput
+`data/learned/{task_id}.yaml` stores active/inactive rule entries, a `last_run` block (`status` / `outcome` / `cycles_used` / `date`), and `prephase_deep_read`. Managed by `learned_store.py`. See [[constraints]].
 
-`reasoning`: internal chain-of-thought. `outcome`: one of `OUTCOME_OK`, `OUTCOME_NONE_CLARIFICATION`, `OUTCOME_NONE_UNSUPPORTED`, `OUTCOME_DENIED_SECURITY`.
-
-`message`: user-facing response. `grounding_refs`: file paths cited as evidence. `completed_steps`: steps executed.
-
-## Learned YAML Format
-
-`data/learned/{task_id}.yaml` stores `task_id`, `last_run` metadata, and `entries` list.
-
-Each entry: `id` (rNNN monotonic), `content`, `status` (active/inactive), `source`, `created`, `reasoning`, `deactivated_reason`. Content under 20 chars or not starting with known action prefixes is rejected by `_apply_learn_diff`.
+Each entry: `id` (`rNNN` / `vNNN`), `content`, `status`, `source`, `reasoning`. Content under `_MIN_CONTENT_LEN` chars or not starting with a `_VALID_RULE_STARTS` prefix is rejected by `apply_learn_diff`.
