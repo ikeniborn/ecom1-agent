@@ -318,3 +318,15 @@ def test_layout_arrows_do_not_cross_frames_unless_labeled():
             continue
         if shape_frame.get(sb["elementId"]) != shape_frame.get(eb["elementId"]):
             assert e["id"] in labeled, f"unlabeled cross-frame arrow {e['id']}"
+
+
+def test_committed_canvas_is_in_sync_with_generator():
+    """The committed .excalidraw must equal a fresh generation (byte-for-byte, in
+    main()'s serialization). Fails if someone edits the generator without re-running
+    `uv run python tools/gen_excalidraw.py`."""
+    expected = json.dumps(gx.assemble(), indent=2, ensure_ascii=False) + "\n"
+    actual = gx.OUT_PATH.read_text(encoding="utf-8")
+    assert actual == expected, (
+        "committed docs/architecture/agent-architecture.excalidraw is stale — "
+        "run: uv run python tools/gen_excalidraw.py"
+    )
