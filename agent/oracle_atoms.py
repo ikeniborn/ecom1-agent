@@ -20,6 +20,7 @@ class Atom:
     status: str            # active | candidate
     embedding_hash: str = ""
     source_task: str = ""   # task_id the candidate was distilled from (promote gate)
+    polarity: str = "method"   # method | anti_pattern
     extra: dict = field(default_factory=dict)
 
 
@@ -40,6 +41,7 @@ def load_atoms(path: str | Path) -> list[Atom]:
         known["domain"] = list(d.get("domain") or [])
         known["embedding_hash"] = d.get("embedding_hash") or ""
         known["source_task"] = d.get("source_task") or ""
+        known["polarity"] = d.get("polarity") or "method"
         atoms.append(Atom(**known))
     return atoms
 
@@ -57,10 +59,18 @@ def save_atoms(path: str | Path, atoms: list[Atom]) -> None:
 
 
 def build_oracle_block(oracle_atoms) -> str:
-    """Render retrieved knowledge atoms as a context block for the PLAN prompt."""
+    """Render retrieved knowledge atoms for the PLAN prompt, split by polarity."""
     if not oracle_atoms:
         return ""
-    lines = ["## VALIDATED KNOWLEDGE (apply when relevant; verified methods)"]
-    for a in oracle_atoms:
-        lines.append(f"- ({', '.join(a.domain)}) {a.content.strip()}")
+    methods = [a for a in oracle_atoms if getattr(a, "polarity", "method") != "anti_pattern"]
+    antis = [a for a in oracle_atoms if getattr(a, "polarity", "method") == "anti_pattern"]
+    lines: list[str] = []
+    if methods:
+        lines.append("## VALIDATED KNOWLEDGE — APPLY (verified methods)")
+        for a in methods:
+            lines.append(f"- ({', '.join(a.domain)}) {a.content.strip()}")
+    if antis:
+        lines.append("## ANTI-PATTERNS — AVOID (known failure causes)")
+        for a in antis:
+            lines.append(f"- ({', '.join(a.domain)}) {a.content.strip()}")
     return "\n".join(lines)
