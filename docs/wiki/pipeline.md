@@ -8,7 +8,9 @@ The deterministic Plan-IR pipeline in `agent/pipeline.py`. One pipeline per task
 
 ## INTENT — run_intent
 
-`run_intent(facts, instruction)` (`reason.py:60`) makes one reason-tier LLM call with the `intent.md` system prompt and the pre-phase facts block, parsing the JSON reply into an `IntentSpec` (objective, desired_outcome, params, outcome_space, constraints, success_criteria, answer_shape, required_refs). It is frozen for the whole run; later `learn_ctx` updates affect only PLAN. See [[llm]].
+`run_intent(facts, instruction, token_out=None, learn_ctx=None)` (`reason.py:60`) makes one reason-tier LLM call with the `intent.md` system prompt and the pre-phase facts block, parsing the JSON reply into an `IntentSpec` (objective, desired_outcome, params, outcome_space, constraints, success_criteria, answer_shape, required_refs). It is frozen for the whole run.
+
+**Learned rules in INTENT:** `pipeline.run_pipeline` passes the run's pre-loaded `learn_ctx` snapshot to `run_intent`. INTENT injects a `LEARNED_RULES (active)` block (same `_format_entry` used by `run_plan`) so that a learned rule can shape `required_refs`, `success_criteria`, or `outcome_space`. WHY: `required_refs` (the sole driver of enforced answer-ref projection) is INTENT's output, but INTENT previously received no learned context — so no LEARN rule could fix a missing grounding ref. In-loop `_ilearn` updates still write to `learn_ctx` in place but are consumed only by subsequent PLAN calls, not by the frozen INTENT. See [[interpreter#Answer-ref assembly]] for how `required_refs` drives ref enforcement, and [[llm]].
 
 ## INTENT retry and hard failure
 
