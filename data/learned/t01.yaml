@@ -1,352 +1,93 @@
 entries:
-- agents_md_anchor: '#plan-phase-answer-refs'
-  content: When success_criteria includes a nonempty check on $answer.exists, the
-    answer branch for the matching outcome must include the required refs (e.g., record_path)
-    from the discovered row.
-  created: '2026-06-16'
+- agents_md_anchor: null
+  content: Always include all required refs from the plan's required_refs in the answer's
+    refs list, mapping each ref to the corresponding column from the rowset as indicated
+    by the ref's source path.
+  created: '2026-06-18'
   deactivated_reason: null
   id: r001
-  reasoning: 'verify: success_criteria[0] failed: {''op'': ''nonempty'', ''lhs'':
-    ''$answer.exists'', ''rhs'': None, ''args'': []}. The PlanIR answer for ''found''
-    branch had refs: [] but the required refs for OUTCOME_OK included a record_path.
-    The answer shape omitted the refs, causing $answer.exists to be empty. The PlanIR
-    must populate answer refs with the required record_path from the matching row.'
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$row.record_path'']
+    on OK answer. Root cause: The PlanIR answer for the ''found'' branch has an empty
+    refs list, but the plan''s required_refs for OUTCOME_OK includes a record_path
+    ref. The planner omitted the required refs from the answer. Failing PlanIR fragment:
+    the answer object in the ''found'' branch has "refs":[]. Rule linkage: This rule
+    ensures the planner always populates the answer''s refs with all required refs,
+    preventing unresolved ref errors.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never include both a top-level 'answer' mapping and explicit answer ops
+    in the same PlanIR; use only one method to define answers.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error ''real_vm: answer already provided'' indicates duplicate answer
+    attempts. The PlanIR contains both a top-level ''answer'' object (mapping labels
+    to answer configs) and explicit answer ops with guard_labels. The system likely
+    auto-generates answers from the top-level mapping, causing a conflict when explicit
+    ops also try to provide answers. The fix is to remove the top-level ''answer''
+    mapping and rely solely on explicit answer ops, or vice versa.'
   status: active
   surface: ir
 - content: null
-  created: '2026-06-16'
+  created: '2026-06-18'
   deactivated_reason: superseded by newer verdict
   id: v001
   score: 0.0
   score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-16'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - no answer provided
+  - answer missing required reference '/proc/catalog/FST-APSRIZJW.json'
   source: verdict
   status: inactive
   submitted_message: ''
   submitted_outcome: ''
   submitted_refs: []
+- content: null
+  created: '2026-06-18'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: No matching product found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 - agents_md_anchor: null
-  content: When success_criteria includes a regex_match on $answer.text, the answer
-    message must be exactly the string that matches the regex (e.g., '<YES>' or '<NO>'),
-    not a natural-language sentence.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r002
-  reasoning: The verify phase failed with 'regex_match' on $answer.text because the
-    answer message was a full sentence ('Milwaukee FID3 is available... <YES>') rather
-    than the exact pattern '<YES>' or '<NO>'. The regex_match op likely requires the
-    entire string to match the pattern, so the PLAN must produce an answer message
-    that is exactly the matched string.
-  status: active
-  surface: ir
-- agents_md_anchor: null
-  content: When using /bin/sql, do not use --param flags; instead embed parameter
-    values directly in the SQL query string, properly quoted and escaped.
-  created: '2026-06-16'
-  deactivated_reason: null
+  content: Always use an explicit rowset format (e.g., 'csv' or 'json') that matches
+    the RPC output when the RPC returns structured data, and include a validation
+    step to ensure the rowset contains dicts before using column access primitives.
+  created: '2026-06-18'
+  deactivated_reason: misdirected — blamed rowset format for an interpreter primitive-contract
+    bug now fixed by F1/F2; superseded by r004
   id: r003
-  reasoning: 'The error was verify: success_criteria[0] failed because the answer.text
-    did not match ''<YES>|<NO>''. The root cause is that the SQL query used unsupported
-    --param flags, causing the /bin/sql tool to output its help text instead of executing
-    the query. This led to no data rows, and the answer branch likely produced an
-    incorrect answer.text. The PlanIR fragment: discovery args with ''--param'' flags.
-    The /bin/sql tool does not support --param; parameters must be embedded directly
-    in the SQL string. The rule ensures future plans use correct SQL syntax.'
-  status: active
+  reasoning: 'Error: ''str'' object has no attribute ''get'' in real_vm. Root cause:
+    The rowset format ''auto_delim'' parsed the SQL Exec RPC output into a list of
+    strings instead of dicts, so the ''first'' primitive returned a string, and the
+    subsequent ''column'' primitive called .get() on that string, causing the AttributeError.
+    The PlanIR must guarantee that rows are dicts before column access. Using an explicit
+    format like ''csv'' with column headers ensures each row is a dict. A validation
+    step (e.g., checking type of first row) would also prevent this, but the VM may
+    not support it; thus the rule focuses on format choice.'
+  status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: When success_criteria includes a regex_match on $answer.text, the answer
-    branch must set the message to the exact string that matches the regex, and the
-    answer_shape skeleton must be ignored (the message is the full answer text).
-  created: '2026-06-16'
+  content: When answering a catalogue existence query, resolve the product by matching
+    brand/model/property normalized (case-insensitive, trimmed; use LIKE for a partial
+    model token), apply 'first' to reduce the rowset to one record, read that record's
+    fields with 'get' (never 'column' on a single record), and project its record_path
+    into the OUTCOME_OK refs.
+  created: '2026-06-18'
   deactivated_reason: null
   id: r004
-  reasoning: 'The verify step failed with ''success_criteria[0] failed: regex_match
-    on $answer.text with pattern <YES>|<NO>''. The observed SQL output was cnt=0,
-    so the decision branch correctly selected ''no'' and the answer message was set
-    to ''<NO>''. However, the final answer text likely incorporated the answer_shape
-    skeleton ''Milwaukee FID3 is {availability_status} in the catalog. {details}'',
-    producing a text that did not match the regex. The existing rule [in-session]
-    only requires the message to be the exact matching string, but does not explicitly
-    forbid using the skeleton. A new rule is needed to ensure the skeleton is omitted
-    when a regex_match on $answer.text is present.'
+  reasoning: Method-not-value rule (F6). States the matching/extraction method so it
+    survives per-StartRun re-seeding; pairs with F1/F2 (typed primitive contracts) and
+    the interpreter ref-projection. Replaces r003 which misattributed the crash to format.
   status: active
   surface: ir
 - content: null
-  created: '2026-06-16'
-  deactivated_reason: superseded by newer verdict
+  created: '2026-06-18'
   id: v003
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When the IntentSpec's required_refs for an outcome specifies a ref (e.g.,
-    record_path), the answer branch for that outcome must include that ref in its
-    refs list, mapping the required ref path to the computed variable that holds the
-    value.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r005
-  reasoning: 'The PlanIR computed $found_product.record_path but the answer branch
-    for OUTCOME_OK had an empty refs list. The IntentSpec required a record_path ref
-    for that outcome, causing an interpret error: ''unresolved required refs ["$found_product.record_path"]
-    on OK answer''. The rule ensures that all required refs are explicitly included
-    in the answer branch''s refs list.'
-  status: active
-  surface: ir
-- content: null
-  created: '2026-06-16'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When success_criteria includes a nonempty check on a token under $answer
-    (e.g., $answer.yes_no_token), the answer branch for the matching outcome must
-    set that token to a nonempty value (e.g., 'YES' or 'NO') in addition to the message.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r006
-  reasoning: The verify step failed because success_criteria[0] required $answer.yes_no_token
-    to be nonempty, but the PlanIR answer branch for the 'found' outcome only set
-    'message' and 'outcome', not 'yes_no_token'. The SQL query returned a row, so
-    the decision took the 'found' branch, but the missing token caused the criteria
-    to fail. A new rule is needed to ensure that answer branches emit all tokens checked
-    by success_criteria.
-  status: active
-  surface: ir
-- agents_md_anchor: null
-  content: Do not include fields other than 'message' and 'refs' in the answer branch
-    of PlanIR; extra fields like 'yes_no_token' are forbidden by the schema.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r007
-  reasoning: The PlanIR validation error 'Extra inputs are not permitted' occurred
-    because the answer branch contained a 'yes_no_token' field. The PlanIR schema
-    only allows 'message' and 'refs' in the answer object. The success_criteria check
-    on $answer.yes_no_token cannot be satisfied by adding an extra field; the answer
-    branch must only contain the standard fields.
-  status: active
-  surface: ir
-- content: null
-  created: '2026-06-16'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When success_criteria includes equality checks on a variable (e.g., $found_product)
-    that will be null if no matching record is found, the PlanIR must ensure that
-    variable is always defined by constructing a default object from the IntentSpec
-    param values (e.g., brand, kind_name, family_name, properties) and using it in
-    the answer branch for the 'not found' outcome.  This avoids verify-phase failures
-    due to null evaluation.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r008
-  reasoning: 'verify: success_criteria[0] failed — the and-equality chain on $found_product
-    could not be evaluated because $found_product was null when the SQL returned no
-    rows.  The root cause is that the PlanIR decision branch for not_found left $found_product
-    undefined, while the success_criteria unconditionally expects it.  The fix is
-    to guarantee $found_product is always assigned, using a custom-extracted dummy
-    object populated from the search parameters.  Also, the found branch currently
-    misses the required record_path ref (r005).'
-  status: active
-  surface: ir
-- content: null
-  created: '2026-06-16'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When success_criteria or required_refs reference a dotted variable path
-    (e.g., $product.product_sku), the PlanIR must define an object variable with the
-    object name (e.g., $product) that contains all fields referenced by success_criteria
-    and required_refs. This can be done by first extracting the row as a dict variable,
-    then using compute steps (e.g., 'assign' or 'set') to create the object with named
-    keys, or by using a rowset that directly produces the object. The answer branch
-    for the outcome must reference the correct dotted path in the message skeleton
-    and include required refs mapping from the required ref path to the object's key.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r009
-  reasoning: 'Error: verify: success_criteria[0] failed nonempty on $product.product_sku.
-    Root cause: PlanIR uses flat variables ($product_sku, $product_name, $record_path)
-    instead of an object variable $product with keys product_sku, product_name, record_path.
-    The IntentSpec''s success_criteria and required_refs both reference $product.product_sku
-    and $product.record_path, so the variable path must match exactly. Additionally,
-    the answer branch for OUTCOME_OK had empty refs list, violating required_refs.
-    The new rule ensures the PlanIR constructs the necessary object and includes proper
-    refs.'
-  status: active
-  surface: ir
-- content: null
-  created: '2026-06-16'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: '#answer-shape-field-inclusion'
-  content: When success_criteria includes a nonempty check on a field under $answer
-    (e.g., $answer.product_sku) and the answer message skeleton includes a placeholder
-    for that field (e.g., {product_sku}), the answer branch for the matching outcome
-    must include that field as a top-level attribute of the answer object, assigned
-    the computed value. The placeholder will be automatically replaced, and the field
-    is necessary for the success_criteria to pass.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r010
-  reasoning: 'Error: verify: success_criteria[0] failed: nonempty $answer.product_sku.
-    The PlanIR sets $product_sku via compute but does not add a ''product_sku'' field
-    to the answer object; only ''message'' and ''refs'' are present. The message skeleton
-    ''{product_sku}'' does not create the field. The success_criteria checks the answer
-    object''s fields, so the field must be explicitly included. The required_refs
-    (record_path) were correctly provided. This is a shape bug in the PlanIR answer
-    branch. No existing rule covers this exact case (r009 is for dotted variable paths
-    like $product.product_sku, not $answer.field).'
-  status: active
-  surface: ir
-- agents_md_anchor: '#plan-answer-construction'
-  content: When the answer message skeleton includes simple placeholders like {field_name}
-    (single-level, no dot), the answer branch for that outcome must include those
-    field names as top-level attributes in the answer object, with their values set
-    to the computed variable or path that holds the data, so that placeholder substitution
-    succeeds and success_criteria referencing $answer.field_name are satisfied. Additionally,
-    the answer branch must include all required refs from the IntentSpec's required_refs
-    for that outcome.
-  created: '2026-06-16'
-  deactivated_reason: r011 advises including top-level attributes in answer for placeholder
-    substitution, but the schema only allows 'message' and 'refs' (see r007 and validation
-    error). This rule directly caused the extra fields that led to validation failure.
-  id: r011
-  reasoning: 'The error ''real_vm: <lambda>() takes 2 positional arguments but 3 were
-    given'' occurs because the answer object for the ''found'' branch is missing the
-    fields ''product_sku'' and ''product_name'' that are required by the message skeleton
-    placeholders {product_sku} and {product_name}. The Answer rpc attempts to substitute
-    these placeholders by looking up the fields as top-level attributes of the answer
-    object, but when the field is absent, a lambda that expects two arguments (the
-    answer object and the key) receives a third argument (likely a default or fallback)
-    causing a mismatch. The failing PlanIR fragment is the answer branch: {"found":
-    {"message": "The product {product_name} (SKU: {product_sku}) is available in the
-    catalogue.", "outcome": "OUTCOME_OK", "refs": []}}. It lacks the necessary fields
-    and also fails to include the required_refs (record_path) for OUTCOME_OK. Existing
-    rules (r001, r005, r009) address parts of this but do not explicitly mandate top-level
-    fields for simple placeholders, so a new rule is needed to ensure the answer object
-    carries both placeholder fields and required refs.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-16'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: '#answerbranch'
-  content: Never include fields other than 'message' and 'refs' in the answer branch
-    of PlanIR; placeholder substitution for message skeleton tokens (e.g., {product_name})
-    works automatically from the execution environment variables (e.g., $found_product.product_name)
-    — do not add answer attributes for them.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r012
-  reasoning: 'Error: plan validation failed with ''Extra inputs are not permitted''
-    for answer.found.product_name and answer.found.sku. The generated PlanIR included
-    a ''found'' object inside the answer branch, adding top-level attributes beyond
-    the allowed ''message'' and ''refs''. Root cause: adherence to r011 which advises
-    including placeholder fields as top-level answer attributes, but the PlanIR schema
-    only permits ''message'' and ''refs'' (as stated by r007). The correct approach
-    is to omit extra fields; placeholder substitution resolves from the execution
-    environment. Rule linkage: r007 already forbids extra fields, but r011 contradicted
-    it and caused the violation. Deactivate r011 to prevent recurrence.'
-  status: active
-  surface: ir
-- agents_md_anchor: null
-  content: Always define variables referenced by success_criteria (e.g., $found_product.product_sku)
-    in every execution path. When no matching data exists, construct a default object
-    that contains all fields required by success_criteria, with nonempty placeholder
-    values (e.g., 'MISSING'), and assign it to the variable before the decision branch.
-    Also, for each outcome specified in the IntentSpec, include all required refs
-    in the answer branch's refs list.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r013
-  reasoning: 'Error: verify: success_criteria[0] failed on nonempty check of $found_product.product_sku.
-    OBSERVED_RPC_OUTPUTS shows SQL returned only column headers, no rows. The PlanIR
-    executed correctly but $found_product was undefined in the ''not_found'' branch
-    because compute set it via ''first'' on an empty $rows. The decision branch for
-    not_found did not define $found_product, so success_criteria failed. Additionally,
-    the ''found'' branch omitted the required record_path ref. Root cause: PlanIR
-    does not define success_criteria variables in all paths. Rule r008 covers equality
-    checks but not nonempty; this rule generalizes to any variable referenced in success_criteria.'
-  status: active
-  surface: ir
-- agents_md_anchor: null
-  content: Do not use the 'neq' predicate in decision branch conditions; use only
-    valid predicates such as 'eq', 'exists', 'regex', or 'not' (wrapping a valid predicate)
-    to express inequality. When you need to check if a variable is not equal to a
-    sentinel value (e.g., 'MISSING'), write the condition using 'eq' and swap the
-    true/false branches, or use a 'not' operator with 'eq'.
-  created: '2026-06-16'
-  deactivated_reason: null
-  id: r014
-  reasoning: PlanIR validation failed with error 'unknown predicate op 'neq''. The
-    PlanIR used 'neq' in decision.branches.0.when, but the PlanIR schema does not
-    support 'neq' — allowed ops are 'eq', 'exists', 'regex', 'not', etc. This is a
-    structural bug in the plan shape. Correct by using 'eq' with reversed branches
-    or a 'not' wrapper.
-  status: active
-  surface: ir
-- content: null
-  created: '2026-06-16'
-  id: v009
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
@@ -356,8 +97,8 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 last_run:
-  cycles_used: 4
-  date: '2026-06-16'
+  cycles_used: 1
+  date: '2026-06-18'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t01

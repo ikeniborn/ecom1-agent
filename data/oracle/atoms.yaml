@@ -1,39 +1,959 @@
-- id: probe_then_refine_lookup
-  description: Exact-equality lookup returning 0 rows usually means a format mismatch, not absence
-  domain: [sql, lookup, discovery]
-  content: >-
-    An exact-equality lookup that returns 0 rows usually means the literal does
-    not match the stored format, not that the entity is absent. Probe DISTINCT
-    column values or sample the target table first, then refine with a
-    normalized or case-insensitive comparison before concluding the item is not
-    carried.
-  source: investigation
-  validated_by: manual
-  validated_at: '2026-06-18'
-  status: active
+- id: sql-query-products-by-kind-brand-series-and-multi-properties
+  description: SQL pattern to query products by kind, brand, series, and multiple variant properties using
+    CTEs and INTERSECT
+  domain:
+  - sql
+  - product-catalogue
+  - query-pattern
+  content: "To find products matching a specific kind, brand, series, and a set of variant properties\
+    \ (key-value pairs), use a Common Table Expression (CTE) to resolve the kind ID from a kind table,\
+    \ another CTE to find SKUs that possess all required properties by intersecting results of individual\
+    \ property queries, then join the product variants table with both CTEs and filter by brand and series.\
+    \ This pattern ensures that only products satisfying all given variant properties are returned. Generic\
+    \ template:\n\nWITH kind AS (\n  SELECT kind_id FROM product_kinds WHERE kind_name = :kind_name\n\
+    ),\nprops AS (\n  SELECT product_sku FROM variant_properties WHERE property_key = :key1 AND property_value_text\
+    \ = :value1\n  INTERSECT\n  SELECT product_sku FROM variant_properties WHERE property_key = :key2\
+    \ AND property_value_text = :value2\n  -- add more INTERSECT blocks for additional properties\n)\n\
+    SELECT p.sku, p.name, p.record_path\nFROM product_variants p\nJOIN kind ON p.product_kind_id = kind.kind_id\n\
+    JOIN props ON p.product_sku = props.product_sku\nWHERE p.brand = :brand AND p.series = :series;"
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 7f155d5c0a09013330d25572dea8ca6ca714379b2a5377727f344b75f4ce4c67
+  source_task: t01
   polarity: method
-- id: normalize_free_text_filter
-  description: Prefer normalized/LIKE comparison over strict equality on free-text columns
-  domain: [sql, normalization]
-  content: >-
-    When a SQL filter on a free-text attribute returns nothing, prefer a
-    normalized comparison (trim + lower, or LIKE) over strict equality, because
-    stored values often carry units, casing, or spacing variations the literal
-    does not reproduce.
-  source: investigation
-  validated_by: manual
-  validated_at: '2026-06-18'
+- id: product-existence-check-via-sql-intersect
+  description: A method to determine if a product exists in a catalog by querying a database with multiple
+    variant property filters using SQL INTERSECT and counting results.
+  domain:
+  - database
+  - product-catalog
+  - sql
+  content: 'To check for the existence of a product matching specific brand, series, kind, and multiple
+    variant properties:
+
+    1. Identify the product kind ID from a product_kinds table using the kind name.
+
+    2. For each required variant property (e.g., screw_type, diameter), query the product_variant_properties
+    table to get SKUs where property_key equals the desired value.
+
+    3. Use INTERSECT to combine the SKU sets from each property filter, ensuring a product variant satisfies
+    all properties simultaneously.
+
+    4. Join the resulting SKUs with the product_variants table, filtering by brand, series, and the kind
+    ID obtained in step 1.
+
+    5. Count the resulting rows. If the count is greater than zero, the product exists; otherwise, it
+    does not.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
   status: active
+  embedding_hash: 4f6ae821546d173497ffaed14b2cc98d40d61e6b5a49f3a52090e7d0bef016fb
+  source_task: t01
+  polarity: anti_pattern
+- id: decision_outcome_mapping_completeness
+  description: Ensure all decision branch labels are mapped to an outcome to avoid default OUTCOME_NONE_CLARIFICATION
+  domain:
+  - scripting
+  - decision_logic
+  content: When defining a decision with branches and a default label, always include an answer mapping
+    for every possible label, including the default. If a label is not explicitly mapped, the system may
+    return OUTCOME_NONE_CLARIFICATION instead of the intended outcome, causing unexpected behavior. For
+    example, if a decision has a 'not_found' default label, map it to an appropriate outcome such as OUTCOME_NONE_UNSUPPORTED
+    or OUTCOME_OK, rather than leaving it unmapped.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 421bd2532c07cdae9f71839b1f161784ef4a112fcb2f6c0df01597a88aa2cdb1
+  source_task: t01
+  polarity: anti_pattern
+- id: extract-scalar-from-sql-rowset
+  description: Obtain a single scalar value from a SQL query result by aliasing the value in SELECT, parsing
+    the rowset, taking the first row, and reading the named column.
+  domain:
+  - sql
+  - data-processing
+  - workflow
+  - scalar-value
+  - rowset-parsing
+  content: When a workflow needs to surface a single value from SQL, issue a SELECT statement that returns
+    exactly one row and alias the target value to a named column. Parse the raw execution output into
+    structured rows, isolate the first row, and reference the aliased column on that row to yield the
+    scalar result.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 1911a121a19b6cc00c92e62a1295895eab25d0f3dea808fed56fbe23eeb48526
+  source_task: t_int
   polarity: method
-- id: read_governing_doc_before_filter
-  description: Read the governing /docs policy before encoding a count/eligibility filter
-  domain: [docs, eligibility]
-  content: >-
-    Before encoding a count or eligibility filter, read the governing /docs
-    policy surfaced in pre-phase; the documented rule, not a naive WHERE clause,
-    defines correctness.
+- id: scalar-sql-result-to-answer
+  description: Pattern for retrieving a scalar value from a SQL query through a multi-stage dataflow pipeline
+    and returning it in a formatted answer.
+  domain:
+  - intent-handling
+  - dataflow
+  - sql
+  - scripting
+  content: 'In a dataflow intent script, to return a scalar SQL result: (1) In `discovery`, execute the
+    SQL via an `Exec` RPC to an external query runner, passing the query as an argument, and bind the
+    raw output. (2) In `rowsets`, parse the bound raw output with `auto_delim` format into a row collection.
+    (3) In `compute`, apply the `first` primitive to the row collection to extract the initial row into
+    a named variable. (4) In `answer`, interpolate the row variable''s column field into the `message`
+    template to present the value.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 941a6ef401e2a35e4528ea11b00a5c94813dd073fb063d8544ef70b97c1f01c5
+  source_task: t_iso
+  polarity: method
+- id: sql-scalar-to-template
+  description: Execute a SQL query returning a single scalar value, parse it into a rowset, extract the
+    first row, and return the value via a message template.
+  domain:
+  - data_access
+  - workflow
+  - templating
+  content: Use an Exec discovery step to run a SELECT statement that returns one row with an aliased column.
+    Bind the raw output, transform it into a rowset using auto_delim formatting, extract the first row
+    with a compute primitive, and reference the aliased column in the answer template as `{<row>.<column>}`.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: b6e92a2a5d5599903163998321430c1531e2444bbd66f0d3a0657caaaf6cd912
+  source_task: t_seed
+  polarity: method
+- id: pipeline-sql-scalar-extraction
+  description: Pattern to execute a SQL query and surface a single scalar value (e.g., a count) in a multi-step
+    pipeline answer.
+  domain:
+  - sql
+  - pipeline
+  - data-extraction
+  - integration
+  content: 'To return a single scalar from SQL in a pipeline: execute a query that returns one row with
+    an aliased column; bind the raw output; parse it into a rowset using auto-delimited formatting; compute
+    the first row into a named variable; then expose the scalar in the answer by referencing variable.column_alias.
+    Use an OUTCOME_OK label when the value is successfully retrieved.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: e403a630acc32e8d30cd1e3d2c07ef39f7182d4ba871e35ab651ec3fd4e7662b
+  source_task: t_iso
+  polarity: method
+- id: sql-connectivity-smoke-test-scalar-extraction
+  description: Verify a SQL endpoint is responsive by running a trivial constant query and extracting
+    the scalar value from the first returned row.
+  domain:
+  - database
+  - sql
+  - health-check
+  - workflow-engine
+  content: To confirm that a SQL-compatible endpoint is reachable and operational without touching actual
+    tables, execute a minimal constant query (e.g., SELECT 1). Parse the resulting tabular output into
+    rows, extract the first row, and read its scalar column value to generate a lightweight success indicator
+    or liveness proof.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9f5b397218815c50981ba1a3fb4221f2f175a10a07c79d3a85261cb0e36b3f54
+  source_task: t_seed
+  polarity: method
+- id: extract-scalar-sql-cli
+  description: Retrieve a scalar value from a command-line SQL query and surface it in a workflow answer.
+  domain:
+  - orchestration
+  - database
+  - workflow
+  - shell
+  content: 'To return a single value from a database query in an orchestration script: invoke a command-line
+    SQL executor with the query as arguments, bind the raw standard output, parse it into a rowset using
+    automatic delimiter detection, extract the first row, and reference the target column name in the
+    answer template.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 582690a6593751affd7a0eec46df9e765bf3da63a61b6a402107d96429c7ce4e
+  source_task: t_int
+  polarity: method
+- id: scalar-sql-pipeline
+  description: Extract a single scalar value from a SQL query result within a pipeline by using a column
+    alias and first-row access.
+  domain:
+  - sql
+  - pipeline
+  - data-extraction
+  content: To retrieve a scalar value produced by SQL in a pipeline, select the value with an explicit
+    column alias, parse the output into a rowset, take the first row, and read the field by its alias.
+    This decouples the query result from fixed paths and allows the scalar to be referenced dynamically
+    in downstream steps or answer templates.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: d0fc349cdadc92cd5e55116a1fb782c6e460fb5a22630002d65f23bd8f83a5db
+  source_task: t_int
+  polarity: method
+- id: sql-scalar-extraction
+  description: Pattern for executing a SQL query that returns a single scalar value, extracting it from
+    the first row of the result set, and surfacing it in a templated response.
+  domain:
+  - sql
+  - scalar-query
+  - data-extraction
+  - templating
+  - pipeline
+  content: 'To retrieve a singleton SQL result (such as a count or verification flag): run a SELECT statement
+    with a single labeled column; bind the raw command output; parse it into a rowset using automatic
+    delimiter detection; extract the first row into a variable; and reference that variable''s column
+    by name in the answer template. This isolates the scalar value from the rowset for direct use in output
+    formatting.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 14dd4ca9d828625ba3148976cec184203da34d63a927f646f0699a05d48bdc7e
+  source_task: t_iso
+  polarity: method
+- id: extract-scalar-sql-cli
+  description: Obtain a single scalar value from a SQL query executed via a command-line tool by parsing
+    the output into a rowset and isolating the first row.
+  domain:
+  - sql
+  - cli
+  - data-extraction
+  content: 'To retrieve a scalar value from a SQL query executed through an external command-line client:
+    run the query with a column alias, parse the raw output as a delimited rowset, extract the first row
+    to obtain a record object, and access the desired field by its alias. This pattern converts single-row
+    CLI SQL output into a structured, addressable value.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: aa33e4f2cc438a1def505325d66173d42486d5d58bac9f0642cda8ac9b7761b0
+  source_task: t_int
+  polarity: method
+- id: sql-scalar-extraction
+  description: Extract a scalar value from a SQL query result in a script pipeline by aliasing the expression
+    and reading the first row.
+  domain:
+  - sql
+  - scripting
+  - pipeline
+  - data-extraction
+  content: 'To extract a scalar value from a SQL query inside a script pipeline: execute a SELECT statement
+    that returns a single row and aliases the target expression to a named column; bind the raw output;
+    parse it into a rowset using an automatic delimiter; extract the first row with the `first` primitive;
+    then reference the aliased column from that row in the answer template to surface the scalar result.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: a5c5ada0449c559eb80d33162d01bf5543e2cd745e7bdd8f0aa7638698f27538
+  source_task: t_seed
+  polarity: method
+- id: workflow-sql-scalar-template
+  description: Pattern for executing a SQL query and surfacing a scalar result in an answer template via
+    row extraction and interpolation.
+  domain:
+  - workflow
+  - sql
+  - rpc
+  - templating
+  content: 'To return a scalar database value in an answer: execute the query via an Exec RPC and bind
+    the raw text output; parse that output into a rowset using an automatic delimiter format; extract
+    the first row with a compute primitive; then interpolate the desired column into the answer message
+    template using the syntax `{<row_variable>.<column_alias>}`.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: d85e7c4655ba85062ddb49946ae7b5d8ca095cbffeff06cc655fc368f2aa4886
+  source_task: t_seed
+  polarity: method
+- id: extract-scalar-sql-first-row
+  description: Execute a SQL query that returns a single scalar value as a named column, parse the raw
+    result into rows, take the first row, and interpolate that column value into the answer message.
+  domain:
+  - sql
+  - scripting
+  - data-extraction
+  content: 'To return a scalar SQL result in a script answer: run a query returning one row with an aliased
+    column; parse the raw output into a delimited rowset; compute the first row as a structured object;
+    and reference the column by name in the answer message template. Use a default decision branch to
+    emit a success outcome when no conditional logic is required.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 266e4fb0a5bb500305905bf5e49ea19af8914c260f8ecd382bf50a2b9c841c6b
+  source_task: t_int
+  polarity: method
+- id: sql-scalar-verify
+  description: Verify a SQL execution path or return a scalar constant by selecting a literal value with
+    a column alias and extracting the first row's field.
+  domain:
+  - sql
+  - verification
+  - data-pipeline
+  content: To confirm database connectivity or retrieve a scalar result through a rowset-based pipeline,
+    execute a query that selects a constant literal with an explicit column alias. Parse the query output
+    into a rowset, take the first row, and return the value mapped to the aliased column.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 063aa052866c84c8c85517e41ff3f4952ae9aa8f5825694a72cfeb3a6602d17f
+  source_task: t_int
+  polarity: method
+- id: scalar-from-cli-sql
+  description: Extract a single scalar value from the output of a command-line SQL query by parsing it
+    as a delimited rowset, taking the first row, and referencing the target column in the answer template.
+  domain:
+  - sql
+  - cli
+  - data-extraction
+  content: Execute a SQL query via a command-line client and bind the raw output. Parse the output as
+    an auto-delimited rowset. Use the 'first' primitive to extract the initial row into a variable. Return
+    the scalar value by referencing the variable and column name (e.g., {variable.column}) in the answer
+    template.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: dadb547d5ddb17b645f2d4053087cc05316bb51caeb64202f10822804169f2a9
+  source_task: t_iso
+  polarity: method
+- id: extract-scalar-from-first-row
+  description: Extract a single scalar value from the first row of tabular query output by parsing the
+    result set and accessing a named column.
+  domain:
+  - sql
+  - data-extraction
+  - pipeline-scripting
+  - scalar-resolution
+  content: 'To obtain a single scalar value from a query that returns tabular output: execute the query
+    to produce raw delimited data, parse that data into a collection of structured rows, select the first
+    row from the collection, and access the desired column by name on that row object. The resulting scalar
+    can then be referenced directly in messages, variables, or control logic.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 0e98cf242214e5447bc18b114e0c0c8d17848d6b950d656742c4f635c7283b5e
+  source_task: t_seed
+  polarity: method
+- id: sql-scalar-extraction-first-row
+  description: Extract a single scalar value from a SQL query by selecting it as an aliased column and
+    reading the first row of the result set.
+  domain:
+  - sql
+  - data-access
+  - scalar-extraction
+  - pipeline
+  content: 'To obtain a scalar value (such as a count or aggregate) from a SQL query in a data pipeline:
+    (1) execute a SELECT statement that returns exactly one row with an explicitly aliased column (e.g.,
+    SELECT <expression> AS <field_name>); (2) parse the output into a rowset; (3) extract the first row;
+    (4) reference the aliased field on that row to retrieve the scalar value.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: c5c0dc37861771da5e6c220ef44d34ba896e8563ae9cbd34a06a46dff7003b65
+  source_task: t_int
+  polarity: method
+- id: cli-sql-scalar-extraction
+  description: Extract a single scalar value from command-line SQL output by parsing tabular rows and
+    selecting the first result.
+  domain:
+  - database
+  - sql
+  - cli
+  - scalar-extraction
+  - parsing
+  content: 'To return a single value from a SQL query executed through a command-line interface: execute
+    the statement, capture raw tabular output, parse into rows via automatic delimiter detection, extract
+    the first row, and reference the target column from that row in the response. This assumes the query
+    returns exactly one row.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 712c722e61e4f8d32c7bd949a55e8e531955f3b273773a348da1ffc9e36003f6
+  source_task: t_seed
+  polarity: method
+- id: sql-scalar-firstrow-return
+  description: Extract and return a scalar value from a SQL query by parsing raw output as a rowset, taking
+    the first row, and referencing the target column in the response.
+  domain:
+  - sql
+  - database
+  - scalar
+  - query
+  - rowset
+  - extraction
+  content: 'To surface a scalar result (e.g., a count) via SQL: execute a SELECT statement that aliases
+    the value to a named column; bind the raw output as an auto-delimited rowset; compute the first row
+    from the rowset; and reference the named column on that row object in the answer template.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 8996af03a254682e168b9fe5c47492f21829a5e47f10f9b18dc0a837ef1095d3
+  source_task: t_iso
+  polarity: method
+- id: scalar-sql-extraction-via-row-template
+  description: Extract and present a single scalar value from a SQL query by isolating the first row and
+    referencing its column in an answer template.
+  domain:
+  - sql
+  - workflow
+  - data-extraction
+  - rpc
+  content: 'To return a scalar value from a SQL query in an automated workflow: execute the query through
+    a SQL interpreter endpoint; parse the raw text output into structured rows using automatic delimiter
+    detection; extract the first row using a ''first'' primitive bound to a variable; and reference the
+    desired column from that row variable via dot notation in the answer message template.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 4b17c295f2dcf2f60806bc0d86fcfc65742d8671b981e293c3b953000b147945
+  source_task: t_seed
+  polarity: method
+- id: cli-sql-scalar-extraction
+  description: Extract a single scalar value from a database by piping a SQL query through stdin to a
+    command-line client, parsing the delimited tabular output into a rowset, and selecting the target
+    column from the first row.
+  domain:
+  - sql
+  - cli
+  - integration
+  - data-extraction
+  content: To obtain a scalar result from a database when only a command-line interface is available,
+    send the SQL statement via stdin to the database executable. Capture the resulting delimited text
+    output as a rowset table, extract the first row, and reference the desired column to produce the final
+    value. This pattern treats the CLI tool as a RPC endpoint and its tabular output as a structured data
+    format, avoiding the need for a native database driver.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: be3ff345a32053812fced7174d6e28a7b3a79a2b191fafcf51a3327bb8380836
+  source_task: t_int
+  polarity: method
+- id: extract-sql-scalar-firstrow
+  description: Pattern to execute a SQL query and return a single scalar value from the first result row
+    in a pipeline workflow.
+  domain:
+  - automation
+  - sql
+  - data-extraction
+  - pipeline
+  content: 'To surface a scalar result from SQL in a pipeline: execute the query via a command node and
+    capture the raw output; parse the output into a rowset; extract the first row using a `first` primitive
+    into a named variable; then reference the target column from that variable in the answer message template.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9172a5c497ac847d0f34df19c642271c0fa8eeeb20645271099900db4c011b84
+  source_task: t_int
+  polarity: method
+- id: extract-scalar-from-sql-rowset
+  description: Extract a single scalar value from the first row of a SQL query result within a pipeline.
+  domain:
+  - pipeline
+  - sql
+  - data_extraction
+  content: When a pipeline must return a single value from a SQL query, execute the query to produce a
+    raw result, parse it into rows, take the first row, read the target column, and emit that value as
+    the outcome.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: e6fc3fa94a7adc2ec6f1d7a684ee161643a433d2761ba3f8918559da005ccaa6
+  source_task: t_iso
+  polarity: method
+- id: pipeline-sql-scalar-extraction
+  description: Execute a SQL query via standard input and return a scalar value from the first result
+    row by parsing raw delimited output through a pipeline.
+  domain:
+  - pipeline
+  - sql
+  - data-processing
+  - scalar-extraction
+  content: Pass the SQL statement via standard input to the query executor and bind the raw output. Parse
+    the raw response into rows using automatic delimiter detection. Use a compute primitive to extract
+    the first row into a variable. Reference the desired column from that row variable in the answer template
+    to surface the scalar result.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 2f0c382759c2a2128ed5659afe0b916be19a99ff25b0c7f5333014eb10ce8a74
+  source_task: t_iso
+  polarity: method
+- id: scalar-count-from-sql-rowset
+  description: Serve a count intent by extracting a scalar value from the first row of a SQL query result
+    and returning it as a success answer with catalog provenance.
+  domain:
+  - sql
+  - pipeline
+  - scalar-extraction
+  - rowset-parsing
+  - count-intent
+  - provenance
+  content: Execute a SELECT query that returns a single row containing the desired count as a named scalar
+    column. Parse the raw output into a rowset using automatic delimiter detection. Isolate the first
+    row, extract the count field, and return that value as the answer payload. Mark the outcome as successful
+    and reference the relevant data catalog for provenance.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 52ff90adcecdc8aa480504afcbcee7cf3f1b310013d81244cef4c3ac63aa646c
+  source_task: t_seed
+  polarity: method
+- id: query-cli-parse-first-row
+  description: General pattern for running a SQL query through a command-line executor, converting the
+    raw text result into structured rows, taking the first row, and using one of its columns in the answer.
+  domain:
+  - sql
+  - cli
+  - data-parsing
+  - scripting
+  content: 'When integrating a SQL query into a script that lacks a native database client: execute the
+    SQL binary through a shell/exec action with the query supplied on stdin; capture the raw output; feed
+    that output into an auto-delim rowset parser to produce structured rows; extract the first row into
+    a separate variable using a first-record primitive; and address individual columns by name from that
+    row variable in the answer template or downstream logic. This avoids embedding connection strings,
+    driver-specific APIs, or vendor-dependent result handling.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 96a3358f6942d9afe447eafd2dd8ea76a735906ad142a52643fda7c5019bda18
+  source_task: t_seed
+  polarity: method
+- id: workflow-extract-sql-scalar
+  description: Pattern for executing a SQL query within a pipeline and surfacing a single scalar result
+    by parsing delimited output and extracting the first row's aliased column.
+  domain:
+  - workflow-engine
+  - pipeline
+  - sql
+  - data-extraction
+  content: 'To surface a scalar value from a SQL query within a structured workflow pipeline: invoke the
+    database client via a system/exec RPC, passing the query through standard input; capture the raw output;
+    parse it into a rowset using an auto-delimited format; extract the first row with a first/head primitive;
+    then reference the queried column by its alias from that row object in the final answer template or
+    downstream logic.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 97614c731431acd0c5ae51fdd864d340fd3c84233baf41b4386a97aa6a321cc8
+  source_task: t_int
+  polarity: method
+- id: external-sql-scalar-extraction
+  description: Pattern for executing SQL via an external binary and surfacing a scalar result by parsing
+    raw output into an inferred rowset, taking the first row, and dereferencing a column.
+  domain:
+  - scripting
+  - data-access
+  - sql
+  content: 'To extract a scalar value from SQL executed by an external binary: (1) run the SQL engine
+    via an Exec RPC with the query supplied via stdin and capture the raw text output; (2) feed the raw
+    output into a rowset stage using auto_delim format with automatic column inference to produce a rows
+    collection; (3) apply the first compute primitive to the rows collection to isolate a single record;
+    (4) in the answer template, interpolate the target field from that first record to return the scalar
+    value.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 1bfc04d731edf723e0d4422a2ecd10cdc295f9b526d056f711f55b7360b0797d
+  source_task: t_int
+  polarity: method
+- id: extract-scalar-sql-in-declarative-pipeline
+  description: Pattern to execute a scalar SQL query in a declarative pipeline, parse the result, and
+    project the first cell into the response.
+  domain:
+  - pipeline
+  - sql
+  - json-dsl
+  - data-extraction
+  - workflow
+  content: 'In a declarative JSON workflow, extract a scalar SQL result by chaining three stages: (1)
+    Execute the SQL query via a command node and capture the raw text output. (2) Parse the raw output
+    into a typed rowset using automatic delimiter detection. (3) Project the first row into a variable.
+    Finally, reference the desired column of that row in the answer template and return it alongside an
+    outcome status and a citation to the source catalog.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 04c4a0dfe5c3eb00adba94332bc841051cb062435c0ac97a885864a2878e349d
+  source_task: t_iso
+  polarity: method
+- id: sql-scalar-extraction-via-stdin-rowset
+  description: Execute a SQL query via standard input, parse the raw output as a delimited rowset, isolate
+    the first row, and extract a specific column value as a scalar result.
+  domain:
+  - rule-engine
+  - sql
+  - data-extraction
+  content: 'To retrieve a single scalar value from a SQL query in a discovery-based script: (1) Invoke
+    the SQL interpreter with the query supplied via stdin and bind the raw text output. (2) Parse the
+    raw output into an automatically delimited rowset to produce a collection of records. (3) Apply a
+    first/head selection primitive on the collection to obtain a single-row object. (4) Reference the
+    desired column on that row object to extract the scalar value for use in downstream answers, decisions,
+    or variables.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 79dc7791168a2d859a4b3c9953f9ca1cf013964e6509dbb4e4e25dc4324eda02
+  source_task: t_int
+  polarity: method
+- id: sql-scalar-verify-first-row
+  description: Verify SQL connectivity or extract a scalar constant by running a trivial SELECT and reading
+    the first row's aliased column
+  domain:
+  - sql
+  - database
+  - verification
+  - health-check
+  - data-pipeline
+  content: To verify connectivity or extract a scalar from a SQL source, execute a trivial constant query
+    such as `SELECT 1 AS <alias>`. Parse the raw result into rows, select the first row, and reference
+    the aliased column. This confirms the query path is functional and yields a predictable scalar without
+    depending on table state.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 951fa310bc1e78ab11b04572a09a89b1346ade327a48a30d1525dbbebe692c75
+  source_task: t_seed
+  polarity: method
+- id: scalar-sql-result-via-pipeline-template
+  description: Return a scalar SQL result by selecting the first row and interpolating its aliased column
+    into the pipeline answer.
+  domain:
+  - pipeline
+  - sql
+  - scalar-extraction
+  - message-template
+  content: 'To return a scalar value obtained from SQL through a processing pipeline: formulate the query
+    to return a single value in a named column; bind the raw response as a delimited rowset; apply a first-row
+    operation to obtain the singleton record; and reference the column alias in the answer message template
+    to emit the value. Ensure the compute step output and the template placeholder align.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 109be131d6a2203a90af767b25daf87a220cb89ba1db2534968526a300ed8962
+  source_task: t_iso
+  polarity: method
+- id: sql-stdin-scalar-result
+  description: Execute a SQL query by piping it to a command-line database client's standard input, parse
+    the resulting delimited text output into a rowset, extract the first row, and return the value of
+    a specific column.
+  domain:
+  - database
+  - sql
+  - cli
+  - automation
+  - integration
+  content: When integrating with a SQL engine via a command-line interface, send the query through stdin
+    and capture stdout. Convert the raw tabular text into structured rows using automatic delimiter detection.
+    Isolate the first result row and access the desired column field by name to obtain the scalar answer.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: eeb12381295dc7b43f6143a898e164b4bedaa6d27a9ee746971bc8efa8e5451d
+  source_task: t_seed
+  polarity: method
+- id: pipeline_sql_scalar_extraction
+  description: Pattern for extracting a single scalar value from a SQL query result within a declarative
+    data pipeline.
+  domain:
+  - data-pipeline
+  - sql
+  - etl
+  content: 'To surface a scalar result from a SQL query in a structured pipeline: execute the query and
+    capture the raw output, parse that output into a rowset, select the first row from the collection,
+    and reference the desired column from that row object. This generalizes any single-value SELECT expression
+    into a pipeline variable without embedding database-specific identifiers into downstream logic.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 358027ef2ca9d5274b8542d8355b1923a24735a4ad625460fcf8cf79a772efa3
+  source_task: t_int
+  polarity: method
+- id: extract-scalar-from-cli-sql
+  description: Extract a scalar value (e.g., a count or single-column result) from a command-line SQL
+    query by treating its text output as a delimited rowset and plucking the first row's target column.
+  domain:
+  - sql
+  - cli
+  - data-extraction
+  - scripting
+  - workflow
+  content: 'To retrieve a single scalar value from a database via a command-line SQL executor: invoke
+    the SQL binary with the query supplied on standard input; parse the resulting text output as an auto-delimited
+    rowset to produce structured records; isolate the first data row (which handles a single-result set
+    and skips any header); then reference the desired field by its column name. This pattern decouples
+    execution, parsing, and scalar extraction into discrete stages, making it reusable for any single-value
+    query such as counts, sums, or lookups.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 62d3c76ea4e85c007e5b48f8393c8ae79f5a0baabc4689ced306e309de28f26d
+  source_task: t_seed
+  polarity: method
+- id: scalar-sql-result-to-message
+  description: Surface a single scalar SQL result through a rowset-extraction pipeline by aliasing the
+    column, parsing raw output into rows, taking the first row, and interpolating the field into the response
+    template.
+  domain:
+  - sql
+  - workflow
+  - data-extraction
+  - templating
+  content: 'To return a scalar value from SQL in a discovery-based workflow: execute a query that returns
+    one row with an explicit column alias; bind the raw output; parse it into a rowset using automatic
+    delimiter detection; extract the first record with a ''first'' primitive into a row variable; then
+    reference the aliased column from that row in the answer message template. This separates data retrieval,
+    parsing, extraction, and presentation while keeping the value dynamically bound.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: e0353c2aaf986941967e7d75f054dcf7b64ed21a319bad702be4b060ab7a0157
+  source_task: t_iso
+  polarity: method
+- id: external-sql-scalar-extraction
+  description: Extract a scalar result from an external SQL command-line query for use in a templated
+    workflow answer.
+  domain:
+  - workflow
+  - integration
+  - sql
+  - external-command
+  - templating
+  content: Invoke an external SQL interpreter via RPC Exec, feeding the query through stdin. Bind the
+    raw text output, convert it into rows with an auto-delimited rowset parser, reduce the rows to a single
+    record using the `first` primitive, and reference the desired column in the answer template with `{recordVariable.columnName}`.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: ac80b36b62b78601b1596c456a5d43750ec8f5f6fa52c9de1402397f91b36bd1
+  source_task: t_seed
+  polarity: method
+- id: query-cli-scalar-extract
+  description: Pattern for obtaining a single scalar SQL value by executing a CLI client via stdin, parsing
+    stdout as a rowset, and extracting the first row's column.
+  domain:
+  - database
+  - sql
+  - workflow
+  - cli
+  - data-extraction
+  content: 'To retrieve a scalar value from a database using a command-line SQL client within an orchestrated
+    workflow: (1) execute the client binary, piping the query string via standard input; (2) capture and
+    parse standard output into a tabular rowset using an auto-detected delimiter; (3) isolate the first
+    row of the result; (4) reference the target column field from that row to populate the final output
+    or downstream variable.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: a68093102a2626a419324d9155163717cc63617e9921e5230383241a3f540ab6
+  source_task: t_int
+  polarity: method
+- id: sql-scalar-via-cli
+  description: Execute SQL through a command-line database client and extract a scalar value from the
+    text output.
+  domain:
+  - sql
+  - cli
+  - data-access
+  content: 'To retrieve a value from a database using only its command-line client: invoke the SQL binary
+    through an execution primitive, pass the query via standard input, capture the raw text output, parse
+    it as a delimiter-separated rowset to produce structured rows, take the first row, and reference the
+    desired column by the alias defined in the SELECT statement.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: be3e7bbfe068c4e009198717459af3ed10de5b2b7315ae1d81870e5563710779
+  source_task: t_int
+  polarity: method
+- id: scalar-from-sql-pipeline
+  description: Extract a single scalar result from a SQL query by parsing raw output into rows and reading
+    the first row's aliased column.
+  domain:
+  - data-pipeline
+  - sql
+  - scalar-extraction
+  content: 'In a pipeline that executes SQL and produces raw text output, extract a scalar value by: (1)
+    writing the query to return a single row with an explicitly aliased column; (2) parsing the raw output
+    into a rowset; (3) selecting the first row; (4) reading the value using the column alias as the field
+    name.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 46d80aa6fae71f587e33f452e29e0f74f331006c7ce95a47d01b926697b6fcd5
+  source_task: t_iso
+  polarity: method
+- id: minimal-sql-verification-scalar
+  description: Verify SQL execution pipeline health by selecting a constant scalar value, avoiding table
+    dependencies.
+  domain:
+  - database
+  - sql
+  - verification
+  - health-check
+  content: When verifying that a SQL execution path and result-extraction pipeline are healthy, run a
+    table-free constant query (e.g., SELECT 1 AS alias). Parse the output into rows, take the first row,
+    and read the scalar column. This confirms connectivity, query execution, and result parsing without
+    requiring table access, specific permissions, or heavy computation.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9fed8c46aba8919e168d003ea5c8fbbc2f725230351ce857776706b260581a7a
+  source_task: t_seed
+  polarity: method
+- id: scalar-from-sql-rowset
+  description: Pattern for extracting a single scalar value from a SQL query result in a rowset-processing
+    workflow and surfacing it via templating.
+  domain:
+  - workflow
+  - sql-integration
+  - data-pipeline
+  - templating
+  content: 'To extract a scalar result from a SQL query inside a pipeline: issue the query exposing the
+    value as a named column; bind the raw output; parse it into a rowset using automatic delimiter detection;
+    select the first row into a variable; then reference that row’s column in the answer template to return
+    the value.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 3762b110b04f31bc93b386b346fc3753d39951b3ee2b269cf96712221b582836
+  source_task: t_iso
+  polarity: method
+- id: sql-cli-scalar-extraction
+  description: Extract a scalar value from a SQL query executed via CLI by parsing delimited output, selecting
+    the first row, and referencing a named column.
+  domain:
+  - orchestration
+  - sql
+  - cli
+  - data-extraction
+  content: When a script needs to return a scalar database value through a command-line SQL executor,
+    submit a query that projects an aliased column, interpret the raw text output as an auto-delimited
+    rowset, reduce the rowset to its first record, and read the desired field from that record into the
+    answer template.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 012d35a06d9e0b455019f95830e1f06fef959bf3efd233e47b28f62979375897
+  source_task: t_seed
+  polarity: method
+- id: sql-scalar-to-answer
+  description: Execute a SQL scalar query via RPC and return the result as a templated answer.
+  domain:
+  - sql
+  - rpc
+  - workflow
+  - scalar-extraction
+  content: Execute a SQL query via RPC with the statement supplied through stdin. Parse the raw response
+    as delimited rowsets. Extract the first row. Return the value of the target column by referencing
+    it in the answer message template, using an OK outcome. Avoid hard-coding literal IDs, paths, SKU
+    codes, or numeric amounts in the query or response references.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: d4232a688061cabf612b9ef1630e2a91d0d2c8c30fcf8624644d9664b0c72636
+  source_task: t_int
+  polarity: method
+- id: sql-cli-scalar-query
+  description: Execute SQL via a command-line client's stdin and extract a scalar value from the delimited
+    tabular output.
+  domain:
+  - sql
+  - cli
+  - data-access
+  - integration
+  - scripting
+  content: 'To retrieve a scalar value from a database through a command-line SQL executable: (1) pass
+    the query via the process''s stdin, (2) capture the raw text output, (3) parse it as an auto-delimited
+    table to produce rows, (4) isolate the first row, and (5) reference the desired column from that row
+    for downstream use or the final answer.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: d69d96e5fed98b8f49fdb4fffd04fff94118c77db25757bd47b65ae006bef634
+  source_task: t_iso
+  polarity: method
+- id: external-structured-text-to-first-row-field
+  description: Extract a scalar field value from external structured text output by auto-parsing it into
+    a rowset, selecting the first row, and accessing the field by name.
+  domain:
+  - workflow
+  - data-pipeline
+  - external-integration
+  - text-parsing
+  content: 'To retrieve a scalar value from an external command that outputs structured text: execute
+    the command and capture the raw text; parse the raw text into a rowset using automatic delimiter detection;
+    extract the first record into a structured variable; then reference fields of that record by column
+    name in answers or downstream computations.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 0919236ae4bfa0a4ba7b918fe50370d3a55e16978cbba3ec8d9823a1a6048e1d
+  source_task: t_seed
+  polarity: method
+- id: normalized-catalogue-existence-match
+  description: General method for catalogue existence queries — normalized attribute
+    matching plus single-record extraction discipline.
+  domain:
+  - product-catalogue
+  - sql
+  - method
+  content: "To decide whether a catalogue product exists, match its identifying\
+    \ attributes (brand, model/series, variant properties) NORMALIZED: case-insensitive\
+    \ and whitespace-trimmed, using LIKE for partial model tokens rather than strict\
+    \ equality, since exact-match against re-seeded data is brittle. Reduce the result\
+    \ rowset with `first` to a single record, then read fields with `get` (a single\
+    \ record is a dict, not a list — never apply a list operation like `column`\
+    \ to it), and surface that record's record_path as the grounding reference."
   source: investigation
   validated_by: manual
   validated_at: '2026-06-18'
   status: active
+  embedding_hash: ''
+  source_task: t01
   polarity: method
