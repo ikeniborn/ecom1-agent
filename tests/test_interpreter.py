@@ -281,3 +281,24 @@ def test_required_record_path_unresolved_refuses_on_ok():
     plan = _plan(answer={"ok": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}})
     with pytest.raises(InterpretError):
         interpret(plan, intent, vm)
+
+
+def test_compute_listop_on_scalar_raises_interpret_error():
+    # F1: reproduces run-15:08 — first() yields one dict, column() is a list-op.
+    # The mismatch must surface as a retryable InterpretError (mutation_landed False),
+    # not a bare AttributeError the pipeline misclassifies as a real-VM error.
+    fx = {fixture_key("Exec", "/bin/sql", ["Q"]): {"stdout": "product_sku\nSTO-1"}}
+    vm = MockVMSpy(fixtures=fx)
+    plan = _plan(
+        discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "args": ["Q"]}, "bind": "raw"}],
+        rowsets=[{"from": "raw", "format": "auto_delim", "into": "rows", "columns": []}],
+        compute=[
+            {"prim": "first", "args": ["$rows"], "into": "first_row"},
+            {"prim": "column", "args": ["$first_row", "product_sku"], "into": "names"},
+        ],
+        answer={"ok": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}},
+    )
+    with pytest.raises(InterpretError) as ei:
+        interpret(plan, _INTENT, vm)
+    assert ei.value.mutation_landed is False
+    assert "column" in str(ei.value)

@@ -57,3 +57,22 @@ def test_parser_registry_fuzzy_sku():
 def test_unknown_parser_raises():
     with pytest.raises(KeyError):
         run_parser("nope", "", {})
+
+
+def test_list_ops_reject_scalar_with_actionable_message():
+    # F1: a list-consuming primitive handed a non-list (e.g. the output of `first`)
+    # raises a clear TypeError naming the fix, not a cryptic AttributeError.
+    import pytest
+    with pytest.raises(TypeError, match=r"'column' expects list\[dict\]; use 'get'"):
+        run_primitive("column", ["product_sku", "name"])
+    with pytest.raises(TypeError, match=r"'sum_col' expects list\[dict\]"):
+        run_primitive("sum_col", [{"a": 1}, "a"])
+    with pytest.raises(TypeError, match=r"'filter_rows' expects list\[dict\]"):
+        from agent.ir_models import PredExpr
+        run_primitive("filter_rows", ["scalar", PredExpr(op="nonempty", lhs="$x")])
+
+
+def test_list_ops_allow_none_as_empty():
+    # None (empty rowset) stays valid -> [] / 0.0, preserving current semantics.
+    assert run_primitive("column", [None, "c"]) == []
+    assert run_primitive("sum_col", [None, "c"]) == 0.0

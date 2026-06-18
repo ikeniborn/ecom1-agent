@@ -19,12 +19,23 @@ def _to_number(s: Any) -> float:
     return float(m.group()) if m else 0.0
 
 
+def _require_rows(prim: str, rows: Any) -> list:
+    """List-consuming primitives accept list[dict] (None -> empty). A scalar/dict
+    (e.g. the output of `first`/`get`) is a contract error: raise a clear, actionable
+    TypeError so F1's compute-wrap turns it into a retryable signal instead of a crash."""
+    if rows is None:
+        return []
+    if not isinstance(rows, list):
+        raise TypeError(f"'{prim}' expects list[dict]; use 'get' for a single row")
+    return rows
+
+
 def _sum_col(rows: list[dict], col: str) -> float:
-    return float(sum(_to_number(r.get(col)) for r in (rows or [])))
+    return float(sum(_to_number(r.get(col)) for r in _require_rows("sum_col", rows)))
 
 
 def _column(rows: list[dict], col: str) -> list:
-    return [r.get(col) for r in (rows or [])]
+    return [r.get(col) for r in _require_rows("column", rows)]
 
 
 def _div(a: Any, b: Any) -> float:
@@ -33,7 +44,7 @@ def _div(a: Any, b: Any) -> float:
 
 
 def _filter_rows(rows: list[dict], pred) -> list[dict]:
-    return [r for r in (rows or []) if evaluate(pred, dict(r))]
+    return [r for r in _require_rows("filter_rows", rows) if evaluate(pred, dict(r))]
 
 
 PRIMITIVES: dict[str, Callable[..., Any]] = {

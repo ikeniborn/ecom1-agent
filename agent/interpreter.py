@@ -231,13 +231,22 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
     for rs in plan.rowsets:
         env[rs.into] = _parse_rowset(_payload(env.get(rs.from_)), rs)
 
-    # 4. compute + custom_extract
+    # 4. compute + custom_extract — a type-incorrect step (e.g. a list-op on a single
+    #    dict) becomes a retryable InterpretError, never a bare crash the pipeline would
+    #    misclassify as a real-VM error (F1). compute runs before any op, so
+    #    mutation_landed is still False here -> the pipeline safely retries.
     from .primitives import run_parser, run_primitive
     for cs in plan.compute:
-        cargs = [resolve(a, env) for a in cs.args]
-        env[cs.into] = run_primitive(cs.prim, cargs)
+        try:
+            cargs = [resolve(a, env) for a in cs.args]
+            env[cs.into] = run_primitive(cs.prim, cargs)
+        except (TypeError, AttributeError, KeyError, IndexError) as e:
+            raise _refuse(f"compute step '{cs.prim}' failed: {e}", mutation_landed)
     for ce in plan.custom_extract:
-        env[ce.into] = run_parser(ce.name, _payload(env.get(ce.input)), intent.params or {})
+        try:
+            env[ce.into] = run_parser(ce.name, _payload(env.get(ce.input)), intent.params or {})
+        except (TypeError, AttributeError, KeyError, IndexError) as e:
+            raise _refuse(f"custom_extract '{ce.name}' failed: {e}", mutation_landed)
 
     # 5. decision (security branch ordering enforced by lint_security_first)
     label = plan.decision.default_label
