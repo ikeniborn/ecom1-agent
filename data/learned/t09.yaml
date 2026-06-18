@@ -1,0 +1,109 @@
+entries:
+- agents_md_anchor: null
+  content: 'When using the filter_rows primitive, pass exactly two arguments: the
+    source rowset reference and a single structured filter predicate object containing
+    the column, operator, and value; do not spread the column and value into separate
+    positional arguments. When using the dedupe primitive, pass exactly one argument:
+    the source rowset reference alone.'
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r001
+  reasoning: 'Verbatim error: ''plan: primitive ''filter_rows'' takes 2 arg(s), plan
+    supplies 3; primitive ''dedupe'' takes 1 arg(s), plan supplies 2''. Root cause:
+    PlanIR compute step supplied incorrect positional arity to table-processing primitives.
+    Failing PlanIR fragments: filter_rows args ["$rows","city","vienna"] (3 args)
+    and dedupe args ["$vienna_rows","product_sku"] (2 args). Rule linkage: the rule
+    enforces correct arity by consolidating the column predicate into a single second
+    argument for filter_rows and removing the extra column argument from dedupe, aligning
+    with the primitive signatures.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When building a formatted string in PlanIR compute steps, always chain
+    the `concat` primitive in pairwise steps with exactly two arguments per call;
+    never pass three or more arguments to a single `concat` invocation.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r002
+  reasoning: 'Verbatim error: ''plan: primitive ''concat'' takes 2 arg(s), plan supplies
+    3''. Root cause: The PlanIR compute node for formatted_answer supplied three positional
+    args to concat (''<COUNT:'', ''$count'', ''>'') but the primitive signature is
+    binary. Failing fragment: {"prim":"concat","args":["<COUNT:","$count",">"],"into":"formatted_answer"}.
+    This requires enforcing pairwise concatenation in compute steps.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When extracting numeric fields from a rowset produced by an external query,
+    always insert a compute step that casts the extracted value to a number before
+    binding it into the result object used for numeric success criteria.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r003
+  reasoning: 'The verify error `success_criteria[OUTCOME_OK][0] failed: {''op'': ''ge'',
+    ''lhs'': ''$result.count'', ''rhs'': 0, ''args'': []}` shows that `$result.count`
+    did not satisfy a numeric greater-than-or-equal comparison. In the failing PlanIR,
+    the `count` column was extracted from the external `/bin/sql` rowset via `auto_delim`
+    and then passed through the `first` primitive directly into `result` without any
+    type conversion. Values parsed from external text output are typically strings,
+    so the strict `ge` evaluator could not treat the value as a number. Shaping the
+    PlanIR to include an explicit number-casting compute step between the rowset extraction
+    and the result binding ensures numeric success criteria evaluate correctly in
+    future cycles.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When feeding the output of an Exec RPC into a rowset extractor, always
+    set the rowset `from_` source to the `.stdout` sub-field of the Exec binding (e.g.
+    `$sql_raw.stdout`) rather than the top-level binding, because Exec returns a structured
+    object containing stdout, stderr, and exit_code; passing the bare binding causes
+    the extractor to receive an object instead of the raw text or JSON array, resulting
+    in an empty rowset and a missing answer.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r004
+  reasoning: 'ERROR: real_vm: answer must be non empty. The PlanIR binds an Exec RPC
+    to `$sql_raw` and then passes `$sql_raw` directly to a rowset extractor with `"format":"json"`.
+    Exec RPCs typically return a structured object `{stdout, stderr, exit_code}`,
+    not the raw stdout string. The rowset extractor therefore likely fails to parse
+    the object as a JSON rowset, yielding an empty `result_rows`. The compute step
+    `first` on that empty/malformed rowset produces a null `result`, so `$result.formatted_answer`
+    evaluates to empty, causing the real_vm to reject the Answer RPC. The SQL may
+    be correct, but the PlanIR data-flow between Exec and rowset is structurally broken.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-18'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Count query ("how many X", answer format <COUNT:%d>). SELECT COUNT(*) over
+    the normalized product kind/type match (match the kind/category name with LOWER/TRIM).
+    COMPUTE the integer count scalar. ANSWER OUTCOME_OK with message EXACTLY the literal
+    '<COUNT:N>' where N is the count — no surrounding words, no quotes; build it by
+    concatenating '<COUNT:' + count + '>'. required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
+    A count of 0 is still OUTCOME_OK with <COUNT:0> — NEVER answer CLARIFICATION/UNSUPPORTED.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: rc1
+  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
+    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
+    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-18'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t09

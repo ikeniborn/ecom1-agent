@@ -1,0 +1,178 @@
+entries:
+- agents_md_anchor: null
+  content: When a required_ref source or success criterion specifies a dotted path
+    like $object.field, always extract that field into a dedicated top-level compute
+    variable via a get primitive and reference that exact flat variable name in the
+    answer refs array; never emit the dotted path string itself as a ref token because
+    the interpreter resolves refs against the compute variable namespace, not against
+    object properties.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r001
+  reasoning: 'Verbatim error: interpret: unresolved required ref(s) [''$product.record_path'']
+    on OK answer. Root cause: the PlanIR compute stage correctly extracted record_path
+    into the flat variable $record_path, but the answer branch ''found_abs'' listed
+    the ref as the dotted string ''$product.record_path''. The interpreter cannot
+    resolve dotted paths in the refs array; it looks for a compute variable with that
+    exact token. Failing PlanIR fragment: "answer":{"found_abs":{"refs":["$product.record_path"]}}.
+    The rule ensures the planner maps nested required sources to flat compute variables
+    and uses those exact names in answer refs.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required_ref source or success criterion specifies a dotted path
+    like $object.field, bind the value into a compute variable whose name exactly
+    matches the dotted path (e.g., product.record_path) via a get primitive, and emit
+    the identical $object.field token in the answer refs array; do not flatten to
+    an underscore-separated alias because the interpreter validates required refs
+    by exact string match against the answer refs list and resolves the token against
+    the compute namespace.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r002
+  reasoning: 'The interpreter error `unresolved required ref(s) [''$product.record_path'']
+    on OK answer` occurred because the PlanIR used a flattened compute variable (`into:
+    "product_record_path"`) and referenced `$product_record_path` in the answer refs,
+    while the frozen IntentSpec required_ref source is exactly `$product.record_path`.
+    The interpreter matches required_ref.source strings to answer refs tokens by exact
+    correspondence, so the underscore alias failed to satisfy the requirement. The
+    failing fragment is the answer refs array `["$product_record_path"]` and the compute
+    step `into: "product_record_path"`.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract dotted-path required references such as $object.field into
+    a top-level compute variable with an underscore-flattened name like object_field
+    via a get primitive, and emit the exact flat token $object_field in the answer
+    refs array; never use literal dots inside compute variable into names or ref tokens
+    because the interpreter treats dotted tokens as nested property access and fails
+    to resolve them against the compute namespace.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r003
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$product.record_path'']
+    on OK answer. Root cause: the PlanIR bound a get result into compute variable
+    product.record_path (containing a literal dot) and emitted $product.record_path
+    in the answer refs. The interpreter interprets dots as property access rather
+    than a variable name, so it cannot resolve the token against the compute namespace.
+    The failing fragment is compute into:"product.record_path" with answer refs:["$product.record_path"].
+    The new rule mandates underscore-flattened variable names and flat ref tokens
+    to ensure resolution, superseding prior conflicting guidance that advocated dotted
+    compute names.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required_ref source specifies a dotted path such as `$object.field`,
+    always include the exact dotted token `$object.field` in the answer refs array;
+    ensure the base compute variable `$object` is an object (row or dict) that exposes
+    `field` as a property, because the interpreter resolves dotted ref tokens by property
+    access on that object. Do not substitute an underscore-flattened alias in the
+    answer refs for a dotted required ref, and do not declare compute variables with
+    literal dot characters in their names.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r004
+  reasoning: 'Diagnosis: the interpreter failed with `interpret: unresolved required
+    ref(s) [''$product.record_path''] on OK answer`. Root cause: the answer refs array
+    contained the underscore-flattened token `$product_record_path` (via an unnecessary
+    `get` primitive aliasing `record_path` into `product_record_path`), but the required_ref
+    source demanded the exact dotted token `$product.record_path`. The interpreter
+    validates required refs by checking that the answer refs list contains the exact
+    source token, and it resolves dotted tokens via property access on the base compute
+    variable (`$product`), not by flat namespace lookup. Failing PlanIR fragment:
+    `"refs":["$product_record_path"]` in the `found` answer block, and the compute
+    step `{"prim":"get","args":["$product","record_path"],"into":"product_record_path"}`.
+    The correct shape is to keep `$product` as the first row object (which already
+    carries `record_path` from the rowset) and emit `"refs":["$product.record_path"]`
+    exactly as required. The prior in-session rules gave contradictory advice about
+    flattening or dot-naming compute variables; the new rule supersedes them by stating
+    the exact-token + property-access behavior.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a scalar field from a rowset is needed for an answer ref, always extract
+    it via the column primitive followed by first into a dedicated flat compute variable,
+    and reference only that flat variable in the answer refs array; never emit a dotted-path
+    token like $row.field because the interpreter resolves answer refs against the
+    flat compute namespace and rowset row objects may be opaque handles that do not
+    support property access.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r005
+  reasoning: 'Verbatim error: interpret: unresolved required ref(s) [''$product.record_path'']
+    on OK answer. Root cause: the PlanIR defined $product as first of $catalog_rows
+    and then emitted ''$product.record_path'' in the answer refs, but the interpreter
+    could not resolve that dotted token—rowset rows are either opaque handles/arrays
+    rather than dicts, or the ref resolver is strictly flat-namespace. The script
+    correctly extracted $sku via column+first but failed to do the same for record_path.
+    Failing fragment: ''"refs":["$product.record_path"]'' in the answer block, with
+    no corresponding column+first extraction for record_path into a flat scalar variable.
+    The rule linkage: by mandating that every field used in answer refs be bound to
+    a flat scalar compute variable via column+first (or get), the next cycle will
+    produce refs that the interpreter can resolve directly.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: If a compute variable is bound by first from a rowset, never use dotted-path
+    tokens such as $variable.field in answer refs because the resulting row handle
+    is opaque and does not support property access during ref resolution; instead,
+    extract each needed scalar field via the column primitive on the source rowset
+    followed by first into its own flat compute variable, and emit only those flat
+    tokens in the refs array.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r006
+  reasoning: The interpret phase failed with 'unresolved required ref(s) [$product.record_path]'.
+    The PlanIR created $product via first on catalog_rows, then emitted $product.record_path
+    as an answer ref. Rowset rows produced by first are opaque handles; the interpreter
+    cannot resolve dotted property access on them for refs. Existing guidance conflicts
+    on whether to use dotted tokens or flat variables for rowset-derived fields. The
+    failure proves that dotted access on a first-bound rowset variable fails, so the
+    planner must use column+first to extract record_path into a flat scalar and emit
+    only that flat token instead of $product.record_path.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-18'
+  id: v001
+  score: 0.0
+  score_detail:
+  - Answer should contain '<YES>'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: 'Support-note claim verification ("a note claims we stock X ... cite the
+    exact record; if the base product exists but the extra claimed property is absent
+    answer <NO> with the checked SKU; if it exists answer <YES> with the SKU"). STEP
+    1: find the BASE product by brand + line/series (minimal normalized match, LOWER/TRIM,
+    LIKE on a short token); SELECT product_sku + record_path; bind base=first(rows).
+    STEP 2: test whether the EXTRA claimed property/variant holds for that base (separate
+    predicate). ALWAYS answer OUTCOME_OK (never UNSUPPORTED/CLARIFICATION). Branches:
+    base found AND extra holds -> message contains <YES> and the checked SKU; base
+    found AND extra absent -> message contains <NO> and the checked SKU; base absent
+    -> message contains <NO>. Author refs=[$base.record_path] on every found/base-exists
+    branch (conditional grounding; cite the BASE record). INTENT: required_refs[OUTCOME_OK]=[];
+    outcome_space=[OUTCOME_OK]. Put the literal SKU string into the message.'
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: rc1
+  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
+    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
+    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 6
+  date: '2026-06-18'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t07

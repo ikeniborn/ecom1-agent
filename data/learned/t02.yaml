@@ -1,0 +1,165 @@
+entries:
+- agents_md_anchor: null
+  content: Always include every required ref defined for an outcome in the `refs`
+    array of each answer branch that emits that outcome, even when the decision path
+    handles an empty rowset. Never omit a required row-indexed reference from a zero-result
+    branch; instead, ensure the upstream query or compute step exposes the variable
+    so it resolves to null rather than being undefined when no rows exist.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r001
+  reasoning: 'The interpreter failed with ''interpret: unresolved required ref(s)
+    [''$rows.0.record_path''] on OK answer''. The PlanIR had two OUTCOME_OK branches:
+    ''found'' included ''$rows.0.record_path'', but the default ''absent'' branch
+    had ''"refs":[]''. Because the IntentSpec requires ''$rows.0.record_path'' on
+    every OK answer, the empty-refs branch caused validation failure. The root cause
+    is not the decision split per se, but that a required ref was dropped in a zero-row
+    answer path. The rule fixes this by mandating that all required refs be listed
+    in every answer branch for their outcome and that upstream steps define the referenced
+    variables even when rowsets are empty.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always shape discovery queries that feed $rows.0.* required refs to return
+    exactly one row unconditionally, using scalar subqueries without a FROM clause
+    or a guaranteed single-row source, so that an empty match set still yields a null
+    in row 0 rather than an empty rowset that leaves the indexed reference undefined.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r002
+  reasoning: 'Diagnosis: error is `interpret: unresolved required ref(s) [''$rows.0.record_path'']`.
+    The PlanIR SQL builds a CTE (`matching_variants`) and selects `COUNT(*)` and a
+    scalar subquery `FROM` that CTE. When the CTE yields no rows, the outer query
+    returns zero rows, so the `rowsets` step produces an empty `$rows` list. Consequently
+    `$rows.0.record_path` is undefined. The compute step attempts to alias the field
+    into `$record_path`, but the validator requires the literal row-indexed source
+    `$rows.0.record_path` to be resolvable, which is impossible when row 0 does not
+    exist. Root cause: query cardinality equals match count instead of being unconditionally
+    one. Rule linkage: instructs the planner to decouple the presence of the output
+    row from the presence of matches, guaranteeing the required indexed ref is always
+    addressable (resolving to null) even with zero matches.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always shape discovery queries that must return a single row unconditionally
+    for required row-indexed refs as flat aggregate SELECTs (e.g., SELECT COUNT(*)
+    AS count, MAX(required_col) AS required_col FROM joined_tables WHERE filters)
+    rather than CTEs or scalar subqueries without FROM, because aggregates naturally
+    produce exactly one row with null-filled columns for empty match sets and avoid
+    fragile parenthesis nesting that causes syntax failures.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r003
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [$rows.0.record_path]
+    on OK answer''. Root cause: the PlanIR discovery SQL used a CTE (''WITH matches
+    AS (...) SELECT (SELECT COUNT(*) FROM matches) AS count, (SELECT record_path FROM
+    matches LIMIT 1) AS record_path'') with mismatched parentheses, likely causing
+    a syntax error and an empty result set so $rows.0 never existed. Using a flat
+    aggregate like ''SELECT COUNT(*) AS count, MAX(record_path) AS record_path FROM
+    ... WHERE ...'' guarantees exactly one row with record_path null when no rows
+    match, eliminating CTE nesting risk and ensuring the required $rows.0.record_path
+    ref resolves.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always wrap a nullable required-ref aggregate column in a discovery query
+    with COALESCE(..., '') so the auto_delim rowset parser preserves the key in row
+    0; never rely on a bare MAX(required_col) alone, because SQL NULL from an empty
+    match set can be dropped by the parser and leave the row-indexed reference undefined.
+  created: '2026-06-18'
+  deactivated_reason: 'Superseded: the old rule recommended COALESCE(..., '''') to
+    preserve the key, but empty-string values are still elided by the auto_delim parser;
+    a non-empty sentinel is required.'
+  id: r004
+  reasoning: The plan emitted a flat aggregate SELECT with MAX(pv.record_path) following
+    Rule 3, yet the interpret phase reported unresolved required ref $rows.0.record_path
+    on the OK answer. The aggregate guarantees one row, but MAX(...) yields SQL NULL
+    when no rows match. In auto_delim rowset parsing, a NULL-valued column may be
+    omitted from the parsed row object, so the record_path key disappears and $rows.0.record_path
+    becomes undefined. Coalescing to an empty string ensures the column is materially
+    present in the delimited output and the key survives parsing.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always wrap a nullable required-ref aggregate column in a discovery query
+    with COALESCE(MAX(col), '(none)') or another non-empty sentinel string; never
+    use an empty-string fallback, because the auto_delim rowset parser may elide empty
+    values and leave the row-indexed reference unresolved even though the aggregate
+    row is present.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r005
+  reasoning: The interpreter error is `unresolved required ref(s) ['$rows.0.record_path']
+    on OK answer`. The PlanIR follows existing aggregate guidance and emits a single-row
+    flat SELECT with `COUNT(*)` and `COALESCE(MAX(record_path), '')`. Because the
+    error names only `record_path` and not `count`, the aggregate row itself is present
+    (the parser captured `count`), but the `record_path` key is missing from the parsed
+    row object. This indicates the `auto_delim` parser drops empty-string cells, so
+    the `''` sentinel is insufficient. The failing fragment is the SQL column `COALESCE(MAX(record_path),
+    '') AS record_path` feeding the `auto_delim` rowset. The new rule replaces the
+    empty-string fallback with a non-empty sentinel so the parser preserves the required
+    key.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always reference a required row-indexed ref by its original `$rows.N.column`
+    source path directly in the answer branch `refs` array; never indirect it through
+    a compute `get` step or alias variable, because the required-ref validator matches
+    on the declared source path and does not trace variable indirection.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r006
+  reasoning: 'Error: `interpret: unresolved required ref(s) [''$rows.0.record_path'']
+    on OK answer`. Root cause: The PlanIR aliased `$rows.0.record_path` into `$record_path`
+    via a compute `get` primitive, then listed only `$record_path` in the answer `refs`.
+    The required-ref checker validates that the exact source path declared in the
+    tool spec (`$rows.0.record_path`) appears in the answer `refs`; it does not trace
+    through `get` aliases. Failing fragment: compute step `{"prim":"get","args":["$rows.0","record_path"],"into":"record_path"}`
+    and `"refs":["$record_path"]`. The upstream aggregate query already returns a
+    guaranteed single row with COALESCE, so the alias is unnecessary and harmful.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-18'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: 'Existence query ("is X in the catalogue"/"do you carry X"). MATCH MINIMALLY:
+    brand + ONE distinctive model/series token via normalized LIKE (LOWER/TRIM) on
+    a SHORT fragment; do NOT add extra variant-property JOINs/EXISTS unless one token
+    is genuinely insufficient — over-constraining yields a false 0-row ''absent''
+    for a present product. For ''regular or flat''/''bare or kit'' alternants match
+    ANY variant (OR), never require all. SELECT the record_path column. COMPUTE match_count=count(rows);
+    first_record=first(rows). DECIDE match_count ge 1 -> label found else label absent.
+    ANSWER (single top-level mapping, NO Answer op in ops): found.message contains
+    the literal token <YES> and found.refs=[$first_record.record_path]; absent.message
+    contains the literal token <NO> and absent.refs=[]. INTENT: required_refs[OUTCOME_OK]=[]
+    (record_path is CONDITIONAL, authored per-branch); outcome_space=[OUTCOME_OK].
+    NEVER answer CLARIFICATION/UNSUPPORTED — ''absent'' is OUTCOME_OK with <NO>. Read
+    single-record fields with get, never column.'
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: rc1
+  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
+    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
+    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 6
+  date: '2026-06-18'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t02

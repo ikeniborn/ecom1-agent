@@ -1,0 +1,53 @@
+entries:
+- agents_md_anchor: null
+  content: Never use unbound named parameter placeholders in SQL queries sent through
+    Exec RPC stdin; always inline the required values from intent parameters or prior
+    discovery refs into the query text.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r001
+  reasoning: 'The verbatim error is ''real_vm: answer must be non empty''. The root
+    cause is that the PlanIR emitted an Exec RPC to /bin/sql whose stdin contained
+    the named placeholder '':requested_kind_name'' but the RPC ''args'' array was
+    empty, leaving the parameter unbound. This caused the SQL execution to yield no
+    valid delimited result, so ''$sql_result_text'' could not be parsed into ''$rows'',
+    and downstream variables ''$count_str'' and ''$count'' remained empty. The failing
+    fragment is the Exec discovery step with ''"args":[]'' and '':requested_kind_name''
+    in the query text. The new rule prevents this by requiring that any value needed
+    in a SQL query be explicitly inlined into the string rather than relying on unsupported
+    placeholder binding.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-18'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Count query ("how many X", answer format <COUNT:%d>). SELECT COUNT(*) over
+    the normalized product kind/type match (match the kind/category name with LOWER/TRIM).
+    COMPUTE the integer count scalar. ANSWER OUTCOME_OK with message EXACTLY the literal
+    '<COUNT:N>' where N is the count — no surrounding words, no quotes; build it by
+    concatenating '<COUNT:' + count + '>'. required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
+    A count of 0 is still OUTCOME_OK with <COUNT:0> — NEVER answer CLARIFICATION/UNSUPPORTED.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: rc1
+  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
+    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
+    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 1
+  date: '2026-06-18'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t10

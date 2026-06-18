@@ -1,0 +1,134 @@
+entries:
+- agents_md_anchor: null
+  content: Always nest binary `concat` primitives to assemble strings from more than
+    two values in compute steps; never pass more than two arguments to a single `concat`
+    call.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r001
+  reasoning: 'Error: plan: primitive ''concat'' takes 2 arg(s), plan supplies 5. Root
+    cause: the compute step tried to concatenate five strings using one `concat` primitive,
+    but `concat` is strictly binary in PlanIR. The failing fragment is {"prim":"concat","args":["$variant_name","
+    (","$variant_style",") — ","$variant_record_path"],"into":"$details"}. The rule
+    prevents this by requiring chained binary `concat` calls for multi-value string
+    assembly.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include the exact `source` expressions from the ToolPlan `required_refs`
+    in the matching PlanIR answer branch's `refs` array; never leave `refs` empty
+    when the ToolPlan mandates required references for that outcome.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r002
+  reasoning: 'The error `interpret: unresolved required ref(s) [''$variant.record_path'']
+    on OK answer` indicates the PlanIR answer block failed to declare the required
+    ref. The PlanIR correctly discovered data and bound `$variant` via `first` and
+    `get`, but the answer branches for OUTCOME_OK (`found` and `none`) emitted `"refs":
+    []`. Because the ToolPlan explicitly requires `$variant.record_path` for OUTCOME_OK,
+    the interpreter rejected the candidate. Wiring the required source expressions
+    into `answer.<branch>.refs` ensures the verifier can resolve them.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use `first` on a potentially empty rowset as the sole compute step
+    feeding a required ref into an OK answer branch; always precede it with a fallback
+    primitive or sentinel-row strategy that guarantees the required field exists,
+    because success criteria permitting zero matches still require the ref to resolve.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r003
+  reasoning: The interpreter error `unresolved required ref(s) ['$variant.record_path']
+    on OK answer` is triggered by the `not_found` answer branch (OUTCOME_OK, default
+    when `$match_count` is 0). In the PlanIR, `$variant` is produced by `first` on
+    `$rows`; when the SQL query returns zero rows, `$variant` is empty, so the path
+    `.record_path` is unresolvable. The failing fragment is the `not_found` branch
+    referencing `$variant.record_path` without guarding against an empty rowset. The
+    rule instructs the planner to shape compute steps so that a required ref sourced
+    from `first` is backed by an empty-safe fallback or sentinel row, ensuring resolution
+    even in zero-row success cases.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never rely on SQL NULL sentinel rows alone to preserve required ref keys
+    through auto_delim rowset parsing; always follow `first` or rowset extraction
+    with a compute-level fallback primitive that explicitly binds the required field
+    to a default value or empty string, because null columns may be dropped and leave
+    the ref unresolved.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r004
+  reasoning: The interpreter failed with "unresolved required ref(s) ['$variant.record_path']".
+    The PlanIR used a SQL sentinel CTE (SELECT NULL AS record_path...) to emit a dummy
+    row when no products matched, then fed the rowset through "first" into "$variant"
+    and referenced "$variant.record_path". Because auto_delim parsers typically omit
+    null keys, the sentinel row did not preserve the "record_path" key in the parsed
+    rowset, so "$variant" lacked the field and the ref could not be resolved. The
+    new rule closes this loophole by mandating compute-level fallback binding or non-null
+    sentinel values instead of relying on SQL NULLs alone.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not list a dotted required ref such as `$variant.record_path` in the
+    answer branch `refs` array when the base object comes from `first` on a rowset;
+    always extract the property into a flat variable with `get`, apply a compute-level
+    fallback primitive to default missing or dropped values, and reference the flat
+    variable in `refs` while preserving the ToolPlan `kind` and `path`.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r005
+  reasoning: 'Error: `interpret: unresolved required ref(s) [''$variant.record_path'']
+    on OK answer`. Root cause: The PlanIR relied on a SQL sentinel row to provide
+    a record for the zero-match case, but `auto_delim` parsing can drop empty-string/null
+    columns, so `$variant` from `first($rows)` may lack the `record_path` key. Additionally,
+    the answer branches left `refs: []`, omitting the required ref entirely. The failing
+    fragment is the compute step `{"prim":"first","args":["$rows"],"into":"$variant"}`
+    feeding `$variant.record_path` without a `get`+fallback, and the empty `refs`
+    arrays. The new rule forces extraction into a safe flat variable, eliminating
+    the unresolved dotted reference and ensuring `refs` is populated.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-18'
+  id: v001
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: 'Existence query ("is X in the catalogue"/"do you carry X"). MATCH MINIMALLY:
+    brand + ONE distinctive model/series token via normalized LIKE (LOWER/TRIM) on
+    a SHORT fragment; do NOT add extra variant-property JOINs/EXISTS unless one token
+    is genuinely insufficient — over-constraining yields a false 0-row ''absent''
+    for a present product. For ''regular or flat''/''bare or kit'' alternants match
+    ANY variant (OR), never require all. SELECT the record_path column. COMPUTE match_count=count(rows);
+    first_record=first(rows). DECIDE match_count ge 1 -> label found else label absent.
+    ANSWER (single top-level mapping, NO Answer op in ops): found.message contains
+    the literal token <YES> and found.refs=[$first_record.record_path]; absent.message
+    contains the literal token <NO> and absent.refs=[]. INTENT: required_refs[OUTCOME_OK]=[]
+    (record_path is CONDITIONAL, authored per-branch); outcome_space=[OUTCOME_OK].
+    NEVER answer CLARIFICATION/UNSUPPORTED — ''absent'' is OUTCOME_OK with <NO>. Read
+    single-record fields with get, never column.'
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: rc1
+  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
+    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
+    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 6
+  date: '2026-06-18'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t03

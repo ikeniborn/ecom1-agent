@@ -1,0 +1,129 @@
+entries:
+- agents_md_anchor: null
+  content: Never bind a rowset to a plural name and then shadow the singular form
+    with a first-extracted scalar when a required ref or success criterion expects
+    a dotted path such as $product.record_path; keep the rowset bound to the exact
+    singular variable so the interpreter resolves the dotted path as a column reference
+    on the rowset, and extract scalar values for message templates via column+first
+    into a differently named variable.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r001
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''$product.record_path'']''.
+    Root cause: The PlanIR bound the SQL rowset into ''$products'', then used first($products)
+    into ''$product'', and referenced ''$product.record_path'' in the answer refs.
+    The interpreter cannot verify field access on an opaque row handle produced by
+    ''first'' and therefore the dotted path remains unresolved. Failing fragment:
+    "rowsets into ''products''", "compute first($products) into ''product''", "answer
+    refs: [''$product.record_path'']". By keeping the rowset bound to the singular
+    name expected by the required ref (''product''), ''$product.record_path'' resolves
+    against the statically known rowset column schema, while scalar message values
+    are still produced via a separate column+first extraction into a distinct variable
+    (e.g., ''$record_path'').'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always populate the answer branch refs array with an explicit entry using
+    the exact dotted-path source expression when a required ref or success criterion
+    expects a rowset column such as $product.record_path, and extract message-template
+    scalars into a distinctly named variable that does not shadow the rowset or column
+    name.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r002
+  reasoning: 'The interpreter failed with ''unresolved required ref(s) [''$product.record_path'']''
+    on the OK answer. The PlanIR correctly keeps the rowset named ''product'' and
+    extracts ''record_path'' as a scalar for the message template, but the answer.found.refs
+    array is empty. The structured required ref is independent of message substitution;
+    it must be explicitly declared in the answer refs with its original dotted-path
+    source. The failure is a PlanIR-shape bug: the ref was omitted from the answer
+    block, leaving the interpreter unable to satisfy the citation requirement even
+    though the rowset column exists.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract each required rowset column into its own scalar variable
+    via get from the first row, and use only scalar variables in the answer message
+    template and refs array; never place a dotted path such as $product.record_path
+    in the refs array because the interpreter resolves answer refs only from scalar
+    bindings, not from rowset columns.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r003
+  reasoning: 'The interpreter failed with ''interpret: unresolved required ref(s)
+    [$product.record_path] on OK answer''. The PlanIR correctly kept the rowset bound
+    to the singular name product, but violated existing guidance by placing the dotted
+    path $product.record_path directly into the answer refs array and message template
+    instead of extracting the column into a scalar. The interpreter resolves the answer
+    refs array using scalar variables, not rowset-column dotted paths. The failing
+    fragment is the answer block: refs: [$product.record_path] and message: FOUND
+    {sku} (source {product.record_path}). A prior in-session rule incorrectly instructed
+    placing the exact dotted-path source expression in the refs array; this new rule
+    supersedes that by requiring scalar extraction for every answer output.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include the exact dotted-path source expression declared in required_refs
+    or success_criteria in the corresponding answer branch refs array, and extract
+    message-template scalars into distinctly named variables that do not shadow the
+    record binding carrying that dotted path; when a no-match decision branch exists
+    and the outcome space includes a NONE or UNSUPPORTED option, map that branch to
+    the non-OK outcome so required OK refs are not validated on absent results.
+  created: '2026-06-18'
+  deactivated_reason: consolidated into crisp authoritative rc1 (rule-overload caused
+    non-convergence)
+  id: r004
+  reasoning: 'The interpreter failed with verbatim error ''interpret: unresolved required
+    ref(s) [''$product.record_path''] on OK answer''. Root cause: the PlanIR answer
+    branch for ''found'' declared refs: ["$record_path"], a scalar alias produced
+    by a get primitive, but the required_ref source is the exact dotted path ''$product.record_path''.
+    The interpreter matches required refs by their declared source string, so the
+    scalar alias did not satisfy the requirement. Additionally, the ''absent'' branch
+    was incorrectly labeled OUTCOME_OK with empty refs, causing the same required
+    ref to be demanded even when the SQL returned no rows. The failing fragments are
+    ''"answer":{"found":{"refs":["$record_path"]...}}'' and ''"absent":{"outcome":"OUTCOME_OK","refs":[]}''.
+    The corrective rule forces the exact dotted path into the refs array and routes
+    zero-match branches to a non-OK outcome when one exists.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-18'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: NOT FOUND <NO>
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: 'Support-note claim verification ("a note claims we stock X ... cite the
+    exact record; if the base product exists but the extra claimed property is absent
+    answer <NO> with the checked SKU; if it exists answer <YES> with the SKU"). STEP
+    1: find the BASE product by brand + line/series (minimal normalized match, LOWER/TRIM,
+    LIKE on a short token); SELECT product_sku + record_path; bind base=first(rows).
+    STEP 2: test whether the EXTRA claimed property/variant holds for that base (separate
+    predicate). ALWAYS answer OUTCOME_OK (never UNSUPPORTED/CLARIFICATION). Branches:
+    base found AND extra holds -> message contains <YES> and the checked SKU; base
+    found AND extra absent -> message contains <NO> and the checked SKU; base absent
+    -> message contains <NO>. Author refs=[$base.record_path] on every found/base-exists
+    branch (conditional grounding; cite the BASE record). INTENT: required_refs[OUTCOME_OK]=[];
+    outcome_space=[OUTCOME_OK]. Put the literal SKU string into the message.'
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: rc1
+  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
+    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
+    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 5
+  date: '2026-06-18'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t06
