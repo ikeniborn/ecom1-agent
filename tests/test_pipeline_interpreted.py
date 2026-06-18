@@ -251,6 +251,19 @@ def test_plan_signature_includes_stdin_sql():
     assert _plan_signature(PlanIR(**a)) != _plan_signature(PlanIR(**b))
 
 
+def test_answer_once_suppresses_second_answer():
+    # F4: the first guarded answer lands vm.answer; any later answer is a no-op, so the
+    # success path and a terminal can never both submit ("answer already provided").
+    from agent.pipeline import _make_answer_once
+    vm = MagicMock()
+    ans = _make_answer_once(vm)
+    assert ans("first", "OUTCOME_OK", ["/a"]) is True
+    assert ans("second", "OUTCOME_NONE_CLARIFICATION", []) is False
+    vm.answer.assert_called_once()
+    _, kw = vm.answer.call_args
+    assert kw["outcome"] == "OUTCOME_OK" and kw["message"] == "first"
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader

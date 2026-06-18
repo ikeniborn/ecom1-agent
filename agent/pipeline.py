@@ -244,6 +244,27 @@ def distill_from_grader(task_id: str, score: float, score_detail: list[str]) -> 
 
 
 # ---------------------------------------------------------------------------
+# Answer-once guard (F4) — exactly one vm.answer() per task
+# ---------------------------------------------------------------------------
+
+def _make_answer_once(vm):
+    """Return a guarded answer fn (F4): the first call lands vm.answer; later calls are
+    suppressed no-ops. Guarantees the success path and any terminal can never both submit
+    — eliminates the 'answer already provided' dead-end. Returns True if it submitted."""
+    state = {"answered": False}
+
+    def _answer(message: str, outcome: str, refs: list) -> bool:
+        if state["answered"]:
+            print(f"{CLI_YELLOW}[pipeline] duplicate answer suppressed{CLI_CLR}")
+            return False
+        state["answered"] = True
+        vm.answer(message=message[:800], outcome=outcome, refs=list(refs or []))
+        return True
+
+    return _answer
+
+
+# ---------------------------------------------------------------------------
 # Main entry — Plan-IR interpreter pipeline
 # ---------------------------------------------------------------------------
 
@@ -262,6 +283,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     # training-mode bug self-heals because learn_from_grader writes the same store.
     learn_ctx: list = load_entries(task_id)
     total_in = total_out = 0
+    answer_once = _make_answer_once(vm)
 
     def _accum(tk):
         nonlocal total_in, total_out
@@ -285,7 +307,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             _accum(tk)
     if intent is None:
         save_last_run(task_id, "failure", "OUTCOME_NONE_CLARIFICATION", 0)
-        _terminal_clarification(vm, "INTENT failed")
+        answer_once("INTENT failed", "OUTCOME_NONE_CLARIFICATION", [])
         return {"cycles_used": 0, "outcome": "OUTCOME_NONE_CLARIFICATION",
                 "status": "failure", "input_tokens": total_in, "output_tokens": total_out}
 
@@ -346,7 +368,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         if ok:
             ans = result.captured
             refs = _ground_security_refs(ans.outcome, list(ans.refs))
-            vm.answer(message=ans.message[:800], outcome=ans.outcome, refs=refs)
+            answer_once(ans.message, ans.outcome, refs)
             _persist_artifacts(task_id, intent, plan)
             _maybe_distill_and_validate(intent, plan, task_id,
                                         f"OK: {verr or 'verify passed'}")
@@ -364,7 +386,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
                 observed=result.observations)
 
     save_last_run(task_id, "failure", "OUTCOME_NONE_CLARIFICATION", cycle)
-    _terminal_clarification(vm, last_error or "interpreter cycles exhausted")
+    answer_once(last_error or "interpreter cycles exhausted", "OUTCOME_NONE_CLARIFICATION", [])
     return {"cycles_used": cycle, "outcome": "OUTCOME_NONE_CLARIFICATION",
             "status": "failure", "input_tokens": total_in, "output_tokens": total_out}
 
@@ -405,14 +427,6 @@ def learn_from_grader(
         token_out=token_out, prompt_name="ilearn", surface="ir",
     )
     return True
-
-
-# ---------------------------------------------------------------------------
-# Terminal exits — exactly one vm.answer() per task
-# ---------------------------------------------------------------------------
-
-def _terminal_clarification(vm, message: str) -> None:
-    vm.answer(message=message[:800], outcome="OUTCOME_NONE_CLARIFICATION", refs=[])
 
 
 # AGENTS.MD: "When you apply a policy from `docs`, include that policy document
