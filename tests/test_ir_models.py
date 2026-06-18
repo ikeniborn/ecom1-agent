@@ -71,7 +71,7 @@ _GOLDEN_PLAN = {
 
 def test_intentspec_parses_golden():
     spec = IntentSpec(**_GOLDEN_INTENT)
-    assert spec.success_criteria[0].op == "nonempty"
+    assert spec.success_criteria["OUTCOME_OK"][0].op == "nonempty"
     assert spec.answer_shape.msg_skeleton == "{cnt}"
 
 

@@ -36,9 +36,11 @@ Single JSON object, no prose, no fences:
       "deny_when": {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<literal or $ref>"}
     }
   ],
-  "success_criteria": [
-    {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<value>"}
-  ],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<value>"}
+    ]
+  },
   "answer_shape": {
     "msg_skeleton": "<human-readable template, e.g. 'Processed {count} items'>"
   },
@@ -68,9 +70,11 @@ Single JSON object, no prose, no fences:
   decision rests on) and/or a `record_path` (a `$ref` `source` bound at runtime to the
   reported row's path). Declare ONLY load-bearing refs (reading a doc ≠ obligation to
   cite it). Exactly one of `path`/`source` per RefSpec, matching its `kind`.
-- `success_criteria` — STRUCTURAL / grounding checks only (e.g. `count ge 0`, a
-  nonempty bound id). Do NOT bake a SQL recipe, join, `kind_id`, or `city` here — that
-  is PLAN's job (HOW). INTENT states WHAT/why.
+- `success_criteria` — a map keyed by outcome (same shape as `required_refs`).
+  List STRUCTURAL / grounding checks only per outcome (e.g. `count ge 0`, a
+  nonempty bound id). A negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`)
+  typically needs no criteria — it is gated by `outcome_space`. Do NOT bake a SQL
+  recipe, join, `kind_id`, or `city` here — that is PLAN's job (HOW).
 
 ### Security scope — role-aware customer-ownership deny
 

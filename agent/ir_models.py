@@ -85,9 +85,18 @@ class IntentSpec(BaseModel):
     params: dict[str, Any] = {}
     outcome_space: list[str]
     constraints: list[Constraint] = []
-    success_criteria: list[PredExpr] = []
+    success_criteria: dict[str, list[PredExpr]] = {}   # keyed by outcome
     answer_shape: AnswerShape
     required_refs: dict[str, list[RefSpec]] = {}   # keyed by outcome
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_success_criteria(cls, data):
+        # Migration: a bare list (legacy shape / persisted intent.json) means
+        # criteria for the positive outcome.
+        if isinstance(data, dict) and isinstance(data.get("success_criteria"), list):
+            data["success_criteria"] = {"OUTCOME_OK": data["success_criteria"]}
+        return data
 
 
 # --- PlanIR (SDD layer) ----------------------------------------------------

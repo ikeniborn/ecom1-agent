@@ -37,9 +37,11 @@ def verify(result: InterpretResult, intent: IntentSpec) -> tuple[bool, str]:
                 return False, (f"I3: security constraint {c.anchor!r} deny_when holds "
                                f"but outcome is {ans.outcome!r}, not DENIED_SECURITY")
 
-    # success_criteria: every PredExpr over env+answer must hold
-    for i, crit in enumerate(intent.success_criteria):
+    # success_criteria: only the criteria for the chosen outcome must hold.
+    # A valid negative outcome (e.g. OUTCOME_NONE_UNSUPPORTED) with no criteria
+    # passes here; it is still gated by I2 (outcome_space) above.
+    for i, crit in enumerate(intent.success_criteria.get(ans.outcome, [])):
         if not evaluate(crit, env):
-            return False, f"success_criteria[{i}] failed: {crit.model_dump()!r}"
+            return False, f"success_criteria[{ans.outcome}][{i}] failed: {crit.model_dump()!r}"
 
     return True, ""
