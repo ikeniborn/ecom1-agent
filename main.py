@@ -97,7 +97,7 @@ from connectrpc.errors import ConnectError
 
 from agent import run_agent
 from agent.learned_store import save_last_run, write_verdict
-from agent.pipeline import learn_from_grader
+from agent.pipeline import learn_from_grader, distill_from_grader
 from agent.trace import TraceLogger, set_trace
 
 BITGN_URL = os.getenv("BENCHMARK_HOST") or "https://api.bitgn.com"
@@ -320,6 +320,7 @@ def main() -> None:
             for row in scores:
                 task_id, score, detail, elapsed, token_stats = row
                 final_state[task_id] = (score, detail, elapsed, token_stats)
+                distill_from_grader(task_id, float(score), list(detail))
                 if score < 1.0:
                     next_filter.append(task_id)
                     if cycle < TRAIN_MAX_CYCLES:

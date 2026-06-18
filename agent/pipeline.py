@@ -207,6 +207,39 @@ def _maybe_distill_and_validate(intent, plan, task_id, outcome_note) -> None:
         print(f"{CLI_YELLOW}[pipeline] atom promote skipped: {e}{CLI_CLR}")
 
 
+def distill_from_grader(task_id: str, score: float, score_detail: list[str]) -> None:
+    """End-of-run self-fill: distill an ACTIVE polarity atom from the grader score.
+
+    pass (score >= 1.0) -> 'method' atom (effective knowledge);
+    fail (score < 1.0)  -> 'anti_pattern' atom (failure cause, steers away next run).
+
+    Uses the score already returned by SubmitRun — NOT a live grader round-trip
+    (ORACLE_VALIDATE_INLINE stays 0 by default). Never raises; the run result is
+    unchanged if distill yields nothing. Reads the persisted IntentSpec + PlanIR.
+    """
+    if os.environ.get("ORACLE_ENABLED", "1") == "0":
+        return
+    heur = Path("data/heuristics")
+    ip, pp = heur / f"{task_id}.intent.json", heur / f"{task_id}.plan.json"
+    if not (ip.exists() and pp.exists()):
+        return
+    try:
+        from .ir_models import IntentSpec, PlanIR
+        intent = IntentSpec.model_validate_json(ip.read_text(encoding="utf-8"))
+        plan = PlanIR.model_validate_json(pp.read_text(encoding="utf-8"))
+        if score >= 1.0:
+            note, polarity = "effective method (grader score 1.0)", "method"
+        else:
+            detail = " | ".join(s.strip() for s in score_detail if s.strip())
+            note, polarity = f"failure to avoid; grader: {detail}", "anti_pattern"
+        oracle = _new_oracle()
+        oracle.distill(design_intent=intent.objective, error=note,
+                       script_code=plan.model_dump_json(), source_task=task_id,
+                       polarity=polarity, status="active")
+    except Exception as e:
+        print(f"{CLI_YELLOW}[pipeline] distill_from_grader skipped: {e}{CLI_CLR}")
+
+
 # ---------------------------------------------------------------------------
 # Main entry — Plan-IR interpreter pipeline
 # ---------------------------------------------------------------------------

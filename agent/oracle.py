@@ -119,7 +119,8 @@ class KnowledgeOracle:
         save_atoms(self._path, self.atoms)
         return atom
 
-    def distill(self, design_intent, error, script_code, source_task=""):
+    def distill(self, design_intent, error, script_code, source_task="",
+                polarity="method", status="candidate"):
         user = (f"INTENT:\n{design_intent}\n\nERROR:\n{error}\n\n"
                 f"SCRIPT:\n{(script_code or '')[:4000]}\n\nReturn the atom JSON.")
         from .llm import _resolve_model_for_phase
@@ -130,8 +131,8 @@ class KnowledgeOracle:
         atom = Atom(id=out["id"], description=out.get("description", ""),
                     domain=list(out.get("domain") or []), content=out["content"],
                     source="distilled", validated_by="", validated_at="",
-                    status="candidate", embedding_hash=content_hash(out["content"]),
-                    source_task=source_task)
+                    status=status, embedding_hash=content_hash(out["content"]),
+                    source_task=source_task, polarity=polarity)
         return self.add_candidate(atom)
 
     def promote(self, atom_id, validated_by, validated_at):
