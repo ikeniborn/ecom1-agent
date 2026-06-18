@@ -4,7 +4,7 @@ entries:
     refs list, mapping each ref to the corresponding column from the rowset as indicated
     by the ref's source path.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: consolidated into the crisp authoritative r004
   id: r001
   reasoning: 'Error: interpret: unresolved required ref(s) [''$row.record_path'']
     on OK answer. Root cause: The PlanIR answer for the ''found'' branch has an empty
@@ -13,13 +13,13 @@ entries:
     the answer object in the ''found'' branch has "refs":[]. Rule linkage: This rule
     ensures the planner always populates the answer''s refs with all required refs,
     preventing unresolved ref errors.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Never include both a top-level 'answer' mapping and explicit answer ops
     in the same PlanIR; use only one method to define answers.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: consolidated into the crisp authoritative r004
   id: r002
   reasoning: 'Error ''real_vm: answer already provided'' indicates duplicate answer
     attempts. The PlanIR contains both a top-level ''answer'' object (mapping labels
@@ -27,7 +27,7 @@ entries:
     auto-generates answers from the top-level mapping, causing a conflict when explicit
     ops also try to provide answers. The fix is to remove the top-level ''answer''
     mapping and rely solely on explicit answer ops, or vice versa.'
-  status: active
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-18'
@@ -72,28 +72,26 @@ entries:
   status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: 'For a catalogue existence/identification query the product may be PRESENT
-    or ABSENT (data is re-seeded each run); BOTH cases answer OUTCOME_OK. INTENT:
-    keep required_refs[OUTCOME_OK] EMPTY — the record_path is CONDITIONAL grounding
-    supplied by PLAN only on the found branch; keep outcome_space [OUTCOME_OK]. PLAN:
-    match brand/model/variant properties NORMALIZED (LOWER and TRIM, LIKE for a partial
-    model token) in a rowset that selects the record_path column; compute match_count
-    = count(rows) and first_record = first(rows); decision branches on (match_count
-    ge 1) -> label found else label absent; answer.found message MUST contain the
-    literal token <YES> and refs = [$first_record.record_path]; answer.absent message
-    MUST contain the literal token <NO> and refs = []; read single-record fields with
-    get, never column on a single record.'
+  content: 'Catalogue existence query — the product may be PRESENT or ABSENT (re-seeded);
+    BOTH answer OUTCOME_OK. MATCH MINIMALLY: brand + ONE distinctive model/series
+    token via normalized LIKE (LOWER/TRIM) on a SHORT fragment; do NOT add variant-property
+    JOINs/EXISTS unless a single token is genuinely insufficient — over-constraining
+    yields a false 0-row ''absent'' for a present product. SELECT the record_path
+    column. COMPUTE match_count = count(rows); first_record = first(rows). DECIDE:
+    match_count ge 1 -> label found, else label absent. ANSWER (single top-level answer
+    mapping, NO Answer op in ops): found.message contains the literal token <YES>
+    and found.refs = [$first_record.record_path]; absent.message contains the literal
+    token <NO> and absent.refs = []. INTENT: required_refs[OUTCOME_OK] = [] (the record_path
+    is CONDITIONAL, authored per-branch by PLAN); outcome_space = [OUTCOME_OK]. Read
+    single-record fields with get, never column.'
   created: '2026-06-18'
   deactivated_reason: null
   id: r004
-  reasoning: 'Method-not-value rule (F6, extended for present/absent re-seeding).
-    t01 is a yes/no existence query whose product is sometimes absent; both cases
-    are OUTCOME_OK. The record_path ref is CONDITIONAL — needed only on the found
-    branch — so it is AUTHORED on answer.found.refs (interpreter resolves best-effort,
-    drops it when absent) rather than statically required, which would refuse the
-    absent case. Pairs with the learn-aware INTENT channel + F1/F2. Verdicts: present
-    needs /proc/catalog/<sku>.json (v001/v004); absent needs literal <NO> (v005);
-    absent stays OUTCOME_OK not UNSUPPORTED (v002).'
+  reasoning: Consolidated authoritative t01 method (folds r001 refs, r002/r005 single-answer,
+    r006 minimal-match). Single crisp rule to maximize PLAN compliance — prior multi-rule
+    set produced over-constrained SQL (false absent) and a drifted answer binding
+    ($matched_path). Encodes Lever-1 (INTENT required_refs empty, conditional) + Lever-2
+    (per-branch authored record_path) + minimal-distinctive matching.
   status: active
   surface: ir
 - content: null
@@ -125,7 +123,7 @@ entries:
     exists for the target decision label, so the interpreter uses the top-level template
     and projects required_refs instead of applying empty op args.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: consolidated into the crisp authoritative r004
   id: r005
   reasoning: 'Error ''real_vm: answer must be non empty'' with verdict ''answer missing
     required reference ''/proc/catalog/FST-3SJKL8BF.json'''' shows the final answer
@@ -136,7 +134,7 @@ entries:
     empty args, overriding the top-level answer template and bypassing required_refs
     projection. Removing the Answer op from ops lets the interpreter synthesize the
     answer solely from the top-level mapping and populate refs from required_refs.'
-  status: active
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-18'
@@ -152,12 +150,13 @@ entries:
   submitted_refs: []
 - content: null
   created: '2026-06-18'
+  deactivated_reason: superseded by newer verdict
   id: v006
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/STO-2R84BSHQ.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Product exists in catalogue: <NO>'
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
@@ -172,7 +171,7 @@ entries:
     column (or sample the table) first to learn it, then match normalized (LOWER/TRIM).
     Only after a non-empty match should the found/absent decision be trusted.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: consolidated into the crisp authoritative r004
   id: r006
   reasoning: 'Run v006: a present product (STO-2R84BSHQ) scored 0 because the PLAN
     over-constrained (brand AND name/series/model token AND a storage_type property
@@ -180,8 +179,19 @@ entries:
     wrong <NO>. The ref-plumbing was correct; the matching was too strict. Method
     rule: minimal-distinctive-attribute matching + probe-before-constrain, so a present
     product is found and the conditional record_path grounds. Survives re-seeding.'
-  status: active
+  status: inactive
   surface: ir
+- content: null
+  created: '2026-06-18'
+  id: v007
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/FST-1HE3ZSQ6.json'
+  source: verdict
+  status: active
+  submitted_message: Catalog query completed. <NO>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
 last_run:
   cycles_used: 1
   date: '2026-06-18'
