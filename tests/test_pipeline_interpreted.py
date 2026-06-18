@@ -264,6 +264,29 @@ def test_answer_once_suppresses_second_answer():
     assert kw["outcome"] == "OUTCOME_OK" and kw["message"] == "first"
 
 
+def test_ok_with_unresolved_required_ref_never_submits_ok(monkeypatch):
+    # F5 lock: an OUTCOME_OK whose required record_path ref cannot resolve must refuse
+    # inside interpret (mutation_landed False) and route to CLARIFICATION — never submit a
+    # broken OK. Locks F1-F4 against regressions.
+    from agent import pipeline
+    monkeypatch.setattr(pipeline, "_IMAX_STEPS", 2)
+    intent = json.dumps({
+        "objective": "o", "desired_outcome": "d", "params": {},
+        "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
+        "constraints": [], "success_criteria": [], "answer_shape": {},
+        "required_refs": {"OUTCOME_OK": [{"kind": "record_path", "source": "$missing"}]},
+    })
+    learn = json.dumps({"rule_content": "Always bind the record_path ref for OK answers",
+                        "reasoning": "x", "deactivate_ids": [], "skip": False})
+    vm = MagicMock(); vm.exec.return_value = {"stdout": "cnt\n5"}
+    seq = [intent, _PLAN, learn, _PLAN, learn]
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(*seq)):
+        m = run_pipeline(vm, instruction="x", task_id="t_f5", agents_md_text="A")
+    assert m["outcome"] == "OUTCOME_NONE_CLARIFICATION"
+    vm.answer.assert_called_once()
+    assert vm.answer.call_args.kwargs["outcome"] != "OUTCOME_OK"
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader
