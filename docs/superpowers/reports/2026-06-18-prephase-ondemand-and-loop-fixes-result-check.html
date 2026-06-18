@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Result Check — Prephase On-Demand + Loop/Oracle Fixes</title>
+<style>
+  :root[data-theme="dark"]{
+    --bg:#0f1117; --panel:#171a22; --panel2:#1d212b; --fg:#e6e9ef; --muted:#9aa3b2;
+    --border:#2a2f3a; --accent:#6ea8fe; --ok:#3fb950; --warn:#d29922; --info:#58a6ff;
+    --crit:#f85149; --chip:#222834; --shadow:rgba(0,0,0,.45);
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#f0f3f6; --fg:#1f2328; --muted:#57606a;
+    --border:#d0d7de; --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --info:#0969da;
+    --crit:#cf222e; --chip:#eaeef2; --shadow:rgba(140,149,159,.2);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 20px 80px}
+  header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  h1{font-size:24px;margin:0 0 4px}
+  h2{font-size:18px;margin:34px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .sub{color:var(--muted);font-size:13px}
+  .toggle{cursor:pointer;border:1px solid var(--border);background:var(--panel);color:var(--fg);
+    border-radius:8px;padding:8px 12px;font-size:13px}
+  .toggle:hover{border-color:var(--accent)}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:16px 18px;box-shadow:0 1px 3px var(--shadow)}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  @media(max-width:720px){.g2{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  tr:last-child td{border-bottom:none}
+  code{background:var(--chip);padding:1px 6px;border-radius:5px;font-size:13px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;
+    border:1px solid transparent}
+  .b-ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,transparent);border-color:var(--ok)}
+  .b-warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent);border-color:var(--warn)}
+  .b-info{color:var(--info);background:color-mix(in srgb,var(--info) 16%,transparent);border-color:var(--info)}
+  .b-crit{color:var(--crit);background:color-mix(in srgb,var(--crit) 16%,transparent);border-color:var(--crit)}
+  .stat{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 0}
+  .stat .num{font-size:30px;font-weight:800;line-height:1}
+  .stat .lbl{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .stat>div{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:96px}
+  .chain{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
+  .chain .node{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 12px}
+  .chain .arr{color:var(--accent);font-weight:800}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:4px 14px;font-size:14px}
+  .kv .k{color:var(--muted)}
+  ul.tight{margin:6px 0;padding-left:20px}
+  ul.tight li{margin:3px 0}
+  .verdict{font-size:20px;font-weight:800;color:var(--ok)}
+  details{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin:6px 0}
+  summary{cursor:pointer;font-weight:600}
+  .fixopt{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Result Check — Prephase On-Demand + Loop/Oracle Fixes</h1>
+    <div class="sub">Сверка результатов выполнения плана с цепочкой IDD → SDD · 2026-06-18</div>
+  </div>
+  <button class="toggle" id="tg" aria-label="Переключить тему">🌗 Тема</button>
+</header>
+
+<h2>Резюме сверки</h2>
+<div class="panel">
+  <div class="kv">
+    <div class="k">Plan</div><div><code>docs/superpowers/plans/2026-06-18-prephase-ondemand-and-loop-fixes.md</code></div>
+    <div class="k">Spec</div><div><code>docs/superpowers/specs/2026-06-17-prephase-ondemand-and-loop-fixes-design.md</code></div>
+    <div class="k">Intent</div><div><code>docs/superpowers/intents/2026-06-16-prephase-ondemand-and-loop-fixes-intent.md</code></div>
+    <div class="k">База diff</div><div><code>git diff 099ee0d..HEAD</code> — 27 файлов. <code>git diff HEAD</code> пуст: работа закоммичена в 8 коммитах.</div>
+    <div class="k">Plan hash</div><div><code>8fd374c1e32773eb</code></div>
+  </div>
+  <div style="margin-top:14px" class="chain">
+    <span class="node">Intent · 2026-06-16</span><span class="arr">→</span>
+    <span class="node">Spec · 2026-06-17</span><span class="arr">→</span>
+    <span class="node">Plan · 2026-06-18</span>
+  </div>
+</div>
+
+<h2>Покрытие шагов плана (7 задач)</h2>
+<div class="panel">
+  <div class="stat">
+    <div><div class="num" style="color:var(--ok)">6</div><div class="lbl">DONE</div></div>
+    <div><div class="num" style="color:var(--warn)">1</div><div class="lbl">PARTIAL</div></div>
+    <div><div class="num" style="color:var(--crit)">0</div><div class="lbl">MISSING</div></div>
+  </div>
+  <table style="margin-top:14px">
+    <thead><tr><th>Задача / блок</th><th>Статус</th><th>Свидетельство в diff</th></tr></thead>
+    <tbody>
+      <tr><td>Задача 1 (Block A) — тонкий prephase + AGENTS.MD inventory</td><td><span class="badge b-ok">DONE</span></td><td><code>agents_md_parser.py</code> (+35), <code>orchestrator.py</code> (+5), <code>reason.py</code>, <code>test_reason.py</code></td></tr>
+      <tr><td>Задача 2 (Block C-models) — Atom polarity + split-рендер</td><td><span class="badge b-ok">DONE</span></td><td><code>oracle_atoms.py</code> (+18)</td></tr>
+      <tr><td>Задача 3 (Block B) — seed atoms.yaml + миграция теста</td><td><span class="badge b-ok">DONE</span></td><td><code>data/oracle/atoms.yaml</code> (+39), <code>test_oracle_seed.py</code></td></tr>
+      <tr><td>Задача 4 (Block C-seam) — distill polarity/status + self-fill</td><td><span class="badge b-ok">DONE</span></td><td><code>oracle.py</code>, <code>pipeline.py</code> (+33), <code>main.py</code> (+3)</td></tr>
+      <tr><td>Задача 5 (Block D) — verify keyed by outcome</td><td><span class="badge b-ok">DONE</span></td><td><code>ir_models.py</code> (+11), <code>verify.py</code>, <code>intent.md</code> (+16), <code>test_ir_models.py</code></td></tr>
+      <tr><td>Задача 6 (Block E) — IR op list + auto-repair</td><td><span class="badge b-ok">DONE</span></td><td><code>plan.md</code> (+23), <code>reason.py</code> (_repair_plan_dict)</td></tr>
+      <tr><td>Задача 7 (Acceptance) — Steps 6–7 (docs)</td><td><span class="badge b-ok">DONE</span></td><td><code>docs/wiki/*</code> — oracle/pipeline/interpreter/data-files обновлены</td></tr>
+      <tr><td>Задача 7 (Acceptance) — Steps 1–5 (живой прогон)</td><td><span class="badge b-warn">PARTIAL</span></td><td>Отложено пользователем; действие не порождает git diff</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Findings</h2>
+<div class="panel grid">
+  <table>
+    <thead><tr><th>Severity</th><th>Шаг / область</th><th>Plan</th><th>Diff</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge b-warn">WARNING</span></td>
+        <td>Задача 7, Steps 1–5 (Acceptance)</td>
+        <td>Живой <code>make task TASKS='t01'</code> → OUTCOME_OK, замер PLAN-промпта, инъекция атома, regression spot-check ≥2 задач, дельта LLM-вызовов.</td>
+        <td>Свидетельств нет — прогон бенчмарка не порождает git diff; отложено пользователем.</td>
+      </tr>
+      <tr>
+        <td><span class="badge b-warn">WARNING</span></td>
+        <td>Excess — docs/wiki/</td>
+        <td>Step 6 называет регенерацию только oracle/pipeline/interpreter/data-files.</td>
+        <td>Впервые добавлены в трекинг ещё 6 страниц (architecture, learning, llm, proto-api, tooling, vm) + <code>.iwiki/index.jsonl</code>, <code>log.jsonl</code> — весь <code>docs/wiki/</code> был untracked.</td>
+      </tr>
+      <tr>
+        <td><span class="badge b-info">INFO</span></td>
+        <td>Block A — policies (план F-001, open)</td>
+        <td>Spec §94: «компактная сводка security deny-rules», глоссарий политик не инжектится целиком.</td>
+        <td>Реализация инжектит полный текст <code>policies</code> в INTENT-tier через <code>_INTENT_KEYS</code> без компакции.</td>
+      </tr>
+      <tr>
+        <td><span class="badge b-info">INFO</span></td>
+        <td>Доп. фикс вне нумерованного шага</td>
+        <td>Соответствует дизайну Block A: policies убраны из PLAN-tier, добираются on-demand.</td>
+        <td><code>data/prompts/plan.md</code> (коммит <code>1081fdd</code>) — чтение управляющей <code>/docs</code> политики через discovery вместо <code>facts.policies</code>. Найдено финальным интеграционным ревью.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div>
+    <details><summary>Fix options — WARNING: живой прогон</summary>
+      <ul class="tight fixopt"><li>(1) Пользователь запускает <code>LOG_LEVEL=DEBUG make task TASKS='t01'</code> и сверяет гейты.</li><li>(2) Предоставить креды/сеть и прогнать в сессии.</li></ul>
+    </details>
+    <details><summary>Fix options — WARNING: excess wiki</summary>
+      <ul class="tight fixopt"><li>(1) Принять — первичный коммит ранее untracked каталога <code>docs/wiki/</code>.</li><li>(2) При желании исключить <code>index.jsonl</code> из трекинга через <code>.gitignore</code>.</li></ul>
+    </details>
+    <details><summary>Fix options — INFO: policies compaction</summary>
+      <ul class="tight fixopt"><li>(1) Follow-up — компактировать policies для INTENT-tier.</li><li>(2) Принять как осознанное отклонение (PLAN-tier shrink — основная цель — достигнут).</li></ul>
+    </details>
+    <details><summary>Fix options — INFO: доп. фикс plan.md</summary>
+      <ul class="tight fixopt"><li>Принять — это корректность фичи (реконсиляция Block A + Block E).</li></ul>
+    </details>
+  </div>
+</div>
+
+<h2>Покрытие Intent / Spec</h2>
+<div class="grid g2">
+  <div class="panel">
+    <strong>Desired Outcomes — 5/6 со свидетельством</strong>
+    <table style="margin-top:10px">
+      <tbody>
+        <tr><td>#1 t01 → OUTCOME_OK</td><td><span class="badge b-warn">код есть, рантайм не верифицирован</span></td></tr>
+        <tr><td>#2 PLAN адресует tools/каталоги из AGENTS.MD без полного документа</td><td><span class="badge b-ok">✓</span></td></tr>
+        <tr><td>#3 Тонкий prephase, PLAN-промпт меньше, данные через discovery</td><td><span class="badge b-ok">✓ механизм</span></td></tr>
+        <tr><td>#4 Оракул непустой, ≥1 атом инжектится</td><td><span class="badge b-ok">✓</span></td></tr>
+        <tr><td>#5 Валидный OUTCOME_NONE_UNSUPPORTED проходит verify</td><td><span class="badge b-ok">✓</span></td></tr>
+        <tr><td>#6 IR-syntax ошибки не жгут циклы</td><td><span class="badge b-ok">✓</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <strong>Spec requirements — 5/5 (Блоки A–E)</strong>
+    <ul class="tight">
+      <li>Block A — тиринг фактов + inventory ✓</li>
+      <li>Block B — seed probe-then-refine ✓</li>
+      <li>Block C — polarity + self-fill ✓</li>
+      <li>Block D — keyed verify ✓</li>
+      <li>Block E — op list + auto-repair ✓</li>
+    </ul>
+    <div class="sub" style="margin-top:8px">Verification plan (живой прогон) — отложен. «Измеримо меньше» PLAN-промпт: механизм + DEBUG-замер на месте, величина требует прогона.</div>
+  </div>
+</div>
+
+<h2>Сводка</h2>
+<div class="panel">
+  <div class="stat">
+    <div><div class="num" style="color:var(--crit)">0</div><div class="lbl">CRITICAL</div></div>
+    <div><div class="num" style="color:var(--warn)">2</div><div class="lbl">WARNING</div></div>
+    <div><div class="num" style="color:var(--info)">2</div><div class="lbl">INFO</div></div>
+  </div>
+  <p style="margin:16px 0 4px"><span class="verdict">Вердикт: OK</span></p>
+  <p class="sub">Критических MISSING-шагов нет. Все шаги кода/сидов/промптов (Задачи 1–6) и документация (Задача 7, Steps 6–7) присутствуют в diff. Единственный непокрытый пункт — отложенный пользователем живой acceptance-прогон, который по своей природе не порождает git diff.</p>
+</div>
+
+<p class="sub" style="margin-top:28px">Chain: intent (2026-06-16) → spec (2026-06-17) → plan (2026-06-18)</p>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  var saved=null;
+  try{saved=localStorage.getItem("rc-theme")}catch(e){}
+  root.setAttribute("data-theme", saved || "dark");
+  document.getElementById("tg").addEventListener("click",function(){
+    var cur=root.getAttribute("data-theme")==="dark"?"light":"dark";
+    root.setAttribute("data-theme",cur);
+    try{localStorage.setItem("rc-theme",cur)}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Архитектура агента ecom1 — Plan-IR интерпретатор</title>
+<style>
+  /* ---- Theme custom properties ---- */
+  :root{
+    --bg:#f6f7fb; --surface:#ffffff; --fg:#2b2b3a; --muted:#6b6b80;
+    --accent:#5c6bc0; --accent-2:#3949ab;
+    --border:#d6d8e6; --line:#9aa0b4; --zebra:#eef0f8;
+    --ok:#43a047; --ok-2:#2e7d32; --warn:#fb8c00; --warn-2:#ef6c00;
+    --danger:#e53935; --danger-2:#c62828;
+    --shadow:rgba(40,40,80,.18);
+  }
+  body:has(#theme-toggle:checked){
+    --bg:#181825; --surface:#262637; --fg:#cdd6f4; --muted:#a6adc8;
+    --accent:#89b4fa; --accent-2:#5e95f0;
+    --border:#3a3b52; --line:#6c7086; --zebra:#21222f;
+    --ok:#a6e3a1; --ok-2:#74c46e; --warn:#f9e2af; --warn-2:#f5c95b;
+    --danger:#f38ba8; --danger-2:#e8638a;
+    --shadow:rgba(0,0,0,.45);
+  }
+  body{
+    margin:0 auto; padding:1.5rem 2rem 4rem; max-width:1080px;
+    font:16px/1.55 system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb,var(--accent) 10%, transparent), transparent),
+      var(--bg);
+    color:var(--fg);
+    transition:background .3s, color .3s;
+  }
+  .theme-btn{
+    position:sticky; top:.5rem; float:right; z-index:10;
+    cursor:pointer; user-select:none;
+    padding:.3rem .65rem; border:1px solid var(--border); border-radius:8px;
+    background:var(--surface); box-shadow:0 2px 8px var(--shadow);
+  }
+  h1{ color:var(--accent); margin-bottom:.2rem; font-size:2rem; }
+  h1 + .sub{ margin-top:0; }
+  h2{
+    color:var(--fg); margin-top:2.6rem; font-size:1.35rem;
+    padding-left:.7rem; border-left:5px solid var(--accent); border-radius:2px;
+  }
+  h3{ color:var(--fg); margin-top:1.6rem; font-size:1.08rem; }
+  code{ background:var(--zebra); padding:.1rem .35rem; border-radius:4px; font-size:.86em; }
+  .sub{ color:var(--muted); font-size:.95rem; }
+  .lead{ font-size:1.08rem; }
+
+  /* ---- Diagram frame ---- */
+  figure.diagram{ margin:1.2rem 0; }
+  figure.diagram svg{ width:100%; height:auto; display:block; overflow:visible; }
+  figcaption{ color:var(--muted); font-size:.85rem; margin-top:.35rem; text-align:center; }
+
+  /* ---- SVG node primitives ---- */
+  .card{ fill:var(--surface); stroke:var(--border); stroke-width:1.5; filter:url(#dropshadow); transition:stroke .15s, stroke-width .15s; }
+  .node:hover .card{ stroke:var(--accent); stroke-width:2.5; }
+  .bar-accent{ fill:var(--accent); } .bar-ok{ fill:var(--ok); }
+  .bar-warn{ fill:var(--warn); } .bar-term{ fill:var(--danger); }
+  .t-title{ fill:var(--fg); font:600 14px system-ui, sans-serif; }
+  .t-sub{ fill:var(--muted); font:11px system-ui, sans-serif; }
+  .t-mono{ font-family:ui-monospace, monospace; }
+  text{ pointer-events:none; }
+
+  .conn{ fill:none; stroke:var(--line); stroke-width:2; }
+  .conn-a{ fill:none; stroke:var(--accent); stroke-width:2; stroke-dasharray:5 5; }
+  .flow{ fill:none; stroke:var(--accent); stroke-width:2.6; stroke-dasharray:8 6; animation:dash 1.1s linear infinite; }
+  .flow-ok{ fill:none; stroke:var(--ok); stroke-width:2.6; stroke-dasharray:8 6; animation:dash 1.1s linear infinite; }
+  .flow-warn{ fill:none; stroke:var(--warn); stroke-width:2.6; stroke-dasharray:8 6; animation:dash 1.1s linear infinite; }
+  .conn-term{ fill:none; stroke:var(--danger); stroke-width:2.2; }
+  @keyframes dash{ to{ stroke-dashoffset:-14; } }
+  @media (prefers-reduced-motion: reduce){ .flow,.flow-ok,.flow-warn{ animation:none; } }
+
+  .lbl-bg{ fill:var(--bg); }
+  .lbl{ fill:var(--fg); font:11px system-ui, sans-serif; }
+  .boundary-rect{ fill:none; stroke:var(--accent); stroke-width:1.6; stroke-dasharray:7 6; opacity:.85; }
+
+  /* ---- Table ---- */
+  .rpt-table{ border-collapse:separate; border-spacing:0; width:100%; background:var(--surface);
+    margin:1rem 0; font-size:.92rem; border:1px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 2px 12px var(--shadow); }
+  .rpt-table th, .rpt-table td{ border-bottom:1px solid var(--border); padding:.5rem .75rem; text-align:left; vertical-align:top; }
+  .rpt-table tbody tr:last-child td{ border-bottom:none; }
+  .rpt-table thead th{ background:var(--accent); color:var(--bg); position:sticky; top:0; }
+  .rpt-table tbody tr:nth-child(even){ background:var(--zebra); }
+  .rpt-table tbody tr:hover{ background:color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+  .rpt-table td code{ white-space:nowrap; }
+
+  /* ---- C4 ---- */
+  .rpt-c4 .boundary{
+    border:1.6px dashed var(--accent); border-radius:12px;
+    padding:1.8rem 1rem 1rem; margin:.7rem 0; position:relative;
+    display:flex; flex-wrap:wrap; gap:.6rem;
+    background:color-mix(in srgb, var(--accent) 5%, transparent);
+  }
+  .rpt-c4 .boundary::before{
+    content:attr(data-label); position:absolute; top:-.7rem; left:.9rem;
+    background:var(--bg); padding:0 .45rem; font-size:.8rem; color:var(--accent); font-weight:600;
+  }
+  .rpt-c4 .comp{
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    padding:.55rem .85rem; min-width:6rem; font-size:.85rem; box-shadow:0 1px 6px var(--shadow);
+    border-left:4px solid var(--accent);
+  }
+  .rpt-c4 .comp b{ color:var(--accent); }
+  .rpt-c4 .boundary.tier-thin .comp{ border-left-color:var(--ok); }
+  .rpt-c4 .boundary.tier-thin .comp b{ color:var(--ok-2); }
+  .rpt-c4 .comp.dropped{ border-left-color:var(--danger); opacity:.85; }
+  .rpt-c4 .comp.dropped b{ color:var(--danger-2); }
+
+  details{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:.7rem 1rem; margin:.7rem 0; box-shadow:0 1px 8px var(--shadow); }
+  details summary{ cursor:pointer; font-weight:600; color:var(--accent); }
+  details[open] summary{ margin-bottom:.55rem; }
+  ul.tight li{ margin:.28rem 0; }
+  .note{ border-left:4px solid var(--accent); padding:.55rem 1rem; background:color-mix(in srgb,var(--accent) 8%, var(--surface)); border-radius:0 8px 8px 0; margin:1rem 0; box-shadow:0 1px 8px var(--shadow); }
+  .note.ok{ border-left-color:var(--ok); background:color-mix(in srgb,var(--ok) 9%, var(--surface)); }
+  .note.warn{ border-left-color:var(--warn); background:color-mix(in srgb,var(--warn) 10%, var(--surface)); }
+
+  .badge{ display:inline-block; font-size:.72rem; padding:.05rem .5rem; border-radius:999px; border:1px solid var(--border); }
+  .badge.llm{ color:var(--warn-2); border-color:var(--warn); }
+  .badge.det{ color:var(--ok-2); border-color:var(--ok); }
+  .badge.apply{ color:var(--ok-2); border-color:var(--ok); }
+  .badge.avoid{ color:var(--danger-2); border-color:var(--danger); }
+
+  .cols2{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  @media (max-width:760px){ .cols2{ grid-template-columns:1fr; } }
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:.8rem 1rem; box-shadow:0 1px 8px var(--shadow); }
+  .panel h4{ margin:.1rem 0 .5rem; color:var(--accent); font-size:1rem; }
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="theme-toggle" hidden>
+<label for="theme-toggle" class="theme-btn" title="Переключить тему">🌙 / ☀️</label>
+
+<!-- Shared SVG defs (filters + arrow markers) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="dropshadow" x="-20%" y="-20%" width="140%" height="160%">
+    <feDropShadow dx="0" dy="2.5" stdDeviation="3.5" flood-color="var(--shadow)" flood-opacity="1"/>
+  </filter>
+  <marker id="arr"  markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="9" refY="4" orient="auto">
+    <path d="M0,0 L9,4 L0,8 Z" fill="var(--line)"/></marker>
+  <marker id="arrA" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="9" refY="4" orient="auto">
+    <path d="M0,0 L9,4 L0,8 Z" fill="var(--accent)"/></marker>
+  <marker id="arrOk" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="9" refY="4" orient="auto">
+    <path d="M0,0 L9,4 L0,8 Z" fill="var(--ok)"/></marker>
+  <marker id="arrWarn" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="9" refY="4" orient="auto">
+    <path d="M0,0 L9,4 L0,8 Z" fill="var(--warn)"/></marker>
+  <marker id="arrTerm" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="9" refY="4" orient="auto">
+    <path d="M0,0 L9,4 L0,8 Z" fill="var(--danger)"/></marker>
+</defs></svg>
+
+<main class="report">
+
+<h1>Архитектура агента ecom1</h1>
+<p class="sub">Plan-IR интерпретатор · ветка <code>heuristics</code> · обновлено 2026-06-18 · источники: <code>CLAUDE.md</code>, <code>agent/CLAUDE.md</code>, <code>agent/*.py</code>, <code>docs/wiki/</code></p>
+<p class="lead">Детерминированный <b>Plan-IR интерпретатор</b>. Одна задача — один проход:
+<code>INTENT → loop[PLAN → auto-repair → lint → interpret → verify] → answer-once</code>.
+Единственный quality-gate — детерминированный <code>verify()</code>. Агент <b>не</b> грузит все данные заранее:
+INTENT получает полный контекст один раз, PLAN — тонкий, а тяжёлые данные добираются
+<b>по запросу</b> через IR <code>discovery</code>-шаги. Знания копятся в <b>двух контурах</b>:
+правила задачи (<code>data/learned</code>) и общие знания оракула (<code>data/oracle</code>) с полярностью
+«метод / анти-паттерн» на успехах и провалах.</p>
+
+<div class="note">
+<b>Ключевой инвариант:</b> <code>vm.answer(...)</code> вызывается <b>ровно один раз</b> за задачу —
+успешный путь или один терминальный <code>OUTCOME_NONE_CLARIFICATION</code>.
+</div>
+
+<!-- ============ C4 ============ -->
+<h2>1. Контейнеры и компоненты</h2>
+<figure class="rpt-c4">
+  <div class="boundary" data-label="Система · BitGN harness">
+    <div class="comp"><b>main.py</b><br><span class="sub">точка входа · StartRun/SubmitRun · training-loop · distill_from_grader</span></div>
+
+    <div class="boundary" data-label="agent/ · Plan-IR pipeline">
+      <div class="comp"><b>orchestrator.py</b><br><span class="sub">run_agent(): VM open · /AGENTS.MD · pre-phase facts</span></div>
+      <div class="comp"><b>agents_md_parser.py</b><br><span class="sub">parse + render_inventory (0 LLM)</span></div>
+      <div class="comp"><b>pipeline.py</b><br><span class="sub">run_pipeline(): INTENT + LOOP + LEARN + self-fill</span></div>
+      <div class="comp"><b>reason.py</b><br><span class="sub">run_intent / run_plan · tiered facts · IR auto-repair</span></div>
+      <div class="comp"><b>interpreter.py</b><br><span class="sub">lint + interpret (no LLM)</span></div>
+      <div class="comp"><b>verify.py</b><br><span class="sub">детерм. quality-gate · keyed by outcome</span></div>
+      <div class="comp"><b>oracle*.py</b><br><span class="sub">retrieve / distill / validate / promote · polarity</span></div>
+      <div class="comp"><b>learned_store.py</b><br><span class="sub">data/learned/*.yaml</span></div>
+      <div class="comp"><b>llm.py</b><br><span class="sub">провайдер-роутинг + tier-resolution</span></div>
+    </div>
+
+    <div class="boundary" data-label="Внешнее окружение · VM">
+      <div class="comp"><b>VM RPC</b><br><span class="sub">ECOM / PCM сервисы · SQL · файлы</span></div>
+      <div class="comp"><b>bitgn/</b><br><span class="sub">protobuf-стабы (из proto/)</span></div>
+    </div>
+  </div>
+</figure>
+
+<!-- ============ Information & tools ============ -->
+<h2>2. Обработка доступной информации и инструментов</h2>
+<p><code>orchestrator.py:run_agent()</code> до пайплайна открывает VM, читает <code>/AGENTS.MD</code> напрямую и собирает <code>facts</code>.
+Из <code>/AGENTS.MD</code> детерминированно (0 LLM) строится <b>инвентарь инструментов и каталогов</b>
+(<code>render_inventory</code>): <code>tools/rpcs:</code> — доступные RPC/инструменты, <code>catalog/paths:</code> —
+каталожные/файловые пути. Это компактная замена многословного документа.</p>
+<figure class="diagram">
+<svg viewBox="0 0 920 96" role="img" aria-label="Поток сбора pre-phase фактов">
+  <path class="flow" marker-end="url(#arrA)" d="M170,46 H191"/>
+  <path class="flow" marker-end="url(#arrA)" d="M355,46 H376"/>
+  <path class="flow" marker-end="url(#arrA)" d="M540,46 H561"/>
+  <path class="flow" marker-end="url(#arrOk)" d="M725,46 H746"/>
+  <g class="node"><rect class="card" x="10"  y="18" width="160" height="56" rx="12"/><rect class="bar-accent" x="18" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="95"  y="42" text-anchor="middle">AGENTS.MD</text><text class="t-sub" x="95"  y="60" text-anchor="middle">→ inventory</text></g>
+  <g class="node"><rect class="card" x="195" y="18" width="160" height="56" rx="12"/><rect class="bar-accent" x="203" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="275" y="42" text-anchor="middle">DOC_SELECT</text><text class="t-sub" x="275" y="60" text-anchor="middle">LLM · fast · schema</text></g>
+  <g class="node"><rect class="card" x="380" y="18" width="160" height="56" rx="12"/><rect class="bar-accent" x="388" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="460" y="42" text-anchor="middle">identity</text><text class="t-sub" x="460" y="60" text-anchor="middle">кто исполнитель</text></g>
+  <g class="node"><rect class="card" x="565" y="18" width="160" height="56" rx="12"/><rect class="bar-accent" x="573" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="645" y="42" text-anchor="middle">listings</text><text class="t-sub" x="645" y="60" text-anchor="middle">dirs + sampling</text></g>
+  <g class="node"><rect class="card" x="750" y="18" width="160" height="56" rx="12"/><rect class="bar-ok" x="758" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="830" y="42" text-anchor="middle">facts</text><text class="t-sub" x="830" y="60" text-anchor="middle">→ tiering</text></g>
+</svg>
+<figcaption>Tier-2 семплинг: <code>PREPHASE_SAMPLE_ROWS</code> / <code>_ROW_CHARS</code>; листинги: <code>PREPHASE_LISTING_BYTES</code>; пути: <code>PREPHASE_PATH_LITERALS</code>.</figcaption>
+</figure>
+
+<h3>Tiering фактов — кто что видит</h3>
+<p>Раньше <code>_facts_block</code> инжектил <i>все</i> факты в INTENT и в <b>каждый</b> PLAN-цикл (27–29 K символов, пересылаемых заново → context drift).
+Теперь факты режутся по фазам: INTENT (один frozen-вызов) получает полный набор; PLAN (повторяется) — тонкий, тяжёлые данные добираются по запросу.</p>
+<figure class="rpt-c4">
+  <div class="boundary" data-label="INTENT-tier · полный · 1 frozen-вызов">
+    <div class="comp"><b>agents_md_inventory</b></div>
+    <div class="comp"><b>schema</b> DDL</div>
+    <div class="comp"><b>identity</b></div>
+    <div class="comp"><b>docs_inventory</b></div>
+    <div class="comp"><b>policies</b><br><span class="sub">security deny-rules</span></div>
+  </div>
+  <div class="boundary tier-thin" data-label="PLAN-tier · тонкий · повторяется каждый цикл">
+    <div class="comp"><b>agents_md_inventory</b></div>
+    <div class="comp"><b>schema</b> DDL</div>
+    <div class="comp"><b>identity</b></div>
+    <div class="comp"><b>docs_inventory</b><br><span class="sub">список путей</span></div>
+    <div class="comp dropped"><b>policies ✗</b></div>
+    <div class="comp dropped"><b>sample_rows ✗</b></div>
+    <div class="comp dropped"><b>target_records ✗</b></div>
+    <div class="comp dropped"><b>path_listings ✗</b></div>
+    <div class="comp dropped"><b>full agents_md ✗</b></div>
+  </div>
+</figure>
+<p class="sub"><code>_facts_block(facts, tier)</code>: <code>run_intent</code> → <code>tier="intent"</code>, <code>run_plan</code> → <code>tier="plan"</code>.
+Красные блоки выброшены из upfront-инъекции PLAN и добираются через <code>discovery</code>. При <code>LOG_LEVEL=DEBUG</code> <code>run_plan</code> печатает размер PLAN-промпта.</p>
+<div class="note ok"><b>Цель:</b> PLAN-промпт для <code>t01</code> падает с ~28 K до &lt; ~10 K символов — главный рычаг против context drift.</div>
+
+<!-- ============ Pipeline flow ============ -->
+<h2>3. Поток выполнения задачи</h2>
+<figure class="diagram">
+<svg viewBox="0 0 920 520" role="img" aria-label="Главный поток: INTENT, цикл, ответ">
+  <!-- INTENT -->
+  <g class="node"><rect class="card" x="350" y="14" width="220" height="58" rx="14"/><rect class="bar-accent" x="358" y="26" width="5" height="34" rx="2.5"/><text class="t-title" x="460" y="40" text-anchor="middle">INTENT</text><text class="t-sub" x="460" y="58" text-anchor="middle">LLM · reason · frozen → IntentSpec</text></g>
+  <path class="flow" marker-end="url(#arrA)" d="M460,72 V104"/>
+
+  <!-- LOOP container -->
+  <rect class="boundary-rect" x="18" y="108" width="884" height="272" rx="16"/>
+  <rect class="lbl-bg" x="40" y="100" width="392" height="18"/>
+  <text class="lbl" x="48" y="113" font-weight="600">LOOP · cycle = 1 … INTERPRETER_MAX_STEPS (default 6)</text>
+
+  <!-- 5 phase nodes -->
+  <g class="node"><rect class="card" x="30"  y="152" width="150" height="60" rx="12"/><rect class="bar-accent" x="38" y="164" width="5" height="36" rx="2.5"/><text class="t-title" x="105" y="178" text-anchor="middle">PLAN</text><text class="t-sub" x="105" y="196" text-anchor="middle">LLM·reason → PlanIR</text></g>
+  <g class="node"><rect class="card" x="198" y="152" width="150" height="60" rx="12"/><rect class="bar-ok" x="206" y="164" width="5" height="36" rx="2.5"/><text class="t-title" x="273" y="178" text-anchor="middle">auto-repair</text><text class="t-sub" x="273" y="196" text-anchor="middle">det · op/answer fix</text></g>
+  <g class="node"><rect class="card" x="366" y="152" width="142" height="60" rx="12"/><rect class="bar-ok" x="374" y="164" width="5" height="36" rx="2.5"/><text class="t-title" x="437" y="178" text-anchor="middle">lint</text><text class="t-sub" x="437" y="196" text-anchor="middle">det · security-first</text></g>
+  <g class="node"><rect class="card" x="526" y="152" width="170" height="60" rx="12"/><rect class="bar-ok" x="534" y="164" width="5" height="36" rx="2.5"/><text class="t-title" x="611" y="178" text-anchor="middle">interpret</text><text class="t-sub" x="611" y="196" text-anchor="middle">det · discovery-probes vs VM</text></g>
+  <g class="node"><rect class="card" x="714" y="152" width="158" height="60" rx="12"/><rect class="bar-ok" x="722" y="164" width="5" height="36" rx="2.5"/><text class="t-title" x="793" y="178" text-anchor="middle">verify</text><text class="t-sub" x="793" y="196" text-anchor="middle">det · criteria по outcome</text></g>
+
+  <!-- inter-phase connectors -->
+  <path class="flow" marker-end="url(#arrA)" d="M180,182 H191"/>
+  <path class="flow" marker-end="url(#arrA)" d="M348,182 H359"/>
+  <path class="flow" marker-end="url(#arrA)" d="M508,182 H519"/>
+  <path class="flow" marker-end="url(#arrA)" d="M696,182 H707"/>
+
+  <!-- retry loop back -->
+  <path class="conn-a" marker-end="url(#arrA)" d="M793,212 V312 Q793,324 781,324 L117,324 Q105,324 105,312 V216"/>
+  <rect class="lbl-bg" x="350" y="315" width="240" height="18"/>
+  <text class="lbl" x="470" y="328" text-anchor="middle">_ilearn(observed) → retry · next cycle</text>
+
+  <!-- branches out of loop -->
+  <path class="flow-ok" marker-end="url(#arrOk)" d="M460,380 C460,418 300,418 250,428"/>
+  <path class="conn-term" marker-end="url(#arrTerm)" d="M460,380 C460,418 660,418 680,428"/>
+  <rect class="lbl-bg" x="300" y="395" width="92" height="18"/>
+  <text class="lbl" x="346" y="408" text-anchor="middle">verify PASS</text>
+  <rect class="lbl-bg" x="540" y="395" width="120" height="18"/>
+  <text class="lbl" x="600" y="408" text-anchor="middle">exhaust / break</text>
+
+  <!-- terminal nodes -->
+  <g class="node"><rect class="card" x="70"  y="430" width="360" height="64" rx="14"/><rect class="bar-ok" x="78" y="444" width="5" height="36" rx="2.5"/><text class="t-title" x="250" y="458" text-anchor="middle">vm.answer() ×1</text><text class="t-sub" x="250" y="478" text-anchor="middle">persist artifacts · distill→validate→promote</text></g>
+  <g class="node"><rect class="card" x="500" y="430" width="360" height="64" rx="14"/><rect class="bar-term" x="508" y="444" width="5" height="36" rx="2.5"/><text class="t-title t-mono" x="680" y="458" text-anchor="middle">OUTCOME_NONE_CLARIFICATION</text><text class="t-sub" x="680" y="478" text-anchor="middle">loop exhaust · no-progress · mutation landed</text></g>
+</svg>
+</figure>
+
+<details>
+  <summary>Фазы подробно</summary>
+  <ul class="tight">
+    <li><b>INTENT</b> (<code>reason.py:run_intent</code>, reason-tier, 1 вызов, frozen, retry на пустой/parse-fail по <code>DESIGN_MAX_ATTEMPTS</code>) → <code>IntentSpec</code>: objective, desired_outcome, params, outcome_space, constraints, <b>success_criteria (keyed by outcome)</b>, answer_shape, required_refs. Hard-fail → terminal CLARIFICATION.</li>
+    <li><b>PLAN</b> (<code>reason.py:run_plan</code>, reason-tier) вход: <code>[intent, thin-facts, learn_ctx, prev_error?, oracle_atoms, observed?]</code> → <code>PlanIR</code>: discovery, rowsets, compute, decision, ops, answer, custom_extract.</li>
+    <li><b>auto-repair</b> (<code>_repair_plan_dict</code>) — детерминированно, без LLM, до <code>PlanIR(**obj)</code>: маппит op-синонимы (<code>neq→ne</code>, <code>!=→ne</code>, <code>==→eq</code>, <code>gte→ge</code>, <code>lte→le</code>) и срезает лишние ключи answer-веток. Немаппируемое падает на валидации → <code>PlanError</code> → iLEARN.</li>
+    <li><b>lint</b> (<code>interpreter.lint_security_first</code>) — без LLM. PlanError/InterpretError → <code>_ilearn</code>.</li>
+    <li><b>plan-signature</b> — <code>_plan_signature(plan)</code> по discovery+ops (SQL нормализован, прочие args verbatim). Anti-infinite-loop guard.</li>
+    <li><b>interpret</b> (<code>interpreter.interpret</code>) — без LLM; <code>discovery</code>-шаги добирают данные по запросу. InterpretError → retry; реальная VM-ошибка → retry только если plan read-only И ошибка retryable (<code>_is_retryable_vm_error</code>), иначе break.</li>
+    <li><b>verify</b> (<code>verify.verify</code>) — детерминированный, без LLM. Применяет критерии <b>только выбранного outcome</b>. Единственный gate перед answer.</li>
+  </ul>
+</details>
+
+<!-- ============ State transitions ============ -->
+<h2>4. Исходы цикла</h2>
+<figure class="diagram">
+<svg viewBox="0 0 920 240" role="img" aria-label="Переходы исходов цикла">
+  <!-- row 1: PASS -->
+  <g class="node"><rect class="card" x="20"  y="14" width="150" height="48" rx="24"/><rect class="bar-accent" x="28" y="24" width="5" height="28" rx="2.5"/><text class="t-title" x="95" y="43" text-anchor="middle">cycle N</text></g>
+  <path class="flow-ok" marker-end="url(#arrOk)" d="M170,38 H300"/>
+  <rect class="lbl-bg" x="195" y="21" width="86" height="16"/><text class="lbl" x="238" y="33" text-anchor="middle">verify PASS</text>
+  <g class="node"><rect class="card" x="310" y="14" width="210" height="48" rx="24"/><rect class="bar-ok" x="318" y="24" width="5" height="28" rx="2.5"/><text class="t-title" x="415" y="43" text-anchor="middle">answer + return</text></g>
+
+  <!-- row 2: retry -->
+  <g class="node"><rect class="card" x="20"  y="96" width="150" height="48" rx="24"/><rect class="bar-accent" x="28" y="106" width="5" height="28" rx="2.5"/><text class="t-title" x="95" y="125" text-anchor="middle">cycle N</text></g>
+  <path class="flow" marker-end="url(#arrA)" d="M170,120 H300"/>
+  <rect class="lbl-bg" x="200" y="103" width="74" height="16"/><text class="lbl" x="237" y="115" text-anchor="middle">fail / error</text>
+  <g class="node"><rect class="card" x="310" y="96" width="150" height="48" rx="24"/><rect class="bar-warn" x="318" y="106" width="5" height="28" rx="2.5"/><text class="t-title t-mono" x="385" y="125" text-anchor="middle">_ilearn</text></g>
+  <path class="flow" marker-end="url(#arrA)" d="M460,120 H590"/>
+  <rect class="lbl-bg" x="495" y="103" width="62" height="16"/><text class="lbl" x="526" y="115" text-anchor="middle">cycle++</text>
+  <g class="node"><rect class="card" x="600" y="96" width="160" height="48" rx="24"/><rect class="bar-accent" x="608" y="106" width="5" height="28" rx="2.5"/><text class="t-title" x="680" y="125" text-anchor="middle">cycle N+1</text></g>
+
+  <!-- row 3: clarification -->
+  <g class="node"><rect class="card" x="20"  y="178" width="150" height="48" rx="24"/><rect class="bar-accent" x="28" y="188" width="5" height="28" rx="2.5"/><text class="t-title" x="95" y="207" text-anchor="middle">cycle N</text></g>
+  <path class="conn-term" marker-end="url(#arrTerm)" d="M170,202 H420"/>
+  <rect class="lbl-bg" x="180" y="185" width="232" height="16"/><text class="lbl" x="296" y="197" text-anchor="middle">same signature / exhaust / mutation landed</text>
+  <g class="node"><rect class="card" x="430" y="178" width="270" height="48" rx="24"/><rect class="bar-term" x="438" y="188" width="5" height="28" rx="2.5"/><text class="t-title t-mono" x="565" y="207" text-anchor="middle">CLARIFICATION</text></g>
+</svg>
+</figure>
+
+<!-- ============ On-demand fetch ============ -->
+<h2>5. Получение данных по запросу (probe-then-refine)</h2>
+<p>Тяжёлые данные (sample-строки, тела записей, тексты политик) не инжектятся в PLAN заранее — PLAN добирает их сам через
+<code>discovery</code>-шаги. Механизм переиспользует существующий цикл: вывод RPC возвращается в следующий PLAN-вызов
+через аргумент <code>observed</code>. <b>Новой фазы нет.</b></p>
+<figure class="diagram">
+<svg viewBox="0 0 920 200" role="img" aria-label="Probe-then-refine: проба, наблюдение, уточнение">
+  <!-- nodes row -->
+  <g class="node"><rect class="card" x="20"  y="20" width="200" height="58" rx="12"/><rect class="bar-accent" x="28" y="32" width="5" height="34" rx="2.5"/><text class="t-title" x="120" y="46" text-anchor="middle">PLAN · проба</text><text class="t-sub" x="120" y="64" text-anchor="middle">SELECT DISTINCT / sample</text></g>
+  <g class="node"><rect class="card" x="360" y="20" width="200" height="58" rx="12"/><rect class="bar-ok" x="368" y="32" width="5" height="34" rx="2.5"/><text class="t-title" x="460" y="46" text-anchor="middle">interpret</text><text class="t-sub" x="460" y="64" text-anchor="middle">discovery исполняется на VM</text></g>
+  <g class="node"><rect class="card" x="700" y="20" width="200" height="58" rx="12"/><rect class="bar-warn" x="708" y="32" width="5" height="34" rx="2.5"/><text class="t-title" x="800" y="46" text-anchor="middle">observed</text><text class="t-sub" x="800" y="64" text-anchor="middle">факт. формат данных</text></g>
+  <g class="node"><rect class="card" x="360" y="124" width="200" height="58" rx="12"/><rect class="bar-ok" x="368" y="136" width="5" height="34" rx="2.5"/><text class="t-title" x="460" y="150" text-anchor="middle">PLAN · уточнение</text><text class="t-sub" x="460" y="168" text-anchor="middle">формат-корректный фильтр</text></g>
+  <!-- connectors -->
+  <path class="flow" marker-end="url(#arrA)" d="M220,49 H352"/>
+  <path class="flow-warn" marker-end="url(#arrWarn)" d="M560,49 H692"/>
+  <path class="conn-a" marker-end="url(#arrA)" d="M800,78 V153 Q800,165 788,165 H568"/>
+  <rect class="lbl-bg" x="600" y="120" width="150" height="16"/><text class="lbl" x="675" y="132" text-anchor="middle">observed → next PLAN</text>
+  <path class="flow-ok" marker-end="url(#arrOk)" d="M360,153 H250 Q238,153 238,141 V80"/>
+  <rect class="lbl-bg" x="250" y="150" width="96" height="16"/><text class="lbl" x="298" y="162" text-anchor="middle">refine cycle</text>
+</svg>
+<figcaption>Exact-match с 0 строк ≠ «нет товара» — это рассинхрон формата. Проба DISTINCT/семпла → нормализованный фильтр. Знание-метод сидится в оракул (см. §7).</figcaption>
+</figure>
+
+<!-- ============ Two knowledge contours ============ -->
+<h2>6. Накопление знаний — два контура</h2>
+<p>Агент учится в двух независимых контурах: один <b>привязан к задаче</b> (правила, как решать именно её),
+второй — <b>общий межзадачный</b> (методы и анти-паттерны, переносимые между задачами).</p>
+<div class="cols2">
+  <div class="panel">
+    <h4>Контур задачи · <code>data/learned/{tid}.yaml</code></h4>
+    <ul class="tight">
+      <li><b>Где:</b> внутри прохода (между циклами) + в training-режиме между прогонами.</li>
+      <li><b>Триггер:</b> провал цикла / grader-feedback → <code>_ilearn</code> → <code>LearnConsolidate</code> diff.</li>
+      <li><b>Область:</b> только эта задача; PLAN видит все active-правила задачи.</li>
+      <li><b>Полярность:</b> корректирующее правило формы PLAN.</li>
+    </ul>
+  </div>
+  <div class="panel">
+    <h4>Контур общих знаний · <code>data/oracle/atoms.yaml</code></h4>
+    <ul class="tight">
+      <li><b>Где:</b> межзадачно; ретривится семантически в PLAN любой подходящей задачи.</li>
+      <li><b>Триггер:</b> grader-score в конце прогона → <code>distill_from_grader</code>.</li>
+      <li><b>Область:</b> generic-методы, переносимые; засеян стартовый набор.</li>
+      <li><b>Полярность:</b> <span class="badge apply">method · APPLY</span> на успехе, <span class="badge avoid">anti_pattern · AVOID</span> на провале.</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Self-fill оракула по grader-score</h3>
+<p><code>distill_from_grader(task_id, score, score_detail)</code> заполняет банк из счёта, который уже вернул SubmitRun —
+<b>без</b> живого grader-round-trip. Успех (<code>score ≥ 1.0</code>) → атом-метод; провал → атом-анти-паттерн.
+Оба пишутся со <code>status="active"</code>; читают персистнутые <code>IntentSpec</code>+<code>PlanIR</code>; no-op без артефактов; никогда не бросают.
+<code>main.py</code> зовёт для <b>каждой</b> задачи (и успех, и провал).</p>
+<figure class="diagram">
+<svg viewBox="0 0 920 220" role="img" aria-label="Self-fill: успех в метод, провал в анти-паттерн, оба в банк и обратно в PLAN">
+  <!-- source -->
+  <g class="node"><rect class="card" x="20" y="84" width="180" height="56" rx="12"/><rect class="bar-accent" x="28" y="96" width="5" height="32" rx="2.5"/><text class="t-title" x="110" y="108" text-anchor="middle">grader score</text><text class="t-sub" x="110" y="126" text-anchor="middle">конец прогона</text></g>
+  <!-- method branch (up) -->
+  <g class="node"><rect class="card" x="330" y="18" width="220" height="56" rx="12"/><rect class="bar-ok" x="338" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="440" y="38" text-anchor="middle">method-атом · APPLY</text><text class="t-sub" x="440" y="56" text-anchor="middle">score ≥ 1.0 · рабочий метод</text></g>
+  <!-- anti branch (down) -->
+  <g class="node"><rect class="card" x="330" y="146" width="220" height="56" rx="12"/><rect class="bar-term" x="338" y="158" width="5" height="32" rx="2.5"/><text class="t-title" x="440" y="166" text-anchor="middle">anti_pattern · AVOID</text><text class="t-sub" x="440" y="184" text-anchor="middle">score &lt; 1.0 · причина провала</text></g>
+  <!-- bank -->
+  <g class="node"><rect class="card" x="640" y="84" width="160" height="56" rx="12"/><rect class="bar-accent" x="648" y="96" width="5" height="32" rx="2.5"/><text class="t-title t-mono" x="720" y="108" text-anchor="middle">atoms.yaml</text><text class="t-sub" x="720" y="126" text-anchor="middle">active</text></g>
+  <!-- branches -->
+  <path class="flow-ok" marker-end="url(#arrOk)" d="M200,104 C260,104 280,46 322,46"/>
+  <rect class="lbl-bg" x="232" y="62" width="78" height="16"/><text class="lbl" x="271" y="74" text-anchor="middle">pass → method</text>
+  <path class="conn-term" marker-end="url(#arrTerm)" d="M200,112 C260,112 280,174 322,174"/>
+  <rect class="lbl-bg" x="230" y="150" width="86" height="16"/><text class="lbl" x="273" y="162" text-anchor="middle">fail → anti</text>
+  <path class="flow-ok" marker-end="url(#arrOk)" d="M550,46 C600,46 610,100 632,108"/>
+  <path class="conn-term" marker-end="url(#arrTerm)" d="M550,174 C600,174 610,124 632,116"/>
+  <!-- back to PLAN -->
+  <path class="conn-a" marker-end="url(#arrA)" d="M720,140 V190 Q720,202 708,202 L120,202 Q108,202 108,190 V142"/>
+  <rect class="lbl-bg" x="330" y="194" width="300" height="16"/><text class="lbl" x="480" y="206" text-anchor="middle">retrieval (APPLY/AVOID) → PLAN следующего прогона</text>
+</svg>
+<figcaption>Решает chicken-and-egg: падающие задачи раньше никогда не наполняли банк. Шум ограничен <code>ORACLE_FLOOR</code> + <code>ORACLE_K</code>.</figcaption>
+</figure>
+<div class="note warn"><b>Стоимость:</b> self-fill — это один reason-tier distill-вызов <b>на задачу</b>, гейт только <code>ORACLE_ENABLED</code> (default on). N задач → +N вызовов сверх per-task бюджета. <code>ORACLE_VALIDATE_INLINE=0</code> остаётся default — без живого grader во время обычного прогона.</div>
+
+<!-- ============ LEARN / persistence ============ -->
+<h2>7. LEARN-seam и персистентность (контур задачи)</h2>
+<p><code>_ilearn(...)</code> оборачивает <code>_learn_consolidate_text(...)</code> (driven by rendered IntentSpec + PlanIR). Пишет diff в <code>data/learned/{tid}.yaml</code>, мутирует in-session <code>learn_ctx</code>, сохраняет <code>prephase_deep_read</code> хинты. Один surface — PLAN видит все active-правила.</p>
+<figure class="diagram">
+<svg viewBox="0 0 920 96" role="img" aria-label="LEARN seam">
+  <path class="flow" marker-end="url(#arrA)" d="M210,46 H243"/>
+  <path class="flow" marker-end="url(#arrA)" d="M443,46 H476"/>
+  <path class="flow" marker-end="url(#arrOk)" d="M676,46 H710"/>
+  <g class="node"><rect class="card" x="10"  y="18" width="200" height="56" rx="12"/><rect class="bar-warn" x="18" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="110" y="42" text-anchor="middle">grader feedback</text><text class="t-sub" x="110" y="60" text-anchor="middle">score &lt; 1.0</text></g>
+  <g class="node"><rect class="card" x="243" y="18" width="200" height="56" rx="12"/><rect class="bar-accent" x="251" y="30" width="5" height="32" rx="2.5"/><text class="t-title t-mono" x="343" y="42" text-anchor="middle">_ilearn</text><text class="t-sub" x="343" y="60" text-anchor="middle">learn_consolidate</text></g>
+  <g class="node"><rect class="card" x="476" y="18" width="200" height="56" rx="12"/><rect class="bar-accent" x="484" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="576" y="42" text-anchor="middle">LearnConsolidate</text><text class="t-sub" x="576" y="60" text-anchor="middle">diff (Pydantic)</text></g>
+  <g class="node"><rect class="card" x="710" y="18" width="200" height="56" rx="12"/><rect class="bar-ok" x="718" y="30" width="5" height="32" rx="2.5"/><text class="t-title t-mono" x="810" y="42" text-anchor="middle">{tid}.yaml</text><text class="t-sub" x="810" y="60" text-anchor="middle">data/learned/</text></g>
+</svg>
+</figure>
+<p class="sub"><code>learned_store.py</code>: <code>load_entries(tid)</code> (только active), <code>apply_learn_diff</code>, <code>save_last_run</code>. <code>_persist_artifacts</code> пишет <code>{tid}.intent.json</code> + <code>{tid}.plan.json</code> — потребляются <code>learn_from_grader</code> (training) <b>и</b> <code>distill_from_grader</code> (self-fill).</p>
+
+<h3>Training mode (<code>TRAIN_MAX_CYCLES &gt; 1</code>)</h3>
+<p><code>main.py</code> оборачивает StartRun/SubmitRun во внешний loop. После SubmitRun задачи со <code>score &lt; 1.0</code> получают LEARN-правило из grader-feedback (без перезапуска INTENT/PLAN — читает персистнутые IntentSpec+PlanIR). Следующий cycle: свежий StartRun только по падающим задачам. Трейсы: <code>{tid}.c{N}.jsonl</code>.</p>
+
+<!-- ============ Oracle ============ -->
+<h2>8. Knowledge-oracle (контур общих знаний)</h2>
+<p>Семантический retrieval атомов знаний в PLAN (<code>agent/oracle.py</code>), master-toggle <code>ORACLE_ENABLED</code>.
+Банк засеян generic-методами (probe-then-refine, нормализация free-text, чтение управляющей <code>/docs</code>-политики).</p>
+<figure class="diagram">
+<svg viewBox="0 0 920 96" role="img" aria-label="Oracle retrieval">
+  <path class="flow" marker-end="url(#arrA)" d="M210,46 H243"/>
+  <path class="flow" marker-end="url(#arrA)" d="M443,46 H477"/>
+  <path class="flow" marker-end="url(#arrOk)" d="M677,46 H710"/>
+  <g class="node"><rect class="card" x="10"  y="18" width="200" height="56" rx="12"/><rect class="bar-accent" x="18" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="110" y="42" text-anchor="middle">cosine top-N</text><text class="t-sub" x="110" y="60" text-anchor="middle">ORACLE_TOPN · только active</text></g>
+  <g class="node"><rect class="card" x="243" y="18" width="200" height="56" rx="12"/><rect class="bar-accent" x="251" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="343" y="42" text-anchor="middle">LLM re-rank</text><text class="t-sub" x="343" y="60" text-anchor="middle">fast · RANK_ENABLED</text></g>
+  <g class="node"><rect class="card" x="477" y="18" width="200" height="56" rx="12"/><rect class="bar-warn" x="485" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="577" y="42" text-anchor="middle">floor filter</text><text class="t-sub" x="577" y="60" text-anchor="middle">ORACLE_FLOOR</text></g>
+  <g class="node"><rect class="card" x="710" y="18" width="200" height="56" rx="12"/><rect class="bar-ok" x="718" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="810" y="42" text-anchor="middle">inject K → PLAN</text><text class="t-sub" x="810" y="60" text-anchor="middle">ORACLE_K · APPLY/AVOID</text></g>
+</svg>
+</figure>
+<p class="sub">При недоступном embedding-endpoint <code>_cosine_topn</code> падает, и <code>_tag_fallback</code> добирает по ключевым словам — retrieval всё равно возвращает атомы.
+<code>build_oracle_block</code> рендерит методы под «<b>APPLY</b> (verified methods)», анти-паттерны — под «<b>AVOID</b> (known failure causes)».</p>
+
+<h3>Источники наполнения банка</h3>
+<table class="rpt-table">
+<thead><tr><th>Путь</th><th>Когда</th><th>Полярность / статус</th></tr></thead>
+<tbody>
+<tr><td>Ручной seed</td><td>авторство (доверие)</td><td><code>method</code> · <code>active</code></td></tr>
+<tr><td>distill → validate → promote <span class="sub">(success path, <code>ORACLE_DISTILL=1</code>)</span></td><td>успешный verify + inline grader</td><td><code>candidate</code> → <code>active</code> на улучшении</td></tr>
+<tr><td><code>distill_from_grader</code> (self-fill)</td><td>конец прогона, любая задача</td><td><code>method</code> (pass) / <code>anti_pattern</code> (fail) · <code>active</code></td></tr>
+</tbody>
+</table>
+<figure class="diagram">
+<svg viewBox="0 0 920 96" role="img" aria-label="Distill validate promote">
+  <path class="flow" marker-end="url(#arrA)" d="M280,46 H330"/>
+  <path class="flow" marker-end="url(#arrOk)" d="M570,46 H620"/>
+  <g class="node"><rect class="card" x="40"  y="18" width="240" height="56" rx="12"/><rect class="bar-accent" x="48" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="160" y="42" text-anchor="middle">oracle.distill</text><text class="t-sub" x="160" y="60" text-anchor="middle">plan → atom · polarity/status</text></g>
+  <g class="node"><rect class="card" x="330" y="18" width="240" height="56" rx="12"/><rect class="bar-warn" x="338" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="450" y="42" text-anchor="middle">validate · grader</text><text class="t-sub" x="450" y="60" text-anchor="middle">VALIDATE_INLINE=1</text></g>
+  <g class="node"><rect class="card" x="620" y="18" width="240" height="56" rx="12"/><rect class="bar-ok" x="628" y="30" width="5" height="32" rx="2.5"/><text class="t-title" x="740" y="42" text-anchor="middle">oracle.promote</text><text class="t-sub" x="740" y="60" text-anchor="middle">on improvement</text></g>
+</svg>
+<figcaption><code>VALIDATE_INLINE=0</code> → distill пишет candidate без promotion (bulk-режим, промоут оффлайн). Хранилище: <code>data/oracle/atoms.yaml</code>.</figcaption>
+</figure>
+
+<!-- ============ Model routing ============ -->
+<h2>9. Маршрутизация моделей (<code>llm.py</code>)</h2>
+<p>Две оси. <b>Провайдер-транспорт</b> по префиксу <code>MODEL</code>; <b>per-phase модель</b> по <code>_resolve_model_for_phase</code>.</p>
+<table class="rpt-table">
+<thead><tr><th>Префикс / флаг</th><th>Транспорт</th></tr></thead>
+<tbody>
+<tr><td><code>anthropic/</code></td><td>Anthropic SDK (prompt caching через <code>cache_control</code>)</td></tr>
+<tr><td><code>openrouter/</code></td><td>OpenRouter (OpenAI-совместимый)</td></tr>
+<tr><td><code>ollama/</code> / bare name</td><td>локальный Ollama</td></tr>
+<tr><td><code>claude-code/</code> / <code>CC_ENABLED=1</code></td><td>CC CLI subprocess (<code>cc_client.py</code>, OAuth)</td></tr>
+</tbody>
+</table>
+<table class="rpt-table">
+<thead><tr><th>Tier</th><th>Фазы</th><th>Resolve env</th><th>think</th></tr></thead>
+<tbody>
+<tr><td>reason</td><td>INTENT, PLAN, iLEARN, distill <span class="sub">(+ catch-all)</span></td><td><code>MODEL_REASON</code></td><td><span class="badge">on</span></td></tr>
+<tr><td>fast</td><td>DOC_SELECT, oracle rerank</td><td><code>MODEL_FAST</code></td><td><span class="badge">off</span></td></tr>
+<tr><td>embed</td><td>oracle retrieval</td><td><code>EMBED_MODEL</code></td><td>—</td></tr>
+</tbody>
+</table>
+<p class="sub">Порядок: <code>MODEL_&lt;PHASE&gt;</code> → tier-env → <code>MODEL</code>. С одним <code>MODEL</code> всё резолвится в <code>MODEL</code> (back-compat). Transient (503/rate-limit/timeout) → exp-backoff → следующий tier → <code>MODEL_FALLBACK</code>.</p>
+<div class="note"><b>LLM-бюджет (на задачу):</b> 1 (INTENT hard-stop) / 2 (best: INTENT + 1 PLAN) / <code>1 + 2·INTERPRETER_MAX_STEPS</code> (worst: каждый failing cycle = PLAN + iLEARN). Плюс +1 distill self-fill в конце прогона при <code>ORACLE_ENABLED=1</code>.</div>
+
+<!-- ============ Pydantic models ============ -->
+<h2>10. Модели данных</h2>
+<table class="rpt-table">
+<thead><tr><th>Файл</th><th>Модель</th><th>Части / заметки</th></tr></thead>
+<tbody>
+<tr><td rowspan="2"><code>ir_models.py</code></td><td><code>IntentSpec</code></td><td>PredExpr, Constraint, RefSpec, AnswerShape · <code>success_criteria: dict[str, list[PredExpr]]</code> (keyed by outcome; bare-list коэрсится в <code>{"OUTCOME_OK": [...]}</code>)</td></tr>
+<tr><td><code>PlanIR</code></td><td>Step, RowSet, ComputeStep, DecisionTree, GuardedOp, AnswerTemplateIR (<code>{message, outcome, refs}</code>), CustomExtract</td></tr>
+<tr><td><code>oracle_atoms.py</code></td><td><code>Atom</code></td><td>id, domain, content, source, validated_by/at, status (active|candidate), <b>polarity (method|anti_pattern)</b>, source_task, embedding_hash</td></tr>
+<tr><td rowspan="2"><code>models.py</code></td><td><code>LearnConsolidateOutput</code></td><td>rule_content?, agents_md_anchor?, reasoning, deactivate_ids, skip?, prephase_deep_read</td></tr>
+<tr><td><code>AnswerOutput</code></td><td>message, outcome, grounding_refs</td></tr>
+</tbody>
+</table>
+
+<!-- ============ Data files ============ -->
+<h2>11. Ключевые data-файлы</h2>
+<table class="rpt-table">
+<thead><tr><th>Путь</th><th>Назначение</th></tr></thead>
+<tbody>
+<tr><td><code>data/prompts/*.md</code></td><td>Phase-guides: intent (keyed success_criteria), plan (allowed ops + AnswerTemplateIR shape + on-demand /docs read), ilearn, learn, compact</td></tr>
+<tr><td><code>data/learned/{tid}.yaml</code></td><td>Контур задачи: active+inactive LEARN-правила; <code>last_run</code> = status/outcome/cycles_used/date</td></tr>
+<tr><td><code>data/heuristics/{tid}.intent.json</code></td><td>Персистнутый IntentSpec (для learn_from_grader + distill_from_grader)</td></tr>
+<tr><td><code>data/heuristics/{tid}.plan.json</code></td><td>Персистнутый PlanIR (для learn_from_grader + distill_from_grader)</td></tr>
+<tr><td><code>data/oracle/atoms.yaml</code></td><td>Контур общих знаний: засеянные методы + self-fill атомы с polarity</td></tr>
+<tr><td><code>models.json</code></td><td>Provider-хинты + Ollama-опции (num_ctx и пр.)</td></tr>
+</tbody>
+</table>
+
+<!-- ============ Env ============ -->
+<h2>12. Основные переменные окружения</h2>
+<table class="rpt-table">
+<thead><tr><th>Var</th><th>Назначение</th></tr></thead>
+<tbody>
+<tr><td><code>MODEL</code> / <code>MODEL_FALLBACK</code></td><td>Primary LLM / fallback после исчерпания всех tier</td></tr>
+<tr><td><code>MODEL_REASON</code> / <code>MODEL_FAST</code></td><td>Tier-модели (catch-all = REASON)</td></tr>
+<tr><td><code>INTERPRETER_MAX_STEPS</code></td><td>Потолок циклов интерпретатора (default 6)</td></tr>
+<tr><td><code>TRAIN_MAX_CYCLES</code></td><td>Per-task training-циклы (default 1 = без тренировки)</td></tr>
+<tr><td><code>PREPHASE_PATH_LITERALS</code> / <code>_LISTING_BYTES</code></td><td>Кап путей из инструкции / байт-кап листинга dir</td></tr>
+<tr><td><code>PREPHASE_SAMPLE_ROWS</code> / <code>_ROW_CHARS</code></td><td>LIMIT на таблицу / байт-кап строки (Tier-2 семплинг)</td></tr>
+<tr><td><code>ORACLE_ENABLED</code></td><td>Master-toggle оракула — гейт retrieval <b>и</b> self-fill (default 1)</td></tr>
+<tr><td><code>ORACLE_TOPN</code> / <code>_K</code> / <code>_FLOOR</code></td><td>Кандидаты cosine / инъекция в PLAN / порог similarity (10 / 4 / 0.5)</td></tr>
+<tr><td><code>ORACLE_DISTILL</code> / <code>_VALIDATE_INLINE</code></td><td>Авто-distill на success-path / inline grader-валидация</td></tr>
+<tr><td><code>EMBED_MODEL</code> / <code>EMBED_BASE_URL</code></td><td>Embedding-модель и endpoint для retrieval</td></tr>
+<tr><td><code>LOG_LEVEL=DEBUG</code></td><td>Полное логирование LLM-ответов + размер PLAN-промпта</td></tr>
+</tbody>
+</table>
+
+<!-- ============ Constraints ============ -->
+<h2>13. Значимые инварианты</h2>
+<ul class="tight">
+  <li><b>One pipeline</b> — только детерминированный Plan-IR интерпретатор; нет DESIGN/CODEGEN/TEST-GEN.</li>
+  <li><b>answer ×1</b> — ровно один вызов <code>vm.answer</code> за задачу.</li>
+  <li><b>verify()</b> — единственный pre-answer gate, детерминированный; применяет критерии <b>только выбранного outcome</b> (валидный негатив проходит).</li>
+  <li><b>INTENT frozen</b> — полный контекст один раз; обновления <code>learn_ctx</code> влияют только на последующие PLAN-циклы.</li>
+  <li><b>Тонкий PLAN + on-demand</b> — тяжёлые факты не инжектятся заранее, добираются через <code>discovery</code>.</li>
+  <li><b>auto-repair fail-closed</b> — мапит известные op-синонимы; немаппируемое всё равно падает на валидации (нет тихого приёма невалидного IR).</li>
+  <li><b>Два контура знаний</b> — задача (<code>data/learned</code>) и общие методы/анти-паттерны (<code>data/oracle</code>) независимы.</li>
+  <li><b>plan-signature</b> — anti-infinite-loop guard (заменил legacy SQL-multiset retry).</li>
+  <li><b>Prompt rules</b> — task-specific знания только через LEARN/oracle; <code>data/prompts/</code> не патчат под отдельную задачу (допустимы лишь generic-структурные правила).</li>
+  <li><b>Re-seed safety</b> — правила/атомы остаются <i>методами</i>, не хардкод-значениями (бенчмарк ре-рандомит данные каждый StartRun).</li>
+</ul>
+
+<p class="sub" style="margin-top:3rem">Plan-IR интерпретатор · ecom1-agent · ветка heuristics · обновлено 2026-06-18</p>
+
+</main>
+</body>
+</html>

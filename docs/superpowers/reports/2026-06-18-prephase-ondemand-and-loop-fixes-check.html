@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка плана — Prephase On-Demand + Loop/Oracle Fixes</title>
+<style>
+:root{
+  --bg:#f6f7fb; --surface:#ffffff; --fg:#2b2b3a; --muted:#6b6b80;
+  --accent:#5c6bc0; --accent-2:#3949ab; --border:#d6d8e6; --line:#9aa0b4; --zebra:#eef0f8;
+  --ok:#43a047; --ok-2:#2e7d32; --warn:#fb8c00; --warn-2:#ef6c00; --danger:#e53935; --danger-2:#c62828;
+  --shadow:rgba(40,40,80,.18);
+}
+body:has(#theme-toggle:checked){
+  --bg:#181825; --surface:#262637; --fg:#cdd6f4; --muted:#a6adc8;
+  --accent:#89b4fa; --accent-2:#5e95f0; --border:#3a3b52; --line:#6c7086; --zebra:#21222f;
+  --ok:#a6e3a1; --ok-2:#74c46e; --warn:#f9e2af; --warn-2:#f5c95b; --danger:#f38ba8; --danger-2:#e8638a;
+  --shadow:rgba(0,0,0,.45);
+}
+body{
+  margin:0 auto; padding:1.5rem 2rem 4rem; max-width:1080px;
+  font:16px/1.55 system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb,var(--accent) 10%, transparent), transparent),
+    var(--bg);
+  color:var(--fg);
+  transition:background .3s, color .3s;
+}
+.theme-btn{
+  position:sticky; top:.5rem; float:right;
+  cursor:pointer; user-select:none;
+  padding:.25rem .6rem; border:1px solid var(--border); border-radius:6px;
+  background:var(--surface); z-index:10;
+}
+h1{font-size:1.6rem; margin:.2rem 0 .4rem}
+h2{font-size:1.25rem; margin:2rem 0 .6rem; border-bottom:2px solid var(--border); padding-bottom:.25rem}
+h3{font-size:1.05rem; margin:1.4rem 0 .4rem; color:var(--accent)}
+.lead{color:var(--muted); margin:.2rem 0 1rem}
+table{border-collapse:collapse; width:100%; margin:.6rem 0 1.2rem; font-size:.92rem}
+th,td{border:1px solid var(--border); padding:.45rem .6rem; text-align:left; vertical-align:top}
+th{background:color-mix(in srgb,var(--accent) 14%, var(--surface))}
+tbody tr:nth-child(even){background:var(--zebra)}
+code{background:color-mix(in srgb,var(--accent) 12%, var(--surface)); padding:.05rem .3rem; border-radius:4px; font-size:.85em}
+.badge{display:inline-block; padding:.08rem .5rem; border-radius:999px; font-size:.8rem; font-weight:600; border:1px solid}
+.b-ok{color:var(--ok-2); border-color:var(--ok); background:color-mix(in srgb,var(--ok) 18%, transparent)}
+.b-warn{color:var(--warn-2); border-color:var(--warn); background:color-mix(in srgb,var(--warn) 18%, transparent)}
+.b-danger{color:var(--danger-2); border-color:var(--danger); background:color-mix(in srgb,var(--danger) 18%, transparent)}
+.note{border-left:4px solid var(--accent); background:color-mix(in srgb,var(--accent) 10%, var(--surface)); padding:.6rem .9rem; border-radius:0 6px 6px 0; margin:1rem 0}
+.kv{display:flex; flex-wrap:wrap; gap:.4rem 1.4rem; margin:.4rem 0 1rem}
+.kv div{min-width:220px}
+.kv b{color:var(--muted); font-weight:600}
+figure{margin:1rem 0; padding:1rem; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 2px 8px var(--shadow); overflow-x:auto}
+figcaption{color:var(--muted); font-size:.85rem; margin-top:.5rem}
+.legend{font-size:.82rem; color:var(--muted); margin:.3rem 0}
+.matrix td.hit{background:color-mix(in srgb,var(--accent) 26%, var(--surface)); text-align:center; font-weight:700; color:var(--accent-2)}
+.matrix td.empty{text-align:center; color:var(--muted)}
+.chain{font-family:monospace; font-size:.85rem; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:.7rem .9rem; overflow-x:auto}
+.dot{display:inline-block; width:.7rem; height:.7rem; border-radius:50%; vertical-align:middle; margin-right:.35rem}
+</style>
+</head>
+<body>
+<input type="checkbox" id="theme-toggle" hidden>
+<label for="theme-toggle" class="theme-btn" title="Переключить тему">🌙 / ☀️</label>
+
+<main class="report">
+<h1>Проверка плана: Prephase On-Demand + Loop/Oracle Fixes</h1>
+<p class="lead">Фазовая валидация плана реализации против спецификации (SDD) и цепочки IDD→SDD→Plan. Дата прогона: 2026-06-18.</p>
+
+<div class="kv">
+  <div><b>План:</b> <code>docs/superpowers/plans/2026-06-18-prephase-ondemand-and-loop-fixes.md</code></div>
+  <div><b>plan_hash:</b> <code>e7ee874b8916230a</code> (prev: —)</div>
+  <div><b>Спека:</b> <code>docs/superpowers/specs/2026-06-17-prephase-ondemand-and-loop-fixes-design.md</code></div>
+  <div><b>spec_hash:</b> <code>34f0b1003895d215</code> (prev: —)</div>
+  <div><b>Финальный вердикт:</b> <span class="badge b-ok">OK</span></div>
+</div>
+
+<div class="note">Первый прогон проверки: блок <code>review:</code> во frontmatter плана инициализирован, все секции — новые. CRITICAL открытых нет; WARNING открытых нет.</div>
+
+<!-- ============ БЛОК 1: РЕЗЮМЕ ПЛАНА ============ -->
+<h2>1. Резюме плана — шаги и критерии готовности (DoD)</h2>
+<p class="lead">Цель: вернуть <code>OUTCOME_OK</code> для задачи <code>t01</code> на живом прогоне через тонкий prephase, on-demand fetch в PLAN <code>discovery</code>, самозаполнение оракула с полярностью, keyed-by-outcome verify и детерминированный авторемонт IR.</p>
+<table>
+  <thead><tr><th>Задача / Блок</th><th>Шаг</th><th>Действие</th><th>DoD (критерий готовности)</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="8">Task 1 (Block A)<br>Тонкий prephase + инвентарь AGENTS.MD</td><td>1</td><td><code>render_inventory</code> в <code>agents_md_parser.py</code></td><td>функция добавлена ниже <code>parse_agents_md</code></td></tr>
+    <tr><td>2</td><td>поле <code>agents_md_inventory</code> в <code>PrePhaseFacts</code></td><td>модель содержит новое поле</td></tr>
+    <tr><td>3</td><td>вычислить инвентарь в <code>gather_prephase_facts</code></td><td>импорт + аргумент в <code>PrePhaseFacts(...)</code></td></tr>
+    <tr><td>4</td><td>tier-aware <code>_facts_block</code></td><td>PLAN-ключи ⊂ INTENT-ключей; тяжёлые факты исключены из PLAN</td></tr>
+    <tr><td>5</td><td>передать tier из <code>run_intent</code>/<code>run_plan</code> + DEBUG-печать размера</td><td>tier="intent"/"plan" проброшен; печать <code>chars=</code></td></tr>
+    <tr><td>6</td><td>проверка рендерера + tier на живом коде</td><td>команда: PLAN chars ≪ INTENT chars, печать <code>OK</code></td></tr>
+    <tr><td>7</td><td>зелёный <code>pytest tests/ -q</code></td><td>команда: PASS</td></tr>
+    <tr><td>8</td><td>commit</td><td>git commit выполнен</td></tr>
+
+    <tr><td rowspan="6">Task 2 (Block C-models)<br>Полярность атома + рендер</td><td>1</td><td><code>polarity</code> в <code>Atom</code></td><td>поле с default <code>method</code></td></tr>
+    <tr><td>2</td><td>чтение <code>polarity</code> в <code>load_atoms</code></td><td><code>.get(...)</code> добавлен</td></tr>
+    <tr><td>3</td><td>рендер полярности в <code>build_oracle_block</code></td><td>заголовки APPLY/AVOID</td></tr>
+    <tr><td>4</td><td>проверка на живом коде</td><td>команда: APPLY+AVOID в выводе, <code>OK</code></td></tr>
+    <tr><td>5</td><td>зелёный suite</td><td>команда: PASS</td></tr>
+    <tr><td>6</td><td>commit</td><td>git commit выполнен</td></tr>
+
+    <tr><td rowspan="4">Task 3 (Block B)<br>Сид atoms.yaml</td><td>1</td><td>записать seed-атомы (3 generic method)</td><td>файл перезаписан re-seed-safe атомами</td></tr>
+    <tr><td>2</td><td>банк грузится и рендерится</td><td>команда: loaded 3 atoms, <code>OK</code></td></tr>
+    <tr><td>3</td><td>retrieval инжектит ≥1 атом</td><td>команда: ≥1 atom id, <code>OK</code></td></tr>
+    <tr><td>4</td><td>commit</td><td>git commit выполнен</td></tr>
+
+    <tr><td rowspan="6">Task 4 (Block C-seam)<br>Distill polarity + self-fill</td><td>1</td><td><code>polarity</code>+<code>status</code> в <code>oracle.distill</code></td><td>сигнатура + конструктор Atom обновлены, back-compat</td></tr>
+    <tr><td>2</td><td><code>distill_from_grader</code> в <code>pipeline.py</code></td><td>функция рядом с <code>_maybe_distill_and_validate</code>, never-raise</td></tr>
+    <tr><td>3</td><td>проводка в score-loop <code>main.py</code></td><td>вызов на каждой задаче (pass+fail)</td></tr>
+    <tr><td>4</td><td>import-safe + no-op без артефактов</td><td>команда: <code>OK</code> без исключения</td></tr>
+    <tr><td>5</td><td>зелёный suite</td><td>команда: PASS</td></tr>
+    <tr><td>6</td><td>commit</td><td>git commit выполнен</td></tr>
+
+    <tr><td rowspan="7">Task 5 (Block D)<br>verify keyed by outcome</td><td>1</td><td><code>success_criteria</code> → keyed dict + coercion</td><td>поле dict; <code>mode="before"</code> валидатор для bare-list</td></tr>
+    <tr><td>2</td><td>verify применяет критерии выбранного outcome</td><td><code>.get(ans.outcome, [])</code></td></tr>
+    <tr><td>3</td><td>keyed-shape в <code>intent.md</code> (структурно)</td><td>JSON-пример + правило-буллет обновлены</td></tr>
+    <tr><td>4</td><td>миграция теста <code>test_ir_models.py</code></td><td>чтение через ключ <code>["OUTCOME_OK"][0]</code></td></tr>
+    <tr><td>5</td><td>проверка negative-outcome на живом коде</td><td>команда: NEG True / POS-FAIL False / POS-OK True / <code>OK</code></td></tr>
+    <tr><td>6</td><td>зелёный suite</td><td>команда: PASS</td></tr>
+    <tr><td>7</td><td>commit</td><td>git commit выполнен</td></tr>
+
+    <tr><td rowspan="6">Task 6 (Block E)<br>IR-синтаксис + авторемонт</td><td>1</td><td>список ops + <code>AnswerTemplateIR</code> в <code>plan.md</code></td><td>секция добавлена (структурно)</td></tr>
+    <tr><td>2</td><td>нормализатор в <code>reason.py</code></td><td><code>_repair_ops</code>+<code>_repair_plan_dict</code></td></tr>
+    <tr><td>3</td><td>вызов нормализатора перед <code>PlanIR(**obj)</code></td><td>repair до pydantic-валидации</td></tr>
+    <tr><td>4</td><td>проверка авторемонта на живом коде</td><td>команда: <code>op= ne -&gt; OK</code></td></tr>
+    <tr><td>5</td><td>зелёный suite</td><td>команда: PASS</td></tr>
+    <tr><td>6</td><td>commit</td><td>git commit выполнен</td></tr>
+
+    <tr><td rowspan="7">Task 7 (Acceptance)<br>живой прогон t01 + докуменация</td><td>1</td><td>прогон <code>t01</code></td><td>score 1.00, <code>outcome=OUTCOME_OK</code>, probe перед фильтром</td></tr>
+    <tr><td>2</td><td>размер PLAN-промпта</td><td>каждый <code>chars=</code> ≪ 27–29 K (цель &lt; ~10 K)</td></tr>
+    <tr><td>3</td><td>≥1 атом оракула в PLAN</td><td>grep APPLY/AVOID/[oracle] в логе</td></tr>
+    <tr><td>4</td><td>регресс-спот-чек ≥2 проходящих задач</td><td>обе по-прежнему 1.00 (вкл. security-задачу)</td></tr>
+    <tr><td>5</td><td>дельта числа LLM-вызовов (tracked, не gate)</td><td>записано before/after</td></tr>
+    <tr><td>6</td><td>обновление wiki (iwiki-ingest + lint)</td><td>нет битых <code>[[refs]]</code>/orphan/stale</td></tr>
+    <tr><td>7</td><td>commit доков</td><td>git commit выполнен</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ БЛОК 2: ЗАВИСИМОСТИ И ПЕРЕСЕЧЕНИЯ ============ -->
+<h2>2. Зависимости и пересечения</h2>
+
+<h3>Граф зависимостей задач (результат задачи M используется в задаче N, M→N)</h3>
+<figure>
+<svg viewBox="0 0 760 230" width="100%" role="img" aria-label="граф зависимостей задач">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+    </marker>
+  </defs>
+  <!-- edges: A(1)->C-models(2)->B(3)->C-seam(4); 5 indep; 6 indep; all -> 7 -->
+  <line x1="78"  y1="60" x2="190" y2="60" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="226" y1="60" x2="338" y2="60" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="374" y1="60" x2="486" y2="60" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- all tasks feed Acceptance (T7) -->
+  <line x1="60"  y1="78" x2="640" y2="172" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <line x1="208" y1="78" x2="648" y2="172" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <line x1="356" y1="78" x2="656" y2="172" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <line x1="504" y1="78" x2="664" y2="172" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <line x1="560" y1="155" x2="668" y2="172" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <line x1="700" y1="155" x2="690" y2="172" stroke="var(--line)" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <!-- nodes row 1: linear chain -->
+  <g font-size="11" text-anchor="middle">
+    <rect x="24"  y="44" width="54" height="32" rx="7" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <text x="51"  y="58" fill="var(--fg)">T1</text><text x="51" y="70" fill="var(--muted)">Block A</text>
+    <rect x="172" y="44" width="54" height="32" rx="7" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <text x="199" y="58" fill="var(--fg)">T2</text><text x="199" y="70" fill="var(--muted)">C-models</text>
+    <rect x="320" y="44" width="54" height="32" rx="7" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <text x="347" y="58" fill="var(--fg)">T3</text><text x="347" y="70" fill="var(--muted)">Block B</text>
+    <rect x="468" y="44" width="54" height="32" rx="7" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <text x="495" y="58" fill="var(--fg)">T4</text><text x="495" y="70" fill="var(--muted)">C-seam</text>
+    <!-- independent tasks -->
+    <rect x="500" y="120" width="58" height="34" rx="7" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <text x="529" y="135" fill="var(--fg)">T5</text><text x="529" y="148" fill="var(--muted)">Block D</text>
+    <rect x="672" y="120" width="58" height="34" rx="7" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <text x="701" y="135" fill="var(--fg)">T6</text><text x="701" y="148" fill="var(--muted)">Block E</text>
+    <!-- acceptance -->
+    <rect x="636" y="174" width="64" height="36" rx="7" fill="color-mix(in srgb,var(--ok) 22%, var(--surface))" stroke="var(--ok)" stroke-width="2"/>
+    <text x="668" y="190" fill="var(--fg)">T7</text><text x="668" y="203" fill="var(--muted)">Acceptance</text>
+  </g>
+</svg>
+<figcaption>Сплошные рёбра — жёсткая цепочка порядка зависимостей (T1→T2→T3→T4): <code>Atom.polarity</code> (T2) до сидинга (T3) до использования полярности в distill (T4). Пунктир — все задачи питают приёмочный прогон T7. T5 (success_criteria dict до чтения в verify — внутри задачи) и T6 (авторемонт IR) независимы. Циклов и нарушений порядка не обнаружено.</figcaption>
+</figure>
+
+<h3>Матрица пересечений: задачи × затрагиваемые файлы/артефакты</h3>
+<p class="legend">● — задача модифицирует файл. Несколько ● в столбце = пересечение по артефакту.</p>
+<table class="matrix">
+  <thead><tr><th>Файл / артефакт</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>T6</th><th>T7</th></tr></thead>
+  <tbody>
+    <tr><td><code>agents_md_parser.py</code></td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>orchestrator.py</code></td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>reason.py</code></td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td></tr>
+    <tr><td><code>oracle_atoms.py</code></td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>oracle.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>pipeline.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>main.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>data/oracle/atoms.yaml</code></td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>ir_models.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>verify.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>data/prompts/intent.md</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>data/prompts/plan.md</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td></tr>
+    <tr><td><code>tests/test_ir_models.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td></tr>
+    <tr><td><code>docs/wiki/</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td></tr>
+  </tbody>
+</table>
+<p class="note">Единственное пересечение по файлу — <code>reason.py</code> (T1 правит <code>_facts_block</code>/tier, T6 добавляет нормализатор в <code>run_plan</code>): непересекающиеся участки, конфликта нет. Все остальные файлы трогает ровно одна задача.</p>
+
+<h3>Покрытие требований: требование спеки × задача</h3>
+<table class="matrix">
+  <thead><tr><th>Требование спеки</th><th>Задача-покрытие</th></tr></thead>
+  <tbody>
+    <tr><td>Block A — тонкий prephase + инвентарь AGENTS.MD</td><td>T1</td></tr>
+    <tr><td>Block B — probe-then-refine (seed-атом)</td><td>T3</td></tr>
+    <tr><td>Block C — модель полярности + рендер</td><td>T2</td></tr>
+    <tr><td>Block C — distill polarity + end-of-run self-fill</td><td>T4</td></tr>
+    <tr><td>Block D — verify keyed-by-outcome</td><td>T5</td></tr>
+    <tr><td>Block E — IR-синтаксис: prompt + авторемонт</td><td>T6</td></tr>
+    <tr><td>Verification plan (живой t01, размер промпта, спот-чек, оракул)</td><td>T7</td></tr>
+  </tbody>
+</table>
+<p class="legend">Block C спеки покрыт двумя задачами (T2 модель/рендер, T4 distill/seam) — это намеренное разбиение по порядку зависимостей. Лишних шагов плана без привязки к требованию нет; секции «Constraints override» и «Self-Review» соответствуют жёстким ограничениям intent/спеки (не orphan).</p>
+
+<!-- ============ БЛОК 3: РЕЗУЛЬТАТЫ ПРОВЕРКИ ============ -->
+<h2>3. Результаты проверки по фазам</h2>
+<table>
+  <thead><tr><th>Фаза</th><th>Статус</th><th>Чек-лист (закрытый)</th><th>Итог</th></tr></thead>
+  <tbody>
+    <tr><td>1. structure</td><td><span class="badge b-ok">passed</span></td><td>плейсхолдеры, нумерация шагов/тасков, дубли заголовков</td><td>нет плейсхолдеров; T1–T7 без пропусков/дублей; заголовки уникальны</td></tr>
+    <tr><td>2. coverage</td><td><span class="badge b-ok">passed</span></td><td>каждое требование спеки ↦ ≥1 шаг; каждый шаг ↦ требование</td><td>Blocks A–E + Verification plan покрыты; лишних шагов нет</td></tr>
+    <tr><td>3. dependencies</td><td><span class="badge b-ok">passed</span></td><td>порядок M&lt;N, циклы, доступность артефактов</td><td>T1→T2→T3→T4 корректны; success_criteria(T5.1)→verify(T5.2); циклов нет</td></tr>
+    <tr><td>4. verifiability</td><td><span class="badge b-ok">passed</span></td><td>измеримый DoD; команда/ожидаемый вывод у каждого шага</td><td>каждая задача имеет verify-шаг с командой и ожидаемым выводом</td></tr>
+    <tr><td>5. consistency</td><td><span class="badge b-ok">passed</span></td><td>сверка хешей секций + сводка изменений</td><td>первый прогон — все секции новые; типы согласованы (Self-Review)</td></tr>
+  </tbody>
+</table>
+
+<h3>Findings</h3>
+<table>
+  <thead><tr><th>id</th><th>severity</th><th>section</th><th>text</th><th>verdict</th></tr></thead>
+  <tbody>
+    <tr><td colspan="5" style="text-align:center; color:var(--muted)">Findings отсутствуют — все фазы пройдены без замечаний.</td></tr>
+  </tbody>
+</table>
+
+<h3>Сводка</h3>
+<div class="kv">
+  <div><span class="dot" style="background:var(--danger)"></span><b>CRITICAL open:</b> 0</div>
+  <div><span class="dot" style="background:var(--warn)"></span><b>WARNING open:</b> 0</div>
+  <div><b>Вердикт:</b> <span class="badge b-ok">OK</span></div>
+</div>
+
+<h3>Цепочка IDD → SDD → Plan</h3>
+<div class="chain">
+docs/superpowers/intents/2026-06-16-prephase-ondemand-and-loop-fixes-intent.md<br>
+&nbsp;&nbsp;&rarr; docs/superpowers/specs/2026-06-17-prephase-ondemand-and-loop-fixes-design.md<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&rarr; docs/superpowers/plans/2026-06-18-prephase-ondemand-and-loop-fixes.md
+</div>
+
+</main>
+</body>
+</html>
