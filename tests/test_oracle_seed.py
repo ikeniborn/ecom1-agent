@@ -6,8 +6,8 @@ PATH = "data/oracle/atoms.yaml"
 def test_seed_atoms_present_and_valid():
     atoms = load_atoms(PATH)
     ids = {a.id for a in atoms}
-    for required in {"fraud-impossible-travel", "sql-no-name-binds",
-                     "catalog-price-ex-vat", "never-read-directory"}:
+    for required in {"probe_then_refine_lookup", "normalize_free_text_filter",
+                     "read_governing_doc_before_filter"}:
         assert required in ids, f"missing seed atom {required}"
     for a in atoms:
         assert a.content.strip()
