@@ -251,7 +251,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     Per-task pipeline; calls vm.answer exactly once before returning a metrics
     dict: {cycles_used, outcome, status, input_tokens, output_tokens, ...}.
     """
-    from .interpreter import InterpretError, interpret, lint_security_first
+    from .interpreter import InterpretError, interpret, lint
     from .reason import IntentError, PlanError, run_intent, run_plan
     from .verify import verify
 
@@ -299,7 +299,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             plan = run_plan(intent, facts, learn_ctx, last_error,
                             token_out=tk, oracle_atoms=oracle_atoms,
                             observed=last_observed); _accum(tk)
-            lint_security_first(plan)
+            lint(plan)
         except (PlanError, InterpretError) as e:
             last_error = f"plan: {e}"; _accum(tk)
             _ilearn(task_id, learn_ctx, intent,

@@ -206,6 +206,33 @@ def lint_security_first(plan: PlanIR) -> None:
         )
 
 
+def lint(plan: PlanIR) -> None:
+    """Registry-driven plan-time lint (F8). Dispatches each non-inactive check-spec in
+    data/harness/checks.yaml to its `kind` handler. An ACTIVE error-severity violation
+    raises InterpretError (blocks); a `candidate` entry, or a `warn`-severity one, logs
+    only. Unknown kinds / malformed specs / handler errors degrade to a logged no-op."""
+    from . import harness
+    for spec in harness.load_checks():
+        if not isinstance(spec, dict) or spec.get("status") == "inactive":
+            continue
+        handler = harness.handler_for(spec.get("kind"))
+        if handler is None:
+            print(f"[lint] unknown check kind {spec.get('kind')!r} (id={spec.get('id')}) — skipped")
+            continue
+        try:
+            violations = handler(plan, spec)
+        except Exception as e:                       # a bad handler/spec is never fatal
+            print(f"[lint] check {spec.get('id')!r} errored: {e} — skipped")
+            continue
+        if not violations:
+            continue
+        blocking = (spec.get("status", "active") == "active"
+                    and spec.get("severity", "error") == "error")
+        if blocking:
+            raise InterpretError("; ".join(violations))
+        print(f"[lint] warn ({spec.get('id')}): {violations[0]}")
+
+
 def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResult:
     lint_security_first(plan)
     env: dict = dict(intent.params or {})
