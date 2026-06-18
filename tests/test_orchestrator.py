@@ -514,3 +514,16 @@ def test_gather_uses_learned_deep_read(tmp_path, monkeypatch):
     facts = orch.gather_prephase_facts(vm, instruction="show the last transaction",
                                        agents_md_text="", task_id="t_dr")
     assert "/proc/incoming/payments" in facts.path_listings
+
+
+def test_catalogue_query_logs_doc_select_gap(capsys):
+    # F7: a catalogue query whose entity tokens hit no /docs file logs a gap and does NOT
+    # break (gather completes). Defensive only — many catalogue tasks have no doc.
+    from agent.orchestrator import gather_prephase_facts
+    from agent.mock_vm_spy import MockVMSpy
+    vm = MockVMSpy(fixtures={})        # all RPCs return the empty stub -> no doc hits
+    facts = gather_prephase_facts(vm, 'Does the "Festool SYS bag" exist in the catalogue?',
+                                  agents_md_text="", task_id="t01")
+    out = capsys.readouterr().out
+    assert "DOC_SELECT gap" in out
+    assert isinstance(facts.docs_inventory, str)   # completed without raising

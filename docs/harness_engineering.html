@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harness Engineering — digitized (EN/RU)</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#161a22; --panel2:#1c2230; --ink:#e6e9ef; --mut:#9aa4b2;
+    --line:#28303d; --accent:#6ea8fe; --green:#5ad08a; --purple:#b48cf2; --amber:#f5c451;
+    --red:#f08a8a; --teal:#4fd1c5;
+    --l1:#6ea8fe; --l2:#5ad08a; --l3:#b48cf2; --l4:#c98cf2; --l5:#4fd1c5; --l6:#f08a8a;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overflow-wrap:break-word;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px 120px}
+
+  /* ---- sticky top bar with language switch ---- */
+  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+    gap:12px;padding:12px 0;margin-bottom:8px;background:rgba(15,17,21,.86);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .brand{font-weight:700;font-size:14px;letter-spacing:.02em;color:#cfd6e0}
+  .switch{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .langbtn{appearance:none;border:none;background:transparent;color:var(--mut);
+    font:600 13px/1 inherit;padding:8px 14px;cursor:pointer;letter-spacing:.04em}
+  .langbtn+ .langbtn{border-left:1px solid var(--line)}
+  .langbtn.on{background:var(--accent);color:#0f1115}
+
+  header.doc{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:8px}
+  .kicker{color:var(--accent);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+  h1{font-size:clamp(24px,5vw,34px);line-height:1.18;margin:14px 0 10px;letter-spacing:-.01em}
+  .byline{color:var(--mut);font-size:14px}
+  .byline b{color:var(--ink)}
+  .lede{font-size:18px;color:#cfd6e0;font-style:italic;margin:22px 0 0}
+  h2{font-size:clamp(20px,4vw,24px);margin:54px 0 14px;letter-spacing:-.01em;scroll-margin-top:64px}
+  h3{font-size:18px;margin:34px 0 8px;color:#dfe5ee}
+  p{margin:14px 0}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  strong{color:#fff}
+  em{color:#cdd5e0}
+  ul,ol{margin:14px 0;padding-left:22px}
+  li{margin:8px 0}
+  code{background:#0b0e13;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.86em;color:#cfe3ff;overflow-wrap:break-word}
+  blockquote{margin:18px 0;padding:14px 18px;border-left:3px solid var(--accent);background:var(--panel);border-radius:0 8px 8px 0;color:#d6dde7;font-style:italic}
+  .gotcha{border-left-color:var(--amber);background:#221d10}
+  .gotcha b{color:var(--amber)}
+  .pull{font-size:clamp(18px,3.5vw,22px);line-height:1.4;color:#aeb9c7;font-style:italic;text-align:center;margin:40px 0;padding:0 10px}
+  .mono-eq{font-size:clamp(20px,4vw,26px);color:#cbd4e0;text-align:center;letter-spacing:.02em;margin:30px 0;font-weight:300}
+
+  /* TOC */
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0 8px}
+  nav.toc b{display:block;color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:30px}
+  nav.toc a{color:#c5cedb}
+
+  /* Diagram shell — overflow-x:auto so wide diagrams scroll, never clip */
+  figure{margin:34px 0;background:linear-gradient(180deg,#12161e,#0e1218);border:1px solid var(--line);border-radius:16px;padding:24px 20px;overflow-x:auto}
+  figcaption{text-align:center;color:var(--mut);font-size:13px;margin-top:16px;letter-spacing:.03em}
+  .fig-title{text-align:center;font-size:17px;color:#cfd6e0;margin:0 0 22px;font-weight:600;letter-spacing:.01em}
+
+  /* grids: minmax(0,1fr) lets children shrink instead of overflowing */
+  .cards3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .pcard{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px;border-top:3px solid var(--line);min-width:0}
+  .pcard.p1{border-top-color:var(--l1)} .pcard.p2{border-top-color:var(--l2)} .pcard.p3{border-top-color:var(--l5)}
+  .pcard h4{margin:0 0 4px;font-size:15px}
+  .pcard .stage{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+  .pcard dl{margin:0;font-size:13px;line-height:1.5}
+  .pcard dt{color:var(--accent);font-weight:600;margin-top:10px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .pcard.p2 dt{color:var(--green)} .pcard.p3 dt{color:var(--teal)}
+  .pcard dd{margin:2px 0 0;color:#bcc6d3}
+
+  .stack{display:flex;flex-direction:column;gap:10px;min-width:340px}
+  .layer{display:flex;align-items:center;gap:14px;padding:13px 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel2)}
+  .layer .num{flex:0 0 auto;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:13px;color:#0f1115}
+  .layer .body{flex:1;min-width:0}
+  .layer .body b{display:block;font-size:14px}
+  .layer .body span{font-size:12.5px;color:var(--mut)}
+  .layer.L1{border-left:4px solid var(--l1)} .layer.L1 .num{background:var(--l1)}
+  .layer.L2{border-left:4px solid var(--l2)} .layer.L2 .num{background:var(--l2)}
+  .layer.L3{border-left:4px solid var(--l3)} .layer.L3 .num{background:var(--l3)}
+  .layer.L4{border-left:4px solid var(--l4)} .layer.L4 .num{background:var(--l4)}
+  .layer.L5{border-left:4px solid var(--l5)} .layer.L5 .num{background:var(--l5)}
+  .layer.L6{border-left:4px solid var(--l6)} .layer.L6 .num{background:var(--l6)}
+
+  .flow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 13px;font-size:13px;font-weight:600;color:#dbe3ee}
+  .chip.acc{border-color:var(--l3);color:#e4d7ff}
+  .arw{color:var(--mut);font-size:18px}
+
+  .cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .mcol{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:14px;text-align:center;min-width:0}
+  .mcol .ic{font-size:22px}
+  .mcol b{display:block;margin:8px 0 4px;font-size:14px}
+  .mcol span{font-size:12.5px;color:var(--mut)}
+
+  .deval{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:stretch}
+  .ecard{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:15px;min-width:0}
+  .ecard h4{margin:0 0 8px;font-size:14px}
+  .ecard.plan{border-top:3px solid var(--l3)} .ecard.gen{border-top:3px solid var(--l1)} .ecard.qa{border-top:3px solid var(--l5)}
+  .ecard p{margin:0;font-size:12.5px;color:#bcc6d3;line-height:1.5}
+  .loopnote{margin-top:14px;text-align:center;color:var(--red);font-size:13px;font-weight:600;letter-spacing:.02em}
+  .keyins{margin-top:14px;background:#1a1730;border:1px solid #34305a;border-radius:10px;padding:12px 14px;font-size:13px;color:#cabdf2}
+  .keyins b{color:#d7c9ff}
+
+  /* health-check (L5) mini panel */
+  .hcheck{max-width:460px;margin:0 auto;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:14px}
+  .hcheck .row{display:flex;align-items:center;gap:9px;font-size:13px;padding:6px 0;border-bottom:1px dashed var(--line);color:#cdd6e2}
+  .hcheck .row:last-child{border-bottom:none}
+  .hcheck .ok{color:var(--green);font-weight:700}
+  .hcheck .pass{margin-left:auto;color:var(--green);font-weight:700;font-size:12px;letter-spacing:.05em}
+
+  /* mapping table — scroll wrapper prevents clipping */
+  .map{margin:26px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .map .scroll{overflow-x:auto}
+  .map table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:520px}
+  .map th{background:var(--panel2);text-align:left;padding:11px 14px;color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line)}
+  .map td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top;color:#c8d1dd}
+  .map tr:last-child td{border-bottom:none}
+  .map td:first-child{color:#fff;font-weight:600}
+  .map code{font-size:.84em}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+  .tag.have{background:#13301f;color:var(--green);border:1px solid #1f5235}
+  .tag.partial{background:#2a2410;color:var(--amber);border:1px solid #5a4a18}
+  .tag.gap{background:#301414;color:var(--red);border:1px solid #5a2222}
+
+  .note{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:16px 20px;margin:22px 0}
+  .note b{color:var(--teal)}
+  hr{border:none;border-top:1px solid var(--line);margin:48px 0}
+  .src{color:var(--mut);font-size:13px}
+
+  .hidden{display:none !important}
+
+  @media(max-width:720px){
+    .cards3,.deval{grid-template-columns:1fr}
+    .cols3{grid-template-columns:1fr}
+    nav.toc ol{columns:1}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">Harness Engineering · digitized</span>
+    <span class="switch" role="group" aria-label="language">
+      <button class="langbtn" data-l="en">EN</button>
+      <button class="langbtn" data-l="ru">RU</button>
+    </span>
+  </div>
+
+<!-- ===================================================================== -->
+<!-- ============================  ENGLISH  ============================== -->
+<!-- ===================================================================== -->
+<div id="en" class="article">
+
+<header class="doc">
+  <div class="kicker">Member-only story · digitized for pattern analysis</div>
+  <h1>Harness Engineering: Understand this will make your AI Agent performs better than 80% of others</h1>
+  <p class="byline">By <b>Nick T. (Ph.D.)</b> · 9 min read · Apr 6, 2026 · <i>Artificial Intelligence in Plain English</i></p>
+  <p class="lede">Why Your AI Agent Keeps Failing — And It’s Not the Model’s Fault. The uncomfortable truth about why smart AI systems still collapse in production — and the engineering discipline that finally fixes it.</p>
+</header>
+
+<nav class="toc">
+  <b>Contents</b>
+  <ol>
+    <li><a href="#en-stages">Three stages of AI engineering</a></li>
+    <li><a href="#en-mental">Agent = Model + Harness</a></li>
+    <li><a href="#en-layers">Six architectural layers</a></li>
+    <li><a href="#en-anxiety">The hidden enemy: Context Anxiety</a></li>
+    <li><a href="#en-decoupled">Decoupled evaluation</a></li>
+    <li><a href="#en-bottom">The bottom line</a></li>
+    <li><a href="#en-agent">→ Mapping onto ecom1-agent</a></li>
+  </ol>
+</nav>
+
+<blockquote>
+It was 2 AM when I finally admitted defeat. I had spent three weeks fine-tuning prompts, swapping to the latest flagship model, and tweaking RAG chunking methods obsessively. My AI agent could work greatly in a sandbox. But in production? It’s a disaster. It forgot what it had decided two steps ago. It confidently declared success right before delivering a broken result. The task success rate hovered stubbornly at 68%. No matter what I did to the model, I couldn’t push it past 70%.
+</blockquote>
+
+<p>Sound familiar? Here’s what I eventually discovered: <strong>I wasn’t dealing with a model problem. I was dealing with a systems problem.</strong> And until I understood that distinction, nothing was going to change.</p>
+
+<h2 id="en-stages">The Three Stages of AI Engineering — And Why Most Teams Are Stuck in Stage 2</h2>
+<p>The maturation of LLM applications has quietly pushed us through three distinct stages of thinking. Most teams I’ve talked to are somewhere in stage one or two, wondering why stage three problems keep biting them.</p>
+
+<figure>
+  <p class="fig-title">Evolution: The Three Paradigms</p>
+  <div class="cards3">
+    <div class="pcard p1">
+      <h4>Prompt Engineering</h4>
+      <div class="stage">Stage 1 · Expression &amp; Intent</div>
+      <dl>
+        <dt>Goal</dt><dd>Did the model understand me? Shapes localized probability space.</dd>
+        <dt>Limitation</dt><dd>Hits a hard ceiling when tasks require knowledge outside the model’s weights.</dd>
+        <dt>Analogy</dt><dd>Giving an employee instructions.</dd>
+      </dl>
+    </div>
+    <div class="pcard p2">
+      <h4>Context Engineering</h4>
+      <div class="stage">Stage 2 · Information &amp; Grounding</div>
+      <dl>
+        <dt>Goal</dt><dd>Does the model have the facts? Manages the input pipeline via RAG and history.</dd>
+        <dt>Limitation</dt><dd>Perfect context doesn’t prevent execution drift across long action chains.</dd>
+        <dt>Analogy</dt><dd>Handing the employee the project files.</dd>
+      </dl>
+    </div>
+    <div class="pcard p3">
+      <h4>Harness Engineering</h4>
+      <div class="stage">Stage 3 · Supervision &amp; Execution</div>
+      <dl>
+        <dt>Goal</dt><dd>Can the model sustain correct action? Scaffolding to prevent drift and enforce constraints.</dd>
+        <dt>Result</dt><dd>Ensures the model acts reliably, catches mistakes, and recovers.</dd>
+        <dt>Analogy</dt><dd>Mandating a checklist, QA, and mid-meeting check-ins.</dd>
+      </dl>
+    </div>
+  </div>
+  <figcaption>Stage 1 shapes intent · Stage 2 grounds facts · Stage 3 supervises execution</figcaption>
+</figure>
+
+<h3>Stage 1: Prompt Engineering (Did the model understand me?)</h3>
+<p>This is where everyone starts. You discover that LLMs are exquisitely sensitive probability-shaping machines — a carefully crafted role, a few-shot example, the right format constraint, and suddenly the output transforms. It feels like magic. And it is powerful. For contained, single-turn tasks, good prompting is indispensable.</p>
+<p>But I hit the ceiling hard. No matter how beautifully I worded my instructions, I couldn’t give the model knowledge it didn’t have. I couldn’t make it remember what happened three tool calls ago. I couldn’t stop it from confidently making up data when reality disappointed it.</p>
+<blockquote class="gotcha"><b>⚠ The gotcha:</b> Believing that a more complex or articulate prompt can compensate for a fundamental lack of factual grounding or real-time context. It can’t.</blockquote>
+
+<h3>Stage 2: Context Engineering (Does the model have the facts?)</h3>
+<p>Once I understood that limitation, I dove into context. RAG pipelines. Dynamic retrieval. Tool outputs piped back in. Conversational history injected carefully. I became obsessed with <strong>what the model could see</strong> when it made a decision.</p>
+<p>This felt like a breakthrough — and to be fair, it was. My agent got dramatically smarter when it had access to the right information at the right time.</p>
+<p>But here’s what context engineering still couldn’t solve: <em>execution drift.</em></p>
+<p>My agent would formulate a brilliant plan, execute step one perfectly, misinterpret the tool’s return value on step two, and quietly wander off-course for the next twelve steps. And the scariest part? The system never noticed. It just kept going, confidently executing a plan that had silently become wrong miles back.</p>
+<blockquote class="gotcha"><b>⚠ The common mistake:</b> Equating context engineering with vector database RAG. True context management is so much more — dynamic state injection, tool response summarization, strategic historical truncation. RAG is just the beginning.</blockquote>
+
+<h3>Stage 3: Harness Engineering (Can the model sustain correct action?)</h3>
+<p>This is where things get interesting. And honestly, a little humbling for anyone who thought better models were the answer.</p>
+<p><strong>Harness Engineering</strong> is the discipline of building the scaffolding around the model — the deterministic systems that supervise what the model does, catch its failures, enforce its constraints, and pull it back on course when it drifts.</p>
+<blockquote>The name comes from physical harnesses: reins, safety tethers, the infrastructure of control. That’s exactly what this is.</blockquote>
+
+<h2 id="en-mental">The Mental Model That Changed Everything for Me: Agent = Model + Harness</h2>
+<p>Here’s the reframe (from LangChain) that unlocked my thinking:</p>
+<p class="mono-eq">Agent = Model + Harness</p>
+<p>Nearly everything in your codebase that makes the agent <strong>actually work in production</strong> — that isn’t the foundation model API call itself — is the Harness.</p>
+<p>The analogy I keep coming back to: imagine sending a junior employee to conduct a critical client meeting.</p>
+<ul>
+  <li><strong>Prompting</strong> is telling them the agenda: “Say hello, pitch the product, ask for requirements.”</li>
+  <li><strong>Context</strong> is handing them the dossier: “Here’s the client background, pricing sheet, and meeting objectives.”</li>
+  <li><strong>The Harness</strong> is everything else: the checklist they carry, the mandated mid-meeting check-in with you, the recorded transcript, the correction mechanism if they go off-script, and the strict acceptance criteria for the meeting report.</li>
+</ul>
+<p>No amount of better briefing compensates for missing accountability infrastructure.</p>
+<p>This realization — that the first two stages help the model think better, while Harness Engineering ensures it <strong>acts reliably</strong> — is what finally broke me past 70%. By refactoring task decomposition, state management, critical step validation, and failure recovery, I pushed the same underlying model and the same prompts to over 95% task success.</p>
+
+<h2 id="en-layers">The Six Architectural Layers of a Mature Harness</h2>
+<p>A Harness isn’t a single file or a clever wrapper. It’s a layered architecture, and every layer addresses a different class of failure. Here’s how I think about it:</p>
+
+<figure>
+  <p class="fig-title">Architecture: The 6-Layer Stack</p>
+  <div class="stack">
+    <div class="layer L1"><div class="num">1</div><div class="body"><b>Information Boundaries</b><span>Cognitive scope — bound what the model sees</span></div></div>
+    <div class="layer L2"><div class="num">2</div><div class="body"><b>Tool System</b><span>Actuation — empower action, control when tools fire</span></div></div>
+    <div class="layer L3"><div class="num">3</div><div class="body"><b>Execution Orchestration</b><span>Planning &amp; routing — deterministic step order</span></div></div>
+    <div class="layer L4"><div class="num">4</div><div class="body"><b>Memory &amp; State</b><span>Continuity — segregated state across turns</span></div></div>
+    <div class="layer L5"><div class="num">5</div><div class="body"><b>Evaluation &amp; Observability</b><span>Self-awareness — independent validation</span></div></div>
+    <div class="layer L6"><div class="num">6</div><div class="body"><b>Constraints, Validation &amp; Recovery</b><span>Resilience — catch inevitable failures</span></div></div>
+  </div>
+  <figcaption>A mature Harness is not a single script — it is a meticulously layered architecture designed to bound cognition, empower action, orchestrate workflows, and catch inevitable failures.</figcaption>
+</figure>
+
+<h3>Layer 1: Information Boundaries (Cognitive Scope)</h3>
+<p>What the model “sees” in its immediate context determines its performance more than almost anything else.</p>
+<p>Superfluous data doesn’t make the model smarter — it makes it lose focus. Worse, when you mix different types of information (system rules, current task state, external evidence) into an unstructured blob, the model drops constraints. Critical rules become noise that it stops attending to.</p>
+<p>The Harness must explicitly define and categorize what the model sees: its role, its current objective, the success criteria, and the structured separation of different information types.</p>
+
+<h3>Layer 2: Tool System (Actuation)</h3>
+<p>Without tools, an LLM is a text predictor. With the right tool system, it becomes an agent that can interact with the real world.</p>
+<p>But there’s a critical mistake I made early on: giving the model too many tools. Fifteen tools with comprehensive documentation sounds powerful. In practice, it diffuses attention and causes the model to hallucinate non-existent parameters or misuse APIs it barely understands.</p>
+<p>The Harness must control <strong>when tools are used</strong>, not just which tools are available. It must prevent the model from blindly guessing when it should be searching, and stop it from searching when it already has the answer.</p>
+<blockquote>And this is non-negotiable: <strong>never pipe raw tool outputs directly back into the LLM.</strong> A 50-item JSON response from an API call will poison your context. The Harness must filter, parse, and summarize tool returns before they touch the model.</blockquote>
+
+<h3>Layer 3: Execution Orchestration (Planning &amp; Routing)</h3>
+<p>LLMs often fail not because they lack individual skills but because they can’t string those skills together linearly. They suffer from what I call “stream of consciousness” execution — jumping between steps, skipping validation, prematurely generating output before they have everything they need.</p>
+<p>The Harness lays down strict tracks:</p>
+
+<figure>
+  <p class="fig-title">Layer 3 · Deterministic execution track</p>
+  <div class="flow">
+    <span class="chip acc">Understand Goal</span><span class="arw">→</span>
+    <span class="chip acc">Assess Information</span><span class="arw">→</span>
+    <span class="chip acc">Fetch Missing Info</span><span class="arw">→</span>
+    <span class="chip acc">Analyze</span><span class="arw">→</span>
+    <span class="chip acc">Generate</span><span class="arw">→</span>
+    <span class="chip acc">Verify</span><span class="arw">→</span>
+    <span class="chip acc">Output</span>
+  </div>
+  <figcaption>Transfers project-management responsibility from the probabilistic model to the deterministic system</figcaption>
+</figure>
+<p>This isn’t just scaffolding. It’s the transfer of project management responsibility from the probabilistic model to the deterministic system. The model shouldn’t have to decide what order to do things in. That structure belongs in the Harness.</p>
+
+<h3>Layer 4: Memory and State (Continuity)</h3>
+<p>A stateless agent has amnesia every turn. Without explicit state management, you’re essentially starting a new conversation from scratch at every step of a multi-step task.</p>
+<p>I’ve learned to maintain three strictly segregated memory types:</p>
+
+<figure>
+  <p class="fig-title">Layer 4 · Segregated memory</p>
+  <div class="cols3">
+    <div class="mcol"><div class="ic">🕐</div><b>1 · Current Task State</b><span>What step are we on? What’s pending? What’s been confirmed?</span></div>
+    <div class="mcol"><div class="ic">🧩</div><b>2 · Conversational Intermediate Results</b><span>What conclusions have we already reached in this session?</span></div>
+    <div class="mcol"><div class="ic">👤</div><b>3 · Long-Term Memory / User Profiles</b><span>Global preferences and context that persists across sessions.</span></div>
+  </div>
+  <figcaption>Maintain strictly segregated memory: what is pending vs. what is agreed upon</figcaption>
+</figure>
+<blockquote class="gotcha"><b>⚠ The gotcha that burned me:</b> Conflating task state with conversational history. The result is an infinitely growing, unstructured context window that degrades model performance as the task progresses. Keep them strictly separate.</blockquote>
+
+<h3>Layer 5: Evaluation and Observability (Self-Awareness)</h3>
+<p>This layer is where primitive agents break down spectacularly. They generate output, declare success, and have no mechanism to know whether the output is actually correct.</p>
+<p>An agent that evaluates its own work is an agent with a profound optimistic bias. It will declare broken code as working. It will rate its own response as satisfactory when it hasn’t answered the actual question.</p>
+<p>The Harness needs independent, automated validation mechanisms. Not post-hoc human review — that’s too slow and doesn’t scale. Automated output validation, integrated testing environments, meticulous logging, metrics tracking, and error attribution all belong here.</p>
+
+<figure>
+  <p class="fig-title">Layer 5 · Health check (independent verification)</p>
+  <div class="hcheck">
+    <div class="row"><span class="ok">✓</span> Test A: Data Validation <span class="pass">PASS</span></div>
+    <div class="row"><span class="ok">✓</span> Test B: Logic Flow <span class="pass">PASS</span></div>
+    <div class="row"><span class="ok">✓</span> Test C: API Response <span class="pass">PASS</span></div>
+    <div class="row"><span class="ok">✓</span> Test D: Latency Check <span class="pass">PASS</span></div>
+  </div>
+  <figcaption>Cures “unwarranted self-confidence” — the system continuously proves to itself its actions are correct via independent verification + error-attribution metrics</figcaption>
+</figure>
+<blockquote>The system must continuously prove to itself that its actions are correct, not just assume they are.</blockquote>
+
+<h3>Layer 6: Constraints, Validation, and Recovery (Resilience)</h3>
+<p>In production, <strong>failure is the default state</strong>. APIs timeout. JSON formats break. Search results are inaccurate. An agent without a recovery mechanism is an agent that requires a full human restart on every error.</p>
+<p>The Harness needs three things here:</p>
+<ul>
+  <li><strong>Constraints:</strong> Hard-coded rules defining what the agent is strictly forbidden to do.</li>
+  <li><strong>Validation:</strong> Pre-output and post-output gating checks (schema validation, format checks, constraint verification).</li>
+  <li><strong>Recovery:</strong> Retry logic, fallback paths, and the ability to roll back to the last known stable state.</li>
+</ul>
+
+<figure>
+  <p class="fig-title">Layer 6 · Recovery state machine</p>
+  <div class="flow">
+    <span class="chip">Start</span><span class="arw">→</span>
+    <span class="chip">Execute Action</span><span class="arw">→</span>
+    <span class="chip">Validate Output</span><span class="arw">→</span>
+    <span class="chip">Output Result</span>
+  </div>
+  <div class="flow" style="margin-top:10px">
+    <span class="chip" style="border-color:var(--red);color:#f6c2c2">✗ Error Detected</span>
+    <span class="arw">→</span>
+    <span class="chip" style="border-color:var(--amber);color:#f5d98a">Rollback Loop</span>
+    <span class="arw">→</span>
+    <span class="chip" style="border-color:var(--l2);color:#bdf0d0">Last Known Stable State</span>
+  </div>
+  <figcaption>Hard-coded constraints · pre/post-output gating · rollback logic to prevent full restarts</figcaption>
+</figure>
+
+<h2 id="en-anxiety">The Hidden Enemy: Context Anxiety</h2>
+<p>As tasks stretch across dozens of steps, something strange happens. Anthropic’s researchers have named it <strong>Context Anxiety</strong>.</p>
+<p>As the context window approaches its limits, models start dropping granular details, losing track of core objectives, and behaving as though they’re rushing to finish. They begin hallucinating conclusions that weren’t reached. They skip verification steps. They feel — if that’s the right word — urgent in a way that makes them sloppy.</p>
+<p>The naive solution is context compression: summarize the history, inject the summary, keep going. I tried this. It reduces token count, but it doesn’t actually reset the model’s cognitive state or attention dilution. The solution that actually works is radical: restart the agent entirely.</p>
+<blockquote>Anthropic calls this <strong>Context Reflect</strong>. When the context grows too large, you take the compressed summary and hand it to a completely fresh agent instance — pristine context, no accumulated confusion. It’s the same principle as handling a memory leak by restarting the process rather than frantically garbage-collecting.</blockquote>
+<p>Similarly, I stopped giving agents their entire tool library upfront. Instead, the Harness implements <strong>progressive disclosure</strong>: initially, the model only sees minimal tool stubs. When it signals intent to use a specific capability, the Harness dynamically injects the detailed documentation and parameter schemas. Context optimization isn’t about giving the model more information — it’s about giving it <em>the right information, on demand, exactly when it needs it</em>.</p>
+
+<h2 id="en-decoupled">Separating Generation from Evaluation: The Architecture That Enables Autonomy</h2>
+<p>One of the most important architectural insights I’ve encountered comes from how Anthropic builds truly autonomous agents — ones that can generate complete, working products without human review for hours at a stretch.</p>
+<p>The trick is a strict three-way split:</p>
+
+<figure>
+  <p class="fig-title">Advanced Mechanics: Decoupled Evaluation</p>
+  <div class="deval">
+    <div class="ecard plan"><h4>📋 The Planner</h4><p>Translates vague human requests into rigorous, exact engineering specifications.</p></div>
+    <div class="ecard gen"><h4>⚙ The Generator</h4><p>Takes the specifications and executes them step-by-step to write the code.</p></div>
+    <div class="ecard qa"><h4>🔍 The Evaluator (QA)</h4><p>Acts as a completely independent quality-assurance entity, functionally decoupled from the Generator.</p></div>
+  </div>
+  <div class="loopnote">Generate → Inspect → Fix → Re-inspect</div>
+  <div class="keyins"><b>💡 Key insight:</b> Asking an LLM to grade its own output results in severe optimistic bias. Generation and acceptance testing must be functionally decoupled to create valid autonomy.</div>
+  <figcaption>Independent QA against the real world — not against the Generator’s representation of it</figcaption>
+</figure>
+
+<p>The Evaluator doesn’t just read the Generator’s code. It interacts with the rendered output. In UI work, it clicks through the interface, inspects visual layouts, checks interactive states. It validates against the real world, not against the Generator’s representation of the real world.</p>
+<p>OpenAI took this even further. As agents began writing code faster than human engineers could review pull requests, they built the agent a fully automated CI/CD pipeline of its own. The agent runs its code in isolated sandboxes, captures screenshots with headless browsers, reads its own execution logs, and iterates until it can verify the deployment is correct — without a human in the loop.</p>
+<blockquote>“Done” no longer means “I finished generating the text.” It means “I ran the code, reviewed the logs, found a bug, fixed it, and verified the deployment in the sandbox.”</blockquote>
+
+<h2 id="en-bottom">The Bottom Line</h2>
+<p>Here’s the truth about production AI systems, distilled from everything I’ve learned building them:</p>
+<p class="pull">“A foundation model’s intelligence defines its theoretical ceiling on a benchmark leaderboard. The robustness of the Harness Engineering determines whether that intelligence can actually survive, recover, and deliver value in the chaotic real world.”</p>
+<p>The model is not your bottleneck. The model has never been your bottleneck, past a certain point.</p>
+<p><strong>The gap between a 70% success rate and a 95% success rate — between a demo and a product — lives entirely in the Harness.</strong></p>
+
+<hr>
+
+<h2 id="en-agent">→ Mapping onto ecom1-agent (patterns to implement)</h2>
+<div class="note">
+  <p><b>Why this section exists:</b> the stated purpose of digitizing this article is to extract patterns implementable in <code>ecom1-agent</code>. Striking finding — the project is <em>already</em> a Harness in the article’s exact sense: a deterministic Plan-IR interpreter wrapping a probabilistic model. Below: each article layer mapped to the existing mechanism, with status flags marking what’s present vs. a genuine gap worth building. <em>(This mapping is the analyst’s addition, not part of the original article.)</em></p>
+</div>
+
+<div class="map"><div class="scroll">
+<table>
+  <thead><tr><th>Article concept</th><th>ecom1-agent mechanism</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>L1 · Information Boundaries</td>
+      <td>Pre-phase facts (<code>DOC_SELECT</code> + schema + identity + listings); structured <code>IntentSpec</code> (role/objective/success_criteria/answer_shape) frozen per run.</td>
+      <td><span class="tag have">have</span></td>
+    </tr>
+    <tr>
+      <td>L2 · Tool System (never pipe raw outputs)</td>
+      <td>VM RPC behind the interpreter; <code>interpret()</code> summarizes/parses RPC returns deterministically rather than dumping raw JSON into the LLM. JSON-extract priority de-risks spurious tool calls.</td>
+      <td><span class="tag have">have</span></td>
+    </tr>
+    <tr>
+      <td>L3 · Execution Orchestration (deterministic track)</td>
+      <td>The whole point: fixed flow <code>INTENT → loop[PLAN → lint → interpret → verify → answer-once]</code>. Order belongs to the harness, not the model. Mirrors the article’s Understand→Assess→Fetch→Analyze→Generate→Verify→Output track.</td>
+      <td><span class="tag have">have</span></td>
+    </tr>
+    <tr>
+      <td>L4 · Memory &amp; State (segregated)</td>
+      <td><code>learn_ctx</code> (in-run), <code>learned_store</code> per-task rules (cross-session), <code>data/heuristics/*.{intent,plan}.json</code>. Compaction at <code>COMPACTION_THRESHOLD</code>.</td>
+      <td><span class="tag partial">partial</span></td>
+    </tr>
+    <tr>
+      <td>L5 · Evaluation &amp; Observability (independent)</td>
+      <td><code>verify()</code> — deterministic, no-LLM gate checking <code>success_criteria</code>/refs before the single <code>vm.answer</code>. Exactly the article’s “don’t let the model grade itself”.</td>
+      <td><span class="tag have">have</span></td>
+    </tr>
+    <tr>
+      <td>L6 · Constraints / Validation / Recovery</td>
+      <td><code>lint_security_first</code> (constraints), <code>verify()</code> (validation gate), <code>_ilearn</code> retry + <code>_plan_signature</code> no-progress short-circuit + mutation-landed break (recovery).</td>
+      <td><span class="tag have">have</span></td>
+    </tr>
+    <tr>
+      <td>Context Reflect (restart fresh, not compress)</td>
+      <td>Today: in-memory LLM compaction only. The article argues compaction doesn’t reset cognitive state — restart on a fresh instance does.</td>
+      <td><span class="tag gap">gap</span></td>
+    </tr>
+    <tr>
+      <td>Progressive tool disclosure</td>
+      <td>Tools/RPC surface is fixed per phase. No on-demand injection of detailed schemas when intent signals a capability.</td>
+      <td><span class="tag gap">gap</span></td>
+    </tr>
+    <tr>
+      <td>Decoupled Planner / Generator / Evaluator</td>
+      <td>INTENT = Planner, PLAN+interpret = Generator, <code>verify()</code> = independent Evaluator. Already a three-way split — but the Evaluator validates against criteria, not against a re-executed real-world render.</td>
+      <td><span class="tag partial">partial</span></td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+
+<h3>Candidate patterns to build (ranked by article-leverage)</h3>
+<ol>
+  <li><strong>Context Reflect over compaction</strong> — when <code>learn_ctx</code> / cycle count crosses a ceiling mid-run, hand a compressed summary to a <em>fresh</em> interpreter pass rather than only compacting in place. The article claims this is what breaks “Context Anxiety” (sloppy late-cycle plans). <span class="tag gap">gap</span></li>
+  <li><strong>Real-world re-validation in <code>verify()</code></strong> — beyond checking <code>success_criteria</code>, re-execute a read-only probe of the mutated VM state and assert observed reality matches the claimed outcome (Evaluator-against-world, not against-plan). Partially exists via <code>ORACLE_VALIDATE_INLINE</code> grader round-trips. <span class="tag partial">partial</span></li>
+  <li><strong>Progressive disclosure of RPC schemas</strong> — start PLAN with minimal tool stubs; inject full parameter schemas only when intent/plan signals that capability. Reduces the L2 attention diffusion the article warns about. <span class="tag gap">gap</span></li>
+  <li><strong>Explicit memory segregation</strong> — formally separate task-state vs. session-results vs. cross-session profile in <code>learn_ctx</code>, since the article names conflation here as its costliest gotcha. <span class="tag partial">partial</span></li>
+</ol>
+
+<div class="note">
+  <p><b>Bottom line for the agent:</b> ecom1-agent already implements 5 of 6 harness layers — that’s the deliberate Plan-IR design. The article’s net-new ideas are <em>Context Reflect</em> (restart-vs-compress) and <em>progressive tool disclosure</em>. Both are concrete, scoped additions, not rewrites.</p>
+</div>
+
+<hr>
+<p class="src">Source: Nick T. (Ph.D.), “Harness Engineering: Understand this will make your AI Agent performs better than 80% of others”, Artificial Intelligence in Plain English (Medium), Apr 6, 2026. Digitized from PDF for internal pattern analysis. Diagrams recreated as inline CSS from the original figures. The ecom1-agent mapping section is analyst commentary, not part of the source article.</p>
+
+</div><!-- /#en -->
+
+
+<!-- ===================================================================== -->
+<!-- ============================  RUSSIAN  ============================== -->
+<!-- ===================================================================== -->
+<div id="ru" class="article hidden">
+
+<header class="doc">
+  <div class="kicker">Платная статья · оцифровано для разбора паттернов</div>
+  <h1>Harness Engineering: поймите это — и ваш AI-агент будет работать лучше, чем 80% остальных</h1>
+  <p class="byline">Автор: <b>Nick T. (Ph.D.)</b> · 9 мин чтения · 6 апр. 2026 · <i>Artificial Intelligence in Plain English</i></p>
+  <p class="lede">Почему ваш AI-агент продолжает падать — и виновата не модель. Неудобная правда о том, почему умные AI-системы всё ещё разваливаются в продакшене — и инженерная дисциплина, которая это наконец исправляет.</p>
+</header>
+
+<nav class="toc">
+  <b>Содержание</b>
+  <ol>
+    <li><a href="#ru-stages">Три стадии AI-инженерии</a></li>
+    <li><a href="#ru-mental">Agent = Model + Harness</a></li>
+    <li><a href="#ru-layers">Шесть архитектурных слоёв</a></li>
+    <li><a href="#ru-anxiety">Скрытый враг: Context Anxiety</a></li>
+    <li><a href="#ru-decoupled">Разделённая оценка</a></li>
+    <li><a href="#ru-bottom">Итог</a></li>
+    <li><a href="#ru-agent">→ Проекция на ecom1-agent</a></li>
+  </ol>
+</nav>
+
+<blockquote>
+Было 2 часа ночи, когда я наконец признал поражение. Я три недели вылизывал промпты, пересаживался на новейшую флагманскую модель и одержимо крутил методы чанкинга RAG. Мой AI-агент прекрасно работал в песочнице. А в продакшене? Катастрофа. Он забывал, что решил два шага назад. Он уверенно объявлял об успехе прямо перед тем, как выдать сломанный результат. Доля успешных задач упрямо держалась на 68%. Что бы я ни делал с моделью, я не мог пробить 70%.
+</blockquote>
+
+<p>Знакомо? Вот что я в итоге понял: <strong>я имел дело не с проблемой модели. Я имел дело с проблемой системы.</strong> И пока я не осознал это различие, ничего не менялось.</p>
+
+<h2 id="ru-stages">Три стадии AI-инженерии — и почему большинство команд застряли на стадии 2</h2>
+<p>Взросление LLM-приложений тихо провело нас через три отчётливые стадии мышления. Большинство команд, с которыми я общался, находятся где-то на первой или второй стадии и недоумевают, почему их раз за разом кусают проблемы третьей.</p>
+
+<figure>
+  <p class="fig-title">Эволюция: три парадигмы</p>
+  <div class="cards3">
+    <div class="pcard p1">
+      <h4>Prompt Engineering</h4>
+      <div class="stage">Стадия 1 · Выражение и намерение</div>
+      <dl>
+        <dt>Цель</dt><dd>Поняла ли меня модель? Формирует локальное вероятностное пространство.</dd>
+        <dt>Ограничение</dt><dd>Жёсткий потолок, когда задача требует знаний за пределами весов модели.</dd>
+        <dt>Аналогия</dt><dd>Дать сотруднику инструкции.</dd>
+      </dl>
+    </div>
+    <div class="pcard p2">
+      <h4>Context Engineering</h4>
+      <div class="stage">Стадия 2 · Информация и заземление</div>
+      <dl>
+        <dt>Цель</dt><dd>Есть ли у модели факты? Управляет входным конвейером через RAG и историю.</dd>
+        <dt>Ограничение</dt><dd>Идеальный контекст не предотвращает дрейф исполнения на длинных цепочках действий.</dd>
+        <dt>Аналогия</dt><dd>Выдать сотруднику проектные документы.</dd>
+      </dl>
+    </div>
+    <div class="pcard p3">
+      <h4>Harness Engineering</h4>
+      <div class="stage">Стадия 3 · Надзор и исполнение</div>
+      <dl>
+        <dt>Цель</dt><dd>Может ли модель удерживать корректное действие? Каркас против дрейфа и для соблюдения ограничений.</dd>
+        <dt>Результат</dt><dd>Гарантирует, что модель действует надёжно, ловит ошибки и восстанавливается.</dd>
+        <dt>Аналогия</dt><dd>Обязательный чек-лист, QA и сверки по ходу встречи.</dd>
+      </dl>
+    </div>
+  </div>
+  <figcaption>Стадия 1 формирует намерение · Стадия 2 заземляет факты · Стадия 3 надзирает за исполнением</figcaption>
+</figure>
+
+<h3>Стадия 1: Prompt Engineering (поняла ли меня модель?)</h3>
+<p>С этого все начинают. Вы обнаруживаете, что LLM — это исключительно чувствительные машины формирования вероятностей: тщательно выписанная роль, пара few-shot-примеров, верное ограничение формата — и вдруг вывод преображается. Это ощущается как магия. И это мощно. Для замкнутых, однотактовых (single-turn) задач хороший промптинг незаменим.</p>
+<p>Но я жёстко упёрся в потолок. Как бы красиво я ни формулировал инструкции, я не мог дать модели знание, которого у неё не было. Я не мог заставить её помнить, что произошло три вызова инструмента назад. Я не мог помешать ей уверенно выдумывать данные, когда реальность её разочаровывала.</p>
+<blockquote class="gotcha"><b>⚠ Ловушка:</b> Вера в то, что более сложный или красноречивый промпт способен компенсировать фундаментальную нехватку фактического заземления или контекста в реальном времени. Не способен.</blockquote>
+
+<h3>Стадия 2: Context Engineering (есть ли у модели факты?)</h3>
+<p>Осознав это ограничение, я нырнул в контекст. RAG-конвейеры. Динамический поиск. Возврат выводов инструментов обратно во вход. Аккуратно вставленная история диалога. Я стал одержим тем, <strong>что модель могла видеть</strong> в момент принятия решения.</p>
+<p>Это походило на прорыв — и, честно говоря, так и было. Мой агент стал заметно умнее, когда получил доступ к нужной информации в нужный момент.</p>
+<p>Но вот что контекст-инженерия так и не решила: <em>дрейф исполнения.</em></p>
+<p>Мой агент составлял блестящий план, идеально выполнял шаг один, неверно интерпретировал возвращаемое значение инструмента на шаге два и тихо уходил с курса на следующие двенадцать шагов. И самое страшное? Система этого не замечала. Она просто шла дальше, уверенно исполняя план, который незаметно стал ошибочным много шагов назад.</p>
+<blockquote class="gotcha"><b>⚠ Частая ошибка:</b> Приравнивать контекст-инженерию к RAG на векторной базе. Настоящее управление контекстом гораздо шире — динамическая инъекция состояния, суммаризация ответов инструментов, стратегическое усечение истории. RAG — это лишь начало.</blockquote>
+
+<h3>Стадия 3: Harness Engineering (может ли модель удерживать корректное действие?)</h3>
+<p>Вот здесь становится интересно. И, честно говоря, немного отрезвляюще для всех, кто думал, что ответ — в моделях получше.</p>
+<p><strong>Harness Engineering</strong> — это дисциплина построения каркаса (страховочной обвязки) вокруг модели: детерминированных систем, которые надзирают за тем, что делает модель, ловят её сбои, навязывают её ограничения и возвращают её на курс, когда она дрейфует.</p>
+<blockquote>Название идёт от физической обвязки: поводья, страховочные стропы, инфраструктура контроля. Это ровно то, чем оно и является.</blockquote>
+
+<h2 id="ru-mental">Ментальная модель, которая всё для меня изменила: Agent = Model + Harness</h2>
+<p>Вот переосмысление (от LangChain), которое разблокировало моё мышление:</p>
+<p class="mono-eq">Agent = Model + Harness</p>
+<p>Почти всё в вашей кодовой базе, что заставляет агента <strong>реально работать в продакшене</strong> — всё, что не является самим вызовом API базовой модели — это и есть Harness.</p>
+<p>Аналогия, к которой я постоянно возвращаюсь: представьте, что вы отправляете младшего сотрудника провести важную встречу с клиентом.</p>
+<ul>
+  <li><strong>Промптинг</strong> — это сказать ему повестку: «Поздоровайся, презентуй продукт, спроси требования».</li>
+  <li><strong>Контекст</strong> — это вручить ему досье: «Вот фон клиента, прайс-лист и цели встречи».</li>
+  <li><strong>Harness</strong> — это всё остальное: чек-лист, который он несёт, обязательная сверка с вами по ходу встречи, записанный транскрипт, механизм коррекции, если он уходит от сценария, и строгие критерии приёмки для отчёта по встрече.</li>
+</ul>
+<p>Никакой объём более качественного брифинга не компенсирует отсутствие инфраструктуры подотчётности.</p>
+<p>Это осознание — что первые две стадии помогают модели <em>думать</em> лучше, а Harness Engineering обеспечивает, чтобы она <strong>действовала надёжно</strong> — и есть то, что наконец пробило меня за 70%. Переработав декомпозицию задач, управление состоянием, валидацию критических шагов и восстановление после сбоев, я довёл ту же самую модель и те же самые промпты до более чем 95% успешных задач.</p>
+
+<h2 id="ru-layers">Шесть архитектурных слоёв зрелого Harness</h2>
+<p>Harness — это не один файл и не хитрая обёртка. Это слоистая архитектура, и каждый слой адресует свой класс сбоев. Вот как я об этом думаю:</p>
+
+<figure>
+  <p class="fig-title">Архитектура: стек из 6 слоёв</p>
+  <div class="stack">
+    <div class="layer L1"><div class="num">1</div><div class="body"><b>Границы информации</b><span>Когнитивный охват — ограничить то, что видит модель</span></div></div>
+    <div class="layer L2"><div class="num">2</div><div class="body"><b>Система инструментов</b><span>Действие — наделить возможностями, контролировать, когда вызывать инструменты</span></div></div>
+    <div class="layer L3"><div class="num">3</div><div class="body"><b>Оркестрация исполнения</b><span>Планирование и маршрутизация — детерминированный порядок шагов</span></div></div>
+    <div class="layer L4"><div class="num">4</div><div class="body"><b>Память и состояние</b><span>Непрерывность — сегрегированное состояние между тактами</span></div></div>
+    <div class="layer L5"><div class="num">5</div><div class="body"><b>Оценка и наблюдаемость</b><span>Самоосознание — независимая валидация</span></div></div>
+    <div class="layer L6"><div class="num">6</div><div class="body"><b>Ограничения, валидация и восстановление</b><span>Устойчивость — ловить неизбежные сбои</span></div></div>
+  </div>
+  <figcaption>Зрелый Harness — не один скрипт, а тщательно выстроенная слоистая архитектура, призванная ограничить познание, наделить действием, оркестровать процессы и ловить неизбежные сбои.</figcaption>
+</figure>
+
+<h3>Слой 1: Границы информации (когнитивный охват)</h3>
+<p>То, что модель «видит» в своём непосредственном контексте, определяет её производительность сильнее почти всего остального.</p>
+<p>Избыточные данные не делают модель умнее — они заставляют её терять фокус. Хуже того: когда вы смешиваете разные типы информации (системные правила, текущее состояние задачи, внешние свидетельства) в неструктурированную кашу, модель роняет ограничения. Критические правила превращаются в шум, который она перестаёт замечать.</p>
+<p>Harness обязан явно определять и категоризировать то, что видит модель: её роль, её текущую цель, критерии успеха и структурное разделение разных типов информации.</p>
+
+<h3>Слой 2: Система инструментов (действие)</h3>
+<p>Без инструментов LLM — это предсказатель текста. С верной системой инструментов она становится агентом, способным взаимодействовать с реальным миром.</p>
+<p>Но есть критическая ошибка, которую я совершил на раннем этапе: дать модели слишком много инструментов. Пятнадцать инструментов с исчерпывающей документацией звучит мощно. На практике это размывает внимание и заставляет модель галлюцинировать несуществующие параметры или неправильно использовать API, которые она едва понимает.</p>
+<p>Harness обязан контролировать, <strong>когда инструменты используются</strong>, а не только какие инструменты доступны. Он должен мешать модели слепо гадать, когда ей следует искать, и останавливать её от поиска, когда ответ у неё уже есть.</p>
+<blockquote>И это не обсуждается: <strong>никогда не прокидывайте сырые выводы инструментов напрямую обратно в LLM.</strong> Ответ API из 50 элементов JSON отравит ваш контекст. Harness обязан отфильтровать, разобрать и суммировать возвраты инструментов прежде, чем они коснутся модели.</blockquote>
+
+<h3>Слой 3: Оркестрация исполнения (планирование и маршрутизация)</h3>
+<p>LLM часто проваливаются не потому, что им не хватает отдельных навыков, а потому, что они не умеют линейно связывать эти навыки воедино. Они страдают тем, что я называю исполнением «потоком сознания» — прыгают между шагами, пропускают валидацию, преждевременно генерируют вывод, ещё не имея всего необходимого.</p>
+<p>Harness прокладывает строгие рельсы:</p>
+
+<figure>
+  <p class="fig-title">Слой 3 · Детерминированный трек исполнения</p>
+  <div class="flow">
+    <span class="chip acc">Понять цель</span><span class="arw">→</span>
+    <span class="chip acc">Оценить информацию</span><span class="arw">→</span>
+    <span class="chip acc">Добрать недостающее</span><span class="arw">→</span>
+    <span class="chip acc">Анализ</span><span class="arw">→</span>
+    <span class="chip acc">Генерация</span><span class="arw">→</span>
+    <span class="chip acc">Проверка</span><span class="arw">→</span>
+    <span class="chip acc">Вывод</span>
+  </div>
+  <figcaption>Переносит ответственность за управление проектом с вероятностной модели на детерминированную систему</figcaption>
+</figure>
+<p>Это не просто каркас. Это перенос ответственности за управление проектом с вероятностной модели на детерминированную систему. Модель не должна решать, в каком порядке делать вещи. Эта структура принадлежит Harness.</p>
+
+<h3>Слой 4: Память и состояние (непрерывность)</h3>
+<p>Агент без состояния каждый такт страдает амнезией. Без явного управления состоянием вы, по сути, начинаете новый диалог с нуля на каждом шаге многошаговой задачи.</p>
+<p>Я научился поддерживать три строго сегрегированных типа памяти:</p>
+
+<figure>
+  <p class="fig-title">Слой 4 · Сегрегированная память</p>
+  <div class="cols3">
+    <div class="mcol"><div class="ic">🕐</div><b>1 · Текущее состояние задачи</b><span>На каком мы шаге? Что в ожидании? Что уже подтверждено?</span></div>
+    <div class="mcol"><div class="ic">🧩</div><b>2 · Промежуточные результаты диалога</b><span>Какие выводы мы уже сделали в этой сессии?</span></div>
+    <div class="mcol"><div class="ic">👤</div><b>3 · Долгосрочная память / профили</b><span>Глобальные предпочтения и контекст, сохраняющиеся между сессиями.</span></div>
+  </div>
+  <figcaption>Держите память строго сегрегированной: что в ожидании против того, что согласовано</figcaption>
+</figure>
+<blockquote class="gotcha"><b>⚠ Ловушка, на которой я обжёгся:</b> Смешение состояния задачи с историей диалога. Результат — бесконечно растущее, неструктурированное окно контекста, которое деградирует производительность модели по мере хода задачи. Держите их строго раздельно.</blockquote>
+
+<h3>Слой 5: Оценка и наблюдаемость (самоосознание)</h3>
+<p>Этот слой — место, где примитивные агенты эффектно разваливаются. Они генерируют вывод, объявляют успех и не имеют механизма узнать, корректен ли вывод на самом деле.</p>
+<p>Агент, оценивающий собственную работу, — это агент с глубоким оптимистичным смещением. Он объявит сломанный код работающим. Он оценит свой ответ как удовлетворительный, когда на деле не ответил на сам вопрос.</p>
+<p>Harness нужны независимые, автоматизированные механизмы валидации. Не пост-фактумный человеческий ревью — он слишком медленный и не масштабируется. Сюда относятся автоматическая валидация вывода, интегрированные тестовые среды, дотошное логирование, отслеживание метрик и атрибуция ошибок.</p>
+
+<figure>
+  <p class="fig-title">Слой 5 · Проверка здоровья (независимая верификация)</p>
+  <div class="hcheck">
+    <div class="row"><span class="ok">✓</span> Тест A: валидация данных <span class="pass">PASS</span></div>
+    <div class="row"><span class="ok">✓</span> Тест B: поток логики <span class="pass">PASS</span></div>
+    <div class="row"><span class="ok">✓</span> Тест C: ответ API <span class="pass">PASS</span></div>
+    <div class="row"><span class="ok">✓</span> Тест D: проверка задержки <span class="pass">PASS</span></div>
+  </div>
+  <figcaption>Лечит «необоснованную самоуверенность» — система непрерывно доказывает себе корректность своих действий через независимую верификацию и метрики атрибуции ошибок</figcaption>
+</figure>
+<blockquote>Система обязана непрерывно доказывать самой себе, что её действия корректны, а не просто это предполагать.</blockquote>
+
+<h3>Слой 6: Ограничения, валидация и восстановление (устойчивость)</h3>
+<p>В продакшене <strong>сбой — это состояние по умолчанию</strong>. API отваливаются по таймауту. Форматы JSON ломаются. Результаты поиска неточны. Агент без механизма восстановления — это агент, требующий полного человеческого перезапуска при каждой ошибке.</p>
+<p>Harness нужны здесь три вещи:</p>
+<ul>
+  <li><strong>Ограничения:</strong> жёстко зашитые правила, определяющие, что агенту строго запрещено делать.</li>
+  <li><strong>Валидация:</strong> входные и выходные шлюзовые проверки (валидация схемы, проверки формата, верификация ограничений).</li>
+  <li><strong>Восстановление:</strong> логика повторов, запасные пути и возможность откатиться к последнему известному стабильному состоянию.</li>
+</ul>
+
+<figure>
+  <p class="fig-title">Слой 6 · Конечный автомат восстановления</p>
+  <div class="flow">
+    <span class="chip">Старт</span><span class="arw">→</span>
+    <span class="chip">Выполнить действие</span><span class="arw">→</span>
+    <span class="chip">Валидировать вывод</span><span class="arw">→</span>
+    <span class="chip">Выдать результат</span>
+  </div>
+  <div class="flow" style="margin-top:10px">
+    <span class="chip" style="border-color:var(--red);color:#f6c2c2">✗ Ошибка обнаружена</span>
+    <span class="arw">→</span>
+    <span class="chip" style="border-color:var(--amber);color:#f5d98a">Цикл отката</span>
+    <span class="arw">→</span>
+    <span class="chip" style="border-color:var(--l2);color:#bdf0d0">Последнее стабильное состояние</span>
+  </div>
+  <figcaption>Жёстко зашитые ограничения · входные/выходные шлюзы · логика отката, чтобы избежать полных перезапусков</figcaption>
+</figure>
+
+<h2 id="ru-anxiety">Скрытый враг: Context Anxiety (контекстная тревожность)</h2>
+<p>Когда задачи растягиваются на десятки шагов, происходит нечто странное. Исследователи Anthropic назвали это <strong>Context Anxiety</strong> (контекстная тревожность).</p>
+<p>По мере приближения окна контекста к пределам модели начинают ронять мелкие детали, теряют из виду ключевые цели и ведут себя так, будто торопятся закончить. Они начинают галлюцинировать выводы, к которым не приходили. Они пропускают шаги верификации. Они ощущают — если это верное слово — спешку, которая делает их небрежными.</p>
+<p>Наивное решение — сжатие контекста: суммировать историю, вставить сводку, идти дальше. Я это пробовал. Это снижает число токенов, но реально не сбрасывает ни когнитивное состояние модели, ни размывание внимания. Решение, которое действительно работает, радикально: перезапустить агента целиком.</p>
+<blockquote>Anthropic называет это <strong>Context Reflect</strong>. Когда контекст разрастается слишком сильно, вы берёте сжатую сводку и передаёте её совершенно свежему экземпляру агента — чистый контекст, без накопленной путаницы. Тот же принцип, что и борьба с утечкой памяти через перезапуск процесса, а не лихорадочную сборку мусора.</blockquote>
+<p>Аналогично я перестал выдавать агентам всю их библиотеку инструментов сразу. Вместо этого Harness реализует <strong>прогрессивное раскрытие</strong>: сначала модель видит лишь минимальные «заглушки» инструментов. Когда она сигнализирует намерение использовать конкретную возможность, Harness динамически подставляет подробную документацию и схемы параметров. Оптимизация контекста — это не про то, чтобы дать модели больше информации; это про то, чтобы дать ей <em>нужную информацию, по запросу, ровно тогда, когда она ей нужна</em>.</p>
+
+<h2 id="ru-decoupled">Отделение генерации от оценки: архитектура, которая даёт автономию</h2>
+<p>Одно из важнейших архитектурных озарений, что мне встретились, идёт из того, как Anthropic строит по-настоящему автономных агентов — таких, что способны генерировать законченные, рабочие продукты без человеческого ревью часами напролёт.</p>
+<p>Трюк — в строгом разделении на три роли:</p>
+
+<figure>
+  <p class="fig-title">Продвинутая механика: разделённая оценка</p>
+  <div class="deval">
+    <div class="ecard plan"><h4>📋 Планировщик (Planner)</h4><p>Переводит расплывчатые человеческие запросы в строгие, точные инженерные спецификации.</p></div>
+    <div class="ecard gen"><h4>⚙ Генератор (Generator)</h4><p>Берёт спецификации и пошагово исполняет их, чтобы написать код.</p></div>
+    <div class="ecard qa"><h4>🔍 Оценщик (Evaluator, QA)</h4><p>Действует как полностью независимая служба контроля качества, функционально отделённая от Генератора.</p></div>
+  </div>
+  <div class="loopnote">Генерация → Инспекция → Исправление → Повторная инспекция</div>
+  <div class="keyins"><b>💡 Ключевая мысль:</b> Просьба к LLM оценивать собственный вывод даёт сильное оптимистичное смещение. Генерация и приёмочное тестирование должны быть функционально разделены, чтобы автономия была валидной.</div>
+  <figcaption>Независимый QA против реального мира — а не против представления Генератора о нём</figcaption>
+</figure>
+
+<p>Оценщик не просто читает код Генератора. Он взаимодействует с отрендеренным выводом. В работе с UI он прокликивает интерфейс, инспектирует визуальные раскладки, проверяет интерактивные состояния. Он валидирует против реального мира, а не против представления Генератора о реальном мире.</p>
+<p>OpenAI пошла ещё дальше. Когда агенты начали писать код быстрее, чем инженеры-люди успевали ревьюить пул-реквесты, они построили агенту его собственный полностью автоматизированный CI/CD-конвейер. Агент запускает свой код в изолированных песочницах, снимает скриншоты headless-браузерами, читает собственные логи исполнения и итерирует, пока не сможет верифицировать, что развёртывание корректно — без человека в петле.</p>
+<blockquote>«Готово» больше не означает «я закончил генерировать текст». Оно означает «я запустил код, просмотрел логи, нашёл баг, исправил его и верифицировал развёртывание в песочнице».</blockquote>
+
+<h2 id="ru-bottom">Итог</h2>
+<p>Вот правда о продакшен-AI-системах, выжатая из всего, что я узнал, строя их:</p>
+<p class="pull">«Интеллект базовой модели задаёт её теоретический потолок в таблице лидеров бенчмарка. Надёжность Harness Engineering определяет, сможет ли этот интеллект реально выжить, восстановиться и принести пользу в хаотичном реальном мире».</p>
+<p>Модель — не ваше узкое место. Модель, начиная с определённой точки, никогда не была вашим узким местом.</p>
+<p><strong>Разрыв между 70% и 95% успешных задач — между демо и продуктом — целиком живёт в Harness.</strong></p>
+
+<hr>
+
+<h2 id="ru-agent">→ Проекция на ecom1-agent (паттерны к внедрению)</h2>
+<div class="note">
+  <p><b>Зачем этот раздел:</b> заявленная цель оцифровки статьи — вытащить паттерны, внедряемые в <code>ecom1-agent</code>. Поразительный вывод: проект <em>уже</em> является Harness в точном смысле статьи — детерминированный интерпретатор Plan-IR, обёрнутый вокруг вероятностной модели. Ниже каждый слой статьи спроецирован на существующий механизм с флагами статуса: что уже есть против настоящего пробела, который стоит построить. <em>(Эта проекция — добавление аналитика, а не часть исходной статьи.)</em></p>
+</div>
+
+<div class="map"><div class="scroll">
+<table>
+  <thead><tr><th>Концепт статьи</th><th>Механизм ecom1-agent</th><th>Статус</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>L1 · Границы информации</td>
+      <td>Pre-phase факты (<code>DOC_SELECT</code> + схема + identity + листинги); структурированный <code>IntentSpec</code> (роль/цель/success_criteria/answer_shape), замороженный на запуск.</td>
+      <td><span class="tag have">есть</span></td>
+    </tr>
+    <tr>
+      <td>L2 · Система инструментов (не лить сырые выводы)</td>
+      <td>VM RPC за интерпретатором; <code>interpret()</code> детерминированно суммирует/разбирает возвраты RPC вместо вброса сырого JSON в LLM. Приоритет JSON-extract снижает риск ложных вызовов инструментов.</td>
+      <td><span class="tag have">есть</span></td>
+    </tr>
+    <tr>
+      <td>L3 · Оркестрация исполнения (детерм. трек)</td>
+      <td>Вся суть: фиксированный поток <code>INTENT → loop[PLAN → lint → interpret → verify → answer-once]</code>. Порядок принадлежит каркасу, а не модели. Зеркалит трек статьи Понять→Оценить→Добрать→Анализ→Генерация→Проверка→Вывод.</td>
+      <td><span class="tag have">есть</span></td>
+    </tr>
+    <tr>
+      <td>L4 · Память и состояние (сегрегация)</td>
+      <td><code>learn_ctx</code> (в рамках запуска), <code>learned_store</code> — правила по задаче (между сессиями), <code>data/heuristics/*.{intent,plan}.json</code>. Компакция по <code>COMPACTION_THRESHOLD</code>.</td>
+      <td><span class="tag partial">частично</span></td>
+    </tr>
+    <tr>
+      <td>L5 · Оценка и наблюдаемость (независимая)</td>
+      <td><code>verify()</code> — детерминированный, без LLM, шлюз, проверяющий <code>success_criteria</code>/refs перед единственным <code>vm.answer</code>. Ровно «не давать модели судить себя» из статьи.</td>
+      <td><span class="tag have">есть</span></td>
+    </tr>
+    <tr>
+      <td>L6 · Ограничения / валидация / восстановление</td>
+      <td><code>lint_security_first</code> (ограничения), <code>verify()</code> (шлюз валидации), повтор <code>_ilearn</code> + короткое замыкание <code>_plan_signature</code> при отсутствии прогресса + прерывание при свершившейся мутации (восстановление).</td>
+      <td><span class="tag have">есть</span></td>
+    </tr>
+    <tr>
+      <td>Context Reflect (рестарт начисто, не сжатие)</td>
+      <td>Сегодня: только in-memory LLM-компакция. Статья утверждает, что компакция не сбрасывает когнитивное состояние — рестарт на свежем экземпляре сбрасывает.</td>
+      <td><span class="tag gap">пробел</span></td>
+    </tr>
+    <tr>
+      <td>Прогрессивное раскрытие инструментов</td>
+      <td>Поверхность инструментов/RPC фиксирована по фазам. Нет подстановки подробных схем по запросу, когда намерение сигнализирует возможность.</td>
+      <td><span class="tag gap">пробел</span></td>
+    </tr>
+    <tr>
+      <td>Разделение Planner / Generator / Evaluator</td>
+      <td>INTENT = Планировщик, PLAN+interpret = Генератор, <code>verify()</code> = независимый Оценщик. Уже разделение на три роли — но Оценщик валидирует против критериев, а не против переисполненного рендера реального мира.</td>
+      <td><span class="tag partial">частично</span></td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+
+<h3>Кандидаты-паттерны к постройке (по силе рычага из статьи)</h3>
+<ol>
+  <li><strong>Context Reflect вместо компакции</strong> — когда <code>learn_ctx</code> / счётчик циклов пересекает потолок посреди запуска, передать сжатую сводку <em>свежему</em> проходу интерпретатора, а не только компактить на месте. Статья утверждает, что именно это ломает «Context Anxiety» (небрежные планы поздних циклов). <span class="tag gap">пробел</span></li>
+  <li><strong>Ревалидация против реального мира в <code>verify()</code></strong> — помимо проверки <code>success_criteria</code>, переисполнить read-only зонд изменённого состояния VM и утверждать, что наблюдаемая реальность совпадает с заявленным исходом (Оценщик-против-мира, а не против-плана). Частично существует через round-trip-обращения к grader (<code>ORACLE_VALIDATE_INLINE</code>). <span class="tag partial">частично</span></li>
+  <li><strong>Прогрессивное раскрытие схем RPC</strong> — начинать PLAN с минимальных «заглушек» инструментов; подставлять полные схемы параметров только когда намерение/план сигнализирует возможность. Снижает размывание внимания на L2, о котором предупреждает статья. <span class="tag gap">пробел</span></li>
+  <li><strong>Явная сегрегация памяти</strong> — формально разделить состояние-задачи, результаты-сессии и кросс-сессионный профиль в <code>learn_ctx</code>, поскольку именно их смешение статья называет самой дорогой ловушкой. <span class="tag partial">частично</span></li>
+</ol>
+
+<div class="note">
+  <p><b>Итог для агента:</b> ecom1-agent уже реализует 5 из 6 слоёв Harness — это намеренный дизайн Plan-IR. Действительно новые идеи статьи — <em>Context Reflect</em> (рестарт-вместо-сжатия) и <em>прогрессивное раскрытие инструментов</em>. Оба — конкретные, ограниченные по объёму добавления, а не переписывание.</p>
+</div>
+
+<hr>
+<p class="src">Источник: Nick T. (Ph.D.), «Harness Engineering: Understand this will make your AI Agent performs better than 80% of others», Artificial Intelligence in Plain English (Medium), 6 апр. 2026. Оцифровано из PDF для внутреннего разбора паттернов. Диаграммы воссозданы на inline-CSS по оригинальным иллюстрациям. Раздел проекции на ecom1-agent — комментарий аналитика, а не часть исходной статьи.</p>
+
+</div><!-- /#ru -->
+
+</div><!-- /.wrap -->
+
+<script>
+  (function(){
+    var btns = document.querySelectorAll('.langbtn');
+    function setLang(l){
+      document.getElementById('en').classList.toggle('hidden', l!=='en');
+      document.getElementById('ru').classList.toggle('hidden', l!=='ru');
+      document.documentElement.lang = l;
+      btns.forEach(function(b){ b.classList.toggle('on', b.dataset.l===l); });
+      try{ localStorage.setItem('he_lang', l); }catch(e){}
+    }
+    btns.forEach(function(b){ b.addEventListener('click', function(){ setLang(b.dataset.l); window.scrollTo(0,0); }); });
+    var saved='ru';
+    try{ saved = localStorage.getItem('he_lang') || 'ru'; }catch(e){}
+    setLang(saved);
+  })();
+</script>
+
+</body>
+</html>

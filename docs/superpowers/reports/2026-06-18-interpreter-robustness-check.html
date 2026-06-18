@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка плана — Interpreter Robustness (IDD /check-plan)</title>
+<style>
+  :root{
+    --bg:#fafafa; --surface:#ffffff; --fg:#333344;
+    --accent:#5c6bc0; --border:#d0d0e0; --line:#888888;
+    --zebra:#f3f3f8; --ok:#43a047; --warn:#fb8c00; --danger:#e53935;
+    --muted:#6b6b80;
+  }
+  body:has(#theme-toggle:checked){
+    --bg:#1e1e2e; --surface:#313244; --fg:#cdd6f4;
+    --accent:#89b4fa; --border:#45475a; --line:#888888;
+    --zebra:#282838; --ok:#a6e3a1; --warn:#f9e2af; --danger:#f38ba8;
+    --muted:#9399b2;
+  }
+  body{
+    margin:0; padding:1.5rem;
+    font:16px/1.55 system-ui, -apple-system, Segoe UI, sans-serif;
+    background:var(--bg); color:var(--fg);
+    transition:background .3s, color .3s;
+  }
+  .theme-btn{
+    position:sticky; top:.5rem; float:right; z-index:10;
+    cursor:pointer; user-select:none;
+    padding:.25rem .6rem; border:1px solid var(--border); border-radius:6px;
+    background:var(--surface);
+  }
+  .report{max-width:1100px; margin:0 auto;}
+  h1{font-size:1.7rem; color:var(--accent); margin:.2rem 0 .3rem;}
+  h2{font-size:1.25rem; color:var(--accent); border-bottom:2px solid var(--border);
+     padding-bottom:.25rem; margin-top:2.2rem;}
+  h3{font-size:1.05rem; margin-top:1.4rem;}
+  .sub{color:var(--muted); margin:0 0 1rem;}
+  code, .mono{font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.92em;}
+  table{border-collapse:collapse; width:100%; margin:1rem 0; background:var(--surface);
+        border:1px solid var(--border); border-radius:8px; overflow:hidden;}
+  th, td{text-align:left; padding:.5rem .65rem; border-bottom:1px solid var(--border);
+         vertical-align:top;}
+  th{background:var(--zebra); font-weight:600;}
+  tbody tr:nth-child(even){background:var(--zebra);}
+  .pill{display:inline-block; padding:.08rem .5rem; border-radius:999px;
+        font-size:.8rem; font-weight:600; white-space:nowrap;}
+  .ok{background:var(--ok); color:#06210a;}
+  .warn{background:var(--warn); color:#3a2400;}
+  .danger{background:var(--danger); color:#330808;}
+  .neutral{background:var(--border); color:var(--fg);}
+  .verdict-box{border:2px solid var(--ok); border-radius:10px; padding:.9rem 1.1rem;
+        background:var(--surface); margin:1rem 0; font-size:1.05rem;}
+  .kv{display:grid; grid-template-columns:max-content 1fr; gap:.25rem 1.2rem;
+      background:var(--surface); border:1px solid var(--border); border-radius:8px;
+      padding:.8rem 1rem; margin:1rem 0;}
+  .kv dt{font-weight:600; color:var(--muted);}
+  .kv dd{margin:0;}
+  figure{margin:1.2rem 0; background:var(--surface); border:1px solid var(--border);
+         border-radius:10px; padding:1rem; overflow-x:auto;}
+  figcaption{color:var(--muted); font-size:.9rem; margin-bottom:.6rem;}
+  .rpt-graph svg{max-width:100%; height:auto; display:block;}
+  .legend{display:flex; gap:1.2rem; flex-wrap:wrap; font-size:.85rem; color:var(--muted);
+          margin-top:.6rem;}
+  .legend span{display:inline-flex; align-items:center; gap:.35rem;}
+  .swatch{width:14px; height:14px; border-radius:3px; display:inline-block;}
+  .matrix td.hit{background:var(--accent); color:#fff; text-align:center; font-weight:700;}
+  .matrix td.cell{text-align:center; color:var(--muted);}
+  .small{font-size:.85rem; color:var(--muted);}
+  .chain{font-family:ui-monospace, monospace; background:var(--surface);
+         border:1px solid var(--border); border-radius:8px; padding:.7rem 1rem;}
+  details{background:var(--surface); border:1px solid var(--border); border-radius:8px;
+          padding:.4rem .8rem; margin:.5rem 0;}
+  summary{cursor:pointer; font-weight:600;}
+  .hashcol{font-family:ui-monospace, monospace; font-size:.82rem; color:var(--muted);}
+</style>
+</head>
+<body>
+<input type="checkbox" id="theme-toggle" hidden>
+<label for="theme-toggle" class="theme-btn" title="Тёмная / светлая тема">🌙 / ☀️</label>
+
+<main class="report">
+
+<h1>Проверка плана: Interpreter Robustness</h1>
+<p class="sub">IDD-валидация плана реализации относительно дизайн-спецификации · алгоритм <code>/check-plan</code> · 2026-06-18</p>
+
+<dl class="kv">
+  <dt>План</dt>
+  <dd class="mono">docs/superpowers/plans/2026-06-18-interpreter-robustness.md</dd>
+  <dt>Спецификация</dt>
+  <dd class="mono">docs/superpowers/specs/2026-06-18-interpreter-robustness-design.md</dd>
+  <dt>plan_hash (новый)</dt>
+  <dd class="mono">554e83e720ff49ce</dd>
+  <dt>spec_hash</dt>
+  <dd class="mono">05bd146a260ec6cc</dd>
+  <dt>intent</dt>
+  <dd class="mono">null (цепочка intent отсутствует)</dd>
+  <dt>Итог</dt>
+  <dd><span class="pill ok">OK</span> — все 5 фаз пройдены, 0 CRITICAL, 3 WARNING (документированы)</dd>
+</dl>
+
+<h2>1. Сводка плана: задачи и шаги с критериями готовности (DoD)</h2>
+<p class="small">Порядок исполнения (спец §Execution Order): F1 → F8a → F2 → F3 → F4 → F5 → F6 → F7 → F8b → docs → live t01.</p>
+
+<table>
+  <thead>
+    <tr><th>Задача</th><th>Шаг</th><th>Критерий готовности (DoD) / проверка</th></tr>
+  </thead>
+  <tbody>
+    <tr><td rowspan="3"><b>F1</b><br><span class="small">типизированная retryable InterpretError при сбое контракта compute</span></td>
+        <td>Тесты 1, 5</td><td>Падающие тесты в <code>test_primitives.py</code> и <code>test_interpreter.py</code> (list-op на скаляре → <code>TypeError</code>/<code>InterpretError</code>, <code>mutation_landed False</code>)</td></tr>
+    <tr><td>Шаги 3, 7</td><td><code>_require_rows</code> в <code>primitives.py</code>; try-обёртка циклов compute + custom_extract в <code>interpreter.py:234-240</code></td></tr>
+    <tr><td>Шаги 2,4,6,8</td><td>Точные команды <code>uv run pytest …</code>; ожидаемо FAIL → PASS на всём наборе</td></tr>
+
+    <tr><td rowspan="2"><b>F8a</b><br><span class="small">движок реестра lint + миграция security_first</span></td>
+        <td>Шаги 3-6</td><td>Создать <code>agent/harness.py</code> (<code>load_checks/save_checks/handler_for</code> + <code>check_security_first</code>); <code>interpreter.lint</code>-диспетчер; seed <code>data/harness/checks.yaml</code>; своп <code>pipeline.py:254,302</code></td></tr>
+    <tr><td>Шаги 1,2,7</td><td><code>test_harness.py</code>: missing-file→[]; seed содержит security_first; active error→raise; unknown kind/candidate→warn. PASS</td></tr>
+
+    <tr><td rowspan="2"><b>F2</b><br><span class="small">primitive_contract / _exists / _arity</span></td>
+        <td>Шаги 3-4</td><td>3 чистых хендлера <code>(plan,spec)->list[str]</code>; обновить <code>_HANDLERS</code>; засеять 6 active error-записей</td></tr>
+    <tr><td>Шаги 1,2,5</td><td>Тесты: list-op на источнике first/get флагится; неизвестный prim; арность. PASS</td></tr>
+
+    <tr><td rowspan="2"><b>F3</b><br><span class="small">SQL→stdin repair + sql_stdin (error) + banner-detect</span></td>
+        <td>Шаги 3-7</td><td><code>repair_sql_stdin</code> (args→stdin до lint); <code>check_sql_stdin</code> + seed <code>chk_sql_stdin severity: error</code>; <code>_plan_signature</code> читает stdin; <code>MockVMSpy.exec</code> fallback ключа на <code>[stdin]</code>; <code>_is_sql_banner</code> + <code>_refuse</code> в discovery/ops</td></tr>
+    <tr><td>Шаги 1,2,8</td><td>Тесты: repair→stdin+lint passes; seeded error; signature учитывает stdin; fixture fallback; <code>test_sql_usage_banner_raises_retryable_refuse</code>. PASS</td></tr>
+
+    <tr><td rowspan="2"><b>F4</b><br><span class="small">answer-once идемпотентность</span></td>
+        <td>Шаг 3</td><td><code>_make_answer_once(vm)</code>; маршрутизация 3 сайтов answer; удалить <code>_terminal_clarification</code> (410-411)</td></tr>
+    <tr><td>Шаги 1,2,4</td><td><code>test_answer_once_suppresses_second_answer</code>: 2-й вызов = no-op, <code>vm.answer.assert_called_once()</code>. PASS</td></tr>
+
+    <tr><td><b>F5</b><br><span class="small">регресс-замок verify-gate</span></td>
+        <td>Шаги 1-2</td><td><code>test_ok_with_unresolved_required_ref_never_submits_ok</code>: нерешённый ref → CLARIFICATION, никогда OK. PASS (фиксация поведения)</td></tr>
+
+    <tr><td rowspan="2"><b>F6</b><br><span class="small">LEARN/oracle: метод, не значение</span></td>
+        <td>Шаги 3-4</td><td><code>data/learned/t01.yaml</code>: деактивировать <code>r003</code>, добавить <code>r004</code> (метод first→get, нормализованное сопоставление); атом в <code>atoms.yaml</code></td></tr>
+    <tr><td>Шаги 1,2,5</td><td>data-shape тесты: r003 неактивен, r004 метод-формы, атом присутствует, парсинг ОК. PASS</td></tr>
+
+    <tr><td><b>F7</b><br><span class="small">лог DOC_SELECT-пробела</span></td>
+        <td>Шаги 1-4</td><td><code>_is_catalogue_query</code> + лог «DOC_SELECT gap» после fallback (<code>orchestrator.py</code>); gather завершается без break. <code>test_catalogue_query_logs_doc_select_gap</code>. PASS</td></tr>
+
+    <tr><td rowspan="2"><b>F8b</b><br><span class="small">distill→validate→promote (по умолч. выкл.)</span></td>
+        <td>Шаги 3-6</td><td><code>harness.distill/promote</code>; <code>harness_validate.validate_check_via_grader</code>; gated-хук <code>_maybe_harness_distill</code> в ветке InterpretError; документировать env в <code>CLAUDE.md</code></td></tr>
+    <tr><td>Шаги 1,2,7</td><td>Тесты: candidate известного kind; отклонение unknown kind; promote; validate (catches-bad ∧ ¬flags-good). PASS</td></tr>
+
+    <tr><td><b>Docs</b></td><td>Шаги 1-4</td><td><code>uv run python -m pytest tests/ -v</code> (только 2 известных pre-existing red t09); 6× <code>iwiki-ingest</code>; <code>/iwiki-lint</code>; commit</td></tr>
+    <tr><td><b>Live</b></td><td>Шаги 1-3</td><td><code>RUN_BENCHMARK=1 uv run pytest tests/test_benchmark_t01.py -v</code> → <code>last_run.status==success</code>, <code>OUTCOME_OK</code>, ref <code>/proc/catalog/&lt;SKU&gt;.json</code></td></tr>
+  </tbody>
+</table>
+
+<h2>2. Диаграммы зависимостей и пересечений</h2>
+
+<h3>2.1 Граф зависимостей шагов (артефакт из M используется в N: M→N)</h3>
+<figure class="rpt-graph">
+  <figcaption>Узлы = задачи; рёбра = «артефакт, созданный в M, потребляется в N». Нарушений порядка/циклов фазой 3 не выявлено — все рёбра идут вперёд по порядку исполнения.</figcaption>
+  <svg viewBox="0 0 980 300" width="980" role="img" aria-label="граф зависимостей задач">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+      </marker>
+    </defs>
+    <!-- main spine edges -->
+    <line x1="70"  y1="80" x2="170" y2="80" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="220" y1="80" x2="320" y2="80" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="370" y1="80" x2="470" y2="80" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="520" y1="80" x2="620" y2="80" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <!-- F8a -> F2 (harness.py + lint + checks.yaml created before F2 handlers) -->
+    <line x1="195" y1="105" x2="345" y2="160" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrow)"/>
+    <!-- F8a -> F3 -->
+    <line x1="195" y1="105" x2="495" y2="160" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrow)"/>
+    <!-- F1 -> F8a (no, F1 independent; F8a swaps pipeline lint). keep spine. -->
+    <!-- F8a/F2/F3/F4 -> F8b -->
+    <line x1="195" y1="55" x2="800" y2="55" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <line x1="650" y1="80" x2="780" y2="80" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <!-- F4 (answer-once region) -> F8b (_maybe_harness_distill placed near _make_answer_once) -->
+    <line x1="495" y1="200" x2="800" y2="105" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <!-- F8b -> docs -> live -->
+    <line x1="845" y1="80" x2="845" y2="240" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- nodes spine -->
+    <g font-size="13" font-family="ui-monospace,monospace" text-anchor="middle">
+      <circle cx="45"  cy="80" r="26" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="45"  y="85" fill="var(--fg)">F1</text>
+      <circle cx="195" cy="80" r="26" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="195" y="85" fill="var(--fg)">F8a</text>
+      <circle cx="345" cy="80" r="26" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="345" y="85" fill="var(--fg)">F2</text>
+      <circle cx="495" cy="80" r="26" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="495" y="85" fill="var(--fg)">F3</text>
+      <circle cx="645" cy="80" r="26" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="645" y="85" fill="var(--fg)">F4</text>
+      <circle cx="815" cy="80" r="26" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="815" y="85" fill="var(--fg)">F8b</text>
+      <!-- lower row: F2/F3 handlers depend on F8a harness.py; F5/F6/F7 mostly independent -->
+      <circle cx="345" cy="185" r="24" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/><text x="345" y="190" fill="var(--fg)">F2*</text>
+      <circle cx="495" cy="185" r="24" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/><text x="495" y="190" fill="var(--fg)">F3*</text>
+      <circle cx="595" cy="250" r="22" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/><text x="595" y="255" fill="var(--fg)">F5</text>
+      <circle cx="675" cy="250" r="22" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/><text x="675" y="255" fill="var(--fg)">F6</text>
+      <circle cx="755" cy="250" r="22" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/><text x="755" y="255" fill="var(--fg)">F7</text>
+      <circle cx="845" cy="265" r="22" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/><text x="845" y="270" fill="var(--fg)">docs/live</text>
+    </g>
+  </svg>
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--line)"></span> хребет порядка исполнения (F1→…→F8b)</span>
+    <span><span class="swatch" style="background:var(--accent)"></span> зависимость по артефакту (harness.py / _HANDLERS / checks.yaml / _make_answer_once)</span>
+    <span>F2*, F3* — те же узлы, что F2/F3, показывают зависимость их хендлеров от движка F8a</span>
+  </div>
+</figure>
+<p class="small"><b>Вывод фазы 3:</b> все потребители артефактов идут <i>после</i> их создателей. <code>harness.py</code>, <code>data/harness/checks.yaml</code> и <code>interpreter.lint</code> создаются в F8a до того, как F2/F3 добавляют хендлеры и записи. <code>_terminal_clarification</code> удаляется в F4 только после перевода всех 3 сайтов на <code>answer_once</code>. F8b опирается на полностью заполнённый <code>_HANDLERS</code> (F3) и регион <code>_make_answer_once</code> (F4). Циклов импортов нет (отложенные импорты <code>interpreter↔harness</code>). Нарушений порядка не найдено.</p>
+
+<h3>2.2 Матрица пересечений: задачи × файл/артефакт</h3>
+<table class="matrix">
+  <thead>
+    <tr><th>Файл / артефакт</th><th>F1</th><th>F8a</th><th>F2</th><th>F3</th><th>F4</th><th>F5</th><th>F6</th><th>F7</th><th>F8b</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>agent/interpreter.py</code></td><td class="hit">✓</td><td class="hit">✓</td><td class="cell">·</td><td class="hit">✓</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td></tr>
+    <tr><td><code>agent/primitives.py</code></td><td class="hit">✓</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td></tr>
+    <tr><td><code>agent/harness.py</code> (new)</td><td class="cell">·</td><td class="hit">✓</td><td class="hit">✓</td><td class="hit">✓</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="hit">✓</td></tr>
+    <tr><td><code>agent/harness_validate.py</code> (new)</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="hit">✓</td></tr>
+    <tr><td><code>agent/pipeline.py</code></td><td class="cell">·</td><td class="hit">✓</td><td class="cell">·</td><td class="cell">·</td><td class="hit">✓</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="hit">✓</td></tr>
+    <tr><td><code>agent/orchestrator.py</code></td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="hit">✓</td><td class="cell">·</td></tr>
+    <tr><td><code>data/harness/checks.yaml</code> (new)</td><td class="cell">·</td><td class="hit">✓</td><td class="hit">✓</td><td class="hit">✓</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td></tr>
+    <tr><td><code>data/learned/t01.yaml</code></td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="hit">✓</td><td class="cell">·</td><td class="cell">·</td></tr>
+    <tr><td><code>data/oracle/atoms.yaml</code></td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="hit">✓</td><td class="cell">·</td><td class="cell">·</td></tr>
+    <tr><td><code>CLAUDE.md</code> (root)</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="cell">·</td><td class="hit">✓</td></tr>
+  </tbody>
+</table>
+<p class="small"><b>Совместно редактируемые файлы:</b> <code>interpreter.py</code> (F1, F8a, F3), <code>harness.py</code> (F8a, F2, F3, F8b), <code>pipeline.py</code> (F8a, F4, F8b), <code>checks.yaml</code> (F8a, F2, F3). Все инкрементальные правки одного файла идут в порядке исполнения (создатель раньше расширителей), пересечений с конфликтом порядка нет.</p>
+
+<h3>2.3 Пересечение покрытия требований</h3>
+<table class="matrix">
+  <thead><tr><th>Требование спеца</th><th>Покрывающая задача плана</th><th>Статус</th></tr></thead>
+  <tbody>
+    <tr><td>F1 (compute crash → typed InterpretError)</td><td>Task F1</td><td><span class="pill ok">покрыто</span></td></tr>
+    <tr><td>F2 (primitive_contract/_exists/_arity)</td><td>Task F2</td><td><span class="pill ok">покрыто</span></td></tr>
+    <tr><td>F3 (sql_stdin + banner-detect)</td><td>Task F3</td><td><span class="pill warn">покрыто (откл. F-001)</span></td></tr>
+    <tr><td>F4 (answer-once)</td><td>Task F4</td><td><span class="pill ok">покрыто</span></td></tr>
+    <tr><td>F5 (verify-gate lock)</td><td>Task F5</td><td><span class="pill ok">покрыто</span></td></tr>
+    <tr><td>F6 (LEARN/oracle метод)</td><td>Task F6</td><td><span class="pill ok">покрыто</span></td></tr>
+    <tr><td>F7 (DOC_SELECT fallback)</td><td>Task F7</td><td><span class="pill ok">покрыто</span></td></tr>
+    <tr><td>F8a (registry engine + миграция)</td><td>Task F8a</td><td><span class="pill ok">покрыто</span></td></tr>
+    <tr><td>F8b (distill→validate→promote)</td><td>Task F8b</td><td><span class="pill warn">покрыто (откл. F-002)</span></td></tr>
+    <tr><td>Testing Strategy (юнит-тесты на MockVMSpy)</td><td>F1…F8b: red/green тесты</td><td><span class="pill ok">покрыто</span></td></tr>
+    <tr><td>Execution Order</td><td>§File Structure + Self-Review</td><td><span class="pill ok">совпадает</span></td></tr>
+    <tr><td>Docs (wiki + env-vars в CLAUDE.md)</td><td>Task Docs + F8b Шаг 6</td><td><span class="pill ok">покрыто</span></td></tr>
+  </tbody>
+</table>
+<p class="small">«Лишних» шагов вне спеца не найдено: коммиты и red/green-проверки — стандартный TDD-каркас, предписанный §Execution Order. Task Docs добавляет ingest <code>orchestrator.py</code> сверх списка спеца — оправданное улучшение (F7 правит этот модуль).</p>
+
+<h2>3. Результаты валидации</h2>
+
+<h3>3.1 Статус по фазам</h3>
+<table>
+  <thead><tr><th>Фаза</th><th>Что проверялось</th><th>Статус</th><th>Открытые CRITICAL</th></tr></thead>
+  <tbody>
+    <tr><td>1 · structure</td><td>плейсхолдеры, нумерация шагов, дубли заголовков</td><td><span class="pill ok">passed</span></td><td>0</td></tr>
+    <tr><td>2 · coverage</td><td>покрытие требований F1–F8b + Testing/Order/Docs; трассировка шагов; 2 деклар. отклонения</td><td><span class="pill ok">passed</span></td><td>0</td></tr>
+    <tr><td>3 · dependencies</td><td>порядок шагов, циклы, доступность артефактов</td><td><span class="pill ok">passed</span></td><td>0</td></tr>
+    <tr><td>4 · verifiability</td><td>измеримый DoD; команды и ожидаемый вывод у каждого шага</td><td><span class="pill ok">passed</span></td><td>0</td></tr>
+    <tr><td>5 · consistency</td><td>section-хеши; сверка типов/имён из Self-Review с кодом плана</td><td><span class="pill ok">passed</span></td><td>0</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 Находки</h3>
+<table>
+  <thead><tr><th>ID</th><th>Серьёзность</th><th>Фаза</th><th>Секция (хеш)</th><th>Текст</th><th>Вердикт</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="mono">F-001</td>
+      <td><span class="pill warn">WARNING</span></td>
+      <td>coverage</td>
+      <td>Task F3<br><span class="hashcol">fbc37fd36565d032</span></td>
+      <td><b>ИСПРАВЛЕНО (root-cause, по выбору пользователя).</b> Было: <code>chk_sql_stdin</code> сеялся как <code>severity: warn</code> → <code>lint()</code> не бросал (Testing Strategy спеца подразумевает «lint raises»). Стало: Task F3 добавляет детерминированный pre-lint repair (<code>interpreter.repair_sql_stdin</code>), переписывающий каждый <code>Exec /bin/sql</code> <code>args→stdin</code> до <code>lint</code>; <code>chk_sql_stdin</code> сеется <code>severity: error</code> (spec-literal) и не срабатывает на реальных планах; корпус SQL-in-args сохранён (repair прозрачен для PLAN, ключ фикстуры <code>MockVMSpy</code> делает fallback на <code>[stdin]</code>); <code>_plan_signature</code> читает stdin (no-progress guard различает запросы); рантайм-детект баннера остаётся backstop. Девиации нет.</td>
+      <td><span class="pill ok">fixed</span></td>
+    </tr>
+    <tr>
+      <td class="mono">F-002</td>
+      <td><span class="pill warn">WARNING</span></td>
+      <td>coverage</td>
+      <td>Task F8b<br><span class="hashcol">b94842c6f707355c</span></td>
+      <td><b>ИСПРАВЛЕНО.</b> Было: инлайн подключался только gated-<code>distill</code>, а <code>HARNESS_VALIDATE_INLINE</code> описан как «reserved for offline» (спец: «default 1 при включённом distill», инлайн validate→promote). Стало: Task F8b подключает полный инлайн-путь — <code>_maybe_harness_distill</code> валидирует кандидата против (падающий план, последний сохранённый known-good план из <code>data/heuristics/{tid}.plan.json</code>) и промоутит <code>candidate→active</code> при catches-bad ∧ ¬flags-good; <code>HARNESS_VALIDATE_INLINE=0</code> оставляет warn-only кандидата. Весь путь под <code>HARNESS_DISTILL=1</code> (default 0) — на core-фиксы не влияет. Соответствует спецу F8. Девиации нет.</td>
+      <td><span class="pill ok">fixed</span></td>
+    </tr>
+    <tr>
+      <td class="mono">F-003</td>
+      <td><span class="pill warn">WARNING</span></td>
+      <td>consistency</td>
+      <td>Task F2<br><span class="hashcol">84443eb9aa357cca</span></td>
+      <td><b>ИСПРАВЛЕНО.</b> Мёртвая константа <code>_LIST_CONSUMING</code> удалена из кода-образца Task F2 Шаг 3 (<code>check_primitive_contract</code> опирается на <code>spec.get("prim")</code>/<code>forbid_source</code>). Соответствует Simplicity-First / no-dead-code.</td>
+      <td><span class="pill ok">fixed</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<details>
+  <summary>Проверенные утверждения Self-Review (фаза 5) — все подтверждены кодом</summary>
+  <ul>
+    <li>Сигнатура хендлеров единообразна <code>(plan, spec) -&gt; list[str]</code> — все 5 (security_first, primitive_contract, primitive_exists, primitive_arity, sql_stdin). ✓</li>
+    <li>Ключи <code>_HANDLERS</code> совпадают с засеянными <code>kind</code> в <code>checks.yaml</code> и с <code>handler_for</code>. ✓</li>
+    <li><code>_make_answer_once(vm) -&gt; _answer(message, outcome, refs) -&gt; bool</code> используется одинаково на всех 3 сайтах (INTENT-fail, success, loop-exhaust). ✓</li>
+    <li>Атрибуты <code>ComputeStep(prim,args,into)</code>, <code>Step(rpc,args,bind)</code>, <code>GuardedOp(rpc,args)</code> существуют — доступ хендлеров валиден. ✓</li>
+    <li>Якоря строк в <code>interpreter.py</code>/<code>pipeline.py</code>/<code>orchestrator.py</code> совпадают с фактическим кодом (compute 236-240, lint-swap 254/302, terminal 285/363/410-411, F7 fallback 497-498). ✓</li>
+    <li>Команда Live-задачи исполнима: <code>test_benchmark_t01.py</code> гейтится на <code>RUN_BENCHMARK==1</code>. ✓</li>
+  </ul>
+</details>
+
+<h3>3.3 Сводка</h3>
+<table>
+  <thead><tr><th>Метрика</th><th>Значение</th></tr></thead>
+  <tbody>
+    <tr><td>Открытых CRITICAL</td><td><span class="pill ok">0</span></td></tr>
+    <tr><td>Открытых WARNING</td><td><span class="pill ok">0</span> (все 3 закрыты: F-001/F-002/F-003 → fixed)</td></tr>
+    <tr><td>Фаз пройдено</td><td>5 / 5</td></tr>
+  </tbody>
+</table>
+
+<h3>3.4 Итоговый вердикт</h3>
+<div class="verdict-box">
+  <b><span class="pill ok">OK</span></b> — все 5 фаз пройдены, открытых CRITICAL и WARNING нет.
+  Все 3 варнинга исправлены в плане: F-001 (sql_stdin) — root-cause pre-lint repair
+  <code>args→stdin</code> + <code>chk_sql_stdin</code> severity:error; F-002 (F8b) — полный
+  инлайн distill→validate→promote per spec; F-003 — удалена мёртвая константа.
+  Девиаций от спеца не осталось. План готов к исполнению.
+</div>
+
+<h3>3.5 Цепочка IDD</h3>
+<div class="chain">
+  intent: <b>null</b> &nbsp;→&nbsp;
+  spec: <b>docs/superpowers/specs/2026-06-18-interpreter-robustness-design.md</b> (<span class="mono">05bd146a260ec6cc</span>) &nbsp;→&nbsp;
+  plan: <b>docs/superpowers/plans/2026-06-18-interpreter-robustness.md</b> (<span class="mono">554e83e720ff49ce</span>)
+</div>
+<p class="small">last_run: 2026-06-18 · алгоритм /check-plan · правлен только frontmatter плана (тело не изменялось — body-хеш стабилен).</p>
+
+</main>
+</body>
+</html>

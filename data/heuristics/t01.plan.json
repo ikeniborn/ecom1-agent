@@ -1,0 +1,77 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH kind AS (SELECT product_kind_id FROM product_kinds WHERE product_kind_name = 'Wood and Drywall Screw'),\nprops AS (\n  SELECT product_sku FROM product_variant_properties \n  WHERE property_key = 'screw_type' AND property_value_text = 'wood screw'\n  INTERSECT\n  SELECT product_sku FROM product_variant_properties \n  WHERE property_key = 'diameter' AND property_value_text = '3 mm'\n)\nSELECT pv.product_sku, pv.product_name, pv.record_path\nFROM product_variants pv\nJOIN kind ON pv.product_kind_id = kind.product_kind_id\nJOIN props ON pv.product_sku = props.product_sku\nWHERE pv.brand = 'Heco' AND pv.series = 'Zinc Plated TopFix GTU-YPJ';"
+      },
+      "bind": "raw_products"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_products",
+      "format": "auto_delim",
+      "into": "products",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "product_name",
+          "candidates": [
+            "product_name"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$products"
+      ],
+      "into": "product_count"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "gt",
+          "lhs": "$product_count",
+          "rhs": "0",
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "Yes, we carry {product_name} (SKU: {product_sku}).",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    },
+    "not_found": {
+      "message": "No matching product found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}
