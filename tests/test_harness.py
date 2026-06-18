@@ -61,3 +61,41 @@ def test_lint_candidate_is_warn_only(monkeypatch, capsys):
                                           "severity": "error", "status": "candidate"}])
     lint(_denied_after_business())                 # candidate never blocks
     assert "warn" in capsys.readouterr().out
+
+
+def _contract_plan(prim, *args):
+    # first() produces a dict-binding `r0`; the named list-op then consumes it.
+    return _plan(compute=[{"prim": "first", "args": ["$rows"], "into": "r0"},
+                          {"prim": prim, "args": list(args), "into": "out"}])
+
+
+def test_primitive_contract_flags_listop_on_scalar_source():
+    spec = {"id": "chk_column_on_scalar", "kind": "primitive_contract",
+            "prim": "column", "arg_index": 0, "forbid_source": ["first", "get"],
+            "message": "'column' expects list[dict]; use 'get' for a single row"}
+    assert harness.check_primitive_contract(_contract_plan("column", "$r0", "name"), spec)
+    # Consuming a rowset binding (not first/get output) is fine.
+    good = _plan(compute=[{"prim": "column", "args": ["$rows", "name"], "into": "out"}])
+    assert harness.check_primitive_contract(good, spec) == []
+
+
+def test_primitive_exists_flags_unknown_prim():
+    spec = {"id": "chk_primitive_exists", "kind": "primitive_exists"}
+    bad = _plan(compute=[{"prim": "frobnicate", "args": ["$rows"], "into": "out"}])
+    assert harness.check_primitive_exists(bad, spec)
+    assert harness.check_primitive_exists(_plan(), spec) == []
+
+
+def test_primitive_arity_flags_wrong_arg_count():
+    spec = {"id": "chk_primitive_arity", "kind": "primitive_arity"}
+    # `get` takes 2 args (obj, key); supplying 1 is an arity violation.
+    bad = _plan(compute=[{"prim": "get", "args": ["$r0"], "into": "out"}])
+    assert harness.check_primitive_arity(bad, spec)
+    ok = _plan(compute=[{"prim": "get", "args": ["$r0", "k"], "into": "out"}])
+    assert harness.check_primitive_arity(ok, spec) == []
+
+
+def test_seeded_checks_include_primitive_contract_active():
+    specs = {s.get("id"): s for s in harness.load_checks()}
+    assert specs["chk_column_on_scalar"]["status"] == "active"
+    assert specs["chk_column_on_scalar"]["severity"] == "error"
