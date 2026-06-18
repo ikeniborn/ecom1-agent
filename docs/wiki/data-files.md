@@ -32,6 +32,12 @@ On a successful run the pipeline writes `{task_id}.intent.json` (the frozen `Int
 
 Both files are consumed by `pipeline.learn_from_grader` between training cycles (`TRAIN_MAX_CYCLES > 1`) and by `distill_from_grader` end-of-run self-fill: they let those seams distil grader feedback without re-running the INTENT and PLAN LLM calls. The `IntentSpec` is the WHAT/why layer (`objective`, `outcome_space`, `constraints`, `required_refs`, and `success_criteria` keyed by outcome); the `PlanIR` is the HOW layer (`discovery`, `rowsets`, `compute`, `decision`, `ops`, `answer`, `custom_extract`). A bare-list `success_criteria` in an older persisted `intent.json` is coerced to `{"OUTCOME_OK": [...]}` on load. See [[learning]] and [[pipeline#End-of-run self-fill]].
 
+## Harness Check Catalogue (`data/harness/checks.yaml`)
+
+`data/harness/checks.yaml` is the data-driven catalogue of plan-time lint check-specs loaded by `agent/harness.py:load_checks()` (`harness.py:25`). Each entry declares a `kind` (maps to a code-backed handler), instance-specific parameters, `severity` (`error`|`warn`), and `status` (`active`|`candidate`|`inactive`). The file is created on first write by `save_checks()` with `p.parent.mkdir(parents=True, exist_ok=True)`, so the directory may be absent on a fresh checkout. See [[harness]] for the full handler catalogue.
+
+The seeded entries cover: `security_first` (H3 branch ordering), `primitive_contract` instances for `column`/`sum_col`/`filter_rows`/`count` fed from scalar producers (`first`/`get`), `primitive_exists` (unknown primitive name), `primitive_arity` (wrong argument count), and `sql_stdin` (SQL delivered via `args` rather than `stdin`). The `source_task` field records which task the spec was seeded from. A `candidate` entry is a distilled-but-unvalidated spec (written by `harness.distill`); it logs violations but does not block. An `inactive` entry is permanently skipped. The `id` field must be unique across the catalogue; `distill()` rejects a new spec whose `id` collides with an existing entry.
+
 ## Model Config (`models.json`)
 
 Per-model provider hints and sampling options, keyed by the model ID used in env vars and loaded by `main.py` at startup. Supplies what cannot be inferred from a model name: explicit `provider`, Ollama options, embedding role, and Claude Code CLI flags. See [[llm]].

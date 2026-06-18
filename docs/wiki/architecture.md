@@ -48,7 +48,7 @@ It discovers the SQLite schema and table names via `/bin/sql`, samples top-N row
 
 There is exactly one pipeline: the deterministic Plan-IR interpreter. Once `run_agent` calls `run_pipeline`, the flow is INTENT → loop[PLAN → lint → interpret → verify → answer-once] → CLARIFICATION, with `vm.answer` invoked exactly once per task.
 
-INTENT is a single reason-tier LLM call, frozen for the run. The loop runs up to `INTERPRETER_MAX_STEPS` cycles: each cycle a PLAN call emits a `PlanIR`, which is linted, interpreted against the VM (no LLM), then checked by the deterministic `verify()` gate — the only quality gate before answering. Pass calls `vm.answer` once and persists artifacts; fail feeds an iLEARN step and retries. Loop exhaustion or a no-progress (identical-plan) short-circuit yields a terminal clarification. Full detail lives in [[pipeline]], with the executor in [[interpreter]], knowledge injection in [[oracle]], and the LEARN mechanism in [[learning]].
+INTENT is a single reason-tier LLM call, frozen for the run. The loop runs up to `INTERPRETER_MAX_STEPS` cycles: each cycle a PLAN call emits a `PlanIR`, which is repaired (`repair_sql_stdin`) then linted via the registry dispatcher (`lint`), interpreted against the VM (no LLM), then checked by the deterministic `verify()` gate — the only quality gate before answering. Pass calls `vm.answer` exactly once (idempotency guard) and persists artifacts; fail feeds an iLEARN step and retries. Loop exhaustion or a no-progress (identical-plan) short-circuit yields a terminal clarification. Full detail lives in [[pipeline]], with the executor in [[interpreter]], the lint registry in [[harness]], knowledge injection in [[oracle]], and the LEARN mechanism in [[learning]].
 
 ## Makefile Targets
 

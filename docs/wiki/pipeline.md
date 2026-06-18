@@ -28,15 +28,15 @@ INTENT is retried up to `_DESIGN_MAX_ATTEMPTS` (env `DESIGN_MAX_ATTEMPTS`, defau
 
 ## The cycle loop and INTERPRETER_MAX_STEPS
 
-The loop runs `cycle = 1..INTERPRETER_MAX_STEPS` (`_IMAX_STEPS`, env `INTERPRETER_MAX_STEPS`, default 6; `pipeline.py:260`). Each cycle: PLAN → `lint_security_first` → plan-signature check → `interpret` → `verify`. `set_cycle(cycle)` stamps the trace. Exhausting the loop without a passing verify falls through to terminal CLARIFICATION.
+The loop runs `cycle = 1..INTERPRETER_MAX_STEPS` (`_IMAX_STEPS`, env `INTERPRETER_MAX_STEPS`, default 6; `pipeline.py:260`). Each cycle: PLAN → `repair_sql_stdin` → `lint` (registry dispatcher) → plan-signature check → `interpret` → `verify`. `set_cycle(cycle)` stamps the trace. Exhausting the loop without a passing verify falls through to terminal CLARIFICATION.
 
-## Lint
+## Pre-lint repair and lint
 
-`interpreter.lint_security_first(plan)` runs immediately after PLAN, no LLM. A `PlanError` (bad/empty/unparseable PLAN response) or `InterpretError` raised here is caught together (`pipeline.py:270`): `last_error` is set, `_ilearn` fires with the plan JSON, and the loop `continue`s to the next cycle. See [[interpreter]].
+`repair_sql_stdin(plan)` runs first, normalising any `/bin/sql` Exec step that delivers SQL via `args` (nondeterministic) to deliver it via `stdin` (reliable channel) instead. After repair, the registry dispatcher `interpreter.lint(plan)` runs — no LLM. A `PlanError` (bad/empty/unparseable PLAN response) or `InterpretError` raised by lint is caught together: `last_error` is set, `_ilearn` fires with the plan JSON, and the loop `continue`s to the next cycle. See [[interpreter#lint — registry-driven lint dispatcher]] and [[harness]].
 
-## _plan_signature no-progress short-circuit
+## Plan signature and no-progress guard
 
-`_plan_signature(plan)` (`pipeline.py:29`) builds a per-step identity over `discovery + ops`: SQL Exec args are whitespace/case-normalised and sorted; every other step contributes its rpc plus verbatim sorted args, so re-planning a changed Read/List path is not mistaken for stalling. If a cycle's signature equals the previous one, the loop breaks with CLARIFICATION. It is consecutive-only — A↔B oscillation is bounded by the cycle ceiling, not caught here.
+`_plan_signature(plan)` (`pipeline.py:29`) builds a per-step identity over `discovery + ops`: SQL Exec steps include both `args` and `stdin` content (whitespace/case-normalised and sorted), so a before/after `repair_sql_stdin` that only moves SQL from args to stdin produces the same signature. Every other step contributes its rpc plus verbatim sorted args, so re-planning a changed Read/List path is not mistaken for stalling. If a cycle's signature equals the previous one, the loop breaks with CLARIFICATION. It is consecutive-only — A↔B oscillation is bounded by the cycle ceiling, not caught here.
 
 ## Interpret
 
@@ -44,7 +44,9 @@ The loop runs `cycle = 1..INTERPRETER_MAX_STEPS` (`_IMAX_STEPS`, env `INTERPRETE
 
 ## Verify and answer-once
 
-`verify(result, intent)` (`pipeline.py:308`) is the sole deterministic quality gate (no LLM), checking `success_criteria` and required refs. `success_criteria` is keyed by outcome (`dict[str, list[PredExpr]]`); verify applies only `success_criteria.get(ans.outcome, [])`, so a valid negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`) with no criteria for it passes — still gated by `outcome_space`. On pass: `_ground_security_refs` ensures a DENIED_SECURITY answer cites `/docs/security.md`, `vm.answer` is called once (message capped at 800 chars), artifacts persist, distill runs, and the run returns. On fail: `_ilearn` fires with observed RPC outputs, or breaks if a mutation already landed. See [[interpreter#verify() — the deterministic quality gate]].
+`verify(result, intent)` (`pipeline.py:308`) is the sole deterministic quality gate (no LLM), checking `success_criteria` and required refs. `success_criteria` is keyed by outcome (`dict[str, list[PredExpr]]`); verify applies only `success_criteria.get(ans.outcome, [])`, so a valid negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`) with no criteria for it passes — still gated by `outcome_space`. On pass: `_ground_security_refs` ensures a DENIED_SECURITY answer cites `/docs/security.md`, `answer_once(...)` submits via vm.answer (message capped at 800 chars), artifacts persist, distill runs, and the run returns. On fail: `_ilearn` fires with observed RPC outputs, or breaks if a mutation already landed. See [[interpreter#verify() — the deterministic quality gate]].
+
+**answer-once idempotency guard (F4):** `_make_answer_once(vm)` (`pipeline.py:250`) returns a closure that tracks whether `vm.answer` has already been called. The first call submits; subsequent calls are suppressed no-ops (logging a yellow warning). Both the success path and all terminal exits share the same `answer_once` closure, so a success followed by a loop-exhaust terminal can never double-submit. This eliminates the "answer already provided" dead-end that previously required a separate `_terminal_clarification` helper.
 
 ## _ilearn retry seam
 
@@ -70,6 +72,10 @@ On a passing verify, `_maybe_distill_and_validate(intent, plan, task_id, note)` 
 
 Each cycle costs one PLAN call, plus one `_ilearn` LEARN call when the cycle fails. Best happy path is 2 calls (INTENT + 1 PLAN); a hard INTENT stop is 1 call; the worst case is `1 + 2·INTERPRETER_MAX_STEPS`. Interpret and verify make no LLM calls. See [[llm]].
 
+## answer-once and harness distill
+
+After a verify failure, `_maybe_harness_distill(plan, error, task_id)` (`pipeline.py:285`) fires when `HARNESS_DISTILL=1` (default `0`) and the error string indicates an F1-class compute contract failure (`"compute step"` or `"custom_extract"` in the message). It calls `harness.distill(...)` to propose a candidate check-spec, then optionally validates and promotes it inline. It never raises. See [[harness#F8b: distill → validate → promote]].
+
 ## Terminal OUTCOME_NONE_CLARIFICATION
 
-`_terminal_clarification(vm, message)` (`pipeline.py:377`) is the single failure exit: one `vm.answer(outcome="OUTCOME_NONE_CLARIFICATION", refs=[])`. It fires when INTENT cannot be built, when `_plan_signature` short-circuits on no progress, or when the cycle loop exhausts. `save_last_run` records the failure with the cycles used before the terminal answer.
+The terminal exit calls `answer_once(message, "OUTCOME_NONE_CLARIFICATION", [])` — the same idempotency-guarded closure used on the success path, so there is no separate `_terminal_clarification` helper. It fires when INTENT cannot be built, when `_plan_signature` short-circuits on no progress, or when the cycle loop exhausts. `save_last_run` records the failure with the cycles used before the terminal answer.

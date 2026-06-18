@@ -14,23 +14,41 @@ The Plan-IR interpreter is the single deterministic execution engine of ecom1-ag
 - **answer** (`dict[str, AnswerTemplateIR]`, `ir_models.py:157`) — label-keyed templates (`message`, `outcome`, `refs`).
 - **custom_extract** (`list[CustomExtract]`, `ir_models.py:164`) — named-parser escape hatch (`name`, `input`, `into`).
 
+## repair_sql_stdin
+
+`repair_sql_stdin(plan)` (`agent/interpreter.py:217`) is a deterministic pre-lint repair (F3) that runs before `lint()` in the pipeline. It moves SQL from `args` to `stdin` for every `Exec /bin/sql` step where `stdin` is empty and `args` carries SQL strings. The `args` channel is nondeterministic — the `/bin/sql` tool intermittently returns its usage banner rather than executing, so `stdin` is the reliable channel.
+
+The repair is idempotent: it mutates `step.args` in place and returns the plan. After repair, `_plan_signature` is computed over the normalised plan, so a before/after repair that differs only in SQL delivery channel is still recognised as the same plan for the no-progress guard. See [[pipeline#Plan signature and no-progress guard]] and [[harness#Check Kinds (handlers)]] for the `sql_stdin` lint check that catches any plan still carrying SQL in `args` after repair.
+
 ## lint_security_first
 
-`lint_security_first(plan)` (`agent/interpreter.py:191`) is the H3 security invariant, called first inside `interpret` and also separately by the pipeline lint step. It guarantees that every decision branch whose label maps to an `OUTCOME_DENIED_SECURITY` template precedes all non-denied branches.
+`lint_security_first(plan)` (`agent/interpreter.py:199`) is the H3 security invariant, called as defense-in-depth inside `interpret()` and also as a registered check in the harness lint registry (kind `security_first`). It guarantees that every decision branch whose label maps to an `OUTCOME_DENIED_SECURITY` template precedes all non-denied branches.
 
-It collects denied labels from `plan.answer`, finds the last denied branch index and the first non-denied index, and raises `InterpretError` if a denied branch follows a non-denied one (`interpreter.py:202`). This enforces "deny before allow" so a security gate can never be bypassed by branch ordering.
+It collects denied labels from `plan.answer`, finds the last denied branch index and the first non-denied index, and raises `InterpretError` if a denied branch follows a non-denied one (`interpreter.py:211`). This enforces "deny before allow" so a security gate can never be bypassed by branch ordering. The pipeline now calls `lint(plan)` (the registry dispatcher) rather than `lint_security_first` directly; `lint_security_first` remains as the inner check inside `interpret()` and as the `security_first` handler. See [[harness#Check Kinds (handlers)]].
+
+## lint — registry-driven lint dispatcher
+
+`lint(plan)` (`agent/interpreter.py:232`) is the F8 registry-driven dispatcher called by `pipeline.run_pipeline` after `repair_sql_stdin` and before `interpret()`. It iterates every non-`inactive` entry in `data/harness/checks.yaml`, resolves the handler via `harness.handler_for(kind)`, and runs it.
+
+Violation disposition: an `active` + `error`-severity violation raises `InterpretError` (blocks the cycle, routes to iLEARN); a `candidate` or `warn`-severity violation logs only. An unknown `kind` or a handler exception is a logged no-op — it never crashes the pipeline. See [[harness]] for the full handler catalogue and [[data-files#Harness Check Catalogue]] for the spec format.
 
 ## interpret() — executing the plan against the VM
 
-`interpret(plan, intent, vm, facts)` (`agent/interpreter.py:209`) is the deterministic executor. It seeds `env` from `intent.params` (plus `_facts`), then runs the seven phases in order. It NEVER calls `vm.answer` — it returns a `CapturedAnswer` inside an `InterpretResult` for [[pipeline]] to submit after verify. See [[vm]] for the RPC surface.
+`interpret(plan, intent, vm, facts)` (`agent/interpreter.py:259`) is the deterministic executor. It seeds `env` from `intent.params` (plus `_facts`), then runs the seven phases in order. It NEVER calls `vm.answer` — it returns a `CapturedAnswer` inside an `InterpretResult` for [[pipeline]] to submit after verify. See [[vm]] for the RPC surface.
 
-Phase order: discovery (read-only RPCs, SQL payloads tracked into `sql_results`), rowsets (`_parse_rowset`), compute + custom_extract, decision (first matching branch), guarded ops (`decide-then-guard` via `guard_label`; `mutate-then-classify` via `outcome_from_exit`), and answer assembly. RPCs are dispatched by `getattr(vm, rpc.lower())(**kwargs)` with args resolved via `_resolve_args`. A landed mutation (`Write`/`Delete`, or `/bin/*` Exec other than `/bin/sql`) sets `mutation_landed`, which makes a later retry unsafe. Refs are projected from `intent.required_refs[outcome]`, not authored by PLAN — `tmpl.refs` is ignored (`interpreter.py:268`). The refuse invariant raises if an `OUTCOME_OK` answer has an unresolved required `record_path` ref (`interpreter.py:277`).
+Phase order: discovery (read-only RPCs, SQL payloads tracked into `sql_results`), rowsets (`_parse_rowset`), compute + custom_extract, decision (first matching branch), guarded ops (`decide-then-guard` via `guard_label`; `mutate-then-classify` via `outcome_from_exit`), and answer assembly. RPCs are dispatched by `getattr(vm, rpc.lower())(**kwargs)` with args resolved via `_resolve_args`. A landed mutation (`Write`/`Delete`, or `/bin/*` Exec other than `/bin/sql`) sets `mutation_landed`, which makes a later retry unsafe. Refs are projected from `intent.required_refs[outcome]`, not authored by PLAN — `tmpl.refs` is ignored (`interpreter.py:334`). The refuse invariant raises if an `OUTCOME_OK` answer has an unresolved required `record_path` ref (`interpreter.py:343`).
+
+**Runtime SQL-banner backstop:** after each `/bin/sql` Exec in both discovery and ops, `_is_sql_banner(payload)` (`interpreter.py:102`) checks whether the tool returned its usage banner (`# /bin/sql` prefix or `"Send SQL on stdin"` substring) instead of data. If so, `_refuse(...)` raises a retryable `InterpretError` (mutation_landed False), so the pipeline iLEARNs and retries rather than silently parsing an empty rowset. The pre-lint `repair_sql_stdin` eliminates the root cause before execution; this backstop handles any residual runtime slip.
+
+**F1 — compute and custom_extract wrap:** the compute and custom_extract loops catch `TypeError`, `AttributeError`, `KeyError`, and `IndexError` and convert them into `_refuse(...)` calls (`interpreter.py:295–301`). Since compute runs before any mutating op, `mutation_landed` is still False at that point, so the pipeline always retries on a type-mismatch (e.g. passing a scalar dict from `first`/`get` to `column`/`sum_col`). This converts what would have been a bare Python traceback — misclassified as a real-VM exception by the pipeline — into a clean, labelled `InterpretError` that feeds iLEARN. See also `_require_rows` in [[interpreter#Primitives]].
 
 ## Primitives
 
-`agent/primitives.py` is a registry of 13 pure compute primitives over already-resolved args, dispatched by name via `run_primitive(name, args)` (`primitives.py:57`). Adding capability is a new registry entry, never new grammar.
+`agent/primitives.py` is a registry of 13 pure compute primitives over already-resolved args, dispatched by name via `run_primitive(name, args)` (`primitives.py:68`). Adding capability is a new registry entry, never new grammar.
 
-The `PRIMITIVES` table (`primitives.py:39`) covers numeric (`abs_diff`, `div`, `to_number`, `sum_col`), collection (`count`, `column`, `first`, `get`, `dedupe`, `concat`), boolean (`all_true`, `any_true`), and row (`filter_rows`, which evaluates a PredExpr per row) operations. `filter_rows` reuses the predicate engine; `dedupe` requires hashable elements.
+The `PRIMITIVES` table (`primitives.py:50`) covers numeric (`abs_diff`, `div`, `to_number`, `sum_col`), collection (`count`, `column`, `first`, `get`, `dedupe`, `concat`), boolean (`all_true`, `any_true`), and row (`filter_rows`, which evaluates a PredExpr per row) operations. `filter_rows` reuses the predicate engine; `dedupe` requires hashable elements.
+
+**`_require_rows` guard (F1):** `sum_col`, `column`, and `filter_rows` all call `_require_rows(prim, rows)` (`primitives.py:22`) before iterating. If `rows` is `None` it returns `[]` (preserving the previous empty-list behaviour). If `rows` is a non-list (scalar or dict — the typical symptom of passing `first`/`get` output directly into a list-consuming primitive), it raises a clear `TypeError` with an actionable message. This `TypeError` is caught by the F1 compute-wrap in `interpret()` and converted into a retryable `InterpretError`, and is also the target of the `primitive_contract` check kind in [[harness#Check Kinds (handlers)]].
 
 ## Custom-extract parsers
 
