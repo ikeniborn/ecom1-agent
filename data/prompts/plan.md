@@ -131,6 +131,22 @@ Valid names for `custom_extract[*].name`:
   without the `$` prefix).
 - Dotted and indexed paths: `$a.b`, `$rows.0.field`.
 
+## Predicate ops (exact spellings)
+
+`decision.branches[*].when` accepts ONLY these ops — use the exact spelling:
+
+- Leaf: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `nonempty`, `isnull`,
+  `contains_any`, `in_set`, `startswith`, `endswith`, `regex_match`
+- Bool: `and`, `or`, `not` (each takes `args`: a list of nested predicates)
+
+Do NOT use `neq`, `!=`, `==`, `gte`, or `lte` — they are not valid op names.
+
+## AnswerTemplateIR shape (exact keys)
+
+Each `answer[<label>]` object has ONLY these keys: `message`, `outcome`, `refs`.
+Add no other keys. Message `{slot}` placeholders resolve from `env`, never from
+extra fields on the answer object.
+
 ## Tool selection rules
 
 - Prefer `Find` / `Search` / `Read` with line ranges over full `Tree` + parse.

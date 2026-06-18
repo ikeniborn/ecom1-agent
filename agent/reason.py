@@ -15,6 +15,43 @@ from .prompt import load_prompt
 _MAX_TOKENS_INTENT = int(os.environ.get("MAX_TOKENS_INTENT", "4096"))
 _MAX_TOKENS_PLAN = int(os.environ.get("MAX_TOKENS_PLAN", "8192"))
 
+_OP_SYNONYMS = {"neq": "ne", "!=": "ne", "==": "eq", "gte": "ge", "lte": "le",
+                "=>": "ge", "=<": "le"}
+_ANSWER_KEYS = {"message", "outcome", "refs"}
+
+
+def _repair_ops(node) -> None:
+    """Map common predicate-op synonyms to canonical names, in place, recursively."""
+    if isinstance(node, dict):
+        op = node.get("op")
+        if isinstance(op, str) and op in _OP_SYNONYMS:
+            node["op"] = _OP_SYNONYMS[op]
+        for v in node.values():
+            _repair_ops(v)
+    elif isinstance(node, list):
+        for v in node:
+            _repair_ops(v)
+
+
+def _repair_plan_dict(obj: dict) -> dict:
+    """Best-effort pre-lint repair of common IR slips, BEFORE pydantic validation.
+
+    1. Normalize predicate-op synonyms (neq->ne, !=->ne, ==->eq, gte->ge, lte->le).
+    2. Strip unknown keys from each answer branch (extra='forbid' would reject them).
+
+    Unmappable ops are left untouched and still raise at PlanIR construction
+    (-> PlanError -> iLEARN), so invalid IR is never silently accepted.
+    """
+    _repair_ops(obj)
+    ans = obj.get("answer")
+    if isinstance(ans, dict):
+        for tmpl in ans.values():
+            if isinstance(tmpl, dict):
+                for k in list(tmpl.keys()):
+                    if k not in _ANSWER_KEYS:
+                        tmpl.pop(k)
+    return obj
+
 
 class IntentError(RuntimeError):
     pass
@@ -104,6 +141,7 @@ def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str |
     obj = _extract_json_from_text(raw)
     if not isinstance(obj, dict):
         raise PlanError(f"PLAN: could not parse JSON; head: {raw[:200]!r}")
+    obj = _repair_plan_dict(obj)
     try:
         return PlanIR(**obj)
     except Exception as e:
