@@ -76,6 +76,14 @@ Single JSON object, no prose, no fences:
   typically needs no criteria — it is gated by `outcome_space`. Do NOT bake a SQL
   recipe, join, `kind_id`, or `city` here — that is PLAN's job (HOW).
 
+### Learned rules
+
+You may receive a `LEARNED_RULES (active)` block — validated, task-scoped guidance
+distilled from prior runs. Honor it when shaping the spec, especially `required_refs`,
+`success_criteria`, `outcome_space`, and `params`. These rules state methods (how to
+ground an answer, which evidence the grader requires), never re-seeded literals — apply
+the method, do not copy any example value.
+
 ### Security scope — role-aware customer-ownership deny
 
 `facts.identity.kind` is one of `customer`, `employee`, `guest` (structural,

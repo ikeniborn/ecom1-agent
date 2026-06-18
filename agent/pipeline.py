@@ -343,7 +343,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     for _ in range(_DESIGN_MAX_ATTEMPTS):
         tk = {}
         try:
-            intent = run_intent(facts, instruction, token_out=tk); _accum(tk); break
+            intent = run_intent(facts, instruction, token_out=tk, learn_ctx=learn_ctx); _accum(tk); break
         except IntentError:
             _accum(tk)
     if intent is None:

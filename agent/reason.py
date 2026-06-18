@@ -97,10 +97,14 @@ def _facts_block(facts: Any, tier: str = "plan") -> str:
     return block
 
 
-def run_intent(facts, instruction: str, token_out: dict | None = None) -> IntentSpec:
+def run_intent(facts, instruction: str, token_out: dict | None = None,
+               learn_ctx: list[dict] | None = None) -> IntentSpec:
     guide = load_prompt("intent") or "# PHASE: INTENT"
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
-    user = "\n\n".join(p for p in [_facts_block(facts, tier="intent"), f"INSTRUCTION:\n{instruction}"] if p)
+    learned = ("LEARNED_RULES (active):\n" + "\n".join(_format_entry(e) for e in learn_ctx)
+               if learn_ctx else "")
+    user = "\n\n".join(p for p in [_facts_block(facts, tier="intent"), learned,
+                                   f"INSTRUCTION:\n{instruction}"] if p)
     model = _resolve_model_for_phase("intent", os.environ.get("MODEL", ""))
     raw = _call_llm_raw(system, user, model, {}, max_tokens=_MAX_TOKENS_INTENT, token_out=token_out, phase="INTENT")
     if not raw:

@@ -72,33 +72,50 @@ entries:
   status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: When answering a catalogue existence query, resolve the product by matching
-    brand/model/property normalized (case-insensitive, trimmed; use LIKE for a partial
-    model token), apply 'first' to reduce the rowset to one record, read that record's
-    fields with 'get' (never 'column' on a single record), and project its record_path
-    into the OUTCOME_OK refs.
+  content: 'When answering a catalogue existence/identification query, ground the OUTCOME_OK
+    answer on the matched product record. INTENT: set required_refs[OUTCOME_OK] to one
+    record_path ref whose source is $first_record.record_path; set success_criteria[OUTCOME_OK]
+    to match_count ge 1; keep outcome_space [OUTCOME_OK]. PLAN: match brand/model/variant
+    properties NORMALIZED (LOWER and TRIM, LIKE for a partial model token) in a rowset that
+    selects the record_path column; bind first_record = first(rows); read fields with get
+    (never column on a single record); leave answer.refs empty so the interpreter projects
+    them from required_refs.'
   created: '2026-06-18'
   deactivated_reason: null
   id: r004
-  reasoning: Method-not-value rule (F6). States the matching/extraction method so it
-    survives per-StartRun re-seeding; pairs with F1/F2 (typed primitive contracts) and
-    the interpreter ref-projection. Replaces r003 which misattributed the crash to format.
+  reasoning: Method-not-value rule (F6, extended). Now drives BOTH phases via the
+    learn-aware INTENT channel — INTENT declares the record_path required_ref (the grader
+    rejects an OUTCOME_OK with no /proc/catalog/<sku>.json ref) and PLAN binds first_record
+    so the interpreter projects it. Survives per-StartRun re-seeding; pairs with F1/F2.
+    Replaces r003 which misattributed the crash to format.
   status: active
   surface: ir
 - content: null
   created: '2026-06-18'
+  deactivated_reason: superseded by newer verdict
   id: v003
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
   source: verdict
-  status: active
+  status: inactive
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-18'
+  id: v004
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/FST-3SJKL8BF.json'
+  source: verdict
+  status: active
+  submitted_message: Found 0 matching product(s) in the catalogue.
+  submitted_outcome: OUTCOME_OK
   submitted_refs: []
 last_run:
   cycles_used: 1
   date: '2026-06-18'
-  outcome: OUTCOME_NONE_CLARIFICATION
+  outcome: OUTCOME_OK
   status: failure
 task_id: t01
