@@ -74,9 +74,10 @@ Single JSON object, no prose, no fences:
 **`discovery`** — read-only RPCs that populate `env`. Run before decision.
 Use `Exec /bin/sql` with parameterised `:name` placeholders; never inline
 re-seeded literals. Batch with CTEs into a single call where possible (S4).
-Read the eligibility rule for the computation from `facts.policies` (the governing
-`/docs` content surfaced in pre-phase) and encode the rule-correct SQL — the
-documented count/filter, not a naive one.
+When a computation depends on an eligibility/count rule, first `Read` the governing
+`/docs` policy path (surfaced in `docs_inventory`) in a `discovery` step, then encode
+the rule-correct SQL from the documented rule — the documented count/filter, not a
+naive one.
 
 **`rowsets`** — parse delimited text from a bound env key into a list of dicts.
 `format` is `auto_delim` (tab/comma auto-detect) or `json`.
