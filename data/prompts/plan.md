@@ -103,11 +103,14 @@ Args are resolved: `$name` → env lookup; anything else → literal.
 **`answer`** — keyed by decision label. Each `AnswerTemplateIR`:
 - `message` — f-string-style template; `{slot}` resolves from env (same as `$slot`).
 - `outcome` — one of the `Outcome` enum values.
-- `refs` — **leave empty (`[]`)**. The interpreter projects `answer.refs` from
-  `INTENT.required_refs[selected_outcome]`. PLAN supplies only the runtime *bindings*
-  those refs resolve against: ensure your discovery/rowset/compute steps bind the env
-  key the INTENT's `record_path` `source` points at (e.g. a `$row.record_path` column
-  selected from `/bin/sql`). Do NOT author or cite refs here.
+- `refs` — always-required grounding is PROJECTED from `INTENT.required_refs[selected_outcome]`,
+  so for an unconditional ref leave this `[]` and just bind the env key the INTENT `source`
+  points at. For **conditional** grounding — a ref needed on SOME branches only (e.g. a
+  `record_path` that exists only when a match is FOUND, absent on the not-found branch) —
+  author the `$binding` in THAT branch's `refs`; the interpreter resolves it best-effort and
+  DROPS it if it resolves to nothing (so the empty branch is not forced to carry it). Bind the
+  env key it points at (e.g. a `$row.record_path` column selected from `/bin/sql`). Never
+  author a literal you cannot ground at runtime.
 
 **`custom_extract`** — named-parser escape hatch (H2). Dispatches to `PARSERS[name]`
 with `(text, params)` → `list[dict]`; result stored at `into`.

@@ -72,22 +72,28 @@ entries:
   status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: 'When answering a catalogue existence/identification query, ground the OUTCOME_OK
-    answer on the matched product record. INTENT: set required_refs[OUTCOME_OK] to one
-    record_path ref whose source is $first_record.record_path; set success_criteria[OUTCOME_OK]
-    to match_count ge 1; keep outcome_space [OUTCOME_OK]. PLAN: match brand/model/variant
-    properties NORMALIZED (LOWER and TRIM, LIKE for a partial model token) in a rowset that
-    selects the record_path column; bind first_record = first(rows); read fields with get
-    (never column on a single record); leave answer.refs empty so the interpreter projects
-    them from required_refs.'
+  content: 'For a catalogue existence/identification query the product may be PRESENT
+    or ABSENT (data is re-seeded each run); BOTH cases answer OUTCOME_OK. INTENT:
+    keep required_refs[OUTCOME_OK] EMPTY — the record_path is CONDITIONAL grounding
+    supplied by PLAN only on the found branch; keep outcome_space [OUTCOME_OK]. PLAN:
+    match brand/model/variant properties NORMALIZED (LOWER and TRIM, LIKE for a partial
+    model token) in a rowset that selects the record_path column; compute match_count
+    = count(rows) and first_record = first(rows); decision branches on (match_count
+    ge 1) -> label found else label absent; answer.found message MUST contain the
+    literal token <YES> and refs = [$first_record.record_path]; answer.absent message
+    MUST contain the literal token <NO> and refs = []; read single-record fields with
+    get, never column on a single record.'
   created: '2026-06-18'
   deactivated_reason: null
   id: r004
-  reasoning: Method-not-value rule (F6, extended). Now drives BOTH phases via the
-    learn-aware INTENT channel — INTENT declares the record_path required_ref (the grader
-    rejects an OUTCOME_OK with no /proc/catalog/<sku>.json ref) and PLAN binds first_record
-    so the interpreter projects it. Survives per-StartRun re-seeding; pairs with F1/F2.
-    Replaces r003 which misattributed the crash to format.
+  reasoning: 'Method-not-value rule (F6, extended for present/absent re-seeding).
+    t01 is a yes/no existence query whose product is sometimes absent; both cases
+    are OUTCOME_OK. The record_path ref is CONDITIONAL — needed only on the found
+    branch — so it is AUTHORED on answer.found.refs (interpreter resolves best-effort,
+    drops it when absent) rather than statically required, which would refuse the
+    absent case. Pairs with the learn-aware INTENT channel + F1/F2. Verdicts: present
+    needs /proc/catalog/<sku>.json (v001/v004); absent needs literal <NO> (v005);
+    absent stays OUTCOME_OK not UNSUPPORTED (v002).'
   status: active
   surface: ir
 - content: null
@@ -104,18 +110,48 @@ entries:
   submitted_refs: []
 - content: null
   created: '2026-06-18'
+  deactivated_reason: superseded by newer verdict
   id: v004
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/FST-3SJKL8BF.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: Found 0 matching product(s) in the catalogue.
   submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always omit the Answer RPC from the ops array when a top-level answer mapping
+    exists for the target decision label, so the interpreter uses the top-level template
+    and projects required_refs instead of applying empty op args.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error ''real_vm: answer must be non empty'' with verdict ''answer missing
+    required reference ''/proc/catalog/FST-3SJKL8BF.json'''' shows the final answer
+    payload was empty despite a required record_path ref configured in the plan. The
+    PlanIR defines both a top-level ''answer'' object (with refs left empty for interpreter
+    projection per r004) AND an explicit Answer op in ''ops'' with args:{}. This dual
+    definition (already prohibited by r002) caused the explicit op to execute with
+    empty args, overriding the top-level answer template and bypassing required_refs
+    projection. Removing the Answer op from ops lets the interpreter synthesize the
+    answer solely from the top-level mapping and populate refs from required_refs.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-18'
+  id: v005
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 last_run:
   cycles_used: 1
   date: '2026-06-18'
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t01

@@ -149,6 +149,23 @@ def _project_required_refs(intent: "IntentSpec", outcome: str, env: dict) -> tup
     return out, unresolved
 
 
+def _resolve_authored_refs(authored, env: dict) -> list[str]:
+    """Best-effort resolution of PLAN-authored answer.refs for CONDITIONAL grounding.
+    A `$ref` is resolved against env; one that resolves to None/"" is DROPPED (not refused)
+    — this is how a ref needed only on some branches (e.g. a record_path present only when a
+    match is found) is grounded without forcing it on the empty branch. A plain string is a
+    literal. Enforced (always-required) refs stay in intent.required_refs; this only ADDS."""
+    out: list[str] = []
+    for r in authored or []:
+        if isinstance(r, str) and r.startswith("$"):
+            val = resolve(r, env)
+            if val not in (None, ""):
+                out.append(str(val))
+        elif isinstance(r, str) and r:
+            out.append(r)
+    return out
+
+
 def _refuse(msg: str, mutation_landed: bool) -> InterpretError:
     """Build an InterpretError tagged with mutation state (retry-safety)."""
     err = InterpretError(msg)
@@ -330,8 +347,9 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
         if op.outcome_from_exit is not None:           # mutate-then-classify
             exit_outcome = _classify_from_exit(op.outcome_from_exit, result)
 
-    # 7. answer assembly — refs are PROJECTED from intent.required_refs[outcome],
-    #    not authored by PLAN (tmpl.refs is ignored).
+    # 7. answer assembly — ENFORCED refs are projected from intent.required_refs[outcome];
+    #    the selected template's authored refs add best-effort CONDITIONAL grounding
+    #    (resolved $refs that land, dropped if they resolve to nothing — per-branch refs).
     tmpl = plan.answer.get(label) or next(iter(plan.answer.values()))
     outcome = exit_outcome or tmpl.outcome
     message = _fill_slots(tmpl.message, env)
@@ -341,6 +359,9 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
     #    resolve carries mutation_landed so the pipeline routes to terminal.
     if outcome == "OUTCOME_OK" and unresolved:
         raise _refuse(f"unresolved required ref(s) {unresolved!r} on OK answer", mutation_landed)
+    for r in _resolve_authored_refs(tmpl.refs, env):   # conditional grounding (deduped)
+        if r not in refs:
+            refs.append(r)
     _trace_answer(message, outcome, refs)
     captured = CapturedAnswer(message=message, outcome=outcome, refs=refs)
     return InterpretResult(captured=captured, env=env, observations=observations,

@@ -315,3 +315,33 @@ def test_sql_usage_banner_raises_retryable_refuse():
         interpret(plan, _INTENT, vm)
     assert ei.value.mutation_landed is False
     assert "banner" in str(ei.value)
+
+
+def test_authored_conditional_ref_resolves_present_and_drops_absent():
+    # Conditional grounding: a record_path authored on the answer template resolves to a ref
+    # when the match is present, and is DROPPED (not refused) when the rowset is empty — so a
+    # present/absent existence task can ground only the found branch. intent.required_refs is
+    # empty here, so the authored ref is the only ref source.
+    fxp = {fixture_key("Exec", "/bin/sql", ["Q"]): {"stdout": "sku|record_path\nA|/proc/catalog/A.json"}}
+    plan_present = _plan(
+        discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "args": ["Q"]}, "bind": "raw"}],
+        rowsets=[{"from": "raw", "format": "auto_delim", "into": "rows", "columns": []}],
+        compute=[{"prim": "first", "args": ["$rows"], "into": "first_record"}],
+        answer={"ok": {"message": "found <YES>", "outcome": "OUTCOME_OK",
+                       "refs": ["$first_record.record_path"]}},
+    )
+    res = interpret(plan_present, _INTENT, MockVMSpy(fixtures=fxp))
+    assert res.captured.outcome == "OUTCOME_OK"
+    assert res.captured.refs == ["/proc/catalog/A.json"]
+
+    fxa = {fixture_key("Exec", "/bin/sql", ["Q"]): {"stdout": "sku|record_path"}}  # header only -> 0 rows
+    plan_absent = _plan(
+        discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "args": ["Q"]}, "bind": "raw"}],
+        rowsets=[{"from": "raw", "format": "auto_delim", "into": "rows", "columns": []}],
+        compute=[{"prim": "first", "args": ["$rows"], "into": "first_record"}],
+        answer={"ok": {"message": "absent <NO>", "outcome": "OUTCOME_OK",
+                       "refs": ["$first_record.record_path"]}},
+    )
+    res2 = interpret(plan_absent, _INTENT, MockVMSpy(fixtures=fxa))
+    assert res2.captured.outcome == "OUTCOME_OK"
+    assert res2.captured.refs == []   # unresolved authored ref dropped, not refused
