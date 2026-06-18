@@ -240,6 +240,17 @@ def test_plan_signature_differs_on_nonsql_arg():
     )
 
 
+def test_plan_signature_includes_stdin_sql():
+    from agent.pipeline import _plan_signature
+    from agent.ir_models import PlanIR
+    base = json.loads(_PLAN)
+    a = dict(base); a["discovery"] = [{"rpc": "Exec",
+        "args": {"path": "/bin/sql", "args": [], "stdin": "SELECT 1"}}]
+    b = dict(base); b["discovery"] = [{"rpc": "Exec",
+        "args": {"path": "/bin/sql", "args": [], "stdin": "SELECT 2"}}]
+    assert _plan_signature(PlanIR(**a)) != _plan_signature(PlanIR(**b))
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader

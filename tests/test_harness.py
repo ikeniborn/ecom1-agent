@@ -99,3 +99,31 @@ def test_seeded_checks_include_primitive_contract_active():
     specs = {s.get("id"): s for s in harness.load_checks()}
     assert specs["chk_column_on_scalar"]["status"] == "active"
     assert specs["chk_column_on_scalar"]["severity"] == "error"
+
+
+def test_sql_stdin_handler_flags_args_with_empty_stdin():
+    spec = {"id": "chk_sql_stdin", "kind": "sql_stdin", "message": "deliver SQL via stdin"}
+    bad = _plan(discovery=[{"rpc": "Exec",
+                            "args": {"path": "/bin/sql", "args": ["SELECT 1"]}, "bind": "r"}])
+    assert harness.check_sql_stdin(bad, spec)
+    good = _plan(discovery=[{"rpc": "Exec",
+                             "args": {"path": "/bin/sql", "args": [], "stdin": "SELECT 1"},
+                             "bind": "r"}])
+    assert harness.check_sql_stdin(good, spec) == []
+
+
+def test_seeded_sql_stdin_is_error():
+    spec = {s["id"]: s for s in harness.load_checks()}["chk_sql_stdin"]
+    assert spec["severity"] == "error" and spec["status"] == "active"
+
+
+def test_repair_moves_sql_args_to_stdin_then_lint_passes():
+    from agent.interpreter import repair_sql_stdin, lint
+    plan = _plan(discovery=[{"rpc": "Exec",
+                             "args": {"path": "/bin/sql", "args": ["SELECT 1"]}, "bind": "r"}])
+    repaired = repair_sql_stdin(plan)
+    st = repaired.discovery[0]
+    assert st.args["stdin"] == "SELECT 1" and st.args["args"] == []
+    spec = {"id": "chk_sql_stdin", "kind": "sql_stdin", "message": "m"}
+    assert harness.check_sql_stdin(repaired, spec) == []
+    lint(repaired)

@@ -99,6 +99,14 @@ def _payload(result: Any) -> str:
     return (stdout or content or "").strip()
 
 
+def _is_sql_banner(payload: str) -> bool:
+    """True when /bin/sql returned its usage banner instead of data — a runtime backstop
+    to the pre-lint repair. Detect it so the pipeline retries instead of parsing an empty
+    rowset."""
+    head = (payload or "").lstrip()
+    return head.startswith("# /bin/sql") or "Send SQL on stdin" in head
+
+
 def _resolve_args(args: dict, env: dict) -> dict:
     out: dict = {}
     for k, v in (args or {}).items():
@@ -206,6 +214,21 @@ def lint_security_first(plan: PlanIR) -> None:
         )
 
 
+def repair_sql_stdin(plan: PlanIR) -> PlanIR:
+    """Deterministic pre-lint repair (F3): deliver /bin/sql SQL on stdin (the reliable
+    channel) instead of args (nondeterministic — intermittently yields the usage banner).
+    For each Exec /bin/sql step carrying SQL in args with empty stdin, move the SQL into
+    stdin and clear args. Idempotent; mutates the plan's step args in place and returns it."""
+    for st in list(plan.discovery) + list(plan.ops):
+        if st.rpc == "Exec" and str(st.args.get("path", "")) == "/bin/sql":
+            sql_args = st.args.get("args") or []
+            stdin = str(st.args.get("stdin") or "").strip()
+            if sql_args and not stdin:
+                st.args["stdin"] = "\n".join(str(a) for a in sql_args)
+                st.args["args"] = []
+    return plan
+
+
 def lint(plan: PlanIR) -> None:
     """Registry-driven plan-time lint (F8). Dispatches each non-inactive check-spec in
     data/harness/checks.yaml to its `kind` handler. An ACTIVE error-severity violation
@@ -253,6 +276,8 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
         observations.append(f"[{step.rpc} {kwargs.get('path', kwargs.get('root', ''))}] {pay[:_OBS_PER_CALL]}")
         if step.rpc == "Exec" and kwargs.get("path") == "/bin/sql":
             sql_results.append(pay)
+            if _is_sql_banner(pay):
+                raise _refuse("sql returned usage banner — SQL not delivered via stdin", False)
 
     # 3. rowsets
     for rs in plan.rowsets:
@@ -297,7 +322,11 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
             mutation_landed = True
         _trace_vm("INTERPRET", op.rpc, kwargs, _payload(result), mutated=_mut)
         if op.rpc == "Exec" and kwargs.get("path") == "/bin/sql":
-            sql_results.append(_payload(result))
+            pay = _payload(result)
+            sql_results.append(pay)
+            if _is_sql_banner(pay):
+                raise _refuse("sql returned usage banner — SQL not delivered via stdin",
+                              mutation_landed)
         if op.outcome_from_exit is not None:           # mutate-then-classify
             exit_outcome = _classify_from_exit(op.outcome_from_exit, result)
 

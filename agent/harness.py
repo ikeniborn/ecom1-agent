@@ -109,11 +109,27 @@ def check_primitive_arity(plan, spec) -> list[str]:
     return out
 
 
+def check_sql_stdin(plan, spec) -> list[str]:
+    """A /bin/sql Exec must deliver SQL on stdin (args delivery is nondeterministic — the
+    tool intermittently returns its usage banner). Seeded severity: error; the pre-lint
+    repair (interpreter.repair_sql_stdin) normalises args->stdin before lint, so this only
+    fires on a plan that still carries SQL in args with empty stdin after repair."""
+    msg = spec.get("message") or "deliver SQL via /bin/sql stdin (args is nondeterministic)"
+    out: list[str] = []
+    for st in list(plan.discovery) + list(plan.ops):
+        if st.rpc == "Exec" and str(st.args.get("path", "")) == "/bin/sql":
+            stdin = str(st.args.get("stdin") or "").strip()
+            if not stdin and st.args.get("args"):
+                out.append(msg)
+    return out
+
+
 _HANDLERS = {
     "security_first": check_security_first,
     "primitive_contract": check_primitive_contract,
     "primitive_exists": check_primitive_exists,
     "primitive_arity": check_primitive_arity,
+    "sql_stdin": check_sql_stdin,
 }
 
 

@@ -56,7 +56,10 @@ class MockVMSpy:
     def exec(self, path: str = "", args: list[str] | None = None, stdin: str = "", **kwargs: Any) -> Any:
         args_list = list(args or [])
         self._record("Exec", path=path, args=args_list, stdin=stdin, **kwargs)
-        return self._lookup("Exec", path, args_list)
+        # Fixture-key fallback: a repaired /bin/sql call delivers SQL on stdin with empty
+        # args; key the lookup on [stdin] so fixtures recorded under the SQL string match.
+        lookup_args = args_list or ([stdin] if stdin else None)
+        return self._lookup("Exec", path, lookup_args)
 
     def write(self, path: str = "", content: str = "", **kwargs: Any) -> Any:
         self._record("Write", path=path, content=content, **kwargs)

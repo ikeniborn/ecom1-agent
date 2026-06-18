@@ -302,3 +302,16 @@ def test_compute_listop_on_scalar_raises_interpret_error():
         interpret(plan, _INTENT, vm)
     assert ei.value.mutation_landed is False
     assert "column" in str(ei.value)
+
+
+def test_sql_usage_banner_raises_retryable_refuse():
+    # F3 runtime backstop: /bin/sql returned its man-page instead of data.
+    banner = "# /bin/sql\nUsage: send SQL on stdin. Send SQL on stdin to query."
+    fx = {fixture_key("Exec", "/bin/sql", ["Q"]): {"stdout": banner}}
+    vm = MockVMSpy(fixtures=fx)
+    plan = _plan(discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "args": ["Q"]},
+                             "bind": "raw"}])
+    with pytest.raises(InterpretError) as ei:
+        interpret(plan, _INTENT, vm)
+    assert ei.value.mutation_landed is False
+    assert "banner" in str(ei.value)

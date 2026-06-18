@@ -52,3 +52,9 @@ def test_all_rpcs_record():
     vm.delete(path="/tmp/x")
     rpcs = [c[0] for c in vm.calls]
     assert rpcs == ["List", "Tree", "Find", "Search", "Stat", "Write", "Delete"]
+
+
+def test_exec_stdin_fixture_key_fallback():
+    fx = {fixture_key("Exec", "/bin/sql", ["SELECT 1"]): {"stdout": "ok"}}
+    vm = MockVMSpy(fixtures=fx)
+    assert vm.exec(path="/bin/sql", args=[], stdin="SELECT 1") == {"stdout": "ok"}
