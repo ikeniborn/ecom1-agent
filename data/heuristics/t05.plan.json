@@ -1,0 +1,128 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "WITH base AS (SELECT product_sku, record_path FROM product_variants WHERE LOWER(TRIM(brand)) LIKE '%heco%' AND (LOWER(series) LIKE '%gtu-ypj%' OR LOWER(model) LIKE '%gtu-ypj%' OR LOWER(product_name) LIKE '%gtu-ypj%' OR LOWER(series) LIKE '%topfix%' OR LOWER(product_name) LIKE '%topfix%') ORDER BY product_sku LIMIT 1), props AS (SELECT product_sku, MAX(CASE WHEN LOWER(property_key) LIKE '%screw%type%' AND LOWER(property_value_text) LIKE '%wood%' THEN 1 ELSE 0 END) AS has_screw_type, MAX(CASE WHEN LOWER(property_key) LIKE '%diameter%' AND (property_value_number = 6 OR LOWER(TRIM(property_value_text)) IN ('6 mm','6mm','6')) THEN 1 ELSE 0 END) AS has_diameter, MAX(CASE WHEN LOWER(property_key) LIKE '%length%' AND (property_value_number = 120 OR LOWER(TRIM(property_value_text)) IN ('120 mm','120mm','120')) THEN 1 ELSE 0 END) AS has_length FROM product_variant_properties GROUP BY product_sku) SELECT b.product_sku, b.record_path, CASE WHEN COALESCE(p.has_screw_type,0)=1 AND COALESCE(p.has_diameter,0)=1 AND COALESCE(p.has_length,0)=1 THEN 1 ELSE 0 END AS extra_holds FROM base b LEFT JOIN props p ON p.product_sku = b.product_sku;"
+      },
+      "bind": "sql_out"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_out",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku",
+            "sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path",
+            "path"
+          ]
+        },
+        {
+          "into": "extra_holds",
+          "candidates": [
+            "extra_holds"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$rows"
+      ],
+      "into": "base_count"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "base"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$base",
+        "product_sku"
+      ],
+      "into": "checked_sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$base",
+        "record_path"
+      ],
+      "into": "base_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$base",
+        "extra_holds"
+      ],
+      "into": "extra_holds"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$base_count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "base_absent"
+      },
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$extra_holds",
+          "rhs": "1",
+          "args": []
+        },
+        "label": "yes"
+      }
+    ],
+    "default_label": "no"
+  },
+  "ops": [],
+  "answer": {
+    "base_absent": {
+      "message": "No base product matching the Heco TopFix GTU-YPJ wood/drywall screw line was found in the live catalogue; claimed variant (wood screw / 6 mm / 120 mm): NO.",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    },
+    "yes": {
+      "message": "Base product found (SKU {checked_sku}); claimed variant (wood screw / 6 mm / 120 mm): YES — present for checked SKU {checked_sku}.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        "$base_record_path"
+      ]
+    },
+    "no": {
+      "message": "Base product found (SKU {checked_sku}); claimed variant (wood screw / 6 mm / 120 mm): NO — not present for checked SKU {checked_sku}.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        "$base_record_path"
+      ]
+    }
+  },
+  "custom_extract": []
+}

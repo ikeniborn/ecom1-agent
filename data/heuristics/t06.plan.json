@@ -1,0 +1,100 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": {
+          "claimed_brand": "Gorilla",
+          "claimed_adhesive_type": "contact adhesive",
+          "claimed_color_family": "gray"
+        },
+        "stdin": "SELECT v.product_sku, CASE WHEN v.record_path LIKE '/%' THEN v.record_path ELSE '/catalog/' || v.record_path END AS record_path FROM product_variants v WHERE LOWER(TRIM(v.brand)) = LOWER(TRIM(:claimed_brand)) AND LOWER(TRIM(v.series)) LIKE '%crystal grip%' AND LOWER(TRIM(v.model)) LIKE '%2zq-d83%' AND EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND LOWER(TRIM(p.property_key)) = 'adhesive_type' AND LOWER(TRIM(p.property_value_text)) = LOWER(TRIM(:claimed_adhesive_type))) AND EXISTS (SELECT 1 FROM product_variant_properties p2 WHERE p2.product_sku = v.product_sku AND LOWER(TRIM(p2.property_key)) = 'color_family' AND LOWER(TRIM(p2.property_value_text)) = LOWER(TRIM(:claimed_color_family))) LIMIT 5"
+      },
+      "bind": "sql_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_result",
+      "format": "auto_delim",
+      "into": "product_rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$product_rows"
+      ],
+      "into": "match_count"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$product_rows"
+      ],
+      "into": "product"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product",
+        "product_sku"
+      ],
+      "into": "sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product",
+        "record_path"
+      ],
+      "into": "record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$match_count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "absent"
+      }
+    ],
+    "default_label": "found"
+  },
+  "ops": [],
+  "answer": {
+    "absent": {
+      "message": "NOT FOUND <NO>",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "found": {
+      "message": "FOUND {sku} (source {record_path})",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        "$product.record_path"
+      ]
+    }
+  },
+  "custom_extract": []
+}

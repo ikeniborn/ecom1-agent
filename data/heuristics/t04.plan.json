@@ -1,0 +1,88 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT pv.record_path, pv.product_sku FROM product_variants pv WHERE LOWER(TRIM(pv.brand)) = LOWER(TRIM(:brand)) AND LOWER(TRIM(pv.series)) LIKE '%' || LOWER(TRIM(:series)) || '%' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND LOWER(TRIM(pvp.property_key)) = 'size' AND LOWER(TRIM(pvp.property_value_text)) = LOWER(TRIM(:size))) AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND LOWER(TRIM(pvp.property_key)) = 'color_family' AND LOWER(TRIM(pvp.property_value_text)) = LOWER(TRIM(:color_family))) LIMIT 10"
+      },
+      "bind": "sql_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_result",
+      "format": "auto_delim",
+      "into": "match_rows",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$match_rows"
+      ],
+      "into": "match_count"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$match_rows",
+        "record_path"
+      ],
+      "into": "record_paths"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$record_paths"
+      ],
+      "into": "first_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "ge",
+          "lhs": "$match_count",
+          "rhs": "1",
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "absent"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "Yes — the requested product is available in the catalogue.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        "$first_record_path"
+      ]
+    },
+    "absent": {
+      "message": "No — the requested product is not available in the catalogue.",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

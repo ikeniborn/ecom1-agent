@@ -937,23 +937,742 @@
   source_task: t_seed
   polarity: method
 - id: normalized-catalogue-existence-match
-  description: General method for catalogue existence queries — normalized attribute
-    matching plus single-record extraction discipline.
+  description: General method for catalogue existence queries — normalized attribute matching plus single-record
+    extraction discipline.
   domain:
   - product-catalogue
   - sql
   - method
-  content: "To decide whether a catalogue product exists, match its identifying\
-    \ attributes (brand, model/series, variant properties) NORMALIZED: case-insensitive\
-    \ and whitespace-trimmed, using LIKE for partial model tokens rather than strict\
-    \ equality, since exact-match against re-seeded data is brittle. Reduce the result\
-    \ rowset with `first` to a single record, then read fields with `get` (a single\
-    \ record is a dict, not a list — never apply a list operation like `column`\
-    \ to it), and surface that record's record_path as the grounding reference."
+  content: 'To decide whether a catalogue product exists, match its identifying attributes (brand, model/series,
+    variant properties) NORMALIZED: case-insensitive and whitespace-trimmed, using LIKE for partial model
+    tokens rather than strict equality, since exact-match against re-seeded data is brittle. Reduce the
+    result rowset with `first` to a single record, then read fields with `get` (a single record is a dict,
+    not a list — never apply a list operation like `column` to it), and surface that record''s record_path
+    as the grounding reference.'
   source: investigation
   validated_by: manual
   validated_at: '2026-06-18'
   status: active
   embedding_hash: ''
   source_task: t01
+  polarity: method
+- id: scalar-sql-result-pipeline
+  description: General method to execute a SQL scalar query passed via stdin, extract the single result
+    cell from the first row, and return it in the answer.
+  domain:
+  - sql
+  - scalar-extraction
+  - rowset-parsing
+  - compute
+  - answer-template
+  content: Pass the SQL statement to the interpreter via standard input and capture the raw text output.
+    Parse the raw output into a rowset using automatic delimiter detection. Apply the first primitive
+    to the rowset to isolate the single result row. Return the scalar value by referencing its column
+    name from that first row in the answer message.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 1b18931a871e8a38aa86329df4ce0bed683493634dd51841c587ed891b62d6dc
+  source_task: t_int
+  polarity: method
+- id: scalar-sql-row-pipeline
+  description: Pattern for extracting a single SQL scalar result by aliasing it in SELECT, routing raw
+    output through rowset parsing and first-row extraction, and interpolating the aliased column into
+    the answer template.
+  domain:
+  - sql
+  - data-pipeline
+  - orchestration
+  - templating
+  content: 'To return a scalar value from SQL: (1) alias the expression in the SELECT clause (e.g., SELECT
+    <expr> AS <field>), (2) execute the query and bind the raw output, (3) parse the raw output into a
+    delimited rowset, (4) extract the first row object, (5) reference the value in the answer message
+    using the interpolation syntax {<row>.<field>}.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: db4b2ff9ef8c13717b408df507bfddba49f25b4be204fcfbb1b41df231f4ad42
+  source_task: t_int
+  polarity: method
+- id: scalar-sql-first-row-extraction
+  description: Pattern to execute a scalar SQL query and return a single column value by parsing raw output
+    into a rowset, isolating the first row, and referencing its field in the answer.
+  domain:
+  - scripting
+  - sql
+  - scalar-extraction
+  - rowset-parsing
+  - dsl
+  content: 'To return a single value from a SQL query: execute the query and bind the raw textual output;
+    convert that output into a rowset using automatic delimiter detection; apply the `first` primitive
+    to the rowset to capture the sole result row into a variable; then reference the target column of
+    that row variable in the answer template to emit the scalar.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 29acd3771fb6740c11af75e500ce3dd460cd129521a61a11ccefd38e9ef0d330
+  source_task: t_iso
+  polarity: method
+- id: sql-scalar-pipeline
+  description: Pattern for executing a SQL query and extracting a single scalar value from its result
+    set through raw output parsing and first-row projection.
+  domain:
+  - sql
+  - data-extraction
+  - pipeline-pattern
+  content: Execute a SQL query and bind its raw output. Parse the raw output into rows using an auto-delimited
+    format. Extract the first row to isolate the single result. Reference the desired column by name on
+    that row object to obtain the scalar value.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 3fc809fff0e3a296af2d951757080e13644cc0b05a8d29ac64c6c9a3f6457187
+  source_task: t_seed
+  polarity: method
+- id: workflow-scalar-extraction-from-sql
+  description: Reusable pattern for executing a SQL query inside a workflow engine and surfacing a single
+    scalar value from the first row of the result set.
+  domain:
+  - workflow-engine
+  - sql
+  - rpc
+  - data-pipeline
+  - scalar-extraction
+  content: 'To extract a scalar result from a SQL query within a workflow: (1) invoke the query via an
+    RPC call to the SQL interpreter endpoint, passing the statement through standard input; (2) parse
+    the raw textual response into a rowset using automatic delimiter detection; (3) apply a `first` primitive
+    to the rowset to isolate the initial row; (4) reference the target column by name from that row object
+    in downstream expressions, templates, or answer formatting.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 71e3ea67ecab2816abd7e031e7c972c90bb481a5078db444b055b35e27e7abb1
+  source_task: t_seed
+  polarity: method
+- id: pipeline-scalar-from-rowset
+  description: Extract a single scalar value from structured command output by parsing rows and plucking
+    a field from the first record.
+  domain:
+  - pipeline
+  - data-processing
+  - extraction
+  - sql
+  content: 'To extract a scalar from a command''s structured text output: execute the command and bind
+    the raw stream; parse the stream into a rowset using automatic delimiter detection; compute the first
+    element of the rowset into a dedicated row variable; then access the target column field on that row
+    variable to retrieve the scalar value.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 09b2441624e9d1c63d10bb83434b337126455d2df8f6b80ebfadb034ad2b0edd
+  source_task: t_int
+  polarity: method
+- id: scalar-sql-workflow-result
+  description: Pattern for executing a scalar SQL query and returning its value through a discovery-rowset-compute
+    workflow pipeline.
+  domain:
+  - workflow
+  - dsl
+  - sql
+  - scalar
+  - piping
+  content: Execute a scalar SQL command via an external binary and capture the raw stdout. Parse the raw
+    output into an auto-delimited rowset, extract the first row with a compute primitive, and interpolate
+    the target column from that row into the success answer template.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: dbd5db0725b91324a0bdfed7c822078736de8d88b1815c45f7d40e42ccc96670
+  source_task: t_iso
+  polarity: method
+- id: scalar-extraction-from-sql-rowset
+  description: Extract a single scalar value from a SQL query by isolating the first row's named column.
+  domain:
+  - sql
+  - data-pipeline
+  - scalar-extraction
+  - rpc
+  content: 'To surface a scalar result from a SQL query through a multi-stage pipeline: (1) execute a
+    statement that returns exactly one row and alias the scalar value to an explicit column name (e.g.,
+    SELECT <expression> AS <column>); (2) bind the raw executor output; (3) parse that output into a rowset;
+    (4) compute the first row as a distinct object; (5) return the scalar by referencing the named column
+    on that first-row object. This pattern separates query execution from result consumption, ensuring
+    downstream stages access the value through a stable, named field rather than raw output indices.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: bd1fa268c59829e5902eac21536cc8401c09e600ab52834cc243f90d8ca799df
+  source_task: t_seed
+  polarity: method
+- id: product-variant-existence-eav-join-pattern
+  description: SQL pattern to verify product variant existence by joining a main product table with multiple
+    EAV property CTEs and applying normalized fuzzy matching across descriptive columns.
+  domain:
+  - sql
+  - eav-pattern
+  - product-catalog
+  - data-integration
+  content: 'To determine whether a product variant exists when dynamic attributes live in an EAV/properties
+    table and static descriptors live in a main product table: (1) Create one CTE per critical property,
+    selecting product_sku where LOWER(TRIM(property_key)) equals the target key and LOWER(TRIM(property_value_text))
+    equals the target value. (2) JOIN the main product_variants table with every property CTE on product_sku.
+    (3) Filter direct columns (e.g., brand) using LOWER(TRIM()) equality. (4) Match the product line with
+    an OR-ed set of LOWER(TRIM()) LIKE ''%%'' predicates across series, model, and product_name. (5) Count
+    the resulting rows to establish existence; zero means absent, non-zero means present. Normalize all
+    comparisons with LOWER(TRIM()) to defeat case and whitespace mismatches.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: e3393f11392fb75449d1bfc9ee1cc1a4de12a3a7973d81b2f4a396f5519a9098
+  source_task: t01
+  polarity: method
+- id: catalog-existence-requires-record-ref
+  description: When verifying that a catalogue record exists, the answer must include the record's canonical
+    path in the refs array; a match count or summary alone will fail grading if a direct reference is
+    expected.
+  domain:
+  - data-retrieval
+  - catalogue-query
+  - answer-format
+  - grading-compliance
+  content: After querying a product catalogue and finding a matching record, extract the record's unique
+    file path or identifier (e.g., `record_path`) from the result set, thread it into the response payload,
+    and populate the answer's `refs` array with that value. Do not rely solely on returning a count, boolean,
+    or human-readable summary, because validators may require the exact canonical reference to the located
+    record to consider the check successful.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 9172e2f3942fe1577a3155e3946d3840dbcc867aca43b27a23edea5db2b3539c
+  source_task: t01
+  polarity: anti_pattern
+- id: existence-query-negative-answer
+  description: An existence query script must explicitly define a negative answer path for zero-match
+    scenarios, not only a success path.
+  domain:
+  - query-automation
+  - decision-logic
+  - catalogue-search
+  - existence-verification
+  content: When scripting an existence check against a database or catalogue, compute a match count from
+    the filtered results and create a decision branch that activates when the count is zero, returning
+    an explicit negative answer string (e.g., '<NO>'). Use a separate branch or default for positive matches.
+    Avoid relying solely on a default success answer, which fails when no records match.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 1e668da943e75d5dd412f456dfc2f011a1b61d5bba6499c67eae6eed72debed3
+  source_task: t01
+  polarity: anti_pattern
+- id: catalogue-existence-fuzzy-multicolumn-property
+  description: Verify existence of a catalogue item by fuzzy-matching a line descriptor across multiple
+    text columns while filtering on an associated property key-value pair, branching on result count.
+  domain:
+  - sql
+  - data-validation
+  - catalogue-integration
+  - workflow-automation
+  content: 'To determine if an entity exists in a catalogue: (1) Join the primary entity table with its
+    extended properties table. (2) Normalize strings (trim + lowercase) for case-insensitive comparison.
+    (3) Apply an exact normalized match on the brand identifier. (4) Use OR-grouped wildcard LIKE conditions
+    across multiple descriptive text columns (e.g., product name, series, model) to fuzzy-match the line
+    descriptor. (5) Filter by an exact property key and a normalized property value. (6) Aggregate to
+    count matching rows. (7) Branch on the count: if >= 1, the entity exists—return a reference to the
+    first matched record; if 0, report absence. Parameterize all variable inputs (brand, descriptor, property
+    key, property value).'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 755a8f30aead9e76b44d392809eeee8eb02ee1cc559ca422a27b12d018992150
+  source_task: t01
+  polarity: method
+- id: externalize-all-search-literals
+  description: Never hardcode run-specific identifiers or search fragments inside SQL predicates or matching
+    logic; always bind them as external parameters or variables.
+  domain:
+  - sql
+  - query-construction
+  - code-generation
+  - data-discovery
+  content: When writing discovery queries or filter logic that must match a specific runtime entity (e.g.,
+    a product by line, series, model, or SKU), do not embed any run-specific literal strings, codes, or
+    path fragments directly into the query text, even inside LIKE patterns or OR conditions. Partial parameterization—where
+    some terms use bound variables while others remain as hardcoded literals—makes the script non-reusable
+    and produces false negatives or false positives when the literal does not apply to the current run.
+    Every variable search term must be passed through an explicit external parameter (e.g., :line_descriptor)
+    or template variable, ensuring the logic remains fully generalized and correctly locates the target
+    record so its path or ID can be returned and referenced in the answer.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 240e8a80263db1454d48a186164b859379644885d2e69497b996c241ae10b711
+  source_task: t01
+  polarity: anti_pattern
+- id: eav-variant-substring-search
+  description: Robust, case-insensitive catalog lookup across core product descriptors and dynamic EAV
+    variant properties using normalized substring SQL matching.
+  domain:
+  - sql
+  - database-schema
+  - e-commerce
+  - search
+  - query-construction
+  content: 'To implement a tolerant product lookup in a catalog schema that separates core product descriptors
+    (brand, model, series) from dynamic variant properties stored in an EAV key-value table, compose a
+    SELECT query that: (1) normalizes both stored values and bound parameters with LOWER(TRIM()) to ensure
+    case-insensitive matching; (2) applies SQL LIKE with wildcard concatenation (''%'' || parameter ||
+    ''%'') to enable partial string matching on model names, series, and property values; (3) uses one
+    EXISTS subquery per required variant attribute against the EAV properties table to enforce independent
+    key-value filters; (4) aggregates results to test for at least one match, and extracts a representative
+    record identifier for downstream confirmation.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 7c5f1957fa3a74927eab99b9133c650d3681eecc399ac992685afdbca12f6197
+  source_task: t01
+  polarity: method
+- id: catalog-record-absolute-path-refs
+  description: Ensure catalog record references emitted in answers use fully-qualified absolute paths
+    derived from relative database identifiers, satisfying grader verification requirements.
+  domain:
+  - sql-discovery
+  - answer-formatting
+  - catalog-lookup
+  content: When a discovery SQL query returns a relative record identifier or filename from a catalog
+    table backed by a mounted file tree, resolve it to an absolute path by prepending the appropriate
+    base directory. Pass that fully-qualified path into the answer block's refs array so that downstream
+    graders can directly locate and validate the underlying record file.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 954b24f12f0d2567c12e935510e25473c019f8addd9bf84b5bafb121d64cde5a
+  source_task: t01
+  polarity: anti_pattern
+- id: scalar-sql-pipeline-answer
+  description: Pattern to execute a single-row SQL query and surface the scalar result in an answer template
+    via row extraction.
+  domain:
+  - sql
+  - data-pipeline
+  - scripting
+  - compute
+  - templating
+  content: 'To surface a scalar SQL result in a pipeline answer: execute a single-row, single-column SQL
+    query with an explicit column alias. Parse the raw executor output into a rowset using automatic delimiter
+    detection. Extract the first row via a `first` compute primitive, storing it in a row variable. In
+    the answer message template, reference the scalar using the syntax `{<row_variable>.<column_alias>}`.
+    This generic pattern avoids embedding run-specific paths, identifiers, or schema names.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9226ae12fa4544f4b8cc4719e7efe9ad0fd55370499df8b1367d4945c9eeb073
+  source_task: t_int
+  polarity: method
+- id: scalar-sql-pipeline-pattern
+  description: Pattern to query a scalar SQL value and render it in a pipeline script answer.
+  domain:
+  - pipeline-scripting
+  - sql
+  - templating
+  content: To expose a scalar SQL result in a pipeline answer, execute the query during discovery and
+    bind the raw output. Parse that output into a rowset using automatic delimiter detection. Compute
+    the first row from the rowset. Then reference the target column in the answer message through template
+    interpolation using the row variable and field name (e.g., `{row.field}`).
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: a074599686b31c3c0ace8ab3e4f2463724e606d845cea6c1f3da43acaf729533
+  source_task: t_iso
+  polarity: method
+- id: scalar-extraction-from-tabular-exec-output
+  description: Parse raw delimited output from an executed command into a rowset, extract the first row,
+    and reference a specific column to yield a scalar result.
+  domain:
+  - workflow-engine
+  - command-integration
+  - data-parsing
+  - sql
+  content: When a workflow executes an external command that returns tabular data as raw text, use a rowset
+    parser to convert the raw output into structured rows. Then apply a first-row selector to isolate
+    the initial record. Finally, reference the desired column from that record to expose a scalar value
+    in templates or downstream logic.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: ce5dc11b11c5e6bb6ac1e075f50e413baf961040c4c35ad9d396a04b6ce25c99
+  source_task: t_seed
+  polarity: method
+- id: sql-catalog-existence-binary-check
+  description: Query a SQL-backed catalog for product existence using normalized filters, then return
+    a binary yes/no result anchored to the first matching record if found.
+  domain:
+  - sql
+  - catalog-search
+  - existence-check
+  - decision-logic
+  - product-lookup
+  content: 'To verify whether a catalog contains a matching product variant, run a SELECT against the
+    product table using LOWER(TRIM(...)) for case-insensitive exact matching on brand and LOWER(TRIM(...))
+    LIKE ''%...%'' for partial matching on series or model, and cap the query with a LIMIT to bound overhead.
+    Feed the output into a rowset, compute the total row count, and capture the first record. Branch the
+    decision logic: if the count is greater than or equal to one, return an affirmative outcome that references
+    the first matched record’s identifier or path; otherwise, return a negative outcome indicating absence.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: b4716905a19294235ed7c163c77efe5c831756a5ffa2ed202ecb50f425762a1d
+  source_task: t01
+  polarity: method
+- id: catalog-existence-filtered-query
+  description: Determine whether a catalog contains a product matching a brand and series/model pattern
+    by executing a normalized SQL filter, counting the returned rowset, and branching into found/absent
+    outcomes.
+  domain:
+  - database
+  - sql
+  - catalog
+  - availability-check
+  content: 'To test for existence of a product in a SQL-backed catalog when given a brand and series/model
+    pattern: (1) Normalize inputs and database text with LOWER(TRIM(...)). (2) Query the variants table
+    with an exact brand match and LIKE containment on series and/or model columns, fetching a limited
+    candidate window. (3) Count the returned rows in application logic. (4) If the count is >= 1, emit
+    a ''found'' result referencing the first matched record path; otherwise emit an ''absent'' result.
+    Both branches should yield OUTCOME_OK because the availability determination itself is a successful
+    execution outcome.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 4d3fb8b9d9f1c8ad5f67eed00ec95f4faeb690b96762f1c809e474620b5f835e
+  source_task: t01
+  polarity: method
+- id: product_catalog_fuzzy_brand_token_search
+  description: Method to check whether a product catalogue contains an item by matching a normalized brand
+    exactly and a free-text identifier token partially across multiple descriptor columns.
+  domain:
+  - sql
+  - search
+  - product-catalog
+  - data-access
+  - matching
+  content: 'Perform a parameterized SQL existence query: (1) Match the brand with case-insensitive, trimmed
+    exact equality: LOWER(TRIM(brand)) = LOWER(TRIM(:brand)). (2) Match the search token with case-insensitive,
+    trimmed partial LIKE patterns across multiple descriptive columns (e.g., series, model): LOWER(TRIM(column))
+    LIKE ''%'' || LOWER(TRIM(:token)) || ''%''. (3) Bind both values as query parameters to avoid injection.
+    (4) Derive a boolean presence result from the row count (count >= 1 means found), and optionally return
+    the first matching record identifier.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 685bc1e604e74b14168fd5e3f28a2519ea5637ffdef797cad537bd48cdc662a8
+  source_task: t01
+  polarity: method
+- id: catalog-existence-eav-normalized-match
+  description: Method to verify catalog item existence by matching multiple normalized attributes against
+    an EAV property table and returning a binary found/absent decision with a reference to the first match.
+  domain:
+  - sql
+  - data-query
+  - eav-schema
+  - normalization
+  - catalog-search
+  - decision-logic
+  content: 'To determine whether a catalog item exists when attributes are stored in an Entity-Attribute-Value
+    table: (1) Normalize all text comparisons by applying LOWER(TRIM(...)) to both stored values and input
+    parameters for case-insensitive, whitespace-tolerant matching. (2) For each required attribute, use
+    a correlated EXISTS subquery on the properties table keyed by the item identifier, filtering on property
+    key and property value using exact or partial normalized matching. (3) Combine all attribute conditions
+    with AND logic and apply a row limit to cap the result set. (4) Project the item identifier and its
+    record path. (5) After execution, compute the total match count and capture the first identifier.
+    (6) Branch on count >= 1: label the outcome ''found'' and include the first identifier as a reference;
+    otherwise label it ''absent''. (7) Emit a structured answer containing the label, a human-readable
+    message, the outcome status, and any references.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 0425730d67f2592c0436b22991bc8ee58973c9c2f65b3ae810c11006afd65642
+  source_task: t04
+  polarity: method
+- id: eav_property_verification_pattern
+  description: Two-tier SQL verification pattern for property-attached catalog entities that distinguishes
+    between an entity not existing and the entity existing but lacking claimed properties.
+  domain:
+  - sql
+  - data_verification
+  - eav_schema
+  - decision_logic
+  content: 'When verifying whether an entity possesses specific claimed properties in a schema that separates
+    core identity (e.g., brand, model, series, name) from variable attributes in a key–value property
+    table, use a two-stage CTE approach. First, define `base_candidates` by filtering on identity fields
+    to establish whether the underlying entity exists at all. Second, define `full_candidates` by requiring
+    existence in `base_candidates` plus correlated matches in the property table for every required attribute
+    predicate. Query both counts and coalesce the SKU/path so that downstream logic can branch cleanly:
+    if a `full_candidate` exists, report an exact match and cite the record; if only `base_candidates`
+    exist while `full_candidates` count is zero, report that the base entity exists but the claimed properties
+    are absent (returning the base SKU with a negative marker); if no `base_candidates` exist, report
+    that the entity itself is not found. This prevents conflating missing entities with specification
+    mismatches.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 20fbad8f57f165f28d8f6143307fe67ded7b624d9b5bf4b13a25f8d1229fecdf
+  source_task: t05
+  polarity: method
+- id: verify-product-claim-eav-catalog
+  description: Method to verify an entity claim against a normalized relational product catalogue that
+    stores extensible attributes in an EAV properties table, yielding either a citation or a refutation
+    based on match cardinality.
+  domain:
+  - sql
+  - data-validation
+  - product-catalog
+  - eav-schema
+  - entity-verification
+  content: 'To verify a caller’s product claim against a relational catalogue: (1) Query the core variants
+    table with case- and whitespace-normalized predicates (TRIM and LOWER) on brand, series pattern, and
+    model pattern. (2) For each claimed dynamic attribute, add a correlated EXISTS subquery against an
+    EAV-style properties table keyed by product SKU, matching on normalized property_key and property_value_text.
+    (3) Select the product SKU and a resolved record path. (4) After execution, count the result set:
+    zero rows produces an absent/unsupported outcome, while one or more rows produces a found outcome.
+    (5) In the found case, cite the first returned SKU and its source record path as proof. This pattern
+    decouples static product descriptors from extensible attributes and keeps verification case-insensitive
+    without schema changes.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 5d6abd3e65bc17963dd33d169fd4b5732835e554c54763841af9c182f2ebd1ab
+  source_task: t06
+  polarity: method
+- id: fuzzy-catalog-product-claim-verification
+  description: Verify a product claim by fuzzy-matching multiple catalog fields and checking aggregated
+    properties for confirmation.
+  domain:
+  - data-validation
+  - sql
+  - product-catalog
+  - fuzzy-matching
+  - verification
+  content: Validate a product claim by querying a catalog with a parameterized SQL statement that fuzzy-matches
+    a description against multiple text columns (e.g., brand, series, model, name) using case-insensitive
+    LIKE patterns. Join and aggregate related properties as semicolon-delimited key-value pairs via GROUP_CONCAT.
+    Group results by the product key and source path, and limit the result set. Load the output into a
+    rowset, count the rows, and extract the first record. If the count is zero, conclude the product is
+    absent. Otherwise, report the record identifier and confirm or refute the claim by inspecting whether
+    the expected properties (such as product type or color family) are present in the aggregated properties
+    string.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 33a4ed7afec299e2b7ec1dba66792a97d77c48ab1d84fe68cc4cc3e5b01e0b57
+  source_task: t08
+  polarity: method
+- id: synthesize-canonical-reference-path
+  description: When an answer must cite a catalog or registry entity via a canonical filesystem path,
+    derive the path by formatting the entity’s stable identifier into the known template rather than passing
+    through an internal database record_path.
+  domain:
+  - catalog-lookup
+  - answer-formatting
+  - canonicalization
+  - database-querying
+  content: If the system requires a canonical resource reference that follows a predictable path formula
+    (e.g. a base directory plus an entity identifier and extension), extract the entity’s stable identifier
+    from the query result and explicitly build the reference string. Do not rely on internal columns such
+    as record_path, which may point to auxiliary or non-canonical locations.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: abe91bd4483a2f768e274e362463c211d4306368f55c896beba26ccccf7c0c6a
+  source_task: t01
+  polarity: anti_pattern
+- id: catalog-query-avoid-arbitrary-first-match
+  description: When querying a product catalogue to verify existence of a specific variant and cite its
+    reference, using broad filters with LIMIT 1 or a first-row selector risks returning the wrong item
+    among similar variants.
+  domain:
+  - sql
+  - catalog-querying
+  - product-lookup
+  - existence-verification
+  - ambiguity-resolution
+  content: Constrain existence queries with exact-match predicates on all available identifying attributes
+    (brand, series, size, color, and especially SKU or model code) so the result set contains exactly
+    the intended record. If the attributes do not guarantee uniqueness, return every candidate reference
+    rather than selecting an arbitrary row, preventing an incorrect sibling variant from being presented
+    as the answer.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 7fe1c8f16364dfdfb6e318f4374be419e7d8f2a2f7db79b1e23d96fffd228483
+  source_task: t04
+  polarity: anti_pattern
+- id: cite-source-record-in-answer-refs
+  description: When a verification rubric mandates citing the exact source record for a match, propagate
+    the queried absolute record path through the pipeline and populate the answer template's `refs` array
+    with it; leaving `refs` empty will fail grading.
+  domain:
+  - catalog-verification
+  - answer-templating
+  - reference-management
+  - grading-compliance
+  content: In tasks requiring citation of an exact source record upon full or partial verification success,
+    bind the absolute `record_path` in discovery, carry it through `rowsets` and `compute`, and inject
+    it into the relevant answer branch’s `refs` array using a template variable (e.g., `["{product.record_path}"]`).
+    An empty or missing `refs` array produces a grader failure whenever the rubric expects a canonical
+    record reference, regardless of whether the path was correctly queried.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: e7d4cbe22f9426f07d50fda325fb5a9ea59b45d8cb92979b0c218224e3beb87b
+  source_task: t05
+  polarity: anti_pattern
+- id: parameterize-all-caller-claims-in-catalog-sql
+  description: In catalogue verification queries, bind every caller-provided product attribute as a parameter
+    and never hardcode literal identifiers or patterns from previous examples.
+  domain:
+  - scripting
+  - sql
+  - catalog-lookup
+  - verification
+  - query-parameters
+  content: When a script queries a product catalogue to confirm a caller's exact claims, all variable
+    search criteria—such as brand, line, type, or color—must be passed as bound query parameters. Embedding
+    literal strings (e.g., fixed series names, model fragments, or SKU patterns) directly in the SQL WHERE
+    clause ties the query to a single historical example. If the next caller's claims differ even slightly,
+    the literal filters will exclude the matching record and produce a false negative (unsupported/not-found
+    outcome) when the correct result should be a success outcome. Construct the WHERE clause using only
+    the current execution's parameterized claim values so the script remains correct across arbitrary
+    caller inputs.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: edc6a21022419ec27848ba03b10fa4e7e4e5853978816df7d3c998a29e46c570
+  source_task: t06
+  polarity: anti_pattern
+- id: verify-product-claim-via-catalog-query
+  description: Reusable pattern for verifying a product claim by querying a catalog database, aggregating
+    properties, and branching on presence or absence of matches.
+  domain:
+  - data-integration
+  - sql
+  - product-catalog
+  - claim-verification
+  content: To verify a claim about an item in a product catalog, execute a SQL query that joins the primary
+    product table (containing SKU, path, brand, series, model, name) with a properties table on the product
+    identifier. Filter by an exact brand match and use case-insensitive pattern matching against identifying
+    fields such as series, model, or product name. Aggregate the joined property rows per product using
+    group concatenation or equivalent grouping to produce a single properties string per match. Extract
+    the returned columns into a rowset, compute the total match count, and capture the first record. In
+    the decision logic, branch on zero matches to yield an 'absent' outcome indicating the claimed item
+    was not found; otherwise yield a 'found' outcome that references the located record's identifier and
+    path. Return distinct messages and outcomes for each branch without embedding run-specific values
+    (e.g., specific SKUs, paths, product names, or brands) in the reusable logic skeleton.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: ae120852cd8304f215adfb0bf30988abb4bf3a7b80c198b4dc66133dc30df54d
+  source_task: t08
+  polarity: anti_pattern
+- id: catalogue-existence-fuzzy-token-match
+  description: Verify product existence in a catalogue via case-insensitive trimmed substring matching
+    of brand and model tokens across multiple candidate columns
+  domain:
+  - sql
+  - catalog-search
+  - data-verification
+  content: 'To check whether a catalogue/table contains a specific product, run a parameterized query
+    that matches normalized tokens rather than exact strings. Apply LOWER(TRIM(col)) to both the column
+    and the bound token, and match with LIKE ''%'' || token || ''%'' for substring tolerance. AND the
+    distinctive identifiers together (e.g. brand AND model), but OR the model/identifier token across
+    every column it might live in (product_name, series, model) since catalogue schemas scatter the same
+    value across fields. Bind tokens as parameters to avoid injection, and LIMIT results. Then decide
+    existence by counting returned rows: present if count >= 1, absent otherwise. Capture the first matching
+    record''s identifier (e.g. record_path) to cite as evidence. Extract only the discriminating tokens
+    from the request (brand + model code) for matching; ignore descriptive attributes (type, dimensions)
+    that are narrative and may not be stored as filterable columns.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9769465e81e857c263dd0a1c9625329400ab76d6954f7ff1c9608b831fb309d5
+  source_task: t02
+  polarity: method
+- id: verify-catalogue-variant-attributes
+  description: Verify a claimed product variant exists in a catalogue by fuzzy-matching the base entity
+    then checking normalized attribute properties
+  domain:
+  - sql
+  - data-verification
+  - catalogue
+  content: 'To confirm whether a catalogue contains an entity variant with a set of claimed attributes:
+    (1) Locate the base entity first via case-insensitive, trimmed, LIKE-based fuzzy matching across several
+    identifying columns (brand, series, model, name) so wording differences don''t cause false negatives.
+    (2) Treat ''base not found'' as a distinct outcome from ''base found but attribute absent'' — they
+    answer the question differently and must branch separately. (3) For each claimed attribute, match
+    against a key/value property table allowing BOTH representations: a numeric column (value = 6) and
+    a text column with unit variants (''6 mm'',''6mm'',''6''), and match the key by substring (LIKE ''%diameter%'').
+    Aggregate per-entity with MAX(CASE WHEN ... THEN 1 ELSE 0 END) so the variant holds only when every
+    required attribute flag is 1. (4) Default the verdict to NO unless all flags confirm. This guards
+    against unit/format mismatches and missing-base ambiguity that naive equality checks miss.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 09822df6c2e6a3f04c446737175587da2194233ec030d9807ea0eb33fd2abb76
+  source_task: t05
+  polarity: method
+- id: verify-base-product-then-claimed-properties
+  description: Verify a base product exists in a catalogue, then confirm claimed extra properties hold
+    for that record, emitting YES/NO with the checked identifier
+  domain:
+  - sql
+  - data-validation
+  - catalogue-query
+  content: 'To answer ''does product X exist and do its claimed properties hold?'', use one query with
+    three decision tiers, not a boolean lookup. (1) Identify the base record with normalized matching:
+    LOWER(TRIM(col)) for exact fields and LIKE ''%token%'' on a distinctive model/code token rather than
+    the full free-text name, since names vary. (2) For each claimed property, build a MAX(CASE WHEN ...
+    THEN 1 ELSE 0 END) flag that checks multiple sources — a normalized join to a key/value property table
+    (property_key LIKE ''%attr%'' AND property_value matches) OR fallback patterns in an inline serialized-properties
+    column OR the product name — because catalogue attributes live in different places per record. (3)
+    AND-combine the per-property flags (product of flags, or MIN) into a single ''all hold'' indicator.
+    Decide with explicit ordered branches: if the match count is 0 → ABSENT (product not found, claim
+    false); else if all-hold flag is 1 → YES; else → NO. Always surface the checked SKU/record path in
+    the answer for auditability. Keep existence and property-correctness as distinct outcomes so ''absent''
+    is never conflated with ''present but property mismatch''.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 2bff59a3a9500ee5a155bb80b8cdda6303076262cf396b353bc01c804f93d468
+  source_task: t07
   polarity: method

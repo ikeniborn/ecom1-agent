@@ -1,38 +1,31 @@
 {
-  "objective": "Determine whether the product catalogue contains a Wood and Drywall Screw from Heco with series 'Zinc Plated TopFix GTU-YPJ', screw type 'wood screw', and diameter 3 mm.",
+  "objective": "Determine whether the product catalogue contains an item matching the caller's description: Heco brand, Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer line, fastener type bolt, diameter 10 mm.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "brand": "lookup from product_variants WHERE brand = 'Heco'",
-    "product_kind": "lookup from product_kinds WHERE product_kind_name = 'Wood and Drywall Screw'",
-    "series": "lookup from product_variants WHERE series = 'Zinc Plated TopFix GTU-YPJ'",
-    "screw_type": "lookup from product_variant_properties WHERE property_key = 'screw_type' AND property_value_text = 'wood screw'",
-    "diameter": "lookup from product_variant_properties WHERE property_key = 'diameter' AND property_value_text = '3 mm'"
+    "brand": "Heco, extracted from caller instruction",
+    "series_model_token": "distinctive model/series token from caller instruction product line (e.g. HECO 3DW-64B)",
+    "product_category": "Nut Bolt and Washer, from caller instruction",
+    "fastener_type": "bolt, from caller instruction",
+    "diameter_mm": "10, from caller instruction"
   },
   "outcome_space": [
-    "OUTCOME_OK",
-    "OUTCOME_NONE_UNSUPPORTED"
+    "OUTCOME_OK"
   ],
   "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "nonempty",
-        "lhs": "$product_sku",
-        "rhs": null,
+        "op": "ge",
+        "lhs": "$match_count",
+        "rhs": 0,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Yes, we carry {product_name} (SKU: {product_sku})."
+    "msg_skeleton": "Catalogue search result: <YES> (record_path: {record_path}) if a matching product is found, otherwise <NO> if absent"
   },
   "required_refs": {
-    "OUTCOME_OK": [
-      {
-        "kind": "record_path",
-        "path": null,
-        "source": "$product.record_path"
-      }
-    ]
+    "OUTCOME_OK": []
   }
 }

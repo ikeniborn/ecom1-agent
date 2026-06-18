@@ -32,9 +32,31 @@ entries:
     accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Never include a "params" (or bind-parameter) field in an Exec RPC's args
+    — the ExecRequest protocol message accepts only path/stdin and has no params field,
+    so named SQL binds like :brand/:token cause the run to fail before any SQL executes.
+    Embed match values directly inline into the SQL stdin text, normalized with LOWER/TRIM
+    and matched via LIKE, since Exec provides no named-bind mechanism.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Verbatim error: ''real_vm: Protocol message ExecRequest has no "params"
+    field.'' Failing PlanIR fragment: discovery[0].args = {"path":"/bin/sql","stdin":"SELECT
+    ... LIKE ''%'' || LOWER(TRIM(:brand)) || ''%'' ... :token ...","params":{"brand":"Wurth","token":"2I3-BUT"}}.
+    Root cause: the PlanIR authored a parameterized SQL query with named binds (:brand,
+    :token) and supplied them via a params key on the Exec args; the VM''s ExecRequest
+    schema only deserializes path/stdin, so the message was rejected before SQL ran
+    — not a grounding/matching failure. The matching strategy (brand + one distinctive
+    token via normalized LIKE, SELECT record_path) from rc1 is correct; what''s missing
+    is the Exec-shape constraint. Fix: drop the params field and inline the values
+    into the SQL stdin string. This is a pure PlanIR-shape bug, so no prephase_deep_read
+    needed. Complements rc1 without superseding it.'
+  status: active
+  surface: ir
 last_run:
   cycles_used: 1
   date: '2026-06-18'
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t04

@@ -1,0 +1,110 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT v.product_sku, v.record_path, v.brand, v.series, v.model, v.product_name, GROUP_CONCAT(p.property_key || '=' || p.property_value_text, '; ') as properties_list FROM product_variants v LEFT JOIN product_variant_properties p ON v.product_sku = p.product_sku WHERE LOWER(TRIM(v.brand)) = :brand AND (LOWER(TRIM(v.series)) LIKE :pattern OR LOWER(TRIM(v.model)) LIKE :pattern OR LOWER(TRIM(v.product_name)) LIKE :pattern) GROUP BY v.product_sku, v.record_path, v.brand, v.series, v.model, v.product_name LIMIT 10\nbrand=tikkurila\npattern=%tikkurila exterior tik 3pn-569 wood stain and deck oil%"
+      },
+      "bind": "catalog_results"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "catalog_results",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "brand",
+          "candidates": [
+            "brand"
+          ]
+        },
+        {
+          "into": "series",
+          "candidates": [
+            "series"
+          ]
+        },
+        {
+          "into": "model",
+          "candidates": [
+            "model"
+          ]
+        },
+        {
+          "into": "product_name",
+          "candidates": [
+            "product_name"
+          ]
+        },
+        {
+          "into": "properties_list",
+          "candidates": [
+            "properties_list"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$rows"
+      ],
+      "into": "match_count"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "record"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$match_count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "absent"
+      }
+    ],
+    "default_label": "found"
+  },
+  "ops": [],
+  "answer": {
+    "absent": {
+      "message": "No Tikkurila product matching the specified Exterior TIK 3PN-569 Wood Stain and Deck Oil line was found in the catalog.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    },
+    "found": {
+      "message": "Catalog check result for SKU {record.product_sku} at {record.record_path}: claim status reported",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        "$record.record_path"
+      ]
+    }
+  },
+  "custom_extract": []
+}

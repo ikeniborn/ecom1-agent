@@ -1,33 +1,31 @@
 {
   "discovery": [
     {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/README.md"
+      },
+      "bind": "docs_readme"
+    },
+    {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "WITH kind AS (SELECT product_kind_id FROM product_kinds WHERE product_kind_name = 'Wood and Drywall Screw'),\nprops AS (\n  SELECT product_sku FROM product_variant_properties \n  WHERE property_key = 'screw_type' AND property_value_text = 'wood screw'\n  INTERSECT\n  SELECT product_sku FROM product_variant_properties \n  WHERE property_key = 'diameter' AND property_value_text = '3 mm'\n)\nSELECT pv.product_sku, pv.product_name, pv.record_path\nFROM product_variants pv\nJOIN kind ON pv.product_kind_id = kind.product_kind_id\nJOIN props ON pv.product_sku = props.product_sku\nWHERE pv.brand = 'Heco' AND pv.series = 'Zinc Plated TopFix GTU-YPJ';"
+        "args": [
+          ":brand=Heco",
+          ":token=HECO 3DW-64B"
+        ],
+        "stdin": "SELECT record_path FROM product_variants WHERE LOWER(TRIM(brand)) = LOWER(TRIM(:brand)) AND (LOWER(TRIM(series)) LIKE '%' || LOWER(TRIM(:token)) || '%' OR LOWER(TRIM(model)) LIKE '%' || LOWER(TRIM(:token)) || '%') LIMIT 5"
       },
-      "bind": "raw_products"
+      "bind": "catalog_text"
     }
   ],
   "rowsets": [
     {
-      "from_": "raw_products",
+      "from_": "catalog_text",
       "format": "auto_delim",
-      "into": "products",
+      "into": "catalog_rows",
       "columns": [
-        {
-          "into": "product_sku",
-          "candidates": [
-            "product_sku"
-          ]
-        },
-        {
-          "into": "product_name",
-          "candidates": [
-            "product_name"
-          ]
-        },
         {
           "into": "record_path",
           "candidates": [
@@ -41,35 +39,52 @@
     {
       "prim": "count",
       "args": [
-        "$products"
+        "$catalog_rows"
       ],
-      "into": "product_count"
+      "into": "match_count"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$catalog_rows"
+      ],
+      "into": "first_record"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_record",
+        "record_path"
+      ],
+      "into": "first_record_path"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "gt",
-          "lhs": "$product_count",
-          "rhs": "0",
+          "op": "ge",
+          "lhs": "$match_count",
+          "rhs": 1,
           "args": []
         },
         "label": "found"
       }
     ],
-    "default_label": "not_found"
+    "default_label": "absent"
   },
   "ops": [],
   "answer": {
     "found": {
-      "message": "Yes, we carry {product_name} (SKU: {product_sku}).",
+      "message": "Catalogue search result: <YES> (record_path: {first_record_path})",
       "outcome": "OUTCOME_OK",
-      "refs": []
+      "refs": [
+        "$first_record_path"
+      ]
     },
-    "not_found": {
-      "message": "No matching product found.",
-      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+    "absent": {
+      "message": "Catalogue search result: <NO>",
+      "outcome": "OUTCOME_OK",
       "refs": []
     }
   },

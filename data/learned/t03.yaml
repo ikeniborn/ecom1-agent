@@ -126,8 +126,28 @@ entries:
     accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Never attach a 'params' field to an Exec RPC — ExecRequest has no params
+    field, so any ':name' bind placeholders in the SQL stdin cannot be substituted;
+    inline the literal brand/model values directly into the stdin SQL string (already
+    LOWER/TRIM-normalized) instead of using bind parameters.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Verbatim error: ''real_vm: Protocol message ExecRequest has no "params"
+    field.'' Root cause: discovery RPC built SQL with bind placeholders (:brand, :model_token)
+    and tried to supply them via args.params: {"brand":"Bernardo","model_token":"3OB"}.
+    The VM''s ExecRequest schema only accepts path/args/stdin — the extra ''params''
+    key is rejected at the protocol layer before any SQL runs. Failing PlanIR fragment:
+    discovery[0].args.params plus the '':brand''/'':model_token'' placeholders in
+    stdin. The existing rc1 rule correctly shaped the existence query (brand + ONE
+    token, normalized LIKE, record_path, match_count/first_record, found/absent branches)
+    but said nothing about how Exec carries values; this rule closes that gap by forbidding
+    the unsupported params channel and requiring inlined literals in stdin.'
+  status: active
+  surface: ir
 last_run:
-  cycles_used: 6
+  cycles_used: 1
   date: '2026-06-18'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure

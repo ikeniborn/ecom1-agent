@@ -1,0 +1,36 @@
+{
+  "objective": "Verify whether the catalogue stocks the Carhartt 'Stretch Rugged 3EY-11K Work Trousers' base product, then check whether the claimed extra catalogue properties (color family Blue, size XS, fit women) hold for that record, answering <YES> or <NO> with the checked SKU.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "base_sku": "lookup product_sku from product_variants WHERE brand normalized (LOWER/TRIM) matches 'Carhartt' AND series/model/product_name matches a short normalized token of the 'Stretch Rugged 3EY-11K Work Trousers' line (LIKE on a minimal token); bind base = first matching row",
+    "base_record_path": "$base.record_path from the matched product_variants row",
+    "extra_claim_holds": "test whether the matched base SKU also carries color_family=Blue AND size=XS AND fit=women, via product_variant_properties (property_key/property_value_text) and/or product_variants.properties; true only if every claimed extra property is present on the checked SKU"
+  },
+  "outcome_space": [
+    "OUTCOME_OK"
+  ],
+  "constraints": [
+    {
+      "anchor": "#README > catalogue reads",
+      "rule": "Check the actual catalogue item, cite the exact product record",
+      "security": false,
+      "deny_when": null
+    }
+  ],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "ge",
+        "lhs": "$result.checked_count",
+        "rhs": 0,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "Checked catalogue record {record_path}: {YES_or_NO} — Carhartt Stretch Rugged 3EY-11K Work Trousers base SKU {sku}; claimed extras (color family Blue, size XS, fit women) {present_or_absent}."
+  },
+  "required_refs": {
+    "OUTCOME_OK": []
+  }
+}

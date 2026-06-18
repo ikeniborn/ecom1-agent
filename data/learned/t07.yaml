@@ -170,9 +170,33 @@ entries:
     accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always project every binding that success_criteria reads as $result.<name>
+    into the emitted result object under that exact name — bind the count of the discovery
+    rowset and surface it as a result field, so verify resolves $result.checked_count
+    to a number, not undefined; a count>=0 check can fail ONLY when the field is missing
+    from the result namespace.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Verbatim error: verify: success_criteria[OUTCOME_OK][0] failed: {''op'':
+    ''ge'', ''lhs'': ''$result.checked_count'', ''rhs'': 0, ''args'': []}. The predicate
+    is checked_count>=0 — trivially true for any non-negative count (even 0), so the
+    only failure mode is $result.checked_count being absent or non-numeric. OBSERVED_RPC_OUTPUTS
+    shows the SQL returned 1 base row (WRK-2C46MVO8, extra_holds=0), so discovery
+    + rowset parse + count logic all worked. Failing PlanIR fragment: compute emits
+    {"prim":"count","args":["$rows"],"into":"checked_count"} as a LOCAL binding, and
+    ops:[] plus the answer blocks never surface checked_count into the result object
+    — so verify reads $result.checked_count as undefined and ge(undefined,0) fails.
+    Root cause = result-projection gap, not a grounding/data gap. Linkage: rc1 covers
+    the find-base/test-extra/decision shape but is silent on exposing the verification
+    counter as a $result field; this rule adds the missing projection step without
+    superseding rc1.'
+  status: active
+  surface: ir
 last_run:
-  cycles_used: 6
-  date: '2026-06-18'
-  outcome: OUTCOME_NONE_CLARIFICATION
-  status: failure
+  cycles_used: 2
+  date: '2026-06-19'
+  outcome: OUTCOME_OK
+  status: success
 task_id: t07

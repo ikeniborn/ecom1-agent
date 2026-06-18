@@ -1,0 +1,111 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT record_path, brand, series, model, product_name FROM product_variants WHERE LOWER(TRIM(brand)) LIKE '%' || LOWER(TRIM(:brand_token)) || '%' AND ( LOWER(TRIM(product_name)) LIKE '%' || LOWER(TRIM(:model_token)) || '%' OR LOWER(TRIM(series)) LIKE '%' || LOWER(TRIM(:model_token)) || '%' OR LOWER(TRIM(model)) LIKE '%' || LOWER(TRIM(:model_token)) || '%' ) LIMIT 25",
+        "args": [
+          "brand_token=Fischer",
+          "model_token=7UY-G03"
+        ]
+      },
+      "bind": "raw_rows"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_rows",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path",
+            "record path"
+          ]
+        },
+        {
+          "into": "brand",
+          "candidates": [
+            "brand"
+          ]
+        },
+        {
+          "into": "series",
+          "candidates": [
+            "series"
+          ]
+        },
+        {
+          "into": "model",
+          "candidates": [
+            "model"
+          ]
+        },
+        {
+          "into": "product_name",
+          "candidates": [
+            "product_name",
+            "product name"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$rows"
+      ],
+      "into": "match_count"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "first_record"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_record",
+        "record_path"
+      ],
+      "into": "first_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "ge",
+          "lhs": "$match_count",
+          "rhs": 1,
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "absent"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "<YES> — catalogue contains the Fischer SX 7UY-G03 Anchor and Wall Plug (concrete anchor, diameter 6 mm). Matched record: {first_record_path}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        "$first_record.record_path"
+      ]
+    },
+    "absent": {
+      "message": "<NO> — catalogue does not contain the Fischer SX 7UY-G03 Anchor and Wall Plug (concrete anchor, diameter 6 mm).",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

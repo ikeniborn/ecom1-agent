@@ -1,0 +1,29 @@
+{
+  "objective": "Verify against the live catalogue whether the Heco Zinc Plated TopFix GTU-YPJ wood/drywall screw line includes a variant with screw type wood screw, diameter 6 mm, and length 120 mm, and report YES/NO with the checked SKU.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "base_product": "lookup base product from product_variants WHERE brand normalized-matches 'Heco' AND series/line normalized-matches a short 'TopFix GTU-YPJ' / wood-and-drywall-screw token (LOWER/TRIM + LIKE on a minimal token); SELECT product_sku, record_path; bind base = first matching row",
+    "extra_claim_holds": "for $base.product_sku, test via product_variant_properties (and product_variants) whether the claimed extra properties all hold: screw type = wood screw AND diameter = 6 mm AND length = 120 mm",
+    "checked_sku": "$base.product_sku"
+  },
+  "outcome_space": [
+    "OUTCOME_OK"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$answer.message",
+        "rhs": null,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "Base product found (SKU {checked_sku}); claimed variant (wood screw / 6 mm / 120 mm) {YES_NO}. <NO> with checked SKU when base exists but extra claim absent; <YES> with SKU when present; <NO> when base absent."
+  },
+  "required_refs": {
+    "OUTCOME_OK": []
+  }
+}

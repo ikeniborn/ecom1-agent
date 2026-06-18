@@ -183,18 +183,132 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-18'
+  deactivated_reason: superseded by newer verdict
   id: v007
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/FST-1HE3ZSQ6.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: Catalog query completed. <NO>
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
+- content: null
+  created: '2026-06-18'
+  deactivated_reason: Stale literal-SKU verdict from a prior run (references '/proc/catalog/FST-3SJKL8BF.json');
+    it is task-specific residue, not a reusable plan technique.
+  id: v008
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/FST-3SJKL8BF.json'
+  source: verdict
+  status: inactive
+  submitted_message: 'Catalogue search result: <NO>'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When the TOOL_PLAN params include multiple discriminative tokens beyond
+    brand and series (e.g., a type or modifier token), always add each as an additional
+    AND-ed normalized LIKE clause in the discovery SQL; matching only brand and a
+    series fragment is insufficient when a product line groups heterogeneous variants,
+    because unconstrained results may include non-matching items that skew first-record
+    selection and inflate match_count with rows that do not satisfy the full constraint
+    set.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'The verify error indicates the success criteria checking for <YES> or
+    <NO> in the answer message failed. The root cause is that the PlanIR discovery
+    SQL (SCRIPT_CODE) under-constrained the search: it filtered only on brand=''heco''
+    and a series/model/product_name LIKE ''%gtu-ypj%'', completely omitting the screw_type_token
+    (''drywall screw'') supplied in TOOL_PLAN.params. The OBSERVED_RPC_OUTPUTS show
+    three returned rows, two of which are ''wood screw'' variants and only one is
+    the requested ''drywall screw''. Because the query is under-constrained, first_record
+    arbitrarily selects the first row (/proc/catalog/FST-23VT61XO.json — a wood screw),
+    making the answer semantically unreliable and causing the verifier to reject the
+    answer signal. The failing fragment is the WHERE clause that lacks the third param
+    token. Existing rule r004 warns against over-constraining with JOINs, but does
+    not override the need to apply explicitly-supplied param tokens as simple LIKE
+    predicates.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a compute variable is referenced in success criteria as `$answer.<var>`
+    (e.g. `$answer.match_count`) or interpolated in answer message templates, explicitly
+    bind it into the answer payload via the `custom_extract` array with entries such
+    as `{"src":"$<var>","dst":"<var>"}`; never assume compute variables implicitly
+    cross into answer scope, because missing answer keys break verifier checks for
+    both literal message tokens and numeric thresholds.
+  created: '2026-06-18'
+  deactivated_reason: r008 mandated the wrong custom_extract field names (src/dst),
+    which the PlanIR schema rejects as extra_forbidden while reporting name/input/into
+    as missing; the new rule strictly supersedes it with the schema-valid name/input/into
+    trio while preserving r008's intent of binding compute vars into answer scope.
+  id: r008
+  reasoning: 'The verify error `success_criteria[OUTCOME_OK][0] failed` shows the
+    verifier could not satisfy the OR between `$answer.found.message` containing `<YES>`
+    and `$answer.absent.message` containing `<NO>`. The PlanIR defined both branch
+    messages with those literals, yet the answer object was malformed at runtime because
+    `custom_extract` was empty: the `match_count` compute variable was never projected
+    into the answer payload. Since the TOOL_PLAN success criteria also checks `$answer.match_count
+    >= 0`, and the answer message template references `{match_count}`, the interpreter’s
+    answer scope lacked the required key, causing branch rendering to fail and both
+    sides of the OR to evaluate false. The specific failing PlanIR fragment is `"custom_extract":[]`
+    alongside `"compute":[{"into":"match_count",...}]` with no binding to the answer
+    root.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When binding a compute variable into the answer payload via custom_extract,
+    author each entry with the required PlanIR fields name, input, and into — for
+    example {"name":"match_count","input":"$match_count","into":"match_count"} — and
+    never use src/dst keys, which the PlanIR schema rejects (extra_forbidden) while
+    simultaneously flagging name/input/into as missing.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Verbatim error: ''plan: PLAN: validation failed: 10 validation errors
+    for PlanIR ... custom_extract.0.name Field required ... custom_extract.0.src Extra
+    inputs are not permitted [input_value="$match_count"] ... custom_extract.0.dst
+    Extra inputs are not permitted [input_value="match_count"]'' (and identical for
+    custom_extract.1 first_record). Root cause: PLAN emitted custom_extract entries
+    shaped as {"src":"$match_count","dst":"match_count"} and {"src":"$first_record","dst":"first_record"},
+    but the PlanIR custom_extract item model requires the trio name/input/into and
+    forbids src/dst. Failing PlanIR fragment: custom_extract.0={''src'':''$match_count'',''dst'':''match_count''},
+    custom_extract.1={''src'':''$first_record'',''dst'':''first_record''}. Rule linkage:
+    existing r008 explicitly prescribed the wrong key names — ''{"src":"$<var>","dst":"<var>"}''
+    — and directly produced this validation failure; r008''s intent (bind compute
+    vars into answer scope so $answer.<var> resolves and message tokens interpolate)
+    is correct, only its field names are wrong, so the new rule supersedes it with
+    the schema-valid name/input/into trio. Pure PlanIR-shape bug; no grounding data
+    was missing, so no deep-read requested.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never put a `sql` key (nor a sibling `params` key) directly in an Exec
+    RPC's args object — the real_vm ExecRequest protocol message has no `sql` field
+    and rejects the message before execution; instead deliver the query to /bin/sql
+    through ExecRequest's supported fields (the argv/args list, e.g. args:["-c", "<SQL>"],
+    or stdin), binding query params positionally there rather than as a top-level
+    `sql`/`params` pair.
+  created: '2026-06-18'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Verbatim error: ''real_vm: Protocol message ExecRequest has no "sql"
+    field.'' Root cause: the discovery step shaped the Exec RPC as {"rpc":"Exec","args":{"path":"/bin/sql","sql":"SELECT
+    ...","params":{...}}} — putting the query under a `sql` key and bind values under
+    `params`. ExecRequest accepts no such fields, so real_vm discards the message
+    at the protocol layer, never reaching execution (no rows, no OBSERVED_RPC_OUTPUTS).
+    Failing PlanIR fragment: discovery[0].args.sql and discovery[0].args.params. Linkage:
+    existing rules r004/r007/r008/in-session govern matching breadth and custom_extract
+    shape but none constrain how the Exec RPC envelope carries SQL; this new rule
+    fills that gap so the next cycle emits a protocol-valid Exec invocation. Pure
+    PlanIR-shape bug — no missing grounding data, so no prephase_deep_read.'
+  status: active
+  surface: ir
 last_run:
-  cycles_used: 1
+  cycles_used: 3
   date: '2026-06-18'
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t01
