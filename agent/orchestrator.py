@@ -358,6 +358,13 @@ def _sql_stdout_or_exec(vm, path: str) -> str:
 
 _DOC_SELECT_CAP = 4
 
+_CATALOGUE_HINTS = ("catalog", "catalogue", "product", "sku", "tool bag")
+
+
+def _is_catalogue_query(instruction: str) -> bool:
+    t = (instruction or "").lower()
+    return any(h in t for h in _CATALOGUE_HINTS)
+
 
 def _doc_select_fallback(doc_paths: list[str], instruction: str, tokens: list[str]) -> list[str]:
     """One cheap LLM pick over the doc inventory when Search returned 0 hits.
@@ -496,6 +503,12 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
                 continue
         if picked and policies:
             status["policies"] = "ok"
+
+    # F7: catalogue query but entity-token Search found no /docs match — log the gap
+    # (defensive; no break, no prompt change). Many catalogue tasks have no doc.
+    if _is_catalogue_query(instruction) and not search_hit:
+        print(f"[prephase] DOC_SELECT gap: catalogue query, no /docs matched entity tokens "
+              f"(tokens={tokens[:5]})")
 
     # target_records (H1 — VM-discovered subdirs; no static prefix list / plural map)
     target_records: dict[str, str] = {}
