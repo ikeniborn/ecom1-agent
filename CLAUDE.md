@@ -68,7 +68,7 @@ There is **one** pipeline: the deterministic Plan-IR interpreter. Per task — I
 **Execution flow per task:**
 1. `orchestrator.py:run_agent()` — opens VM, reads `/AGENTS.MD` directly, gathers pre-phase facts (DOC_SELECT [fast tier] + schema + identity + listings), calls `run_pipeline`.
 2. `pipeline.py:run_pipeline(vm, instruction, task_id, agents_md_text, facts)`:
-   - **INTENT** (`reason.py:run_intent`, reason tier) — 1 LLM call, frozen for the run, retried on transient empty/parse failure (`DESIGN_MAX_ATTEMPTS`). Output: `IntentSpec` (`objective`, `desired_outcome`, `params`, `outcome_space`, `constraints`, `success_criteria`, `answer_shape`, `required_refs`). On hard failure → terminal `OUTCOME_NONE_CLARIFICATION`.
+   - **INTENT** (`reason.py:run_intent`, reason tier) — 1 LLM call, frozen for the run, retried on transient empty/parse failure (`DESIGN_MAX_ATTEMPTS`). Input `[facts, instruction, learn_ctx]` — INTENT receives the same active learned rules PLAN does, so a learned rule can shape `required_refs`/`success_criteria`/`outcome_space` (the channel for making a missing grounding ref learnable). Output: `IntentSpec` (`objective`, `desired_outcome`, `params`, `outcome_space`, `constraints`, `success_criteria`, `answer_shape`, `required_refs`). On hard failure → terminal `OUTCOME_NONE_CLARIFICATION`.
    - **LOOP** — `cycle = 1..INTERPRETER_MAX_STEPS`:
      - **PLAN** (`reason.py:run_plan`, reason tier) — LLM call; input `[intent, facts, learn_ctx, prev_error?, oracle_atoms, observed?]`. Output: `PlanIR` (`discovery`, `rowsets`, `compute`, `decision`, `ops`, `answer`, `custom_extract`).
      - **lint** — `interpreter.lint_security_first(plan)` (no LLM). On `PlanError`/`InterpretError` → `_ilearn` → next cycle.

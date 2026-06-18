@@ -27,10 +27,12 @@ deterministic Plan-IR interpreter.
 
 **Per-task execution flow:**
 
-1. **INTENT** (`reason.py:run_intent(facts, instruction)`) — 1 LLM call (reason tier),
-   frozen for the run, retried on transient empty/parse failure. System prompt:
-   `intent.md`. Output: `IntentSpec` (objective, desired_outcome, params, outcome_space,
-   constraints, success_criteria, answer_shape, required_refs). Hard failure → terminal
+1. **INTENT** (`reason.py:run_intent(facts, instruction, learn_ctx=...)`) — 1 LLM call
+   (reason tier), frozen for the run, retried on transient empty/parse failure. System
+   prompt: `intent.md`. Receives the run's active `learn_ctx` (same rules PLAN sees) so a
+   learned rule can shape `required_refs`/`success_criteria`/`outcome_space`. Output:
+   `IntentSpec` (objective, desired_outcome, params, outcome_space, constraints,
+   success_criteria, answer_shape, required_refs). Hard failure → terminal
    `OUTCOME_NONE_CLARIFICATION`.
 2. **LOOP** (`cycle = 1..INTERPRETER_MAX_STEPS`):
    - **PLAN** (`reason.py:run_plan(intent, facts, learn_ctx, prev_error, oracle_atoms, observed)`)
@@ -101,7 +103,11 @@ with `set_trace(logger)`; read with `get_trace()`. `set_cycle(n)` stamps the act
 
 - JSON extraction priority in `json_extract.py` is load-bearing: mutation tools take priority over reads
 - `_plan_signature` / identical-plan short-circuit in `pipeline.py` is the anti-infinite-loop guard
-- INTENT is frozen for the run — `learn_ctx` updates only affect subsequent PLAN cycles
+- INTENT is frozen for the run and reads the active `learn_ctx` snapshot loaded before it;
+  in-loop `learn_ctx` updates (iLEARN) only affect subsequent PLAN cycles, not INTENT
+- Answer refs: enforced refs are projected from `intent.required_refs[outcome]`; the selected
+  answer template's authored `refs` add best-effort CONDITIONAL grounding (a `$ref` that
+  resolves to nothing is dropped, not refused) — `interpreter._resolve_authored_refs`
 - System prompt blocks are passed as `list[dict]` (Anthropic multi-block format):
   `[{"type":"text","text":guide,"cache_control":{"type":"ephemeral"}}]` — agent-relevant VM
   API surface is inline in `data/prompts/{intent,plan}.md`; `docs/proto-api-reference.md` is
