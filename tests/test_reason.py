@@ -54,22 +54,19 @@ def test_facts_block_surfaces_gather_status():
         "gather_status": {"docs_inventory": "ok", "policies": "empty"},
     }
     block = _facts_block(facts)
-    assert "gather_status" in block
-    assert "policies" in block and "empty" in block
+    assert "FACT_STATUS (non-ok):" in block
+    assert "policies=empty" in block
 
 
 from agent.reason import _facts_sufficiency
 
 
-def test_facts_block_includes_path_listings_and_status():
+def test_facts_block_surfaces_status_suffix():
     facts = {
         "schema": "CREATE TABLE x(...)",
-        "path_listings": {"/proc/incoming/payments": "/proc/incoming/payments/inpay_a.json"},
         "gather_status": {"schema": "ok", "identity": "empty", "target_records": "error(boom)"},
     }
     block = _facts_block(facts)
-    assert "path_listings" in block
-    assert "inpay_a.json" in block
     assert "FACT_STATUS (non-ok):" in block
     assert "identity=empty" in block
     assert "target_records=error(boom)" in block

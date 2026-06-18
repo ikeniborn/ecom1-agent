@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from bitgn.vm.ecom.ecom_connect import EcomRuntimeClientSync
 from bitgn.vm.ecom.ecom_pb2 import NodeKind, ReadRequest
 
+from agent.agents_md_parser import render_inventory
 from agent.json_extract import _extract_json_from_text
 from agent.learned_store import load_prephase_deep_read
 from agent.llm import _resolve_model_for_phase, call_llm_raw
@@ -229,6 +230,7 @@ def _augment_agents_md(agents_md_text: str, schema_text: str, sample_rows: str =
 
 class PrePhaseFacts(BaseModel):
     agents_md: str = ""
+    agents_md_inventory: str = ""
     schema: str = ""
     sample_rows: str = ""
     docs_inventory: str = ""
@@ -539,7 +541,8 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
     _mark("path_listings", path_listings)
 
     return PrePhaseFacts(
-        agents_md=agents_md_text, schema=schema, sample_rows=samples,
+        agents_md=agents_md_text, agents_md_inventory=render_inventory(agents_md_text),
+        schema=schema, sample_rows=samples,
         docs_inventory=docs_inventory, policies=policies, identity=identity,
         target_records=target_records, path_listings=path_listings, gather_status=status,
     )

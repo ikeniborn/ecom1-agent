@@ -37,15 +37,18 @@ def _facts_sufficiency(facts: Any) -> list[str]:
     return [k for k, v in status.items() if v != "ok"]
 
 
-def _facts_block(facts: Any) -> str:
+_PLAN_KEYS = ("agents_md_inventory", "schema", "identity", "docs_inventory")
+_INTENT_KEYS = _PLAN_KEYS + ("policies",)
+
+
+def _facts_block(facts: Any, tier: str = "plan") -> str:
     if facts is None:
         return ""
     if hasattr(facts, "model_dump"):
         facts = facts.model_dump()
+    keys = _INTENT_KEYS if tier == "intent" else _PLAN_KEYS
     parts = []
-    for key in ("agents_md", "schema", "sample_rows", "docs_inventory",
-                "policies", "identity", "target_records", "path_listings",
-                "gather_status"):
+    for key in keys:
         val = facts.get(key) if isinstance(facts, dict) else None
         if val:
             parts.append(f"## {key}\n{val if isinstance(val, str) else val}")
@@ -60,7 +63,7 @@ def _facts_block(facts: Any) -> str:
 def run_intent(facts, instruction: str, token_out: dict | None = None) -> IntentSpec:
     guide = load_prompt("intent") or "# PHASE: INTENT"
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
-    user = "\n\n".join(p for p in [_facts_block(facts), f"INSTRUCTION:\n{instruction}"] if p)
+    user = "\n\n".join(p for p in [_facts_block(facts, tier="intent"), f"INSTRUCTION:\n{instruction}"] if p)
     model = _resolve_model_for_phase("intent", os.environ.get("MODEL", ""))
     raw = _call_llm_raw(system, user, model, {}, max_tokens=_MAX_TOKENS_INTENT, token_out=token_out, phase="INTENT")
     if not raw:
@@ -84,7 +87,7 @@ def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str |
     if ob:
         parts.append(ob)
     parts.append(f"INTENT_SPEC:\n{intent.model_dump_json(indent=2)}")
-    parts.append(_facts_block(facts))
+    parts.append(_facts_block(facts, tier="plan"))
     if learn_ctx:
         parts.append("LEARNED_RULES (active):\n" + "\n".join(_format_entry(e) for e in learn_ctx))
     if observed:
@@ -92,6 +95,8 @@ def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str |
     if prev_error:
         parts.append(f"PREVIOUS_ERROR:\n{prev_error}")
     user = "\n\n".join(p for p in parts if p)
+    if os.environ.get("LOG_LEVEL") == "DEBUG":
+        print(f"[plan] user prompt chars={len(user)}")
     model = _resolve_model_for_phase("plan", os.environ.get("MODEL", ""))
     raw = _call_llm_raw(system, user, model, {}, max_tokens=_MAX_TOKENS_PLAN, token_out=token_out, phase="PLAN")
     if not raw:
