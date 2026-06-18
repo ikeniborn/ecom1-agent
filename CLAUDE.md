@@ -48,6 +48,8 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `ORACLE_RANK_ENABLED` | `0` → skip LLM re-rank, use cosine top-k (default 1) |
 | `ORACLE_DISTILL` | `1` → auto-distill a candidate atom after a successful cycle (default 0) |
 | `ORACLE_VALIDATE_INLINE` | **P0.** `1` (default) → when `ORACLE_DISTILL=1`, grader-validate each distilled atom inline and promote on improvement. This fires **live grader round-trips during a run** (a fresh StartRun per atom). Set `0` to suppress: distill writes a `candidate` atom and skips promotion (cheap bulk mode; promote offline later). No effect unless `ORACLE_DISTILL=1`. |
+| `HARNESS_DISTILL` | `1` → after an F1-class compute contract failure, distill a `candidate` lint check-spec into `data/harness/checks.yaml` (LLM, reason tier). Default `0` (no cost). Candidates are enforced **warn-only** by `lint` until promoted. |
+| `HARNESS_VALIDATE_INLINE` | `1` (default) → when `HARNESS_DISTILL=1`, a freshly distilled candidate check is validated inline (`harness_validate.validate_check_via_grader`: must flag the failing plan ∧ must NOT flag the last known-good plan) and promoted (`candidate`→`active`) on success. `0` → leave it a warn-only candidate for an offline promote. Only meaningful when `HARNESS_DISTILL=1`. |
 | `PREPHASE_PATH_LITERALS` | Cap on path literals extracted from the instruction text (default 3); learned deep-read paths are probed in addition |
 | `PREPHASE_LISTING_BYTES` | Byte cap on a rendered dir listing; overflow → `… +N skipped` (default 4096) |
 | `PREPHASE_SAMPLE_ROWS` | `LIMIT` per sampled table — Tier-2 (default 3) |
