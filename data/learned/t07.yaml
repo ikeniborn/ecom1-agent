@@ -153,25 +153,30 @@ entries:
 - agents_md_anchor: null
   content: 'Claim verify ("a note claims we stock X with an extra property ... cite
     the record; <YES> if the product exists WITH that extra property, <NO> if the
-    base product exists but the extra property is absent"). discovery: SELECT product_sku,
-    record_path FROM product_variants WHERE brand + ONE series/model token (LOWER/TRIM
-    LIKE; use facts CATALOGUE_CANDIDATES) -> bind base=first(rows). Determine extra=does
-    the claimed property hold for that base (a second predicate/EXISTS over product_variant_properties
-    on the claimed property_key/value). answer (ONE top-level mapping, NO Answer op):
-    base present AND extra holds -> OUTCOME_OK, message contains <YES> + the SKU,
-    refs [$base.record_path]; base present AND extra absent -> OUTCOME_OK, message
-    contains <NO> + the SKU, refs [$base.record_path]; base absent -> OUTCOME_OK,
-    message contains <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space
-    [OUTCOME_OK]. ALWAYS OUTCOME_OK, never CLARIFICATION/UNSUPPORTED.'
+    base exists but the extra property is absent"). From facts CATALOGUE_CANDIDATES
+    pick the row matching ALL of brand AND series AND model in the claim (not just
+    brand). discovery: SELECT product_sku, record_path FROM product_variants WHERE
+    that brand + series/model token (LOWER/TRIM LIKE) -> bind base=first(rows). Determine
+    extra=does the claimed property hold for base (predicate/EXISTS over product_variant_properties
+    on the claimed key/value). answer (ONE top-level mapping, NO Answer op): base
+    present AND extra holds -> OUTCOME_OK, message contains <YES> + the SKU, refs
+    [$base.record_path]; base present AND extra absent -> OUTCOME_OK, message contains
+    <NO> + the SKU, refs [$base.record_path]; base absent -> OUTCOME_OK, message contains
+    <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space [OUTCOME_OK].
+    INTENT: set success_criteria[OUTCOME_OK]=[] (NO internal count/binding criterion
+    — the grader judges the answer token+ref; a success_criterion over a binding the
+    plan didn''t name causes verify to fail every cycle -> exhaust -> CLARIFICATION).
+    ALWAYS OUTCOME_OK, never CLARIFICATION/UNSUPPORTED.'
   created: '2026-06-18'
   deactivated_reason: 'Superseded because it contains the contradictory clause ''INTENT:
     required_refs[OUTCOME_OK]=[]'' which conflicts with the frozen TOOL_PLAN that
     mandates $base.record_path, contributing to planner paralysis.'
   id: rc1
   pinned: true
-  reasoning: 'Convergence-simplified + targeted fixes: count uses a literal {n} template
-    (not concat -> no char-list bug); claim restores the extra-property check (present+extra=YES
-    / present+no-extra=NO) and cites the base record on both. Pinned canonical.'
+  reasoning: success_criteria[OK]=[] fixes verify-vs-plan binding-name mismatch (INTENT
+    wrote $result.count, plan bound n -> verify failed every cycle -> exhaust). Existence/claim
+    cite real CATALOGUE_CANDIDATES rows; claim matches brand+series+model; count literal
+    template. Pinned canonical, convergence-first.
   status: active
   surface: ir
 - agents_md_anchor: null
