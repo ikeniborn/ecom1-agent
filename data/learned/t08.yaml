@@ -13,28 +13,20 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Claim verify ("a note claims we stock X with an extra property; <YES>
-    if it exists WITH the property, <NO> if base exists but property absent"). discovery:
-    ONE BROAD-OR query (NEVER AND/JOIN): SELECT product_sku, record_path FROM product_variants
-    WHERE LOWER(TRIM(brand)) LIKE ''%<brand>%'' OR LOWER(TRIM(series)) LIKE ''%<token>%''
-    OR LOWER(TRIM(model)) LIKE ''%<code>%'' ORDER BY ((LOWER(TRIM(brand)) LIKE ''%<brand>%'')+(LOWER(TRIM(model))
-    LIKE ''%<code>%'')+(LOWER(TRIM(series)) LIKE ''%<token>%'')) DESC LIMIT 5 -> rows;
-    first(rows)->base. A SECOND query checks the extra property: SELECT 1 FROM product_variant_properties
-    WHERE product_sku = base.product_sku AND LOWER(TRIM(property_value_text)) LIKE
-    ''%<value>%'' -> hit; first->h. answer (ONE top-level mapping): base present AND
-    h nonempty -> OUTCOME_OK, <YES> + base.product_sku, refs=[$base.record_path];
-    base present AND h empty -> OUTCOME_OK, <NO> + base.product_sku, refs=[$base.record_path];
-    no base -> OUTCOME_OK, <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[], success_criteria[OUTCOME_OK]=[],
-    outcome_space=[OUTCOME_OK]. ALWAYS OUTCOME_OK.'
+  content: 'Catalogue tasks (existence / claim-verification / count): identify the
+    product by its attributes matched NORMALIZED (case- and whitespace-insensitive),
+    preferring the real rows in the pre-phase CATALOGUE_CANDIDATES fact over a guessed
+    query; ground every positive/identifying answer in the matched record''s record_path;
+    produce the answer token/format the instruction asks for; both present and absent
+    are OUTCOME_OK (never CLARIFICATION). This is a general method — derive concrete
+    SQL/values from THIS run''s facts, never reuse a fixed recipe.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
   pinned: true
-  reasoning: Prescriptive BROAD-OR discovery SQL (the probe's proven pattern, ORDER
-    BY relevance) so the agent's OWN query finds present products and binds record_path
-    -> conditional grounding cites it. deepseek over-constrained (AND/JOIN->0->false
-    <NO>) and ignored copied candidates; this forbids AND/JOIN and hands the exact
-    working query. success_criteria=[] (verify fix). Pinned.
+  reasoning: 'General method-not-value rule (reverted from prescriptive prose per
+    user directive: execution CONTROL belongs in the harness check-specs + interpreter
+    scripts, not in task-prose). Pinned.'
   status: active
   surface: ir
 - agents_md_anchor: null
