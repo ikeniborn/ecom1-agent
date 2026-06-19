@@ -527,3 +527,40 @@ def test_catalogue_query_logs_doc_select_gap(capsys):
     out = capsys.readouterr().out
     assert "DOC_SELECT gap" in out
     assert isinstance(facts.docs_inventory, str)   # completed without raising
+
+
+def test_catalogue_candidate_probe_surfaces_rows():
+    # Approach: test _probe_catalogue_candidates directly with a MockVMSpy fixture keyed
+    # on the deterministic probe SQL, then verify integration via gather_prephase_facts.
+    # The probe SQL is deterministic (token extraction + SQL template are pure functions).
+    from agent.orchestrator import _probe_catalogue_candidates, gather_prephase_facts
+    from agent.mock_vm_spy import MockVMSpy, fixture_key
+
+    instruction = "Is the Festool SYS box in the catalogue?"
+    # Deterministic probe SQL for "Festool SYS" (the token extracted from the instruction).
+    probe_sql = (
+        "SELECT product_sku, brand, series, model, product_name, record_path"
+        " FROM product_variants"
+        " WHERE (LOWER(TRIM(brand)) LIKE '%festool sys%'"
+        " OR LOWER(TRIM(series)) LIKE '%festool sys%'"
+        " OR LOWER(TRIM(model)) LIKE '%festool sys%'"
+        " OR LOWER(TRIM(product_name)) LIKE '%festool sys%')"
+        " LIMIT 15;"
+    )
+    candidate_rows = (
+        "product_sku|brand|series|model|product_name|record_path\n"
+        "FST-1|Festool|SYS|SYS-1|SYS Box|/proc/catalog/FST-1.json"
+    )
+    fkey = fixture_key("Exec", "/bin/sql", [probe_sql])
+    vm = MockVMSpy(fixtures={fkey: {"stdout": candidate_rows}})
+
+    # Unit: probe function returns the candidate rows including record_path.
+    result = _probe_catalogue_candidates(vm, instruction)
+    assert "FST-1" in result
+    assert "/proc/catalog/FST-1.json" in result
+
+    # Integration: candidate rows reach facts.catalogue_candidates via gather_prephase_facts.
+    vm2 = MockVMSpy(fixtures={fkey: {"stdout": candidate_rows}})
+    facts = gather_prephase_facts(vm2, instruction, agents_md_text="", task_id="t01")
+    assert "FST-1" in facts.catalogue_candidates
+    assert "/proc/catalog/FST-1.json" in facts.catalogue_candidates

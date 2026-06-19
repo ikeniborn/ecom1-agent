@@ -238,6 +238,7 @@ class PrePhaseFacts(BaseModel):
     identity: dict = {}
     target_records: dict[str, str] = {}
     path_listings: dict[str, str] = {}   # instruction-named dir -> rendered listing (Tier-1)
+    catalogue_candidates: str = ""       # broad normalized probe over product_variants by entity tokens
     gather_status: dict[str, str] = {}   # fact -> ok|empty|error(<msg>)
 
 
@@ -364,6 +365,52 @@ _CATALOGUE_HINTS = ("catalog", "catalogue", "product", "sku", "tool bag")
 def _is_catalogue_query(instruction: str) -> bool:
     t = (instruction or "").lower()
     return any(h in t for h in _CATALOGUE_HINTS)
+
+
+_CATALOGUE_PROBE_BYTE_CAP = 2000
+_CATALOGUE_PROBE_LIMIT = 15
+_CATALOGUE_PROBE_MAX_TOKENS = 5
+
+
+def _probe_catalogue_candidates(vm: VMAdapter, instruction: str) -> str:
+    """Broad normalized probe over product_variants by entity tokens.
+
+    Returns a compact header+rows string (capped to ~2000 bytes), or "" on
+    empty result or any error. Deterministic, read-only, no LLM call.
+    The probe is intentionally broad (finding candidates); narrowing is PLAN's job.
+    """
+    tokens = _extract_entity_tokens(instruction)
+    if not tokens:
+        return ""
+    # Use top N tokens; inline token literals (lowercased, single-quotes escaped).
+    probe_tokens = tokens[:_CATALOGUE_PROBE_MAX_TOKENS]
+    conditions = []
+    for tok in probe_tokens:
+        safe = tok.lower().replace("'", "''")
+        cond = (
+            f"(LOWER(TRIM(brand)) LIKE '%{safe}%'"
+            f" OR LOWER(TRIM(series)) LIKE '%{safe}%'"
+            f" OR LOWER(TRIM(model)) LIKE '%{safe}%'"
+            f" OR LOWER(TRIM(product_name)) LIKE '%{safe}%')"
+        )
+        conditions.append(cond)
+    where = " OR ".join(conditions)
+    sql = (
+        f"SELECT product_sku, brand, series, model, product_name, record_path"
+        f" FROM product_variants"
+        f" WHERE {where}"
+        f" LIMIT {_CATALOGUE_PROBE_LIMIT};"
+    )
+    try:
+        text = _sql_stdout(vm, sql)
+    except Exception:
+        return ""
+    if not text:
+        return ""
+    # Cap to byte budget; no silent truncation.
+    if len(text) > _CATALOGUE_PROBE_BYTE_CAP:
+        text = text[:_CATALOGUE_PROBE_BYTE_CAP] + "\n… (truncated)"
+    return text
 
 
 def _doc_select_fallback(doc_paths: list[str], instruction: str, tokens: list[str]) -> list[str]:
@@ -510,6 +557,15 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
         print(f"[prephase] DOC_SELECT gap: catalogue query, no /docs matched entity tokens "
               f"(tokens={tokens[:5]})")
 
+    # catalogue candidate probe — broad normalized query by entity tokens (no LLM, read-only)
+    catalogue_candidates = ""
+    if _is_catalogue_query(instruction):
+        try:
+            catalogue_candidates = _probe_catalogue_candidates(vm, instruction)
+        except Exception:
+            pass  # best-effort; never break gather
+    _mark("catalogue_candidates", catalogue_candidates)
+
     # target_records (H1 — VM-discovered subdirs; no static prefix list / plural map)
     target_records: dict[str, str] = {}
     proc_subdirs = [d.rstrip("/").rsplit("/", 1)[-1].lower()
@@ -557,7 +613,8 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
         agents_md=agents_md_text, agents_md_inventory=render_inventory(agents_md_text),
         schema=schema, sample_rows=samples,
         docs_inventory=docs_inventory, policies=policies, identity=identity,
-        target_records=target_records, path_listings=path_listings, gather_status=status,
+        target_records=target_records, path_listings=path_listings,
+        catalogue_candidates=catalogue_candidates, gather_status=status,
     )
 
 

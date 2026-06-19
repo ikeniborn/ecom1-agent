@@ -89,6 +89,13 @@ def _facts_block(facts: Any, tier: str = "plan") -> str:
         val = facts.get(key) if isinstance(facts, dict) else None
         if val:
             parts.append(f"## {key}\n{val if isinstance(val, str) else val}")
+    # Catalogue candidates: included for both intent and plan tiers when non-empty.
+    cand = facts.get("catalogue_candidates", "") if isinstance(facts, dict) else ""
+    if cand:
+        parts.append(
+            "## CATALOGUE_CANDIDATES (actual rows matching the entity tokens"
+            " — match/cite these real records, do not invent SKUs/paths):\n" + cand
+        )
     block = "PRE-PHASE FACTS:\n" + "\n\n".join(str(p) for p in parts)
     nonok = _facts_sufficiency(facts)
     if nonok:
