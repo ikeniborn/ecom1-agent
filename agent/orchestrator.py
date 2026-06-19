@@ -100,8 +100,11 @@ _SAMPLE_ROW_MAX_CHARS = int(os.environ.get("PREPHASE_SAMPLE_ROW_CHARS", "400"))
 
 
 def _sql_stdout(vm: VMAdapter, sql: str) -> str:
+    # Deliver SQL on STDIN — /bin/sql is nondeterministic over args (F3: intermittently
+    # returns its usage banner when SQL is not on stdin). stdin is the reliable channel,
+    # so pre-phase schema/sample/candidate-probe queries land deterministically.
     try:
-        r = vm.exec(path="/bin/sql", args=[sql])
+        r = vm.exec(path="/bin/sql", args=[], stdin=sql)
     except Exception:
         return ""
     stdout = getattr(r, "stdout", None)
@@ -435,7 +438,9 @@ def _probe_catalogue_candidates(vm: VMAdapter, instruction: str) -> str:
     try:
         text = _sql_stdout(vm, sql)
     except Exception:
-        return ""
+        text = ""
+    nrows = max(0, text.count("\n")) if text else 0
+    print(f"[prephase] catalogue_candidates: {nrows} row(s) (tokens={probe_tokens[:5]})")
     if not text:
         return ""
     # Cap to byte budget; no silent truncation.
