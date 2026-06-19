@@ -1,6 +1,7 @@
 """Per-task learned knowledge store. Replaces helpers from prompt_assembler."""
 from __future__ import annotations
 
+import os
 from datetime import date
 from pathlib import Path
 
@@ -12,6 +13,14 @@ _LEARNED_DIR = Path(__file__).parent.parent / "data" / "learned"
 
 _MIN_CONTENT_LEN = 20
 _VALID_RULE_STARTS = ("never", "always", "use", "do not", "when", "if", "prefer")
+
+
+def _learn_max_active() -> int:
+    """Cap on active content-rules kept per task (re-bloat guard). Read live for tests."""
+    try:
+        return max(1, int(os.environ.get("LEARN_MAX_ACTIVE", "3")))
+    except ValueError:
+        return 3
 
 
 def _read(tid: str) -> dict:
@@ -104,6 +113,21 @@ def apply_learn_diff(tid: str, out: LearnConsolidateOutput, surface: str = "code
         "created": str(date.today()),
         "deactivated_reason": None,
     })
+
+    # Re-bloat guard: iLEARN appends one rule per failing cycle/run, which regrows
+    # rule-overload and starves PLAN convergence. Cap active content-rules per task to
+    # the newest _learn_max_active(); deactivate the OLDEST unpinned ones first. A rule
+    # with `pinned: true` (a hand-authored authoritative rule) is exempt — it always
+    # survives. Verdicts (content=None) and already-inactive entries are untouched.
+    cap = _learn_max_active()
+    active = [e for e in entries
+              if e.get("status") == "active" and e.get("content")
+              and e.get("source") != "verdict"]
+    excess = len(active) - cap
+    if excess > 0:
+        for e in [a for a in active if not a.get("pinned")][:excess]:
+            e["status"] = "inactive"
+            e["deactivated_reason"] = f"capped (re-bloat guard: keep newest {cap}; pin to protect)"
 
     data["task_id"] = tid
     data["entries"] = entries
