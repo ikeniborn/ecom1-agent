@@ -345,3 +345,12 @@ def test_authored_conditional_ref_resolves_present_and_drops_absent():
     res2 = interpret(plan_absent, _INTENT, MockVMSpy(fixtures=fxa))
     assert res2.captured.outcome == "OUTCOME_OK"
     assert res2.captured.refs == []   # unresolved authored ref dropped, not refused
+
+
+def test_fill_slots_renders_integral_float_as_int():
+    # F: a SQL COUNT(*) -> to_number yields 1.0; a count token must read <COUNT:1>, not 1.0.
+    from agent.interpreter import _fill_slots
+    assert _fill_slots("<COUNT:{n}>", {"n": 1.0}) == "<COUNT:1>"
+    assert _fill_slots("{n}", {"n": 3.0}) == "3"
+    assert _fill_slots("{n}", {"n": 1.5}) == "1.5"   # non-integral unchanged
+    assert _fill_slots("{x}", {"x": "Festool"}) == "Festool"

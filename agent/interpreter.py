@@ -120,10 +120,20 @@ def _resolve_args(args: dict, env: dict) -> dict:
 _SLOT_RE = _re.compile(r"\{([^{}]+)\}")
 
 
+def _render_slot(val) -> str:
+    """Render an env value for a message slot. An integral float prints WITHOUT the
+    trailing '.0' (a SQL COUNT(*) -> to_number yields 1.0; a count token must read
+    '1', not '1.0'). Non-integral floats and other types are unchanged."""
+    if val is None:
+        return ""
+    if isinstance(val, float) and val.is_integer():
+        return str(int(val))
+    return str(val)
+
+
 def _fill_slots(message: str, env: dict) -> str:
     def repl(m):
-        val = resolve("$" + m.group(1), env)
-        return "" if val is None else str(val)
+        return _render_slot(resolve("$" + m.group(1), env))
     return _SLOT_RE.sub(repl, message)
 
 
