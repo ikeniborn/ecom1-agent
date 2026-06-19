@@ -102,32 +102,29 @@ entries:
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Claim verify ("a note claims we stock X with an extra property ... cite
-    the record; <YES> if the product exists WITH that extra property, <NO> if the
-    base exists but the extra property is absent"). From facts CATALOGUE_CANDIDATES
-    pick the row matching ALL of brand AND series AND model in the claim (not just
-    brand). discovery: SELECT product_sku, record_path FROM product_variants WHERE
-    that brand + series/model token (LOWER/TRIM LIKE) -> bind base=first(rows). Determine
-    extra=does the claimed property hold for base (predicate/EXISTS over product_variant_properties
-    on the claimed key/value). answer (ONE top-level mapping, NO Answer op): base
-    present AND extra holds -> OUTCOME_OK, message contains <YES> + the SKU, refs
-    [$base.record_path]; base present AND extra absent -> OUTCOME_OK, message contains
-    <NO> + the SKU, refs [$base.record_path]; base absent -> OUTCOME_OK, message contains
-    <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space [OUTCOME_OK].
-    INTENT: set success_criteria[OUTCOME_OK]=[] (NO internal count/binding criterion
-    — the grader judges the answer token+ref; a success_criterion over a binding the
-    plan didn''t name causes verify to fail every cycle -> exhaust -> CLARIFICATION).
-    ALWAYS OUTCOME_OK, never CLARIFICATION/UNSUPPORTED.'
+  content: 'Claim verify ("a note claims we stock X with an extra property; <YES>
+    if it exists WITH that property, <NO> if the base product exists but the property
+    is absent"). From facts CATALOGUE_CANDIDATES pick the BASE row matching brand+series+model
+    in the claim — its product_sku and record_path are the citation. Check the EXTRA
+    property with ONE query: SELECT 1 FROM product_variant_properties WHERE product_sku=''<base
+    sku>'' AND LOWER(TRIM(property_key))=LOWER(''<key>'') AND LOWER(TRIM(property_value_text))
+    LIKE ''%<value>%'' -> bind hit=first(rows). answer (ONE top-level mapping, NO
+    Answer op): base found AND hit nonempty -> OUTCOME_OK, message contains <YES>
+    + the base SKU, refs=[<base record_path literal>]; base found AND hit empty ->
+    OUTCOME_OK, message contains <NO> + the base SKU, refs=[<base record_path literal>];
+    no base candidate -> OUTCOME_OK, message contains <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[],
+    success_criteria[OUTCOME_OK]=[], outcome_space=[OUTCOME_OK]. ALWAYS OUTCOME_OK,
+    never CLARIFICATION.'
   created: '2026-06-18'
   deactivated_reason: It prescribes multiple conditional verdict branches that conflict
     with a singleton outcome_space and a hardcoded answer template, causing the planner
     to emit an empty PlanIR.
   id: rc1
   pinned: true
-  reasoning: success_criteria[OK]=[] fixes verify-vs-plan binding-name mismatch (INTENT
-    wrote $result.count, plan bound n -> verify failed every cycle -> exhaust). Existence/claim
-    cite real CATALOGUE_CANDIDATES rows; claim matches brand+series+model; count literal
-    template. Pinned canonical, convergence-first.
+  reasoning: Cite the candidate's record_path LITERALLY from CATALOGUE_CANDIDATES
+    (probe now delivers real rows via the stdin fix), bypassing the fragile re-query
+    that returned 0 -> false <NO>. success_criteria[OK]=[] (verify binding-mismatch
+    fix). Pinned canonical, convergence-first.
   status: active
   surface: ir
 - agents_md_anchor: null

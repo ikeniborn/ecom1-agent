@@ -13,32 +13,30 @@ entries:
   submitted_refs:
   - /proc/catalog/CLN-NOLQX7ED.json
 - agents_md_anchor: null
-  content: 'Claim verify ("a note claims we stock X with an extra property ... cite
-    the record; <YES> if the product exists WITH that extra property, <NO> if the
-    base exists but the extra property is absent"). From facts CATALOGUE_CANDIDATES
-    pick the row matching ALL of brand AND series AND model in the claim (not just
-    brand). discovery: SELECT product_sku, record_path FROM product_variants WHERE
-    that brand + series/model token (LOWER/TRIM LIKE) -> bind base=first(rows). Determine
-    extra=does the claimed property hold for base (predicate/EXISTS over product_variant_properties
-    on the claimed key/value). answer (ONE top-level mapping, NO Answer op): base
-    present AND extra holds -> OUTCOME_OK, message contains <YES> + the SKU, refs
-    [$base.record_path]; base present AND extra absent -> OUTCOME_OK, message contains
-    <NO> + the SKU, refs [$base.record_path]; base absent -> OUTCOME_OK, message contains
-    <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space [OUTCOME_OK].
-    INTENT: set success_criteria[OUTCOME_OK]=[] (NO internal count/binding criterion
-    — the grader judges the answer token+ref; a success_criterion over a binding the
-    plan didn''t name causes verify to fail every cycle -> exhaust -> CLARIFICATION).
-    ALWAYS OUTCOME_OK, never CLARIFICATION/UNSUPPORTED.'
+  content: 'Claim verify ("a note claims we stock X with an extra property; <YES>
+    if it exists WITH that property, <NO> if the base product exists but the property
+    is absent"). From facts CATALOGUE_CANDIDATES pick the BASE row matching brand+series+model
+    in the claim — its product_sku and record_path are the citation. Check the EXTRA
+    property with ONE query: SELECT 1 FROM product_variant_properties WHERE product_sku=''<base
+    sku>'' AND LOWER(TRIM(property_key))=LOWER(''<key>'') AND LOWER(TRIM(property_value_text))
+    LIKE ''%<value>%'' -> bind hit=first(rows). answer (ONE top-level mapping, NO
+    Answer op): base found AND hit nonempty -> OUTCOME_OK, message contains <YES>
+    + the base SKU, refs=[<base record_path literal>]; base found AND hit empty ->
+    OUTCOME_OK, message contains <NO> + the base SKU, refs=[<base record_path literal>];
+    no base candidate -> OUTCOME_OK, message contains <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[],
+    success_criteria[OUTCOME_OK]=[], outcome_space=[OUTCOME_OK]. ALWAYS OUTCOME_OK,
+    never CLARIFICATION.'
   created: '2026-06-18'
-  deactivated_reason: 'Superseded: rc1 directs the PLAN phase to use specific SQL/query-level
-    constructs (CATALOGUE_CANDIDATES, first(rows)) that belong to the interpret phase,
-    causing planner paralysis and empty responses.'
+  deactivated_reason: rc1 is an overly verbose, contradictory prose rule that instructs
+    'NO Answer op' despite PlanIR requiring explicit Answer operations, causing empty
+    or malformed output; v006 is a stale verify error from a prior cycle with incompatible
+    required_refs expectations that distracts the planner.
   id: rc1
   pinned: true
-  reasoning: success_criteria[OK]=[] fixes verify-vs-plan binding-name mismatch (INTENT
-    wrote $result.count, plan bound n -> verify failed every cycle -> exhaust). Existence/claim
-    cite real CATALOGUE_CANDIDATES rows; claim matches brand+series+model; count literal
-    template. Pinned canonical, convergence-first.
+  reasoning: Cite the candidate's record_path LITERALLY from CATALOGUE_CANDIDATES
+    (probe now delivers real rows via the stdin fix), bypassing the fragile re-query
+    that returned 0 -> false <NO>. success_criteria[OK]=[] (verify binding-mismatch
+    fix). Pinned canonical, convergence-first.
   status: active
   surface: ir
 - content: null
@@ -275,18 +273,53 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: rc1 is an overly verbose, contradictory prose rule that instructs
+    'NO Answer op' despite PlanIR requiring explicit Answer operations, causing empty
+    or malformed output; v006 is a stale verify error from a prior cycle with incompatible
+    required_refs expectations that distracts the planner.
   id: v006
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/CLN-GEF2EYP9.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: '<NO> CLN-NOLQX7ED (record: /proc/catalog/CLN-NOLQX7ED.json)'
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /proc/catalog/CLN-NOLQX7ED.json
+- agents_md_anchor: null
+  content: Always produce a non-empty PlanIR JSON containing at least one discovery
+    Rowset that binds the base record and projects its record path and primary key,
+    followed by an Answer operation mapping to OUTCOME_OK whose message template includes
+    the record path and primary key variables, and whose refs array carries the record
+    path whenever the base rowset is non-empty.
+  created: '2026-06-19'
+  deactivated_reason: superseded by pinned rc1
+  id: r011
+  reasoning: The PLAN LLM returned an empty response. Root cause is existing rule
+    [rc1], which contains contradictory PlanIR guidance such as 'NO Answer op' and
+    'ONE top-level mapping' mixed with verbose SQL fragments; this likely overwhelms
+    the LLM or causes it to emit invalid/empty JSON because PlanIR requires explicit
+    Rowset and Answer operations. Stale verify artifact [v006] from a prior cycle
+    references a missing required path that contradicts the current INTENT (required_refs[OUTCOME_OK]=[])
+    and also distracts the planner. The new rule replaces [rc1] with a concise structural
+    template that guarantees a non-empty PlanIR and correctly flows the projected
+    record path through the Answer message and refs.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v007
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/CLN-NOLQX7ED.json'
+  source: verdict
+  status: active
+  submitted_message: '<NO> N/A (record: N/A)'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
 last_run:
-  cycles_used: 3
+  cycles_used: 2
   date: '2026-06-19'
   outcome: OUTCOME_OK
   status: failure

@@ -12,26 +12,24 @@ entries:
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Existence ("is X / do you carry X"). ONE discovery query: SELECT record_path
-    FROM product_variants WHERE LOWER(TRIM(brand)) LIKE ''%<brand>%'' AND (LOWER(TRIM(model))
-    LIKE ''%<code>%'' OR LOWER(TRIM(series)) LIKE ''%<word>%'') — brand + ONE distinctive
-    model code or series word (take real values from facts CATALOGUE_CANDIDATES if
-    present); NO other predicates. compute: count(rows)->n; first(rows)->r. decision:
-    n ge 1 -> found else absent. answer (ONE top-level mapping, NO Answer op): found
-    -> OUTCOME_OK, message contains <YES>, refs [$r.record_path]; absent -> OUTCOME_OK,
-    message contains <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space
-    [OUTCOME_OK]. INTENT: set success_criteria[OUTCOME_OK]=[] (NO internal count/binding
-    criterion — the grader judges the answer token+ref; a success_criterion over a
-    binding the plan didn''t name causes verify to fail every cycle -> exhaust ->
-    CLARIFICATION). Never CLARIFICATION/UNSUPPORTED. Keep the plan minimal.'
+  content: 'Existence ("is X / do you carry X"). facts CATALOGUE_CANDIDATES lists
+    REAL rows (product_sku, brand, series, model, product_name, record_path) matching
+    the entity tokens. If one row matches the described product (brand + the model
+    code or series word from the instruction), the product is PRESENT. answer (ONE
+    top-level mapping, NO Answer op; you do NOT need discovery/compute — decide from
+    the candidates): a candidate matches -> OUTCOME_OK, message contains the literal
+    token <YES>, refs=[<that candidate''s record_path, copied EXACTLY as a literal
+    string>]; NO candidate matches (or CATALOGUE_CANDIDATES empty) -> OUTCOME_OK,
+    message contains the literal token <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[],
+    success_criteria[OUTCOME_OK]=[], outcome_space=[OUTCOME_OK]. Never CLARIFICATION/UNSUPPORTED.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
   pinned: true
-  reasoning: success_criteria[OK]=[] fixes verify-vs-plan binding-name mismatch (INTENT
-    wrote $result.count, plan bound n -> verify failed every cycle -> exhaust). Existence/claim
-    cite real CATALOGUE_CANDIDATES rows; claim matches brand+series+model; count literal
-    template. Pinned canonical, convergence-first.
+  reasoning: Cite the candidate's record_path LITERALLY from CATALOGUE_CANDIDATES
+    (probe now delivers real rows via the stdin fix), bypassing the fragile re-query
+    that returned 0 -> false <NO>. success_criteria[OK]=[] (verify binding-mismatch
+    fix). Pinned canonical, convergence-first.
   status: active
   surface: ir
 - agents_md_anchor: null

@@ -593,9 +593,12 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
         print(f"[prephase] DOC_SELECT gap: catalogue query, no /docs matched entity tokens "
               f"(tokens={tokens[:5]})")
 
-    # catalogue candidate probe — broad normalized query by entity tokens (no LLM, read-only)
+    # catalogue candidate probe — broad normalized query by entity tokens (no LLM, read-only).
+    # Fire on a catalogue hint OR whenever the instruction carries >=2 distinctive entity
+    # tokens (a product reference like "Heco ... Nut Bolt" or "Wiha Screwdriver 13X-B49"
+    # that the narrow _is_catalogue_query hint-list misses).
     catalogue_candidates = ""
-    if _is_catalogue_query(instruction):
+    if _is_catalogue_query(instruction) or len(_probe_keywords(instruction)) >= 2:
         try:
             catalogue_candidates = _probe_catalogue_candidates(vm, instruction)
         except Exception:
