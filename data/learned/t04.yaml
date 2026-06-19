@@ -12,26 +12,22 @@ entries:
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Existence query ("is X in the catalogue"/"do you carry X"). FIRST read
-    facts CATALOGUE_CANDIDATES — real product_variants rows (sku, brand, series, model,
-    product_name, record_path) matching the entity tokens. Pick the row whose brand+model/series
-    (and any named variant property) best matches the described product = PRESENT.
-    Build discovery SQL to re-select that record_path with a BROAD normalized match
-    (brand + ONE distinctive model/series token via LOWER/TRIM LIKE); do NOT over-constrain
-    with extra property JOINs/EXISTS — that causes a false 0-row ''absent''. COMPUTE
-    match_count=count(rows); first_record=first(rows). DECIDE match_count ge 1 ->
-    label found else absent. ANSWER (single top-level mapping, NO Answer op): found.message
-    contains literal <YES> and found.refs=[$first_record.record_path]; absent.message
-    contains literal <NO> and absent.refs=[]. Answer <NO> ONLY if NO candidate matches
-    the described attributes. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
-    NEVER CLARIFICATION/UNSUPPORTED. Read single-record fields with get, never column.'
+  content: 'Existence ("is X / do you carry X"). ONE discovery query: SELECT record_path
+    FROM product_variants WHERE LOWER(TRIM(brand)) LIKE ''%<brand>%'' AND (LOWER(TRIM(model))
+    LIKE ''%<code>%'' OR LOWER(TRIM(series)) LIKE ''%<word>%'') — brand + ONE distinctive
+    model code or series word (take real values from facts CATALOGUE_CANDIDATES if
+    present); NO other predicates. compute: count(rows)->n; first(rows)->r. decision:
+    n ge 1 -> found else absent. answer (ONE top-level mapping, NO Answer op): found
+    -> OUTCOME_OK, message contains <YES>, refs [$r.record_path]; absent -> OUTCOME_OK,
+    message contains <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space
+    [OUTCOME_OK]. Never CLARIFICATION/UNSUPPORTED. Keep the plan minimal.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
   pinned: true
-  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
-    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
-    int+policy-doc; claim <NO>/SKU).
+  reasoning: 'Simplified-for-convergence (user-chosen): minimal single-query IR, terse
+    imperative, 1-cycle target. Trades some correctness for the plan actually reaching
+    a valid OUTCOME_OK answer (richer rules caused exhaust->CLARIFICATION on deepseek).'
   status: active
   surface: ir
 - agents_md_anchor: null

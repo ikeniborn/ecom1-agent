@@ -13,25 +13,22 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Support-note claim verification ("a note claims we stock X ... cite the
-    exact record; if base exists but extra claim absent answer <NO> with checked SKU;
-    if it exists answer <YES> with SKU"). Use facts CATALOGUE_CANDIDATES to find the
-    BASE product by brand+line/series (real row + product_sku + record_path); bind
-    base=first(rows) over a BROAD normalized match (don''t over-constrain). Then test
-    whether the EXTRA claimed property/variant holds for that base (separate predicate
-    over product_variant_properties). ALWAYS answer OUTCOME_OK (never UNSUPPORTED/CLARIFICATION).
-    Branches: base found AND extra holds -> message contains <YES> and the checked
-    SKU; base found AND extra absent -> message contains <NO> and the checked SKU;
-    base absent -> message contains <NO>. Author refs=[$base.record_path] on EVERY
-    base-exists branch. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
-    Put the literal checked SKU into the message.'
+  content: 'Claim verify ("a note claims we stock X ... cite the record; <YES> if
+    it exists, <NO> if base exists but the extra property is absent"). ONE discovery
+    query: SELECT product_sku, record_path FROM product_variants WHERE brand + ONE
+    series/model token matched (LOWER/TRIM LIKE; use facts CATALOGUE_CANDIDATES).
+    compute: count(rows)->n; first(rows)->r. decision: n ge 1 -> present else absent.
+    answer (ONE top-level mapping, NO Answer op): present -> OUTCOME_OK, message contains
+    <YES> and the SKU, refs [$r.record_path]; absent -> OUTCOME_OK, message contains
+    <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space [OUTCOME_OK].
+    ALWAYS OUTCOME_OK, never CLARIFICATION/UNSUPPORTED. Keep the plan minimal.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
   pinned: true
-  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
-    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
-    int+policy-doc; claim <NO>/SKU).
+  reasoning: 'Simplified-for-convergence (user-chosen): minimal single-query IR, terse
+    imperative, 1-cycle target. Trades some correctness for the plan actually reaching
+    a valid OUTCOME_OK answer (richer rules caused exhaust->CLARIFICATION on deepseek).'
   status: active
   surface: ir
 - agents_md_anchor: null

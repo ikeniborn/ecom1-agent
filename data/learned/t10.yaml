@@ -32,22 +32,20 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Count query ("how many X"), answer EXACTLY the token <COUNT:N>. Resolve
-    the product kind/type by name normalized (LOWER/TRIM); SELECT COUNT(*) of matching
-    product_variants. COMPUTE the count as an INTEGER — message must render <COUNT:2>,
-    NEVER <COUNT:2.0>; build it as ''<COUNT:'' + int(count) + ''>''. If a governing
-    policy doc applies (facts docs_inventory/policies, e.g. a catalogue-reporting
-    policy), INTENT MUST set required_refs[OUTCOME_OK]=[{kind: policy_doc, path: <that
-    /docs/...md>}] so the interpreter projects it; else required_refs[OUTCOME_OK]=[].
-    outcome_space=[OUTCOME_OK]; count 0 is still OUTCOME_OK with <COUNT:0>; NEVER
-    CLARIFICATION.'
+  content: 'Count ("how many X"). ONE discovery query: SELECT COUNT(*) AS n FROM product_variants
+    WHERE the kind/type is matched by name (LOWER/TRIM LIKE). compute: get n as an
+    INTEGER. answer OUTCOME_OK with message in the instruction''s EXACT format with
+    n integer (e.g. ''<COUNT:3>'', never 3.0). If the instruction/policies cite a
+    governing /docs counting policy, INTENT sets required_refs[OUTCOME_OK]=[{kind:policy_doc,
+    path:<that /docs...md>}]; else []. outcome_space [OUTCOME_OK]. Never CLARIFICATION.
+    Keep the plan minimal.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
   pinned: true
-  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
-    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
-    int+policy-doc; claim <NO>/SKU).
+  reasoning: 'Simplified-for-convergence (user-chosen): minimal single-query IR, terse
+    imperative, 1-cycle target. Trades some correctness for the plan actually reaching
+    a valid OUTCOME_OK answer (richer rules caused exhaust->CLARIFICATION on deepseek).'
   status: active
   surface: ir
 - agents_md_anchor: null

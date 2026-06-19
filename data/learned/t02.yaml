@@ -137,26 +137,22 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Existence query ("is X in the catalogue"/"do you carry X"). FIRST read
-    facts CATALOGUE_CANDIDATES — real product_variants rows (sku, brand, series, model,
-    product_name, record_path) matching the entity tokens. Pick the row whose brand+model/series
-    (and any named variant property) best matches the described product = PRESENT.
-    Build discovery SQL to re-select that record_path with a BROAD normalized match
-    (brand + ONE distinctive model/series token via LOWER/TRIM LIKE); do NOT over-constrain
-    with extra property JOINs/EXISTS — that causes a false 0-row ''absent''. COMPUTE
-    match_count=count(rows); first_record=first(rows). DECIDE match_count ge 1 ->
-    label found else absent. ANSWER (single top-level mapping, NO Answer op): found.message
-    contains literal <YES> and found.refs=[$first_record.record_path]; absent.message
-    contains literal <NO> and absent.refs=[]. Answer <NO> ONLY if NO candidate matches
-    the described attributes. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
-    NEVER CLARIFICATION/UNSUPPORTED. Read single-record fields with get, never column.'
+  content: 'Existence ("is X / do you carry X"). ONE discovery query: SELECT record_path
+    FROM product_variants WHERE LOWER(TRIM(brand)) LIKE ''%<brand>%'' AND (LOWER(TRIM(model))
+    LIKE ''%<code>%'' OR LOWER(TRIM(series)) LIKE ''%<word>%'') — brand + ONE distinctive
+    model code or series word (take real values from facts CATALOGUE_CANDIDATES if
+    present); NO other predicates. compute: count(rows)->n; first(rows)->r. decision:
+    n ge 1 -> found else absent. answer (ONE top-level mapping, NO Answer op): found
+    -> OUTCOME_OK, message contains <YES>, refs [$r.record_path]; absent -> OUTCOME_OK,
+    message contains <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space
+    [OUTCOME_OK]. Never CLARIFICATION/UNSUPPORTED. Keep the plan minimal.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
   pinned: true
-  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
-    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
-    int+policy-doc; claim <NO>/SKU).
+  reasoning: 'Simplified-for-convergence (user-chosen): minimal single-query IR, terse
+    imperative, 1-cycle target. Trades some correctness for the plan actually reaching
+    a valid OUTCOME_OK answer (richer rules caused exhaust->CLARIFICATION on deepseek).'
   status: active
   surface: ir
 - content: null
@@ -174,18 +170,91 @@ entries:
   submitted_refs: []
 - content: null
   created: '2026-06-19'
+  deactivated_reason: Stale verdict from a previous run referencing Mellerud/CLN-15KJ3KVR
+    and a required_ref that does not apply to the current task.
   id: v003
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/Mellerud/CLN-15KJ3KVR.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: <NO>
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
+- agents_md_anchor: null
+  content: Never populate match_count for an existence check by applying the count
+    primitive to a discovery rowset that may be empty. Instead, emit a dedicated COUNT(*)
+    discovery query that always returns exactly one scalar row to bind match_count,
+    and fetch the first candidate record separately. This guarantees match_count is
+    always bound to an integer so the success-criteria nonempty check passes even
+    when zero rows match.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: The broad discovery SQL returned zero rows, causing the auto_delim rowset
+    parser to leave discovery_rows unbound. The count primitive over an unbound variable
+    produced no value, so $match_count was empty and failed the 'nonempty' success-criterion.
+    Using a separate COUNT(*) query ensures match_count is always defined as 0 or
+    more. Rule [v003] is stale because it references a different product catalog entry
+    and a required_ref constraint absent from the current TOOL_PLAN.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Never compute match_count for an existence check from a unified SQL query
+    that also retrieves candidate records via CTEs, scalar subqueries, or dummy-table
+    LEFT JOINs. Always plan two separate discovery RPCs: one that performs SELECT
+    COUNT(*) AS match_count with the broad normalized WHERE clause so it always returns
+    exactly one scalar row, and another that performs SELECT record_path, ... LIMIT
+    1 for first_record. Bind match_count directly from the scalar row of the first
+    query, ensuring it is always a defined integer even when zero candidates exist.'
+  created: '2026-06-19'
+  deactivated_reason: superseded by simplified pinned rc1
+  id: r008
+  reasoning: 'verify error: $match_count failed the nonempty check. Root cause: The
+    PlanIR emitted a single discovery SQL query that combined a COUNT(*) scalar subquery
+    with a LEFT JOIN against a dummy row (SELECT 1) to conditionally project the first
+    candidate record. This unified CTE pattern intended to guarantee one output row,
+    but the observed RPC output for /bin/sql was empty, causing the ''catalog_rows''
+    rowset to be empty. Emptiness propagated through column→first→to_number, leaving
+    $match_count unbound. Existing rule [in-session] only prohibited using the ''count''
+    primitive on a possibly-empty rowset; it did not ban this scalar-subquery/CTE/dummy-join
+    workaround, so the planner applied it and failed. Strict separation into two dedicated
+    queries eliminates reliance on fragile multi-purpose SQL shapes and guarantees
+    match_count is always bound.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never deliver SQL text to a `/bin/sql` Exec RPC via a `stdin` field; instead
+    construct the complete statement as one SQL string with all search tokens inlined
+    using standard SQL quoting and concatenation, and append it as the last positional
+    argument in the `args` array after any flags like `-header`.
+  created: '2026-06-19'
+  deactivated_reason: superseded by simplified pinned rc1
+  id: r009
+  reasoning: 'The PlanIR passed discovery SQL through a `stdin` key inside the `Exec`
+    RPC args, but the interpreter did not deliver it to the process, so `/bin/sql`
+    printed its usage banner (''SQL not delivered via stdin'') and the queries never
+    executed. The failing fragments are the two discovery blocks with `"stdin": ".param
+    init..."`. Moving the SQL to a positional argument in `args` guarantees the tool
+    receives the text. Because `args`-passed SQL bypasses sqlite3 shell dot-command
+    processing, `.param` bindings cannot be used; literals must be inlined directly
+    in the WHERE clause.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
+  cycles_used: 3
   date: '2026-06-19'
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t02

@@ -88,22 +88,20 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Count query ("how many X"), answer EXACTLY the token <COUNT:N>. Resolve
-    the product kind/type by name normalized (LOWER/TRIM); SELECT COUNT(*) of matching
-    product_variants. COMPUTE the count as an INTEGER — message must render <COUNT:2>,
-    NEVER <COUNT:2.0>; build it as ''<COUNT:'' + int(count) + ''>''. If a governing
-    policy doc applies (facts docs_inventory/policies, e.g. a catalogue-reporting
-    policy), INTENT MUST set required_refs[OUTCOME_OK]=[{kind: policy_doc, path: <that
-    /docs/...md>}] so the interpreter projects it; else required_refs[OUTCOME_OK]=[].
-    outcome_space=[OUTCOME_OK]; count 0 is still OUTCOME_OK with <COUNT:0>; NEVER
-    CLARIFICATION.'
+  content: 'Count ("how many X"). ONE discovery query: SELECT COUNT(*) AS n FROM product_variants
+    WHERE the kind/type is matched by name (LOWER/TRIM LIKE). compute: get n as an
+    INTEGER. answer OUTCOME_OK with message in the instruction''s EXACT format with
+    n integer (e.g. ''<COUNT:3>'', never 3.0). If the instruction/policies cite a
+    governing /docs counting policy, INTENT sets required_refs[OUTCOME_OK]=[{kind:policy_doc,
+    path:<that /docs...md>}]; else []. outcome_space [OUTCOME_OK]. Never CLARIFICATION.
+    Keep the plan minimal.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
   pinned: true
-  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
-    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
-    int+policy-doc; claim <NO>/SKU).
+  reasoning: 'Simplified-for-convergence (user-chosen): minimal single-query IR, terse
+    imperative, 1-cycle target. Trades some correctness for the plan actually reaching
+    a valid OUTCOME_OK answer (richer rules caused exhaust->CLARIFICATION on deepseek).'
   status: active
   surface: ir
 - content: null
@@ -155,18 +153,52 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v003
   score: 0.6000000238418579
   score_detail:
   - Answer should be "1", but at least it contains it
   source: verdict
-  status: active
+  status: inactive
   submitted_message: <COUNT:1.0>
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /docs/current-updates/catalogue-counting-2025-06-22-cleaning-liquids-vienna.md
+- agents_md_anchor: null
+  content: When a read policy document imposes additional relational filters—such
+    as inventory availability thresholds, store location restrictions, or open-store
+    status—on a catalogue count objective, the discovery SQL must JOIN the relevant
+    inventory and store tables and encode every policy filter in the WHERE clause,
+    using DISTINCT when the policy requires counting each SKU once across multiple
+    branches. Do not emit an unconstrained base-table count after ingesting a qualifying
+    policy.
+  created: '2026-06-19'
+  deactivated_reason: superseded by simplified pinned rc1
+  id: r007
+  reasoning: The verify failure ($count >= 0) reflects an incorrect/ungrounded count
+    because the discovery SQL counted all product_variants for the named kind while
+    ignoring the Graz inventory and store-openness constraints introduced by the read
+    policy document /docs/ops-policy-notes/catalogue-count-nuts-bolts-washers-graz-2025-06-22.md.
+    The PlanIR bound the policy into $policy_doc but never translated its requirements
+    into SQL predicates (no JOIN to inventory/stores, no available_today_quantity
+    > 0 filter, no DISTINCT per-SKU semantics). This produced a wrong cardinality.
+    The corrected PlanIR must materialize every policy restriction as a SQL predicate
+    and reference the policy document in required_refs[OUTCOME_OK].
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v004
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/ops-policy-notes/catalogue-count-nuts-bolts-washers-graz-2025-06-22.md'
+  source: verdict
+  status: active
+  submitted_message: <COUNT:0>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
 last_run:
-  cycles_used: 3
+  cycles_used: 2
   date: '2026-06-19'
   outcome: OUTCOME_OK
   status: failure
