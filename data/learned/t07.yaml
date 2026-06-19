@@ -164,8 +164,11 @@ entries:
     base-exists branch. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
     Put the literal checked SKU into the message.'
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: 'Superseded because it contains the contradictory clause ''INTENT:
+    required_refs[OUTCOME_OK]=[]'' which conflicts with the frozen TOOL_PLAN that
+    mandates $base.record_path, contributing to planner paralysis.'
   id: rc1
+  pinned: true
   reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
     rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
     int+policy-doc; claim <NO>/SKU).
@@ -197,21 +200,122 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: rc1 contradicts the IntentSpec by asserting empty required_refs
+    for OUTCOME_OK while simultaneously instructing to author $base.record_path, creating
+    an unresolvable conflict that paralyzes the planner; v002 is a stale unrelated
+    workwear verdict artifact.
   id: v002
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/workwear/work_trousers/WRK-XOWNCA3Y.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Checked catalogue record /proc/catalog/workwear/work_trousers/WRK-1HRFE9NC.json:
     <NO> — Carhartt Stretch Rugged 3EY-11K Work Trousers base SKU WRK-1HRFE9NC; claimed
     extras (color family Blue, size XS, fit women) absent.'
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /proc/catalog/workwear/work_trousers/WRK-1HRFE9NC.json
+- agents_md_anchor: null
+  content: When verifying a support-note claim against a catalogue base product and
+    its variant properties, first discover the base record via a broad match over
+    the catalogue candidates relation binding the brand and product line, then query
+    the associated variant-properties relation for that base identifier to test the
+    concurrent presence of all claimed attributes. Always include the base record_path
+    in the required_refs for the OK outcome because the IntentSpec mandates it, and
+    emit a non-empty PlanIR with distinct steps for base lookup and variant verification.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r008
+  reasoning: 'Verbatim error: ''plan: PLAN LLM returned empty response''. Root cause:
+    Active rule rc1 contains a false directive ''required_refs[OUTCOME_OK]=[]'' that
+    directly contradicts the frozen TOOL_PLAN, which explicitly requires a record_path
+    reference under required_refs[OUTCOME_OK]. This conflict prevents the planner
+    from producing a valid PlanIR, causing it to return nothing. Stale rule v002 further
+    pollutes the context with a task-specific workwear reference from a prior run.
+    The failing PlanIR fragment is empty. The new rule replaces rc1 by keeping the
+    two-step discovery shape (base lookup then variant check) while explicitly aligning
+    required_refs with the IntentSpec and forcing non-empty output.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always emit a non-empty PlanIR containing a discover step that binds the
+    base product from catalogue candidates filtered by brand and product name, followed
+    by a query step that binds variant properties from the related properties relation
+    filtered by the base SKU. Under OUTCOME_OK, branch into three outcomes: no base
+    found, base found with all claimed properties present, and base found with properties
+    absent. Every branch must produce an answer message containing either <YES> or
+    <NO> together with the checked SKU, and every base-found branch must place the
+    base record_path into required_refs[OUTCOME_OK].'
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r009
+  reasoning: 'The plan phase failed because the LLM returned an empty response and
+    no PlanIR was emitted. Root cause is the active rule rc1, which explicitly asserts
+    ''INTENT: required_refs[OUTCOME_OK]=[]'' directly contradicting the IntentSpec''s
+    mandated inclusion of ''$base.record_path'' in required_refs for OUTCOME_OK. This
+    unresolved contradiction, combined with rc1''s convoluted branching prose, caused
+    the planner to deadlock and emit nothing. Additionally, stale rule v002 from an
+    unrelated workwear task is active and irrelevant. A concise structural rule that
+    forces a minimal valid PlanIR skeleton and correctly resolves the required_refs
+    conflict is needed.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When embedding SQL or command text inside PlanIR JSON string fields such
+    as stdin, never use backslash-escaped single quotes (\'); JSON does not permit
+    that escape sequence and the parser will reject the PlanIR. Keep single quotes
+    as literal characters or externalize string parameters into the args array to
+    avoid quote conflicts.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r010
+  reasoning: 'Error: plan: PLAN: could not parse JSON. Root cause: the generated PlanIR
+    contained the invalid JSON escape sequence \'' inside the stdin SQL string (e.g.,
+    LOWER(TRIM(\''Fischer\''))). Standard JSON only allows escapes like \", \\, and
+    \uXXXX; \'' is forbidden and causes parsing to fail. The malformed fragment began
+    with {"discovery":[{"rpc":"Exec","args":{"path":"/bin/sql","args":[],"stdin":"WITH
+    base AS (SELECT product_sku, record_path FROM product_variants WHERE LOWER(TRIM(brand))
+    = LOWER(TRIM(\''Fischer\'')) ...}}. Existing in-session rules describe the correct
+    semantic shape (base lookup then variant query, required refs, YES/NO branching)
+    but do not address JSON lexical escaping, so a new syntax-shaping rule is needed.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required record_path reference for an outcome is sourced from a
+    conditionally bound base variable but the outcome space also covers the base-absent
+    case, shape the PlanIR so the base-present branch authors the concrete record_path
+    into required_refs[OUTCOME_OK] while the base-absent branch authors an empty or
+    null placeholder for that ref, and never return an empty PlanIR.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r011
+  reasoning: 'Error: ''plan: PLAN LLM returned empty response''. Root cause is a logical
+    deadlock in the planner: the frozen TOOL_PLAN unconditionally requires $base.record_path
+    in required_refs[OUTCOME_OK], yet the success criteria and the active rule [rc1]
+    allow a base-absent branch under the same outcome (where $base is unbound and
+    the record_path cannot be produced). Existing in-session rules repeatedly demand
+    a non-empty PlanIR but do not resolve this conditional-ref paradox, so the LLM
+    aborted. The failing PlanIR fragment is the completely empty output. The new rule
+    removes the deadlock by instructing the planner to structurally satisfy the required_refs
+    declaration on every branch—concrete path when bound, empty/null placeholder when
+    unbound—so a valid JSON PlanIR is always emitted.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v003
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 2
+  cycles_used: 6
   date: '2026-06-19'
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t07

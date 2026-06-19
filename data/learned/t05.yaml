@@ -26,8 +26,11 @@ entries:
     base-exists branch. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
     Put the literal checked SKU into the message.'
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: 'Superseded: rc1 directs the PLAN phase to use specific SQL/query-level
+    constructs (CATALOGUE_CANDIDATES, first(rows)) that belong to the interpret phase,
+    causing planner paralysis and empty responses.'
   id: rc1
+  pinned: true
   reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
     rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
     int+policy-doc; claim <NO>/SKU).
@@ -35,20 +38,149 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v002
   score: 0.0
   score_detail:
   - Answer should contain '<NO>'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Base product found (SKU FST-1HE3ZSQ6); claimed variant (wood
     screw / 6 mm / 120 mm): NO — not present for checked SKU FST-1HE3ZSQ6.'
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /proc/catalog/FST-1HE3ZSQ6.json
+- agents_md_anchor: null
+  content: When a plan must verify claims against a base record that may be absent,
+    do not merge the base lookup and property tests into a single SQL discovery with
+    an inline fallback row. Always perform a discrete base-discovery step first, use
+    a dedicated decision branch on rowset emptiness before calling first() and extracting
+    fields, and only run the secondary property discovery after the base SKU is safely
+    bound. This prevents unbound variables from reaching answer templates when discovery
+    returns no parseable rows.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r001
+  reasoning: The verify step failed because $msg did not contain <YES> or <NO>. The
+    root cause was the monolithic discovery SQL that combined the base product search,
+    correlated EXISTS property checks, and a UNION ALL fallback row. The observed
+    RPC output for /bin/sql showed no stdout content, so the auto_delim rowset parser
+    yielded zero rows. The PlanIR then executed first($rows) and get() without guarding
+    emptiness, leaving $checked_sku and other compute variables unbound or null. The
+    decision condition eq($checked_sku,'') evaluated false on null, execution fell
+    through to the default claim_no branch, but the answer template could not resolve
+    a proper verdict string, causing the regex match to fail. Separating base discovery
+    from property verification and branching on rowset cardinality before field extraction
+    eliminates this unbound-variable failure mode.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always emit a non-empty PlanIR JSON object containing at least one discovery
+    rowset and a decision branch; do not embed SQL syntax, table names, or low-level
+    extraction functions such as first() inside PlanIR nodes because query construction
+    belongs to the interpret phase.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r002
+  reasoning: 'The error is ''plan: PLAN LLM returned empty response''. The root cause
+    is that the planner choked on rc1''s highly prescriptive, SQL-level directives
+    (CATALOGUE_CANDIDATES, first(rows), broad normalized match) and the in-session
+    SQL-sequencing rule, which are interpret/execution concerns rather than PlanIR
+    structure. Unable to map those low-level commands into abstract rowsets and branches,
+    the model emitted nothing. The failing PlanIR fragment is the empty SCRIPT_CODE.
+    The new rule mandates a minimal high-level skeleton and prohibits embedding SQL/extraction
+    logic in PlanIR, forcing the planner to delegate query building downstream and
+    reliably produce structured output.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always emit a non-empty PlanIR JSON object for claim-verification tasks
+    against a potentially-absent base record by structuring exactly two discovery
+    stages and explicit decision branches: first a broad base-row discovery, then
+    a branch that tests rowset emptiness and immediately yields a negative verdict
+    with an empty checked identifier when no base is found, then a second property-discovery
+    stage bound to the base identifier produced by the first stage, and final branches
+    that yield a verdict of YES or NO together with the checked identifier depending
+    on whether the discovered property values match the claimed values.'
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r003
+  reasoning: 'Error: plan: PLAN LLM returned empty response. Root cause: The planner
+    paralyzed when trying to shape a multi-step claim-verification PlanIR under constraints
+    prohibiting embedded SQL syntax and extraction functions; without a mandated skeleton
+    showing how to chain discrete base discovery, emptiness branching, and subsequent
+    property discovery within pure structured PlanIR, it emitted nothing. Failing
+    PlanIR fragment: completely empty SCRIPT_CODE. Rule linkage: Prescribing a concrete
+    two-stage discovery-plus-branching skeleton removes ambiguity and guarantees a
+    non-empty PlanIR emission for this recurring claim-verification pattern.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always begin a claim-verification PlanIR by writing the root JSON object
+    with a 'rowsets' array that includes the base-product discovery and a 'branches'
+    array that includes a no-base fallback, using placeholder predicates if necessary,
+    so the response is structurally non-empty from the first token.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r004
+  reasoning: 'Error: ''plan: PLAN LLM returned empty response''. Root cause: the planner
+    produced no parseable PlanIR and stalled with a completely empty script buffer
+    (failing fragment: empty ```python block). Existing rules mandate eventual non-empty
+    structure but do not prescribe the mechanical first step of immediately emitting
+    the JSON envelope and stub arrays, which leaves room for the model to return nothing.
+    The new rule closes that gap by forcing an instant scaffold, making an empty output
+    impossible.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never wrap PlanIR in markdown code fences or surrounding prose; always
+    write the raw JSON object so the first non-whitespace character is `{`, and ensure
+    the object contains at least one discovery rowset and one decision branch so the
+    plan is structurally present from the first token.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r005
+  reasoning: 'Verbatim error: plan: PLAN LLM returned empty response. Root cause:
+    the model emitted an empty fenced code block (```python with no content) instead
+    of raw PlanIR JSON, so the parser extracted nothing. Failing PlanIR fragment:
+    the entire SCRIPT_CODE is empty whitespace inside python fences. Existing in-session
+    rules require non-empty JSON objects but do not explicitly prohibit markdown wrappers,
+    leaving a gap that allowed the LLM to fence an empty payload. The new rule closes
+    this by mandating raw JSON output starting with `{`.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always write PlanIR as raw JSON beginning with `{`; never output an empty
+    response, never wrap it in any markdown code fence such as ```python or ```json,
+    and always include at least one rowset and one branch, using placeholder predicates
+    when necessary.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r006
+  reasoning: The PLAN phase failed with an entirely empty response enclosed in an
+    empty ```python block. Prior in-session rules already mandated non-empty raw JSON
+    and forbade markdown fences, yet the planner emitted a blank code-fenced block.
+    The root cause appears to be that the planner either collapsed under overlapping
+    constraints or defaulted to a Python code block despite the prohibition. By explicitly
+    naming forbidden fence types (```python, ```json) and coupling that with an unconditional
+    mandate to emit the minimal JSON skeleton, the new rule removes any ambiguity
+    about output format and prevents the blank-response failure mode.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v003
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
+  cycles_used: 6
   date: '2026-06-19'
-  outcome: OUTCOME_OK
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t05

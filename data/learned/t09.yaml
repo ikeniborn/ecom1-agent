@@ -100,6 +100,7 @@ entries:
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
+  pinned: true
   reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
     rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
     int+policy-doc; claim <NO>/SKU).
@@ -107,17 +108,65 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v002
   score: 0.0
   score_detail:
   - answer missing required reference '/docs/policy-updates/2025-06-22-catalogue-reporting-wood-drywall-screws-linz.md'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: <COUNT:2.0>
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
+- agents_md_anchor: null
+  content: When a SQL Exec returns a single bare scalar value without guaranteed column
+    headers, do not use auto_delim rowsets with named column candidates because the
+    raw stdout may be parsed as plain strings and keyed extraction will yield empty.
+    Instead, use custom_extract with a regex capturing the integer directly from the
+    raw stdout binding, then apply to_number.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r005
+  reasoning: The verify error shows $count is empty despite the SQL stdout returning
+    '1'. The PlanIR attempts to parse the SQL output via auto_delim rowsets mapping
+    column 'sku_count', then get($row,'sku_count'). Because the raw stdout appears
+    to be just a bare '1' without headers, auto_delim likely produced a plain string
+    or unkeyed array, so keyed extraction returned empty and to_number produced an
+    empty $count. The SQL itself produced a numeric result, but the PlanIR extraction
+    shape was unsound for headerless scalar output.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use auto_delim rowsets with named column candidates to extract a
+    single scalar value from an SQL Exec result; instead apply custom_extract with
+    a regex that captures the integer directly from the raw stdout binding, then use
+    to_number.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r006
+  reasoning: verify failed because $count was empty. The PlanIR used an auto_delim
+    rowset against the SQL output 'sku_count\n1', but single-column SQL results lack
+    reliable delimiters, so the parser could not produce keyed rows and get($row,
+    sku_count) yielded empty, making to_number produce null. Existing [in-session]
+    rule only warns about bare scalars without guaranteed headers; here an AS alias
+    was present yet auto_delim still failed. A blanket ban on auto_delim keyed extraction
+    for single-scalar SQL outputs prevents this class of failure.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v003
+  score: 0.6000000238418579
+  score_detail:
+  - Answer should be "1", but at least it contains it
+  source: verdict
+  status: active
+  submitted_message: <COUNT:1.0>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/current-updates/catalogue-counting-2025-06-22-cleaning-liquids-vienna.md
 last_run:
-  cycles_used: 1
+  cycles_used: 3
   date: '2026-06-19'
   outcome: OUTCOME_OK
   status: failure

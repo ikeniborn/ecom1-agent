@@ -44,6 +44,7 @@ entries:
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
+  pinned: true
   reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
     rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
     int+policy-doc; claim <NO>/SKU).
@@ -70,18 +71,81 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v002
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
   source: verdict
-  status: active
+  status: inactive
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
+- agents_md_anchor: null
+  content: Always verify the schema of inventory, store, and product tables via pre-phase
+    deep-reads or explicit discovery RPCs before emitting count SQL; if a governing
+    policy document restricts the scope to a specific store brand or chain, discover
+    the exact table or column that represents that brand and incorporate it into the
+    SQL join or filter conditions. Never assume generic table names like stores or
+    store_inventory are correct without confirmation, because a schema mismatch will
+    cause the SQL to fail silently and leave the count variable empty.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r003
+  reasoning: 'Verbatim error: verify: success_criteria[OUTCOME_OK][1] failed: {''op'':''nonempty'',''lhs'':''$count'',''rhs'':None,''args'':[]}.
+    Root cause: The Exec SQL produced no parseable tabular output—observed_rpc_outputs
+    shows empty stdout immediately after [Exec /bin/sql]—so the rowset ''rows'' was
+    empty and the compute step get $rows.0 count yielded null. This happened because
+    the PlanIR hard-coded table names (store_inventory, stores, product_variants)
+    and did not map the policy-doc store-brand restriction to an actual column or
+    table, likely causing a SQL error due to wrong identifiers. Failing PlanIR fragment:
+    rowsets extraction from sql_raw and the compute chain to_number(to_number arg).
+    Rule linkage: forcing schema discovery before SQL generation ensures identifiers
+    are grounded and policy scope is correctly encoded, preventing silent failures
+    that leave $count empty.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a governing policy document restricts an inventory count by store
+    brand, city, or status, do not emit a single monolithic SQL query that assumes
+    generic table and column names (e.g., stores, store_inventory, city, is_open).
+    Instead, first emit dedicated schema-discovery RPCs in the PlanIR to verify exact
+    table names, join columns, and the column that encodes brand or chain; only after
+    grounding these identifiers, emit the count query that applies every policy restriction.
+    This prevents silent empty rowsets from schema mismatches.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r004
+  reasoning: 'verify: success_criteria[OUTCOME_OK][1] failed: nonempty on $count.
+    The PlanIR executed Exec /bin/sql with an unverified JOIN across product_variants,
+    store_inventory, and stores using assumed columns (city, is_open, available_today_quantity)
+    and omitted the policy-mandated PowerTool brand filter. The RPC produced zero
+    visible output rows, so first on $count_rows yielded empty/undefined, making $count
+    empty. Root cause: the PlanIR lacked preceding schema-discovery RPCs to confirm
+    table/column names and identify the brand column; a schema mismatch causes the
+    SQL to fail silently. The new rule mandates explicit identifier discovery before
+    the count SQL when policy docs impose store-level restrictions.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v003
+  score: 0.6000000238418579
+  score_detail:
+  - Answer should be "3", but at least it contains it
+  source: verdict
+  status: active
+  submitted_message: <COUNT:3.0>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/current-updates/catalogue-counting-2025-10-08-cleaning-liquids-vienna.md
 last_run:
-  cycles_used: 1
+  cycles_used: 3
   date: '2026-06-19'
-  outcome: OUTCOME_NONE_CLARIFICATION
+  outcome: OUTCOME_OK
   status: failure
+prephase_deep_read:
+- store_inventory
+- stores
+- product_variants
 task_id: t10

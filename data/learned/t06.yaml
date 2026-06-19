@@ -115,8 +115,11 @@ entries:
     base-exists branch. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
     Put the literal checked SKU into the message.'
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: It prescribes multiple conditional verdict branches that conflict
+    with a singleton outcome_space and a hardcoded answer template, causing the planner
+    to emit an empty PlanIR.
   id: rc1
+  pinned: true
   reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
     rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
     int+policy-doc; claim <NO>/SKU).
@@ -278,7 +281,125 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v002
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: 'When verifying a contradictory claim about a base catalogue item, shape
+    the PlanIR as two sequential stages: first discover the base row from the surfaced
+    candidate facts table via a broad normalized match on brand and product line,
+    projecting the record identifier and record_path; then evaluate whether the extra
+    claimed properties simultaneously hold on that single row. Always author record_path
+    as a required_ref on OUTCOME_OK whenever the base record is non-empty, and bind
+    the answer text to the supplied answer-shape template populated with the projected
+    record identifier.'
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r011
+  reasoning: 'Diagnosis: PLAN LLM returned empty response. Root cause: existing rule
+    rc1 embeds contradictory directives (declaring required_refs[OUTCOME_OK]=[] while
+    simultaneously mandating record_path references) and verbose conditional branching
+    that overwhelm the planner into emitting nothing. Failing PlanIR fragment: entirely
+    empty output (no JSON produced). The new rule replaces rc1 with a concise, structurally-aligned
+    two-stage PlanIR template.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When verifying an extra-property claim against a discovered base catalogue
+    record, shape the PlanIR in two sequential stages: first project record_path and
+    the stable record identifier from the base row using a broad normalized match
+    on brand and product line; then evaluate the extra claim as a predicate over that
+    row’s properties. Because the outcome_space is a singleton, author exactly one
+    terminal branch that emits the supplied answer-shape template populated with the
+    projected identifier, and always include the record_path as a required_ref for
+    OUTCOME_OK. Do not introduce branches that emit divergent answer keywords.'
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r012
+  reasoning: 'Error: ''plan: PLAN LLM returned empty response''; the candidate PlanIR
+    was entirely empty. Root cause: active rule rc1 prescribes a multi-branch flow
+    with both <YES> and <NO> answers and explicitly asserts required_refs[OUTCOME_OK]=[],
+    directly contradicting the current intent_spec''s singleton outcome_space, mandated
+    <NO> answer-shape template, and required record_path reference. This irreconcilable
+    conflict caused the planner to abort. The new rule gives a single coherent PlanIR
+    structure that respects the singleton outcome space and populates the fixed answer
+    template without contradictory branches.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always shape claim-verification PlanIR with exactly one terminal branch
+    when the answer_shape template hardcodes the verdict literal: first discover the
+    base record via a broad normalized match on the surfaced facts table and project
+    its record_path and stable identifier, then evaluate the extra claim as a predicate
+    against that single row, and finally emit the literal answer_shape template populated
+    with the identifier while authoring $base.record_path as a required_ref for the
+    sole outcome. Do not synthesize alternate verdict keywords or additional terminal
+    branches.'
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r013
+  reasoning: The PLAN LLM returned an empty response because existing rule rc1 prescribes
+    divergent answer keywords (<YES> versus <NO>) that conflict with the supplied
+    answer_shape template '<NO> {checked_sku}' and the singleton outcome_space. Faced
+    with contradictory branching instructions, the planner emitted nothing. The PlanIR
+    must therefore use exactly one terminal branch that always emits the provided
+    answer template, avoiding invented verdict variants.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When verifying a contradictory catalogue claim against a surfaced candidate
+    facts table where the outcome_space is a singleton and the answer_shape template
+    hardcodes a single verdict literal, shape the PlanIR as exactly two sequential
+    stages with no branching: first a rowset stage that discovers the base record
+    via a broad normalized match, projecting its record_path and stable identifier;
+    second a single terminal stage that populates the answer-shape template with the
+    projected identifier and authors the record_path as a required_ref for the sole
+    outcome. Always emit a non-empty valid PlanIR and never introduce conditional
+    verdict branches or additional outcomes.'
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r014
+  reasoning: 'Verbatim error: ''plan: PLAN LLM returned empty response''. Root cause:
+    The PlanIR generator deadlocked because rule rc1 mandates multiple conditional
+    verdict branches (<YES> vs <NO>) depending on whether the extra claim holds, whereas
+    the task''s singleton outcome_space ([OUTCOME_OK]) and fixed answer_shape template
+    (''<NO> {checked_sku}'') require exactly one terminal branch emitting a predetermined
+    literal. The unresolved contradiction produced an empty JSON structure instead
+    of a valid PlanIR. Failing PlanIR fragment: completely empty script code. The
+    corrective rule supersedes rc1 by prescribing an unambiguous, minimal two-stage
+    PlanIR for singleton-outcome claim verification that eliminates branching and
+    guarantees non-empty output.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always compute the final answer text by embedding the projected identifier
+    variable into the answer_shape template, then pass that fully composed string
+    in the terminal Answer RPC's args as the message payload; never emit the Answer
+    operation with empty args because the real VM requires a non-empty answer payload.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r015
+  reasoning: 'The real_vm error ''answer must be non empty'' indicates the VM received
+    an Answer command with no payload. The failing PlanIR contains ops={''rpc'':''Answer'',''args'':{},...}:
+    the args map is completely empty, so the VM had no answer text to return. Although
+    the compute stage binds $checked_sku and the declarative answer block contains
+    ''<NO> {checked_sku}'', that variable was never injected into the VM-facing operation''s
+    arguments. The PlanIR must explicitly construct the message string (verdict literal
+    + identifier) and supply it in the Answer RPC args. Separately, the rowset also
+    lacked the required broad normalized match predicate on brand and product line,
+    but the empty-answer payload is the immediate cause of the real_vm failure.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v003
   score: 0.0
   score_detail:
   - Answer should contain '<NO>'
@@ -288,7 +409,7 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 last_run:
-  cycles_used: 6
+  cycles_used: 5
   date: '2026-06-19'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure

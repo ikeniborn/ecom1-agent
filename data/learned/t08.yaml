@@ -28,6 +28,7 @@ entries:
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
+  pinned: true
   reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
     rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
     int+policy-doc; claim <NO>/SKU).
@@ -105,7 +106,113 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v002
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: 'Always emit support-note catalogue-verification PlanIR as a linear sequence
+    of simple, named operations: first a broad-match rowset discovery to bind $base
+    with product_sku and record_path; second a predicate projection over the bound
+    base to test claimed variant properties; third a message-build step that fills
+    the answer_shape skeleton using only the previously bound variables. Do not collapse
+    these into a single nested expression or monolithic conditional block.'
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r004
+  reasoning: 'Verbatim error: ''plan: PLAN LLM returned empty response''. Root cause:
+    existing rule [rc1] compresses the entire multi-branch lookup, predicate check,
+    and messaging logic into one dense natural-language paragraph, overwhelming the
+    planner and causing it to emit an empty script block. The failing PlanIR fragment
+    is the empty SCRIPT_CODE. By forcing a stepwise, binding-oriented PlanIR structure,
+    each generation step is mechanically simple and the LLM is far less likely to
+    return emptiness.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never place multi-line SQL scripts or heavily escaped string literals inside
+    PlanIR JSON fields; always decompose data discovery into discrete, simple rowset
+    operations that do not require embedding complex query syntax within JSON string
+    values.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r005
+  reasoning: The planner emitted a monolithic Exec RPC with a multi-line SQL CTE placed
+    in the 'stdin' JSON string, including newlines and escaped single quotes (fragment
+    shows '\\n  SELECT product_sku...' and 'LIKE \\'%\\' || LO'). This caused the
+    PlanIR parser to fail with 'could not parse JSON'. Existing structural rule [in-session]
+    prefers linear simple operations but does not explicitly prohibit the JSON-escaping
+    hazard of inlining SQL text as a JSON string value. A dedicated rule is needed
+    to stop planners from encoding complex SQL inside JSON fields.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always shape support-note claim-verification PlanIR as a non-empty JSON
+    object containing a top-level 'steps' array with at least one named rowset-discovery
+    operation; never emit an empty document, markdown prose, or a programming-language
+    code block.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r006
+  reasoning: 'Verbatim error: ''plan: PLAN LLM returned empty response''. The candidate
+    PlanIR (SCRIPT_CODE) is completely empty, indicating the LLM produced no structured
+    output. Root cause is lack of a mandatory minimum-structure floor in the existing
+    rules; the model had no enforced starting scaffold and defaulted to an empty response.
+    The failing fragment is the empty document itself. Adding a rule that mandates
+    a non-empty JSON ''steps'' array beginning with a discovery operation prevents
+    empty plans and clarifies that markdown/code fences are not acceptable PlanIR.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always emit PlanIR as a raw JSON object beginning with the '{' character
+    and containing a non-empty top-level 'steps' array of named rowset operations;
+    never return an empty response, markdown prose, or a programming-language code
+    block even when the planner is uncertain how to fulfil the intent.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r007
+  reasoning: 'Error: ''plan: PLAN LLM returned empty response''. Observed SCRIPT_CODE
+    is an empty Python markdown fence (```python\n\n```), meaning the planner emitted
+    a fenced code block with no structured content. Root cause: the planner defaulted
+    to an empty code-wrapped document instead of valid PlanIR JSON. Failing PlanIR
+    fragment: the entire output is an empty markdown code block. A stricter structural
+    rule is needed that makes the opening JSON brace and non-empty steps array an
+    unconditional requirement, overriding any tendency to output blank fenced blocks.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always verify claimed variant properties of a bound base product by performing
+    a separate rowset lookup scoped to that base record's product identifier, then
+    applying count or exists primitives to the resulting property rows to determine
+    the verdict; never fold variant predicates into the initial broad-match discovery
+    SQL as computed flags, and never call sum_col with a single argument instead of
+    the required rowset-reference and column-name pair.
+  created: '2026-06-19'
+  deactivated_reason: re-bloat reset; rc1 is the pinned canonical rule
+  id: r008
+  reasoning: 'Diagnosis: plan: primitive ''sum_col'' takes 2 arg(s), plan supplies
+    1. Root cause: the planner collapsed the broad-match discovery and variant-property
+    check into one monolithic SQL statement that injected a CASE flag (is_variant_match)
+    inside the initial query, then extracted that flag column into $variant_flags,
+    and finally invoked the failing fragment {"prim":"sum_col","args":["$variant_flags"],"into":"variant_sum"}
+    with only one argument. This violates the required two-argument signature of sum_col
+    (rowset, column_name) and also introduces a logic flaw by aggregating across all
+    candidates rather than testing the specific bound base. The correct PlanIR shape
+    separates these concerns: first bind $base via a broad match, then query the properties
+    table filtered by $base.product_sku, and use a simple count or emptiness check
+    on that scoped rowset to drive the decision branches—eliminating any need for
+    sum_col or cross-candidate flag aggregation.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v003
   score: 0.0
   score_detail:
   - Answer should contain '<NO>'
