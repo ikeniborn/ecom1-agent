@@ -137,15 +137,17 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Existence ("is X / do you carry X"). facts CATALOGUE_CANDIDATES lists
-    REAL rows (product_sku, brand, series, model, product_name, record_path) matching
-    the entity tokens. If one row matches the described product (brand + the model
-    code or series word from the instruction), the product is PRESENT. answer (ONE
-    top-level mapping, NO Answer op; you do NOT need discovery/compute — decide from
-    the candidates): a candidate matches -> OUTCOME_OK, message contains the literal
-    token <YES>, refs=[<that candidate''s record_path, copied EXACTLY as a literal
-    string>]; NO candidate matches (or CATALOGUE_CANDIDATES empty) -> OUTCOME_OK,
-    message contains the literal token <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[],
+  content: 'Existence ("is X / do you carry X"). discovery: ONE Exec /bin/sql whose
+    stdin is a BROAD-OR query (NEVER AND across attributes, NEVER a variant-property
+    JOIN — that returns 0 for a present product): SELECT record_path FROM product_variants
+    WHERE LOWER(TRIM(brand)) LIKE ''%<brand>%'' OR LOWER(TRIM(series)) LIKE ''%<token>%''
+    OR LOWER(TRIM(model)) LIKE ''%<code>%'' ORDER BY ((LOWER(TRIM(brand)) LIKE ''%<brand>%'')+(LOWER(TRIM(model))
+    LIKE ''%<code>%'')+(LOWER(TRIM(series)) LIKE ''%<token>%'')) DESC LIMIT 5 — fill
+    <brand>/<token>/<code> (lowercased) from the instruction or facts CATALOGUE_CANDIDATES.
+    rowset auto_delim -> rows (column record_path). compute: count(rows)->n; first(rows)->r.
+    decision: n ge 1 -> found else absent. answer (ONE top-level mapping, NO Answer
+    op): found -> OUTCOME_OK, message contains <YES>, refs=[$r.record_path]; absent
+    -> OUTCOME_OK, message contains <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[],
     success_criteria[OUTCOME_OK]=[], outcome_space=[OUTCOME_OK]. Never CLARIFICATION/UNSUPPORTED.'
   created: '2026-06-18'
   deactivated_reason: 'rc1 is superseded: it prescribes compute->n and omits the mandatory
@@ -153,10 +155,11 @@ entries:
     verdict and is stale.'
   id: rc1
   pinned: true
-  reasoning: Cite the candidate's record_path LITERALLY from CATALOGUE_CANDIDATES
-    (probe now delivers real rows via the stdin fix), bypassing the fragile re-query
-    that returned 0 -> false <NO>. success_criteria[OK]=[] (verify binding-mismatch
-    fix). Pinned canonical, convergence-first.
+  reasoning: Prescriptive BROAD-OR discovery SQL (the probe's proven pattern, ORDER
+    BY relevance) so the agent's OWN query finds present products and binds record_path
+    -> conditional grounding cites it. deepseek over-constrained (AND/JOIN->0->false
+    <NO>) and ignored copied candidates; this forbids AND/JOIN and hands the exact
+    working query. success_criteria=[] (verify fix). Pinned.
   status: active
   surface: ir
 - content: null
@@ -373,10 +376,22 @@ entries:
   submitted_refs: []
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v007
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/Heco/FST-Y43LKHBB.json'
+  source: verdict
+  status: inactive
+  submitted_message: <NO>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- content: null
+  created: '2026-06-19'
+  id: v008
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Viega/PLB-1B0AEUWP.json'
   source: verdict
   status: active
   submitted_message: <NO>
@@ -386,5 +401,5 @@ last_run:
   cycles_used: 1
   date: '2026-06-19'
   outcome: OUTCOME_OK
-  status: failure
+  status: success
 task_id: t02

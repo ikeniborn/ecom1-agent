@@ -103,28 +103,29 @@ entries:
   submitted_refs: []
 - agents_md_anchor: null
   content: 'Claim verify ("a note claims we stock X with an extra property; <YES>
-    if it exists WITH that property, <NO> if the base product exists but the property
-    is absent"). From facts CATALOGUE_CANDIDATES pick the BASE row matching brand+series+model
-    in the claim — its product_sku and record_path are the citation. Check the EXTRA
-    property with ONE query: SELECT 1 FROM product_variant_properties WHERE product_sku=''<base
-    sku>'' AND LOWER(TRIM(property_key))=LOWER(''<key>'') AND LOWER(TRIM(property_value_text))
-    LIKE ''%<value>%'' -> bind hit=first(rows). answer (ONE top-level mapping, NO
-    Answer op): base found AND hit nonempty -> OUTCOME_OK, message contains <YES>
-    + the base SKU, refs=[<base record_path literal>]; base found AND hit empty ->
-    OUTCOME_OK, message contains <NO> + the base SKU, refs=[<base record_path literal>];
-    no base candidate -> OUTCOME_OK, message contains <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[],
-    success_criteria[OUTCOME_OK]=[], outcome_space=[OUTCOME_OK]. ALWAYS OUTCOME_OK,
-    never CLARIFICATION.'
+    if it exists WITH the property, <NO> if base exists but property absent"). discovery:
+    ONE BROAD-OR query (NEVER AND/JOIN): SELECT product_sku, record_path FROM product_variants
+    WHERE LOWER(TRIM(brand)) LIKE ''%<brand>%'' OR LOWER(TRIM(series)) LIKE ''%<token>%''
+    OR LOWER(TRIM(model)) LIKE ''%<code>%'' ORDER BY ((LOWER(TRIM(brand)) LIKE ''%<brand>%'')+(LOWER(TRIM(model))
+    LIKE ''%<code>%'')+(LOWER(TRIM(series)) LIKE ''%<token>%'')) DESC LIMIT 5 -> rows;
+    first(rows)->base. A SECOND query checks the extra property: SELECT 1 FROM product_variant_properties
+    WHERE product_sku = base.product_sku AND LOWER(TRIM(property_value_text)) LIKE
+    ''%<value>%'' -> hit; first->h. answer (ONE top-level mapping): base present AND
+    h nonempty -> OUTCOME_OK, <YES> + base.product_sku, refs=[$base.record_path];
+    base present AND h empty -> OUTCOME_OK, <NO> + base.product_sku, refs=[$base.record_path];
+    no base -> OUTCOME_OK, <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[], success_criteria[OUTCOME_OK]=[],
+    outcome_space=[OUTCOME_OK]. ALWAYS OUTCOME_OK.'
   created: '2026-06-18'
   deactivated_reason: It prescribes multiple conditional verdict branches that conflict
     with a singleton outcome_space and a hardcoded answer template, causing the planner
     to emit an empty PlanIR.
   id: rc1
   pinned: true
-  reasoning: Cite the candidate's record_path LITERALLY from CATALOGUE_CANDIDATES
-    (probe now delivers real rows via the stdin fix), bypassing the fragile re-query
-    that returned 0 -> false <NO>. success_criteria[OK]=[] (verify binding-mismatch
-    fix). Pinned canonical, convergence-first.
+  reasoning: Prescriptive BROAD-OR discovery SQL (the probe's proven pattern, ORDER
+    BY relevance) so the agent's OWN query finds present products and binds record_path
+    -> conditional grounding cites it. deepseek over-constrained (AND/JOIN->0->false
+    <NO>) and ignored copied candidates; this forbids AND/JOIN and hands the exact
+    working query. success_criteria=[] (verify fix). Pinned.
   status: active
   surface: ir
 - agents_md_anchor: null

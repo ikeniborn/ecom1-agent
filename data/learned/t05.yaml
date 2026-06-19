@@ -14,29 +14,31 @@ entries:
   - /proc/catalog/CLN-NOLQX7ED.json
 - agents_md_anchor: null
   content: 'Claim verify ("a note claims we stock X with an extra property; <YES>
-    if it exists WITH that property, <NO> if the base product exists but the property
-    is absent"). From facts CATALOGUE_CANDIDATES pick the BASE row matching brand+series+model
-    in the claim — its product_sku and record_path are the citation. Check the EXTRA
-    property with ONE query: SELECT 1 FROM product_variant_properties WHERE product_sku=''<base
-    sku>'' AND LOWER(TRIM(property_key))=LOWER(''<key>'') AND LOWER(TRIM(property_value_text))
-    LIKE ''%<value>%'' -> bind hit=first(rows). answer (ONE top-level mapping, NO
-    Answer op): base found AND hit nonempty -> OUTCOME_OK, message contains <YES>
-    + the base SKU, refs=[<base record_path literal>]; base found AND hit empty ->
-    OUTCOME_OK, message contains <NO> + the base SKU, refs=[<base record_path literal>];
-    no base candidate -> OUTCOME_OK, message contains <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[],
-    success_criteria[OUTCOME_OK]=[], outcome_space=[OUTCOME_OK]. ALWAYS OUTCOME_OK,
-    never CLARIFICATION.'
+    if it exists WITH the property, <NO> if base exists but property absent"). discovery:
+    ONE BROAD-OR query (NEVER AND/JOIN): SELECT product_sku, record_path FROM product_variants
+    WHERE LOWER(TRIM(brand)) LIKE ''%<brand>%'' OR LOWER(TRIM(series)) LIKE ''%<token>%''
+    OR LOWER(TRIM(model)) LIKE ''%<code>%'' ORDER BY ((LOWER(TRIM(brand)) LIKE ''%<brand>%'')+(LOWER(TRIM(model))
+    LIKE ''%<code>%'')+(LOWER(TRIM(series)) LIKE ''%<token>%'')) DESC LIMIT 5 -> rows;
+    first(rows)->base. A SECOND query checks the extra property: SELECT 1 FROM product_variant_properties
+    WHERE product_sku = base.product_sku AND LOWER(TRIM(property_value_text)) LIKE
+    ''%<value>%'' -> hit; first->h. answer (ONE top-level mapping): base present AND
+    h nonempty -> OUTCOME_OK, <YES> + base.product_sku, refs=[$base.record_path];
+    base present AND h empty -> OUTCOME_OK, <NO> + base.product_sku, refs=[$base.record_path];
+    no base -> OUTCOME_OK, <NO>, refs=[]. INTENT: required_refs[OUTCOME_OK]=[], success_criteria[OUTCOME_OK]=[],
+    outcome_space=[OUTCOME_OK]. ALWAYS OUTCOME_OK.'
   created: '2026-06-18'
-  deactivated_reason: rc1 is an overly verbose, contradictory prose rule that instructs
-    'NO Answer op' despite PlanIR requiring explicit Answer operations, causing empty
-    or malformed output; v006 is a stale verify error from a prior cycle with incompatible
-    required_refs expectations that distracts the planner.
+  deactivated_reason: Both mandate projecting a base record_path ref that conflicts
+    with TOOL_PLAN.required_refs[OUTCOME_OK]=[]; rc1 additionally embeds literal SQL
+    and contradictory 'NO Answer op' phrasing that prevents clean PlanIR generation;
+    the dense [in-session] rule fails to disambiguate the dual-attribute check and
+    ref policy, causing the PLAN LLM to return empty.
   id: rc1
   pinned: true
-  reasoning: Cite the candidate's record_path LITERALLY from CATALOGUE_CANDIDATES
-    (probe now delivers real rows via the stdin fix), bypassing the fragile re-query
-    that returned 0 -> false <NO>. success_criteria[OK]=[] (verify binding-mismatch
-    fix). Pinned canonical, convergence-first.
+  reasoning: Prescriptive BROAD-OR discovery SQL (the probe's proven pattern, ORDER
+    BY relevance) so the agent's OWN query finds present products and binds record_path
+    -> conditional grounding cites it. deepseek over-constrained (AND/JOIN->0->false
+    <NO>) and ignored copied candidates; this forbids AND/JOIN and hands the exact
+    working query. success_criteria=[] (verify fix). Pinned.
   status: active
   surface: ir
 - content: null
@@ -309,17 +311,75 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v007
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/CLN-NOLQX7ED.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: '<NO> N/A (record: N/A)'
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
+- content: null
+  created: '2026-06-19'
+  id: v008
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: <YES> CLN-NOLQX7ED
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/CLN-NOLQX7ED.json
+- agents_md_anchor: null
+  content: 'Always decompose catalogue-variant verification PlanIR into two sequential
+    discovery bindings: first filter the base candidate rowset by the claim entity
+    tokens to bind the base SKU and its record path; then filter the variant property
+    rowset by that bound SKU and the claimed extra attributes to bind a hit indicator.
+    Emit a single OUTCOME_OK answer mapping conditioned on whether the base binding
+    and property hit binding are non-empty, using a message pattern that interpolates
+    a YES/NO verdict and the bound SKU, and project only the base record path as the
+    ref.'
+  created: '2026-06-19'
+  deactivated_reason: superseded by prescriptive broad-OR rc1
+  id: r012
+  reasoning: 'ERROR: ''plan: PLAN LLM returned empty response'' with empty SCRIPT_CODE.
+    Root cause is existing rule [rc1], which attempts to encode the entire PlanIR—including
+    literal SQL, answer message templates, and ref projection—into one verbose prose
+    paragraph. This overloads the PLAN LLM and causes it to return nothing. The fix
+    is a structural rule that instructs the planner to emit clean sequential rowset
+    bindings and a single conditional answer mapping without embedding executable
+    SQL or literal values.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always decompose catalogue-variant verification PlanIR into exactly two
+    sequential Discovery bindings followed by one Answer binding: first filter CATALOGUE_CANDIDATES
+    by the claim entity tokens to bind the base product_sku; second filter product_variant_properties
+    by that bound SKU and by BOTH claimed extra attributes to bind a hit indicator.
+    Emit a single OUTCOME_OK Answer mapping with three branches—message contains YES
+    and the bound SKU when both bindings are non-empty; message contains NO and the
+    bound SKU when the base binding is non-empty but the property hit is empty; message
+    contains NO with no SKU when the base binding is empty—and project an empty refs
+    list for every branch because required_refs[OUTCOME_OK] is empty.'
+  created: '2026-06-19'
+  deactivated_reason: superseded by prescriptive broad-OR rc1
+  id: r013
+  reasoning: 'The error is a completely empty PLAN response. Root cause is contradictory
+    structural guidance in active rules: rc1 embeds literal SQL and states ''NO Answer
+    op'' while simultaneously describing an answer mapping, and both rc1 and [in-session]
+    mandate projecting a base record_path ref that directly conflicts with TOOL_PLAN.required_refs[OUTCOME_OK]=[].
+    This contradiction paralyzes the PLAN LLM. Additionally, the prior rules fail
+    to explicitly instruct a composite filter for both extra attributes (screw type
+    and pack count). The new rule resolves all conflicts by prescribing two Discovery
+    bindings, a single OUTCOME_OK Answer with three clear branches, and an empty refs
+    list.'
+  status: inactive
+  surface: ir
 last_run:
-  cycles_used: 2
+  cycles_used: 1
   date: '2026-06-19'
   outcome: OUTCOME_OK
   status: failure
