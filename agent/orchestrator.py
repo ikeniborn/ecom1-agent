@@ -273,6 +273,37 @@ def _extract_entity_tokens(instruction: str) -> list[str]:
     return toks
 
 
+_PROBE_STOP = {
+    "the", "from", "you", "can", "do", "does", "have", "has", "had", "in", "into",
+    "line", "that", "with", "and", "or", "is", "are", "get", "carry", "stock", "stocks",
+    "for", "our", "we", "support", "note", "claims", "claim", "check", "checked", "cite",
+    "record", "exact", "base", "extra", "exists", "absent", "answer", "include", "including",
+    "sku", "how", "many", "count", "report", "catalogue", "catalog", "product", "products",
+    "type", "color", "colour", "family", "size", "please", "actual", "item", "available",
+    "availability", "this", "any", "all", "a", "an", "of", "to", "it", "i",
+    "pipe", "fitting",
+}
+
+
+def _probe_keywords(instruction: str) -> list[str]:
+    """Distinctive single tokens for the catalogue probe: brand/series words and
+    alphanumeric model codes (e.g. 'Pipelife', 'Radopress', 'MX2-EGS', '233-MOB').
+    Drops generic/stopwords and multi-word phrases (which never match a single column
+    via LIKE). Deduped, order-preserving, capped."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for w in re.findall(r"[A-Za-z0-9][A-Za-z0-9-]*", instruction or ""):
+        lw = w.lower()
+        if lw in _PROBE_STOP or lw in seen:
+            continue
+        is_code = any(c.isdigit() for c in w) and len(w) >= 2          # model code: MX2-EGS, 233-MOB
+        is_name = (w[:1].isupper() and len(w) >= 4)                    # brand/series word: Pipelife, Radopress, KJB-LZD
+        if is_code or is_name:
+            seen.add(lw)
+            out.append(w)
+    return out[:8]
+
+
 def _parse_identity(stdout: str) -> dict:
     """Parse `/bin/id` into key=value pairs, tolerant to whitespace/commas/order.
 
@@ -379,7 +410,7 @@ def _probe_catalogue_candidates(vm: VMAdapter, instruction: str) -> str:
     empty result or any error. Deterministic, read-only, no LLM call.
     The probe is intentionally broad (finding candidates); narrowing is PLAN's job.
     """
-    tokens = _extract_entity_tokens(instruction)
+    tokens = _probe_keywords(instruction)
     if not tokens:
         return ""
     # Use top N tokens; inline token literals (lowercased, single-quotes escaped).

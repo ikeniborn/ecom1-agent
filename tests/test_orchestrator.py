@@ -529,38 +529,42 @@ def test_catalogue_query_logs_doc_select_gap(capsys):
     assert isinstance(facts.docs_inventory, str)   # completed without raising
 
 
-def test_catalogue_candidate_probe_surfaces_rows():
-    # Approach: test _probe_catalogue_candidates directly with a MockVMSpy fixture keyed
-    # on the deterministic probe SQL, then verify integration via gather_prephase_facts.
-    # The probe SQL is deterministic (token extraction + SQL template are pure functions).
+def test_probe_keywords_extracts_distinctive_tokens():
+    from agent.orchestrator import _probe_keywords
+    kws = _probe_keywords("Can I get the Pipe Fitting from Pipelife in the Pipelife "
+                          "Universal Radopress MX2-EGS Pipe Fitting line that has fitting "
+                          "type seal ring and diameter 20 mm from you?")
+    low = [k.lower() for k in kws]
+    assert "pipelife" in low and "radopress" in low and "mx2-egs" in low
+    # generic/stopwords excluded
+    assert "fitting" not in low and "can" not in low and "the" not in low and "from" not in low
+    # no multi-word phrases
+    assert all(" " not in k for k in kws)
+
+
+def test_catalogue_candidate_probe_surfaces_rows(monkeypatch):
+    # Monkeypatch _sql_stdout so the probe returns candidate rows regardless of the
+    # exact SQL string — this keeps the test robust to tokenizer changes.
+    from agent import orchestrator
     from agent.orchestrator import _probe_catalogue_candidates, gather_prephase_facts
-    from agent.mock_vm_spy import MockVMSpy, fixture_key
+    from agent.mock_vm_spy import MockVMSpy
 
     instruction = "Is the Festool SYS box in the catalogue?"
-    # Deterministic probe SQL for "Festool SYS" (the token extracted from the instruction).
-    probe_sql = (
-        "SELECT product_sku, brand, series, model, product_name, record_path"
-        " FROM product_variants"
-        " WHERE (LOWER(TRIM(brand)) LIKE '%festool sys%'"
-        " OR LOWER(TRIM(series)) LIKE '%festool sys%'"
-        " OR LOWER(TRIM(model)) LIKE '%festool sys%'"
-        " OR LOWER(TRIM(product_name)) LIKE '%festool sys%')"
-        " LIMIT 15;"
-    )
     candidate_rows = (
         "product_sku|brand|series|model|product_name|record_path\n"
         "FST-1|Festool|SYS|SYS-1|SYS Box|/proc/catalog/FST-1.json"
     )
-    fkey = fixture_key("Exec", "/bin/sql", [probe_sql])
-    vm = MockVMSpy(fixtures={fkey: {"stdout": candidate_rows}})
+
+    monkeypatch.setattr(orchestrator, "_sql_stdout", lambda vm, sql: candidate_rows)
 
     # Unit: probe function returns the candidate rows including record_path.
+    vm = MockVMSpy(fixtures={})
     result = _probe_catalogue_candidates(vm, instruction)
     assert "FST-1" in result
     assert "/proc/catalog/FST-1.json" in result
 
     # Integration: candidate rows reach facts.catalogue_candidates via gather_prephase_facts.
-    vm2 = MockVMSpy(fixtures={fkey: {"stdout": candidate_rows}})
+    vm2 = MockVMSpy(fixtures={})
     facts = gather_prephase_facts(vm2, instruction, agents_md_text="", task_id="t01")
     assert "FST-1" in facts.catalogue_candidates
     assert "/proc/catalog/FST-1.json" in facts.catalogue_candidates
