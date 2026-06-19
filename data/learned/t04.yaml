@@ -1,35 +1,36 @@
 entries:
 - content: null
   created: '2026-06-18'
+  deactivated_reason: superseded by newer verdict
   id: v001
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/safety_gear/work_gloves/fam_safety_gear_work_gloves_0016_2pkmqd1v/SFE-1VS7B0HV.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: No — the requested product is not available in the catalogue.
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'Existence query ("is X in the catalogue"/"do you carry X"). MATCH MINIMALLY:
-    brand + ONE distinctive model/series token via normalized LIKE (LOWER/TRIM) on
-    a SHORT fragment; do NOT add extra variant-property JOINs/EXISTS unless one token
-    is genuinely insufficient — over-constraining yields a false 0-row ''absent''
-    for a present product. For ''regular or flat''/''bare or kit'' alternants match
-    ANY variant (OR), never require all. SELECT the record_path column. COMPUTE match_count=count(rows);
-    first_record=first(rows). DECIDE match_count ge 1 -> label found else label absent.
-    ANSWER (single top-level mapping, NO Answer op in ops): found.message contains
-    the literal token <YES> and found.refs=[$first_record.record_path]; absent.message
-    contains the literal token <NO> and absent.refs=[]. INTENT: required_refs[OUTCOME_OK]=[]
-    (record_path is CONDITIONAL, authored per-branch); outcome_space=[OUTCOME_OK].
-    NEVER answer CLARIFICATION/UNSUPPORTED — ''absent'' is OUTCOME_OK with <NO>. Read
-    single-record fields with get, never column.'
+  content: 'Existence query ("is X in the catalogue"/"do you carry X"). FIRST read
+    facts CATALOGUE_CANDIDATES — real product_variants rows (sku, brand, series, model,
+    product_name, record_path) matching the entity tokens. Pick the row whose brand+model/series
+    (and any named variant property) best matches the described product = PRESENT.
+    Build discovery SQL to re-select that record_path with a BROAD normalized match
+    (brand + ONE distinctive model/series token via LOWER/TRIM LIKE); do NOT over-constrain
+    with extra property JOINs/EXISTS — that causes a false 0-row ''absent''. COMPUTE
+    match_count=count(rows); first_record=first(rows). DECIDE match_count ge 1 ->
+    label found else absent. ANSWER (single top-level mapping, NO Answer op): found.message
+    contains literal <YES> and found.refs=[$first_record.record_path]; absent.message
+    contains literal <NO> and absent.refs=[]. Answer <NO> ONLY if NO candidate matches
+    the described attributes. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
+    NEVER CLARIFICATION/UNSUPPORTED. Read single-record fields with get, never column.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
-  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
-    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
-    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
+    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
+    int+policy-doc; claim <NO>/SKU).
   status: active
   surface: ir
 - agents_md_anchor: null
@@ -39,7 +40,7 @@ entries:
     Embed match values directly inline into the SQL stdin text, normalized with LOWER/TRIM
     and matched via LIKE, since Exec provides no named-bind mechanism.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r001
   reasoning: 'Verbatim error: ''real_vm: Protocol message ExecRequest has no "params"
     field.'' Failing PlanIR fragment: discovery[0].args = {"path":"/bin/sql","stdin":"SELECT
@@ -52,11 +53,22 @@ entries:
     is the Exec-shape constraint. Fix: drop the params field and inline the values
     into the SQL stdin string. This is a pure PlanIR-shape bug, so no prephase_deep_read
     needed. Complements rc1 without superseding it.'
-  status: active
+  status: inactive
   surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
   cycles_used: 1
-  date: '2026-06-18'
+  date: '2026-06-19'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t04

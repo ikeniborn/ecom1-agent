@@ -77,33 +77,48 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-18'
+  deactivated_reason: superseded by newer verdict
   id: v001
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
   source: verdict
-  status: active
+  status: inactive
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: Count query ("how many X", answer format <COUNT:%d>). SELECT COUNT(*) over
-    the normalized product kind/type match (match the kind/category name with LOWER/TRIM).
-    COMPUTE the integer count scalar. ANSWER OUTCOME_OK with message EXACTLY the literal
-    '<COUNT:N>' where N is the count — no surrounding words, no quotes; build it by
-    concatenating '<COUNT:' + count + '>'. required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
-    A count of 0 is still OUTCOME_OK with <COUNT:0> — NEVER answer CLARIFICATION/UNSUPPORTED.
+  content: 'Count query ("how many X"), answer EXACTLY the token <COUNT:N>. Resolve
+    the product kind/type by name normalized (LOWER/TRIM); SELECT COUNT(*) of matching
+    product_variants. COMPUTE the count as an INTEGER — message must render <COUNT:2>,
+    NEVER <COUNT:2.0>; build it as ''<COUNT:'' + int(count) + ''>''. If a governing
+    policy doc applies (facts docs_inventory/policies, e.g. a catalogue-reporting
+    policy), INTENT MUST set required_refs[OUTCOME_OK]=[{kind: policy_doc, path: <that
+    /docs/...md>}] so the interpreter projects it; else required_refs[OUTCOME_OK]=[].
+    outcome_space=[OUTCOME_OK]; count 0 is still OUTCOME_OK with <COUNT:0>; NEVER
+    CLARIFICATION.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
-  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
-    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
-    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
+    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
+    int+policy-doc; claim <NO>/SKU).
   status: active
   surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/policy-updates/2025-06-22-catalogue-reporting-wood-drywall-screws-linz.md'
+  source: verdict
+  status: active
+  submitted_message: <COUNT:2.0>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
 last_run:
-  cycles_used: 4
-  date: '2026-06-18'
-  outcome: OUTCOME_NONE_CLARIFICATION
+  cycles_used: 1
+  date: '2026-06-19'
+  outcome: OUTCOME_OK
   status: failure
 task_id: t09

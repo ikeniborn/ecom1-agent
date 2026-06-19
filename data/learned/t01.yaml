@@ -85,14 +85,14 @@ entries:
     is CONDITIONAL, authored per-branch by PLAN); outcome_space = [OUTCOME_OK]. Read
     single-record fields with get, never column.'
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r004
   reasoning: Consolidated authoritative t01 method (folds r001 refs, r002/r005 single-answer,
     r006 minimal-match). Single crisp rule to maximize PLAN compliance — prior multi-rule
     set produced over-constrained SQL (false absent) and a drifted answer binding
     ($matched_path). Encodes Lever-1 (INTENT required_refs empty, conditional) + Lever-2
     (per-branch authored record_path) + minimal-distinctive matching.
-  status: active
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-18'
@@ -215,7 +215,7 @@ entries:
     selection and inflate match_count with rows that do not satisfy the full constraint
     set.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r007
   reasoning: 'The verify error indicates the success criteria checking for <YES> or
     <NO> in the answer message failed. The root cause is that the PlanIR discovery
@@ -230,7 +230,7 @@ entries:
     token. Existing rule r004 warns against over-constraining with JOINs, but does
     not override the need to apply explicitly-supplied param tokens as simple LIKE
     predicates.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: When a compute variable is referenced in success criteria as `$answer.<var>`
@@ -265,7 +265,7 @@ entries:
     never use src/dst keys, which the PlanIR schema rejects (extra_forbidden) while
     simultaneously flagging name/input/into as missing.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r009
   reasoning: 'Verbatim error: ''plan: PLAN: validation failed: 10 validation errors
     for PlanIR ... custom_extract.0.name Field required ... custom_extract.0.src Extra
@@ -282,7 +282,7 @@ entries:
     is correct, only its field names are wrong, so the new rule supersedes it with
     the schema-valid name/input/into trio. Pure PlanIR-shape bug; no grounding data
     was missing, so no deep-read requested.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Never put a `sql` key (nor a sibling `params` key) directly in an Exec
@@ -292,7 +292,7 @@ entries:
     or stdin), binding query params positionally there rather than as a top-level
     `sql`/`params` pair.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r010
   reasoning: 'Verbatim error: ''real_vm: Protocol message ExecRequest has no "sql"
     field.'' Root cause: the discovery step shaped the Exec RPC as {"rpc":"Exec","args":{"path":"/bin/sql","sql":"SELECT
@@ -304,11 +304,44 @@ entries:
     shape but none constrain how the Exec RPC envelope carries SQL; this new rule
     fills that gap so the next cycle emits a protocol-valid Exec invocation. Pure
     PlanIR-shape bug — no missing grounding data, so no prephase_deep_read.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: 'Existence query ("is X in the catalogue"/"do you carry X"). FIRST read
+    facts CATALOGUE_CANDIDATES — real product_variants rows (sku, brand, series, model,
+    product_name, record_path) matching the entity tokens. Pick the row whose brand+model/series
+    (and any named variant property) best matches the described product = PRESENT.
+    Build discovery SQL to re-select that record_path with a BROAD normalized match
+    (brand + ONE distinctive model/series token via LOWER/TRIM LIKE); do NOT over-constrain
+    with extra property JOINs/EXISTS — that causes a false 0-row ''absent''. COMPUTE
+    match_count=count(rows); first_record=first(rows). DECIDE match_count ge 1 ->
+    label found else absent. ANSWER (single top-level mapping, NO Answer op): found.message
+    contains literal <YES> and found.refs=[$first_record.record_path]; absent.message
+    contains literal <NO> and absent.refs=[]. Answer <NO> ONLY if NO candidate matches
+    the described attributes. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
+    NEVER CLARIFICATION/UNSUPPORTED. Read single-record fields with get, never column.'
+  created: '2026-06-19'
+  deactivated_reason: null
+  id: rc1
+  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
+    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
+    int+policy-doc; claim <NO>/SKU).
   status: active
   surface: ir
 last_run:
   cycles_used: 3
-  date: '2026-06-18'
+  date: '2026-06-19'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t01

@@ -91,34 +91,35 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-18'
+  deactivated_reason: superseded by newer verdict
   id: v001
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
-  status: active
+  status: inactive
   submitted_message: NOT FOUND <NO>
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
   content: 'Support-note claim verification ("a note claims we stock X ... cite the
-    exact record; if the base product exists but the extra claimed property is absent
-    answer <NO> with the checked SKU; if it exists answer <YES> with the SKU"). STEP
-    1: find the BASE product by brand + line/series (minimal normalized match, LOWER/TRIM,
-    LIKE on a short token); SELECT product_sku + record_path; bind base=first(rows).
-    STEP 2: test whether the EXTRA claimed property/variant holds for that base (separate
-    predicate). ALWAYS answer OUTCOME_OK (never UNSUPPORTED/CLARIFICATION). Branches:
-    base found AND extra holds -> message contains <YES> and the checked SKU; base
-    found AND extra absent -> message contains <NO> and the checked SKU; base absent
-    -> message contains <NO>. Author refs=[$base.record_path] on every found/base-exists
-    branch (conditional grounding; cite the BASE record). INTENT: required_refs[OUTCOME_OK]=[];
-    outcome_space=[OUTCOME_OK]. Put the literal SKU string into the message.'
+    exact record; if base exists but extra claim absent answer <NO> with checked SKU;
+    if it exists answer <YES> with SKU"). Use facts CATALOGUE_CANDIDATES to find the
+    BASE product by brand+line/series (real row + product_sku + record_path); bind
+    base=first(rows) over a BROAD normalized match (don''t over-constrain). Then test
+    whether the EXTRA claimed property/variant holds for that base (separate predicate
+    over product_variant_properties). ALWAYS answer OUTCOME_OK (never UNSUPPORTED/CLARIFICATION).
+    Branches: base found AND extra holds -> message contains <YES> and the checked
+    SKU; base found AND extra absent -> message contains <NO> and the checked SKU;
+    base absent -> message contains <NO>. Author refs=[$base.record_path] on EVERY
+    base-exists branch. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
+    Put the literal checked SKU into the message.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
-  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
-    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
-    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
+    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
+    int+policy-doc; claim <NO>/SKU).
   status: active
   surface: ir
 - agents_md_anchor: null
@@ -127,7 +128,7 @@ entries:
     must emit the key `msg` (not `message`/`text`/`answer`), so the populated string
     resolves instead of a missing field that reads as empty.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r005
   reasoning: 'Verbatim error: `verify: success_criteria[OUTCOME_OK][0] failed: {''op'':
     ''nonempty'', ''lhs'': ''$answer.msg'', ''rhs'': None, ''args'': []}`. The RPC
@@ -141,7 +142,7 @@ entries:
     name with the literal path the criterion checks. Note this is independent of rc1
     (which governs the claim-verification flow and branch labels) and adds the missing
     field-naming-alignment technique.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always name each answer-branch text field `message` — the PlanIR schema
@@ -150,7 +151,7 @@ entries:
     onto that `message` field, so never rename the schema field to match the accessor
     token.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r006
   reasoning: 'Verbatim error: ''plan: PLAN: validation failed: 3 validation errors
     for PlanIR / answer.found_holds.message Field required [type=missing] / answer.found_absent.message
@@ -167,7 +168,7 @@ entries:
     to emit `msg`, the direct cause of this failure) by asserting the schema-mandated
     branch field is `message`; the accessor still resolves correctly against it. Pure
     PlanIR-shape bug, no data grounding gap, so no deep-read.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: When a success_criteria accessor reads `$answer.<key>` (here `$answer.msg`),
@@ -177,7 +178,7 @@ entries:
     fails even though discovery succeeded; mirror the accessor token (`msg`) as the
     literal field key on all branches.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r007
   reasoning: 'Verbatim error: verify: success_criteria[OUTCOME_OK][0] failed: {''op'':
     ''nonempty'', ''lhs'': ''$answer.msg'', ''rhs'': None, ''args'': []}. OBSERVED_RPC_OUTPUTS
@@ -192,7 +193,7 @@ entries:
     the accessor maps onto it''. This cycle''s failure is empirical proof the message-mapping
     rule is wrong — `message` does NOT satisfy `$answer.msg`. New rule reaffirms the
     accessor-matching side and supersedes the message-only guidance.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always emit the literal schema field `message` on every PlanIR answer branch
@@ -202,7 +203,7 @@ entries:
     token — renaming it to `msg`/`text`/`answer` fails PLAN with `answer.<branch>.message
     Field required`.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r008
   reasoning: 'Verbatim error: `plan: PLAN: validation failed: 3 validation errors
     for PlanIR / answer.absent.message Field required ... answer.found_holds.message
@@ -216,7 +217,7 @@ entries:
     the surviving correct in-session rule already states schema requires `message`
     and `$answer.msg` aliases onto it; the two msg-mirroring rules directly contradict
     it and caused the loop, so deactivate them and reaffirm the schema field name.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: When a success_criteria accessor reads an answer token (here `$answer.msg`)
@@ -228,7 +229,7 @@ entries:
     and the interpreter exposes each branch key directly under `$answer` with no message→msg
     aliasing, letting the nonempty accessor resolve.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r009
   reasoning: 'Verbatim error: "verify: success_criteria[OUTCOME_OK][0] failed: {''op'':
     ''nonempty'', ''lhs'': ''$answer.msg'', ''rhs'': None, ''args'': []}". Discovery
@@ -244,7 +245,7 @@ entries:
     say keep `message`). Reconciliation: since branches already legally carry extra
     keys (outcome, refs), emit BOTH `message` and `msg` with the same string — PLAN''s
     field-required check and VERIFY''s accessor both pass.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always emit BOTH the schema-required branch field `message` AND a sibling
@@ -256,7 +257,7 @@ entries:
     the PLAN schema's required-`message` check; dual-keying is the only branch shape
     that clears both PLAN and VERIFY.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r010
   reasoning: 'Verbatim error: verify: success_criteria[OUTCOME_OK][0] failed: {''op'':
     ''nonempty'', ''lhs'': ''$answer.msg'', ''rhs'': None, ''args'': []}. Root cause:
@@ -273,11 +274,22 @@ entries:
     and hit this VERIFY failure. This consolidating rule resolves the contradiction:
     emit both keys so PLAN''s required-`message` check AND VERIFY''s `$answer.msg`
     accessor both pass.'
-  status: active
+  status: inactive
   surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v002
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
   cycles_used: 6
-  date: '2026-06-18'
+  date: '2026-06-19'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t06

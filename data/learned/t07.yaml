@@ -140,34 +140,35 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-18'
+  deactivated_reason: superseded by newer verdict
   id: v001
   score: 0.0
   score_detail:
   - Answer should contain '<YES>'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
   content: 'Support-note claim verification ("a note claims we stock X ... cite the
-    exact record; if the base product exists but the extra claimed property is absent
-    answer <NO> with the checked SKU; if it exists answer <YES> with the SKU"). STEP
-    1: find the BASE product by brand + line/series (minimal normalized match, LOWER/TRIM,
-    LIKE on a short token); SELECT product_sku + record_path; bind base=first(rows).
-    STEP 2: test whether the EXTRA claimed property/variant holds for that base (separate
-    predicate). ALWAYS answer OUTCOME_OK (never UNSUPPORTED/CLARIFICATION). Branches:
-    base found AND extra holds -> message contains <YES> and the checked SKU; base
-    found AND extra absent -> message contains <NO> and the checked SKU; base absent
-    -> message contains <NO>. Author refs=[$base.record_path] on every found/base-exists
-    branch (conditional grounding; cite the BASE record). INTENT: required_refs[OUTCOME_OK]=[];
-    outcome_space=[OUTCOME_OK]. Put the literal SKU string into the message.'
+    exact record; if base exists but extra claim absent answer <NO> with checked SKU;
+    if it exists answer <YES> with SKU"). Use facts CATALOGUE_CANDIDATES to find the
+    BASE product by brand+line/series (real row + product_sku + record_path); bind
+    base=first(rows) over a BROAD normalized match (don''t over-constrain). Then test
+    whether the EXTRA claimed property/variant holds for that base (separate predicate
+    over product_variant_properties). ALWAYS answer OUTCOME_OK (never UNSUPPORTED/CLARIFICATION).
+    Branches: base found AND extra holds -> message contains <YES> and the checked
+    SKU; base found AND extra absent -> message contains <NO> and the checked SKU;
+    base absent -> message contains <NO>. Author refs=[$base.record_path] on EVERY
+    base-exists branch. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space=[OUTCOME_OK].
+    Put the literal checked SKU into the message.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
-  reasoning: Consolidated authoritative method rule (rule-overload fix, mirrors t01).
-    Folds the learnable-INTENT + conditional-grounding levers + family method; replaces
-    accumulated ref-shaping rules that caused 5-6 cycle non-convergence -> empty CLARIFICATION.
+  reasoning: Canonical single rule (candidate-aware). Deactivates all run-distilled
+    rules (iLEARN re-bloat). Uses pre-phase CATALOGUE_CANDIDATES + family fixes (count
+    int+policy-doc; claim <NO>/SKU).
   status: active
   surface: ir
 - agents_md_anchor: null
@@ -177,7 +178,7 @@ entries:
     to a number, not undefined; a count>=0 check can fail ONLY when the field is missing
     from the result namespace.
   created: '2026-06-18'
-  deactivated_reason: null
+  deactivated_reason: superseded by canonical rc1
   id: r007
   reasoning: 'Verbatim error: verify: success_criteria[OUTCOME_OK][0] failed: {''op'':
     ''ge'', ''lhs'': ''$result.checked_count'', ''rhs'': 0, ''args'': []}. The predicate
@@ -192,11 +193,25 @@ entries:
     the find-base/test-extra/decision shape but is silent on exposing the verification
     counter as a $result field; this rule adds the missing projection step without
     superseding rc1.'
-  status: active
+  status: inactive
   surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/workwear/work_trousers/WRK-XOWNCA3Y.json'
+  source: verdict
+  status: active
+  submitted_message: 'Checked catalogue record /proc/catalog/workwear/work_trousers/WRK-1HRFE9NC.json:
+    <NO> — Carhartt Stretch Rugged 3EY-11K Work Trousers base SKU WRK-1HRFE9NC; claimed
+    extras (color family Blue, size XS, fit women) absent.'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/workwear/work_trousers/WRK-1HRFE9NC.json
 last_run:
   cycles_used: 2
   date: '2026-06-19'
   outcome: OUTCOME_OK
-  status: success
+  status: failure
 task_id: t07
