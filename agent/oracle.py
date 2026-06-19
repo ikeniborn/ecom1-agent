@@ -28,7 +28,7 @@ class KnowledgeOracle:
         self._path = Path(atoms_path or _DEFAULT_ATOMS)
         self.atoms = atoms if atoms is not None else load_atoms(self._path)
         self._embed = embed_fn or llm.embed_texts
-        self._model = os.environ.get("EMBED_MODEL", "nomic-embed-text")
+        self._model = os.environ.get("ECOM_MODEL_EMBED", "nomic-embed-text")
         self._emb_path = Path(embeddings_path or _DEFAULT_EMBEDDINGS)
         self._vec_cache: dict[str, list[float]] = self._load_vec_cache()
 
@@ -67,11 +67,11 @@ class KnowledgeOracle:
             sv = self._embed_atom(a)
             scored.append((_cosine(qv, sv), a))
         scored.sort(key=lambda t: t[0], reverse=True)
-        floor = float(os.environ.get("ORACLE_FLOOR", "0.5"))
+        floor = float(os.environ.get("ECOM_ORACLE_FLOOR", "0.5"))
         kept = []
         for score, a in scored[:n]:
             if score < floor:
-                if os.environ.get("LOG_LEVEL") == "DEBUG":
+                if os.environ.get("ECOM_LOG_LEVEL") == "DEBUG":
                     print(f"[oracle] discard {a.id} cosine={score:.3f} < floor {floor}")
                 continue
             kept.append(a)
@@ -88,17 +88,17 @@ class KnowledgeOracle:
         return [a for s, a in scored[:n] if s > 0]
 
     def retrieve(self, task_text: str, k=None, rank_fn="default"):
-        if os.environ.get("ORACLE_ENABLED", "1") == "0":
+        if os.environ.get("ECOM_ORACLE_ENABLED", "1") == "0":
             return []
-        k = k or int(os.environ.get("ORACLE_K", "4"))
-        topn = int(os.environ.get("ORACLE_TOPN", "10"))
+        k = k or int(os.environ.get("ECOM_ORACLE_K", "4"))
+        topn = int(os.environ.get("ECOM_ORACLE_TOPN", "10"))
         try:
             cands = self._cosine_topn(task_text, topn)
         except Exception:
             return self._tag_fallback(task_text, k)
         if not cands:
             return []
-        if rank_fn is None or os.environ.get("ORACLE_RANK_ENABLED", "1") == "0":
+        if rank_fn is None or os.environ.get("ECOM_ORACLE_RANK_ENABLED", "1") == "0":
             return cands[:k]
         if rank_fn == "default":
             from .oracle_rank import llm_rerank
@@ -115,7 +115,7 @@ class KnowledgeOracle:
     )
 
     def _dup_cosine(self) -> float:
-        return float(os.environ.get("ORACLE_DEDUP_COSINE", "0.92"))
+        return float(os.environ.get("ECOM_ORACLE_DEDUP_COSINE", "0.92"))
 
     def add_candidate(self, atom):
         # Anti-rebloat: skip a candidate that is near-identical (same polarity, cosine >=
@@ -169,7 +169,7 @@ class KnowledgeOracle:
                 f"SCRIPT:\n{(script_code or '')[:4000]}\n\nReturn the atom JSON.")
         from .llm import _resolve_model_for_phase
         out = call_llm_json(self._DISTILL_SYS, user,
-                            _resolve_model_for_phase("distill", os.environ.get("MODEL", "")))
+                            _resolve_model_for_phase("distill", os.environ.get("ECOM_MODEL", "")))
         if not isinstance(out, dict) or not out.get("content"):
             return None
         atom = Atom(id=out["id"], description=out.get("description", ""),

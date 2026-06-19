@@ -1,6 +1,6 @@
 # LLM
 
-The LLM layer (`agent/llm.py`, `agent/cc_client.py`) is the single funnel every phase calls through `call_llm_raw`. It routes a model id to one of four provider transports, resolves a per-phase model tier, retries transient errors, then falls through to `MODEL_FALLBACK`. See [[architecture]] for how phases invoke it and [[pipeline]] for the call budget.
+The LLM layer (`agent/llm.py`, `agent/cc_client.py`) is the single funnel every phase calls through `call_llm_raw`. It routes a model id to one of four provider transports, resolves a per-phase model tier, retries transient errors, then falls through to `ECOM_MODEL_FALLBACK`. See [[architecture]] for how phases invoke it and [[pipeline]] for the call budget.
 
 ## Provider Routing by Prefix
 
@@ -15,9 +15,9 @@ Transports, all tried in tier order inside `_call_raw_single_model` (`agent/llm.
 
 ## Tier Resolution (`_resolve_model_for_phase`)
 
-`_resolve_model_for_phase(phase, default_model)` (`agent/llm.py:85`) resolves a model id per phase, read live from `os.environ`: `MODEL_<PHASE>` → tier env (`MODEL_REASON` / `MODEL_FAST` / `EMBED_MODEL`) → `default_model`. Live reads let a test's `monkeypatch.setenv` apply without reloading the module. With only `MODEL` set, every phase resolves to `MODEL` (back-compatible).
+`_resolve_model_for_phase(phase, default_model)` (`agent/llm.py:85`) resolves a model id per phase, read live from `os.environ`: `ECOM_MODEL_<PHASE>` → tier env (`ECOM_MODEL_REASON` / `ECOM_MODEL_FAST` / `ECOM_MODEL_EMBED`) → `default_model`. Live reads let a test's `monkeypatch.setenv` apply without reloading the module. With only `ECOM_MODEL` set, every phase resolves to `ECOM_MODEL` (back-compatible).
 
-Phase→tier map `_PHASE_TIER` (`agent/llm.py:69`): reason → `intent`, `plan`, `ilearn`, `learn`, `distill`; fast → `docselect`, `rerank`. `_TIER_ENV` (`agent/llm.py:78`) maps `reason`→`MODEL_REASON`, `fast`→`MODEL_FAST`, `embed`→`EMBED_MODEL`. Phase names are normalised by `_norm_phase` (lowercase, underscores stripped). Any phase not listed defaults to the reason tier for model resolution. See [[data-files]] for `models.json` keys and the phase prompts under `data/prompts/`.
+Phase→tier map `_PHASE_TIER` (`agent/llm.py:69`): reason → `intent`, `plan`, `ilearn`, `learn`, `distill`; fast → `docselect`, `rerank`. `_TIER_ENV` (`agent/llm.py:78`) maps `reason`→`ECOM_MODEL_REASON`, `fast`→`ECOM_MODEL_FAST`, `embed`→`ECOM_MODEL_EMBED`. Phase names are normalised by `_norm_phase` (lowercase, underscores stripped). Any phase not listed defaults to the reason tier for model resolution. See [[data-files]] for `models.json` keys and the phase prompts under `data/prompts/`.
 
 ## Reason vs Fast Tier (`think`)
 
@@ -25,21 +25,21 @@ Phase→tier map `_PHASE_TIER` (`agent/llm.py:69`): reason → `intent`, `plan`,
 
 For Ollama, a `models.json` `ollama_think` value overrides the per-call/tier `think` (`agent/llm.py:481`); otherwise the tier flag is forwarded as `extra_body["think"]`. The Anthropic and OpenRouter tiers do not pass `think` as a request param — the tier instead governs which model is selected and the cfg-level options.
 
-## `MODEL_FALLBACK` Fallthrough
+## `ECOM_MODEL_FALLBACK` Fallthrough
 
-`call_llm_raw` (`agent/llm.py:560`) is the single funnel. It runs the primary model through all transport tiers via `_call_raw_single_model`; only if that returns `None` AND `_FALLBACK_MODEL` is set and differs from the primary does it retry once with `MODEL_FALLBACK` and an empty cfg, `max_retries=1` (`agent/llm.py:591`). `_FALLBACK_MODEL` reads `MODEL_FALLBACK` at import (`agent/llm.py:280`).
+`call_llm_raw` (`agent/llm.py:560`) is the single funnel. It runs the primary model through all transport tiers via `_call_raw_single_model`; only if that returns `None` AND `_FALLBACK_MODEL` is set and differs from the primary does it retry once with `ECOM_MODEL_FALLBACK` and an empty cfg, `max_retries=1` (`agent/llm.py:591`). `_FALLBACK_MODEL` reads `ECOM_MODEL_FALLBACK` at import (`agent/llm.py:280`).
 
 Within each tier, errors are classified against `TRANSIENT_KWS` (503/502/429, overloaded, rate limit, timeouts — `agent/llm.py:262`) and `HARD_CONNECTION_KWS` (broken pipe, ECONNRESET, connection refused — `agent/llm.py:273`). Transient errors retry up to `max_retries` (delay 4s); hard connection errors are capped at 1 retry (delay 2s) before falling through. Empty responses fall through to the next tier rather than returning `""`.
 
 ## Claude Code Subprocess Tier
 
-`cc_client.cc_complete` (`agent/cc_client.py:193`) runs the `iclaude` CLI as a stateless LLM, gated by `CC_ENABLED=1` (`agent/cc_client.py:29`; also re-checked in `llm.py:48`). It is reachable only when a model declares `provider="claude-code"`, and interleaves with the Anthropic tier rather than acting as a downstream fallback. On failure it returns `None`, so the caller retries the whole step.
+`cc_client.cc_complete` (`agent/cc_client.py:193`) runs the `iclaude` CLI as a stateless LLM, gated by `ECOM_CC_ENABLED=1` (`agent/cc_client.py:29`; also re-checked in `llm.py:48`). It is reachable only when a model declares `provider="claude-code"`, and interleaves with the Anthropic tier rather than acting as a downstream fallback. On failure it returns `None`, so the caller retries the whole step.
 
-Isolation flags (`agent/cc_client.py:279`): `--no-save`, `--print`, `--strict-mcp-config`, an empty `--mcp-config`, `--disallowed-tools` banning all built-in tools (`agent/cc_client.py:259`), `--system-prompt-file`, `--output-format json`. The subprocess runs in a temp cwd with `ANTHROPIC_API_KEY`/`OPENROUTER_API_KEY`/`OPENAI_API_KEY` stripped (`CC_STRIP_PROJECT_ENV=1`, `agent/cc_client.py:41`) so it authenticates via OAuth. `cc_model`/`cc_options` (effort, timeout, fallback model, exclude-dynamic) come from `models.json`; the user message is passed via stdin to avoid `E2BIG`. JSON-only output is requested through a system-prompt trailer since the CLI has no `response_format`. `_parse_envelope` (`agent/cc_client.py:75`) scans for the last `type=result` envelope and extracts text plus token usage. Retries: `CC_MAX_RETRIES` (default 2), with fail-fast on legitimately-empty `end_turn` generations and on OAuth quota exhaustion.
+Isolation flags (`agent/cc_client.py:279`): `--no-save`, `--print`, `--strict-mcp-config`, an empty `--mcp-config`, `--disallowed-tools` banning all built-in tools (`agent/cc_client.py:259`), `--system-prompt-file`, `--output-format json`. The subprocess runs in a temp cwd with `ECOM_ANTHROPIC_API_KEY`/`ECOM_OPENROUTER_API_KEY`/`OPENAI_API_KEY` stripped (`ECOM_CC_STRIP_PROJECT_ENV=1`, `agent/cc_client.py:41`) so it authenticates via OAuth. `cc_model`/`cc_options` (effort, timeout, fallback model, exclude-dynamic) come from `models.json`; the user message is passed via stdin to avoid `E2BIG`. JSON-only output is requested through a system-prompt trailer since the CLI has no `response_format`. `_parse_envelope` (`agent/cc_client.py:75`) scans for the last `type=result` envelope and extracts text plus token usage. Retries: `ECOM_CC_MAX_RETRIES` (default 2), with fail-fast on legitimately-empty `end_turn` generations and on OAuth quota exhaustion.
 
 ## HTTP Timeouts
 
-HTTP timeouts (`agent/llm.py:50`) cap how long a stalled request may hang. `LLM_HTTP_READ_TIMEOUT_S` (default 180) and `LLM_HTTP_CONNECT_TIMEOUT_S` (default 10) build an `httpx.Timeout` applied to the OpenRouter and Ollama clients; the Anthropic SDK uses the read timeout directly. The 180s read timeout keeps requests under the task timeout and lets the `TRANSIENT_KWS` retry loop recover from stalled sockets. The `embed_texts` endpoint (`agent/llm.py:666`) uses a fixed 60s timeout.
+HTTP timeouts (`agent/llm.py:50`) cap how long a stalled request may hang. `ECOM_LLM_HTTP_READ_TIMEOUT_S` (default 180) and `ECOM_LLM_HTTP_CONNECT_TIMEOUT_S` (default 10) build an `httpx.Timeout` applied to the OpenRouter and Ollama clients; the Anthropic SDK uses the read timeout directly. The 180s read timeout keeps requests under the task timeout and lets the `TRANSIENT_KWS` retry loop recover from stalled sockets. The `embed_texts` endpoint (`agent/llm.py:666`) uses a fixed 60s timeout.
 
 ## `models.json` Options
 

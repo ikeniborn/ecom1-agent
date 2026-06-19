@@ -64,8 +64,8 @@ def _stat_kind(vm, path: str) -> str:
 
 # Cost safety rails (NOT domain knowledge): bound Stat-probe count + rendered listing size.
 _PATH_LITERAL_RE = re.compile(r"/[\w./-]+")
-_PATH_LITERAL_CAP = int(os.environ.get("PREPHASE_PATH_LITERALS", "3"))
-_PATH_LISTING_BUDGET = int(os.environ.get("PREPHASE_LISTING_BYTES", "4096"))
+_PATH_LITERAL_CAP = int(os.environ.get("ECOM_PREPHASE_PATH_LITERALS", "3"))
+_PATH_LISTING_BUDGET = int(os.environ.get("ECOM_PREPHASE_LISTING_BYTES", "4096"))
 
 
 def _extract_path_literals(instruction: str) -> list[str]:
@@ -95,8 +95,8 @@ def _render_budget(paths: list[str], budget: int) -> str:
     return "\n".join(lines)
 
 
-_SAMPLE_ROWS_PER_TABLE = int(os.environ.get("PREPHASE_SAMPLE_ROWS", "3"))
-_SAMPLE_ROW_MAX_CHARS = int(os.environ.get("PREPHASE_SAMPLE_ROW_CHARS", "400"))
+_SAMPLE_ROWS_PER_TABLE = int(os.environ.get("ECOM_PREPHASE_SAMPLE_ROWS", "3"))
+_SAMPLE_ROW_MAX_CHARS = int(os.environ.get("ECOM_PREPHASE_SAMPLE_ROW_CHARS", "400"))
 
 
 def _sql_stdout(vm: VMAdapter, sql: str) -> str:
@@ -469,7 +469,7 @@ def _doc_select_fallback(doc_paths: list[str], instruction: str, tokens: list[st
     user = (f"INSTRUCTION:\n{instruction}\n\n"
             f"ENTITIES:\n{', '.join(tokens)}\n\n"
             f"DOC_INVENTORY:\n{inventory}")
-    model = _resolve_model_for_phase("docselect", os.environ.get("MODEL", ""))
+    model = _resolve_model_for_phase("docselect", os.environ.get("ECOM_MODEL", ""))
     try:
         raw = call_llm_raw(system, user, model, {}, max_tokens=256, phase="DOC_SELECT")
     except Exception:
@@ -684,7 +684,7 @@ def run_agent(
     metrics = run_pipeline(vm, instruction=task_text, task_id=task_id,
                            agents_md_text=agents_md_text, facts=facts)
     return {
-        "model_used": os.environ.get("MODEL", ""),
+        "model_used": os.environ.get("ECOM_MODEL", ""),
         "task_type": "lookup",
         "cycles_used": metrics.get("cycles_used", 0),
         "outcome": metrics.get("outcome", ""),

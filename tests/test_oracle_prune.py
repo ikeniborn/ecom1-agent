@@ -18,7 +18,7 @@ def _fake_embed(texts, model=None, prefix=None):
 
 
 def test_prune_drops_candidates_and_dedups_active(tmp_path, monkeypatch):
-    monkeypatch.setenv("ORACLE_DEDUP_COSINE", "0.95")
+    monkeypatch.setenv("ECOM_ORACLE_DEDUP_COSINE", "0.95")
     atoms = [
         _atom("a1", "alpha method one for scalar extraction"),
         _atom("a2", "alpha method two paraphrase scalar extraction"),  # dup of a1 (same vec)
@@ -36,7 +36,7 @@ def test_prune_drops_candidates_and_dedups_active(tmp_path, monkeypatch):
 
 
 def test_add_candidate_skips_near_duplicate(tmp_path, monkeypatch):
-    monkeypatch.setenv("ORACLE_DEDUP_COSINE", "0.95")
+    monkeypatch.setenv("ECOM_ORACLE_DEDUP_COSINE", "0.95")
     st = KnowledgeOracle(atoms=[_atom("a1", "alpha existing method")],
                      atoms_path=tmp_path / "atoms.yaml", embed_fn=_fake_embed,
                      embeddings_path=tmp_path / "emb.json")

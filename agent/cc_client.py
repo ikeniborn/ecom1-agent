@@ -26,15 +26,15 @@ import time
 from pathlib import Path
 
 
-_CC_ENABLED = os.environ.get("CC_ENABLED") == "1"
-_ICLAUDE_CMD = os.environ.get("ICLAUDE_CMD", "iclaude")
-_CC_STRIP_PROJECT_ENV = os.environ.get("CC_STRIP_PROJECT_ENV", "1") == "1"
+_CC_ENABLED = os.environ.get("ECOM_CC_ENABLED") == "1"
+_ICLAUDE_CMD = os.environ.get("ECOM_ICLAUDE_CMD", "iclaude")
+_CC_STRIP_PROJECT_ENV = os.environ.get("ECOM_CC_STRIP_PROJECT_ENV", "1") == "1"
 try:
-    _CC_MAX_RETRIES = int(os.environ.get("CC_MAX_RETRIES", "2"))
+    _CC_MAX_RETRIES = int(os.environ.get("ECOM_CC_MAX_RETRIES", "2"))
 except ValueError:
     _CC_MAX_RETRIES = 2
 try:
-    _CC_RETRY_DELAY_S = float(os.environ.get("CC_RETRY_DELAY_S", "4"))
+    _CC_RETRY_DELAY_S = float(os.environ.get("ECOM_CC_RETRY_DELAY_S", "4"))
 except ValueError:
     _CC_RETRY_DELAY_S = 4.0
 
@@ -209,13 +209,13 @@ def cc_complete(
     if not _CC_ENABLED:
         return None
 
-    cc_model = cfg.get("cc_model") or os.environ.get("CC_DEFAULT_MODEL", "")
+    cc_model = cfg.get("cc_model") or os.environ.get("ECOM_CC_DEFAULT_MODEL", "")
     cc_opts = cfg.get("cc_options") or {}
     if isinstance(cc_opts, str):
         cc_opts = {}
-    cc_effort = cc_opts.get("cc_effort") or os.environ.get("CC_DEFAULT_EFFORT", "")
+    cc_effort = cc_opts.get("cc_effort") or os.environ.get("ECOM_CC_DEFAULT_EFFORT", "")
     try:
-        cc_timeout = int(cc_opts.get("cc_timeout_s") or os.environ.get("CC_DEFAULT_TIMEOUT_S", "180"))
+        cc_timeout = int(cc_opts.get("cc_timeout_s") or os.environ.get("ECOM_CC_DEFAULT_TIMEOUT_S", "180"))
     except (TypeError, ValueError):
         cc_timeout = 180
 
@@ -294,13 +294,13 @@ def cc_complete(
     # FIX-N+1: pass-through CC flags from cc_options (OAuth-compatible only;
     # --bare is intentionally NOT supported — it forces ANTHROPIC_API_KEY/apiKeyHelper
     # and disables OAuth / keychain reads, breaking iclaude's auth model).
-    cc_fallback = cc_opts.get("cc_fallback_model") or os.environ.get("CC_DEFAULT_FALLBACK_MODEL", "")
+    cc_fallback = cc_opts.get("cc_fallback_model") or os.environ.get("ECOM_CC_DEFAULT_FALLBACK_MODEL", "")
     if cc_fallback:
         cmd.extend(["--fallback-model", cc_fallback])
 
     _exclude_dyn = cc_opts.get("cc_exclude_dynamic")
     if _exclude_dyn is None:
-        _exclude_dyn = os.environ.get("CC_DEFAULT_EXCLUDE_DYNAMIC") == "1"
+        _exclude_dyn = os.environ.get("ECOM_CC_DEFAULT_EXCLUDE_DYNAMIC") == "1"
     if _exclude_dyn:
         cmd.append("--exclude-dynamic-system-prompt-sections")
 
@@ -363,7 +363,7 @@ def cc_complete(
 
             # FIX-N+4: diagnostic — dump tail of stdout so we can distinguish
             # "iclaude crashed silently" vs "envelope parse failed" vs "rate-limited".
-            _debug = os.environ.get("CC_DEBUG_EMPTY") == "1"
+            _debug = os.environ.get("ECOM_CC_DEBUG_EMPTY") == "1"
             if _debug or attempt >= _CC_MAX_RETRIES or legitimately_empty:
                 tail = "".join(stdout_lines[-8:]).rstrip()[:800] or "<empty>"
                 print(f"[CC] stdout tail (last {min(8, len(stdout_lines))} lines):\n{tail}")

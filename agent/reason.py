@@ -12,8 +12,8 @@ from .learned_store import _format_entry
 from .llm import _resolve_model_for_phase
 from .prompt import load_prompt
 
-_MAX_TOKENS_INTENT = int(os.environ.get("MAX_TOKENS_INTENT", "4096"))
-_MAX_TOKENS_PLAN = int(os.environ.get("MAX_TOKENS_PLAN", "8192"))
+_MAX_TOKENS_INTENT = int(os.environ.get("ECOM_MAX_TOKENS_INTENT", "4096"))
+_MAX_TOKENS_PLAN = int(os.environ.get("ECOM_MAX_TOKENS_PLAN", "8192"))
 
 _OP_SYNONYMS = {"neq": "ne", "!=": "ne", "==": "eq", "gte": "ge", "lte": "le",
                 "=>": "ge", "=<": "le"}
@@ -123,7 +123,7 @@ def run_intent(facts, instruction: str, token_out: dict | None = None,
                if learn_ctx else "")
     user = "\n\n".join(p for p in [_facts_block(facts, tier="intent"), learned,
                                    f"INSTRUCTION:\n{instruction}"] if p)
-    model = _resolve_model_for_phase("intent", os.environ.get("MODEL", ""))
+    model = _resolve_model_for_phase("intent", os.environ.get("ECOM_MODEL", ""))
     raw = _call_llm_raw(system, user, model, {}, max_tokens=_MAX_TOKENS_INTENT, token_out=token_out, phase="INTENT")
     if not raw:
         raise IntentError("INTENT LLM returned empty response")
@@ -154,9 +154,9 @@ def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str |
     if prev_error:
         parts.append(f"PREVIOUS_ERROR:\n{prev_error}")
     user = "\n\n".join(p for p in parts if p)
-    if os.environ.get("LOG_LEVEL") == "DEBUG":
+    if os.environ.get("ECOM_LOG_LEVEL") == "DEBUG":
         print(f"[plan] user prompt chars={len(user)}")
-    model = _resolve_model_for_phase("plan", os.environ.get("MODEL", ""))
+    model = _resolve_model_for_phase("plan", os.environ.get("ECOM_MODEL", ""))
     raw = _call_llm_raw(system, user, model, {}, max_tokens=_MAX_TOKENS_PLAN, token_out=token_out, phase="PLAN")
     if not raw:
         raise PlanEmptyError("PLAN LLM returned empty response")

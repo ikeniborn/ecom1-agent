@@ -40,7 +40,7 @@ def test_run_single_task_creates_jsonl_and_removes_log(tmp_path, monkeypatch):
 
 def test_main_log_contains_only_stats(tmp_path, monkeypatch):
     """main.log must contain stats rows but NOT pipeline cycle lines."""
-    monkeypatch.setenv("MODEL", "test-model")
+    monkeypatch.setenv("ECOM_MODEL", "test-model")
     import main as m
     import io
 

@@ -15,9 +15,9 @@ LOG_LEVEL=DEBUG uv run python main.py           # full LLM response logging
 ```
 
 Key env vars (authoritative table is the root `../CLAUDE.md`):
-- `MODEL` — primary LLM (e.g. `anthropic/claude-sonnet-4-6`)
-- `MODEL_REASON` / `MODEL_FAST` — model tiers (see routing below)
-- `INTERPRETER_MAX_STEPS` — interpreter cycle ceiling (default 6)
+- `ECOM_MODEL` — primary LLM (e.g. `anthropic/claude-sonnet-4-6`)
+- `ECOM_MODEL_REASON` / `ECOM_MODEL_FAST` — model tiers (see routing below)
+- `ECOM_INTERPRETER_MAX_STEPS` — interpreter cycle ceiling (default 6)
 
 ## Agent Package Architecture
 
@@ -80,17 +80,17 @@ sees all active rules.
   `GuardedOp`, `AnswerTemplateIR`, `CustomExtract` (PlanIR).
 
 **Model routing** (`llm.py`): two axes.
-- *Provider transport* by `MODEL` prefix: `anthropic/` → Anthropic SDK (prompt caching via
+- *Provider transport* by `ECOM_MODEL` prefix: `anthropic/` → Anthropic SDK (prompt caching via
   `cache_control` blocks); `openrouter/` → OpenRouter (OpenAI-compatible); bare name /
-  `ollama/` → local Ollama; `CC_ENABLED=1` / `claude-code/` → `cc_client.py` subprocess.
-- *Per-phase model* via `_resolve_model_for_phase(phase, MODEL)`: `MODEL_<PHASE>` → tier env
-  (`MODEL_REASON` / `MODEL_FAST` / `EMBED_MODEL`) → `MODEL`. Reason-tier phases (INTENT, PLAN,
-  iLEARN, distill) → `MODEL_REASON`; fast-tier (DOC_SELECT, oracle rerank) → `MODEL_FAST`;
-  embeddings → `EMBED_MODEL`. **`MODEL_REASON` is the catch-all** for any phase not explicitly
+  `ollama/` → local Ollama; `ECOM_CC_ENABLED=1` / `claude-code/` → `cc_client.py` subprocess.
+- *Per-phase model* via `_resolve_model_for_phase(phase, MODEL)`: `ECOM_MODEL_<PHASE>` → tier env
+  (`ECOM_MODEL_REASON` / `ECOM_MODEL_FAST` / `ECOM_MODEL_EMBED`) → `ECOM_MODEL`. Reason-tier phases (INTENT, PLAN,
+  iLEARN, distill) → `ECOM_MODEL_REASON`; fast-tier (DOC_SELECT, oracle rerank) → `ECOM_MODEL_FAST`;
+  embeddings → `ECOM_MODEL_EMBED`. **`ECOM_MODEL_REASON` is the catch-all** for any phase not explicitly
   fast-tier (including unlisted phases). Reason tier → `think=on`; fast tier → `think=off`.
 
 Transient errors (503, rate-limit, timeout) retry with exponential backoff before falling
-through to the next provider tier, then `MODEL_FALLBACK`.
+through to the next provider tier, then `ECOM_MODEL_FALLBACK`.
 
 **Prompt loading** (`prompt.py`):
 - `load_prompt(name)` — reads `data/prompts/{name}.md`; returns `""` if missing

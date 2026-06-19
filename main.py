@@ -36,8 +36,8 @@ def _setup_logging() -> None:
     except Exception:
         pass
 
-    model = os.getenv("MODEL") or _dotenv.get("MODEL") or "unknown"
-    log_level = (os.getenv("LOG_LEVEL") or _dotenv.get("LOG_LEVEL") or "INFO").upper()
+    model = os.getenv("ECOM_MODEL") or _dotenv.get("ECOM_MODEL") or "unknown"
+    log_level = (os.getenv("ECOM_LOG_LEVEL") or _dotenv.get("ECOM_LOG_LEVEL") or "INFO").upper()
 
     logs_dir = Path(__file__).parent / "logs"
     logs_dir.mkdir(exist_ok=True)
@@ -100,13 +100,13 @@ from agent.learned_store import save_last_run, write_verdict
 from agent.pipeline import learn_from_grader, distill_from_grader
 from agent.trace import TraceLogger, set_trace
 
-BITGN_URL = os.getenv("BENCHMARK_HOST") or "https://api.bitgn.com"
-BENCHMARK_ID = os.getenv("BENCHMARK_ID") or "bitgn/pac1-dev"
-BITGN_API_KEY = os.getenv("BITGN_API_KEY") or ""
-_base_run_name = os.getenv("BITGN_RUN_NAME") or ""
+BITGN_URL = os.getenv("ECOM_BENCHMARK_HOST") or "https://api.bitgn.com"
+BENCHMARK_ID = os.getenv("ECOM_BENCHMARK_ID") or "bitgn/pac1-dev"
+BITGN_API_KEY = os.getenv("ECOM_BITGN_API_KEY") or ""
+_base_run_name = os.getenv("ECOM_BITGN_RUN_NAME") or ""
 BITGN_RUN_NAME = f"{_base_run_name}-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}" if _base_run_name else ""
-PARALLEL_TASKS = max(1, int(os.getenv("PARALLEL_TASKS", "1")))
-TRAIN_MAX_CYCLES = max(1, int(os.getenv("TRAIN_MAX_CYCLES", "1")))
+PARALLEL_TASKS = max(1, int(os.getenv("ECOM_PARALLEL_TASKS", "1")))
+TRAIN_MAX_CYCLES = max(1, int(os.getenv("ECOM_TRAIN_MAX_CYCLES", "1")))
 
 _MODELS_JSON = Path(__file__).parent / "models.json"
 _raw = json.loads(_MODELS_JSON.read_text())
@@ -118,7 +118,7 @@ def _require_env(name: str) -> str:
         raise ValueError(f"Env var {name} is required but not set.")
     return v
 
-_model_default = _require_env("MODEL")
+_model_default = _require_env("ECOM_MODEL")
 print(f"[MODEL] default={_model_default}")
 
 CLI_RED = "\x1B[31m"
@@ -150,7 +150,7 @@ def _run_single_task(trial_id: str, task_filter: list, train_cycle: int = 1) -> 
         task_start = time.time()
         print(f"\n{'=' * 30} Starting task: {task_id} {'=' * 30}")
         print(f"{CLI_BLUE}{trial.instruction}{CLI_CLR}\n{'-' * 80}")
-        _trace.log_header(trial.instruction, model=os.getenv("MODEL", "unknown"))
+        _trace.log_header(trial.instruction, model=os.getenv("ECOM_MODEL", "unknown"))
         token_stats: dict = {"input_tokens": 0, "output_tokens": 0}
         try:
             token_stats = run_agent({}, trial.harness_url, trial.instruction, task_id=task_id)

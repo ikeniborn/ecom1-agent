@@ -7,26 +7,26 @@ def _clear(monkeypatch, *names):
 
 
 def test_per_phase_override_wins(monkeypatch):
-    _clear(monkeypatch, "MODEL_REASON", "MODEL_FAST")
-    monkeypatch.setenv("MODEL_PLAN", "anthropic/claude-opus-4-8")
+    _clear(monkeypatch, "ECOM_MODEL_REASON", "ECOM_MODEL_FAST")
+    monkeypatch.setenv("ECOM_MODEL_PLAN", "anthropic/claude-opus-4-8")
     assert llm._resolve_model_for_phase("plan", "base") == "anthropic/claude-opus-4-8"
 
 
 def test_reason_tier_used_when_no_override(monkeypatch):
-    _clear(monkeypatch, "MODEL_PLAN")
-    monkeypatch.setenv("MODEL_REASON", "reason-model")
+    _clear(monkeypatch, "ECOM_MODEL_PLAN")
+    monkeypatch.setenv("ECOM_MODEL_REASON", "reason-model")
     assert llm._resolve_model_for_phase("plan", "base") == "reason-model"
     assert llm._resolve_model_for_phase("intent", "base") == "reason-model"
 
 
 def test_fast_tier_for_docselect(monkeypatch):
-    _clear(monkeypatch, "MODEL_DOCSELECT", "MODEL_REASON")
-    monkeypatch.setenv("MODEL_FAST", "fast-model")
+    _clear(monkeypatch, "MODEL_DOCSELECT", "ECOM_MODEL_REASON")
+    monkeypatch.setenv("ECOM_MODEL_FAST", "fast-model")
     assert llm._resolve_model_for_phase("docselect", "base") == "fast-model"
 
 
 def test_falls_back_to_default(monkeypatch):
-    _clear(monkeypatch, "MODEL_PLAN", "MODEL_REASON", "MODEL_FAST")
+    _clear(monkeypatch, "ECOM_MODEL_PLAN", "ECOM_MODEL_REASON", "ECOM_MODEL_FAST")
     assert llm._resolve_model_for_phase("plan", "base") == "base"
 
 

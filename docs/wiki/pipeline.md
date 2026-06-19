@@ -14,7 +14,7 @@ The deterministic Plan-IR pipeline in `agent/pipeline.py`. One pipeline per task
 
 ## INTENT retry and hard failure
 
-INTENT is retried up to `_DESIGN_MAX_ATTEMPTS` (env `DESIGN_MAX_ATTEMPTS`, default 3) times on transient empty/parse failure — `IntentError` is caught and the attempt re-run (`pipeline.py:244`). If `intent` is still `None` after all attempts, the run records `save_last_run(..., "OUTCOME_NONE_CLARIFICATION", 0)`, emits one terminal CLARIFICATION, and returns with `cycles_used: 0`.
+INTENT is retried up to `_DESIGN_MAX_ATTEMPTS` (env `ECOM_DESIGN_MAX_ATTEMPTS`, default 3) times on transient empty/parse failure — `IntentError` is caught and the attempt re-run (`pipeline.py:244`). If `intent` is still `None` after all attempts, the run records `save_last_run(..., "OUTCOME_NONE_CLARIFICATION", 0)`, emits one terminal CLARIFICATION, and returns with `cycles_used: 0`.
 
 ## PLAN — run_plan
 
@@ -22,7 +22,7 @@ INTENT is retried up to `_DESIGN_MAX_ATTEMPTS` (env `DESIGN_MAX_ATTEMPTS`, defau
 
 ## Tiered pre-phase facts
 
-`_facts_block(facts, tier)` (`reason.py:40`) injects facts per phase. INTENT (`tier="intent"`) gets `agents_md_inventory`, `schema`, `identity`, `docs_inventory`, and `policies`; PLAN (`tier="plan"`) gets the thin set only (drops `policies`, `sample_rows`, `target_records`, `path_listings`, and the full `agents_md`). The thinned PLAN block shrinks the prompt and pushes heavy data to on-demand IR `discovery`. `agents_md_inventory` is a compact, 0-LLM tool/catalog list rendered by `render_inventory` (`agent/agents_md_parser.py`) instead of re-injecting the verbose AGENTS.MD. With `LOG_LEVEL=DEBUG`, `run_plan` prints the assembled PLAN prompt size.
+`_facts_block(facts, tier)` (`reason.py:40`) injects facts per phase. INTENT (`tier="intent"`) gets `agents_md_inventory`, `schema`, `identity`, `docs_inventory`, and `policies`; PLAN (`tier="plan"`) gets the thin set only (drops `policies`, `sample_rows`, `target_records`, `path_listings`, and the full `agents_md`). The thinned PLAN block shrinks the prompt and pushes heavy data to on-demand IR `discovery`. `agents_md_inventory` is a compact, 0-LLM tool/catalog list rendered by `render_inventory` (`agent/agents_md_parser.py`) instead of re-injecting the verbose AGENTS.MD. With `ECOM_LOG_LEVEL=DEBUG`, `run_plan` prints the assembled PLAN prompt size.
 
 ## PLAN IR auto-repair (pre-lint)
 
@@ -30,7 +30,7 @@ INTENT is retried up to `_DESIGN_MAX_ATTEMPTS` (env `DESIGN_MAX_ATTEMPTS`, defau
 
 ## The cycle loop and INTERPRETER_MAX_STEPS
 
-The loop runs `cycle = 1..INTERPRETER_MAX_STEPS` (`_IMAX_STEPS`, env `INTERPRETER_MAX_STEPS`, default 6; `pipeline.py:260`). Each cycle: PLAN → `repair_sql_stdin` → `lint` (registry dispatcher) → plan-signature check → `interpret` → `verify`. `set_cycle(cycle)` stamps the trace. Exhausting the loop without a passing verify falls through to terminal CLARIFICATION.
+The loop runs `cycle = 1..INTERPRETER_MAX_STEPS` (`_IMAX_STEPS`, env `ECOM_INTERPRETER_MAX_STEPS`, default 6; `pipeline.py:260`). Each cycle: PLAN → `repair_sql_stdin` → `lint` (registry dispatcher) → plan-signature check → `interpret` → `verify`. `set_cycle(cycle)` stamps the trace. Exhausting the loop without a passing verify falls through to terminal CLARIFICATION.
 
 ## Pre-lint repair and lint
 
@@ -38,7 +38,7 @@ The loop runs `cycle = 1..INTERPRETER_MAX_STEPS` (`_IMAX_STEPS`, env `INTERPRETE
 
 ## Empty-PLAN handling
 
-An empty PLAN body (`PlanEmptyError`, raised by `run_plan` when the LLM returns no content — e.g. a `think=on` model starving its visible output, or an endpoint read-timeout) is caught by a dedicated handler ordered before the generic `(PlanError, InterpretError)` catch (`pipeline.py`). Because an empty body carries nothing to learn from, it skips `_ilearn` entirely (which would be a wasted LLM call that emits no rule) and retries the cycle cheaply. A running `empty_streak` counter breaks the loop to terminal CLARIFICATION once it reaches `_EMPTY_PLAN_MAX` (env `EMPTY_PLAN_MAX`, default 2) consecutive empties, so a persistently-empty model does not silently burn the whole `INTERPRETER_MAX_STEPS` budget on `PLAN + iLEARN` pairs. A single transient empty followed by a valid plan resets the streak and the task proceeds normally.
+An empty PLAN body (`PlanEmptyError`, raised by `run_plan` when the LLM returns no content — e.g. a `think=on` model starving its visible output, or an endpoint read-timeout) is caught by a dedicated handler ordered before the generic `(PlanError, InterpretError)` catch (`pipeline.py`). Because an empty body carries nothing to learn from, it skips `_ilearn` entirely (which would be a wasted LLM call that emits no rule) and retries the cycle cheaply. A running `empty_streak` counter breaks the loop to terminal CLARIFICATION once it reaches `_EMPTY_PLAN_MAX` (env `ECOM_EMPTY_PLAN_MAX`, default 2) consecutive empties, so a persistently-empty model does not silently burn the whole `ECOM_INTERPRETER_MAX_STEPS` budget on `PLAN + iLEARN` pairs. A single transient empty followed by a valid plan resets the streak and the task proceeds normally.
 
 ## Plan signature and no-progress guard
 
@@ -60,7 +60,7 @@ An empty PLAN body (`PlanEmptyError`, raised by `run_plan` when the LLM returns 
 
 ## Distill → validate → promote
 
-On a passing verify, `_maybe_distill_and_validate(intent, plan, task_id, note)` (`pipeline.py:187`) runs only when `ORACLE_ENABLED!=0` and `ORACLE_DISTILL=1`. It calls `oracle.distill(...)` to generalise the working `PlanIR` into a candidate atom. When `ORACLE_VALIDATE_INLINE=1`, `validate_atom_via_grader` re-runs against the live grader and `oracle.promote(...)` fires on improvement. It never raises. See [[oracle]].
+On a passing verify, `_maybe_distill_and_validate(intent, plan, task_id, note)` (`pipeline.py:187`) runs only when `ORACLE_ENABLED!=0` and `ECOM_ORACLE_DISTILL=1`. It calls `oracle.distill(...)` to generalise the working `PlanIR` into a candidate atom. When `ECOM_ORACLE_VALIDATE_INLINE=1`, `validate_atom_via_grader` re-runs against the live grader and `oracle.promote(...)` fires on improvement. It never raises. See [[oracle]].
 
 ## Persisted artifacts
 
@@ -68,7 +68,7 @@ On a passing verify, `_maybe_distill_and_validate(intent, plan, task_id, note)` 
 
 ## End-of-run self-fill
 
-`distill_from_grader(task_id, score, score_detail)` (`pipeline.py`) self-fills the oracle bank from the score SubmitRun already returned — not a live grader round-trip (distinct from `ORACLE_VALIDATE_INLINE`). A pass (`score >= 1.0`) distills a `method` atom, a fail an `anti_pattern` atom, both written `status="active"`. It is gated only by `ORACLE_ENABLED`, reads the persisted `IntentSpec`+`PlanIR`, no-ops when artifacts are absent, and never raises. `main.py` calls it once per task (pass and fail) in the score loop, before the fail-only `learn_from_grader`. Because it is gated only by `ORACLE_ENABLED` (default on), it adds one distill LLM call per task. See [[oracle#End-of-run self-fill (distill_from_grader)]].
+`distill_from_grader(task_id, score, score_detail)` (`pipeline.py`) self-fills the oracle bank from the score SubmitRun already returned — not a live grader round-trip (distinct from `ECOM_ORACLE_VALIDATE_INLINE`). A pass (`score >= 1.0`) distills a `method` atom, a fail an `anti_pattern` atom, both written `status="active"`. It is gated only by `ECOM_ORACLE_ENABLED`, reads the persisted `IntentSpec`+`PlanIR`, no-ops when artifacts are absent, and never raises. `main.py` calls it once per task (pass and fail) in the score loop, before the fail-only `learn_from_grader`. Because it is gated only by `ECOM_ORACLE_ENABLED` (default on), it adds one distill LLM call per task. See [[oracle#End-of-run self-fill (distill_from_grader)]].
 
 ## learn_from_grader training path
 
@@ -80,7 +80,7 @@ Each cycle costs one PLAN call, plus one `_ilearn` LEARN call when the cycle fai
 
 ## answer-once and harness distill
 
-After a verify failure, `_maybe_harness_distill(plan, error, task_id)` (`pipeline.py:285`) fires when `HARNESS_DISTILL=1` (default `0`) and the error string indicates an F1-class compute contract failure (`"compute step"` or `"custom_extract"` in the message). It calls `harness.distill(...)` to propose a candidate check-spec, then optionally validates and promotes it inline. It never raises. See [[harness#F8b: distill → validate → promote]].
+After a verify failure, `_maybe_harness_distill(plan, error, task_id)` (`pipeline.py:285`) fires when `ECOM_HARNESS_DISTILL=1` (default `0`) and the error string indicates an F1-class compute contract failure (`"compute step"` or `"custom_extract"` in the message). It calls `harness.distill(...)` to propose a candidate check-spec, then optionally validates and promotes it inline. It never raises. See [[harness#F8b: distill → validate → promote]].
 
 ## Terminal OUTCOME_NONE_CLARIFICATION
 

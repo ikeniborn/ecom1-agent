@@ -58,7 +58,7 @@ def test_oracle_passes_nomic_prefixes():
 
 
 def test_cosine_floor_discards_subthreshold(monkeypatch):
-    monkeypatch.setenv("ORACLE_FLOOR", "0.5")
+    monkeypatch.setenv("ECOM_ORACLE_FLOOR", "0.5")
     atoms = [_atom("hi", "high sim", ["sql"]),
              _atom("lo", "low sim", ["pricing"])]
     emap = {"C:high sim": [1.0, 0.0], "C:low sim": [0.0, 1.0]}

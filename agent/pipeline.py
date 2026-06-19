@@ -16,14 +16,14 @@ from .models import LearnConsolidateOutput
 from .prompt import load_prompt
 from .trace import set_cycle
 
-_IMAX_STEPS = int(os.environ.get("INTERPRETER_MAX_STEPS", "6"))
-_MAX_TOKENS_LEARN = int(os.environ.get("MAX_TOKENS_LEARN", "2048"))
+_IMAX_STEPS = int(os.environ.get("ECOM_INTERPRETER_MAX_STEPS", "6"))
+_MAX_TOKENS_LEARN = int(os.environ.get("ECOM_MAX_TOKENS_LEARN", "2048"))
 # Retries for transient INTENT parse/empty failures (CC subprocess truncation).
-_DESIGN_MAX_ATTEMPTS = int(os.environ.get("DESIGN_MAX_ATTEMPTS", "3"))
+_DESIGN_MAX_ATTEMPTS = int(os.environ.get("ECOM_DESIGN_MAX_ATTEMPTS", "3"))
 # Consecutive empty-PLAN responses tolerated before breaking to CLARIFICATION.
 # An empty body carries nothing to learn from, so these cycles skip iLEARN and
 # must not silently consume the whole INTERPRETER_MAX_STEPS budget.
-_EMPTY_PLAN_MAX = int(os.environ.get("EMPTY_PLAN_MAX", "2"))
+_EMPTY_PLAN_MAX = int(os.environ.get("ECOM_EMPTY_PLAN_MAX", "2"))
 
 
 def _norm_sql(s: str) -> str:
@@ -122,7 +122,7 @@ def _learn_consolidate_text(
         f"EXISTING_RULES:\n{rules_lines}"
     )
 
-    model = _resolve_model_for_phase("learn", os.environ.get("MODEL", ""))
+    model = _resolve_model_for_phase("learn", os.environ.get("ECOM_MODEL", ""))
     raw = call_llm_raw(system, user_msg, model, {}, max_tokens=_MAX_TOKENS_LEARN, token_out=token_out, phase="LEARN")
     if not raw:
         print(f"{CLI_YELLOW}[pipeline] LEARN: empty response, skipping{CLI_CLR}")
@@ -194,8 +194,8 @@ def _distill_call(oracle, intent, plan, task_id, outcome_note):
 def _maybe_distill_and_validate(intent, plan, task_id, outcome_note) -> None:
     """On a successful cycle, distill a candidate atom (ORACLE_DISTILL=1) and,
     when ORACLE_VALIDATE_INLINE=1, grader-validate then promote. Never raises."""
-    if (os.environ.get("ORACLE_ENABLED", "1") == "0"
-            or os.environ.get("ORACLE_DISTILL", "0") != "1"):
+    if (os.environ.get("ECOM_ORACLE_ENABLED", "1") == "0"
+            or os.environ.get("ECOM_ORACLE_DISTILL", "0") != "1"):
         return
     try:
         oracle = _new_oracle()
@@ -203,7 +203,7 @@ def _maybe_distill_and_validate(intent, plan, task_id, outcome_note) -> None:
     except Exception as e:
         print(f"{CLI_YELLOW}[pipeline] oracle distill skipped: {e}{CLI_CLR}")
         return
-    if not atom or os.environ.get("ORACLE_VALIDATE_INLINE", "1") != "1":
+    if not atom or os.environ.get("ECOM_ORACLE_VALIDATE_INLINE", "1") != "1":
         return
     try:
         if validate_atom_via_grader(atom, task_id, intent, plan):
@@ -224,7 +224,7 @@ def distill_from_grader(task_id: str, score: float, score_detail: list[str]) -> 
     (ORACLE_VALIDATE_INLINE stays 0 by default). Never raises; the run result is
     unchanged if distill yields nothing. Reads the persisted IntentSpec + PlanIR.
     """
-    if os.environ.get("ORACLE_ENABLED", "1") == "0":
+    if os.environ.get("ECOM_ORACLE_ENABLED", "1") == "0":
         return
     heur = Path("data/heuristics")
     ip, pp = heur / f"{task_id}.intent.json", heur / f"{task_id}.plan.json"
@@ -292,14 +292,14 @@ def _maybe_harness_distill(plan, error, task_id) -> None:
     validate it — the candidate MUST flag this failing plan AND must NOT flag the last
     known-good plan — and promote (candidate -> active) on success; otherwise it stays a
     warn-only candidate for an offline promote. Never raises (cannot dead-end a run)."""
-    if os.environ.get("HARNESS_DISTILL", "0") != "1":
+    if os.environ.get("ECOM_HARNESS_DISTILL", "0") != "1":
         return
     if "compute step" not in error and "custom_extract" not in error:
         return
     try:
         from . import harness
         candidate = harness.distill(plan, error, source_task=task_id)
-        if not candidate or os.environ.get("HARNESS_VALIDATE_INLINE", "1") != "1":
+        if not candidate or os.environ.get("ECOM_HARNESS_VALIDATE_INLINE", "1") != "1":
             return
         from .harness_validate import validate_check_via_grader
         if validate_check_via_grader(candidate, plan, _load_good_plan(task_id)):

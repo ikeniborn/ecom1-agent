@@ -66,7 +66,7 @@ def run_promote(oracle, green_suite, run_fn, validated_at, validated_by="grader"
     active_n = len([a for a in oracle.atoms if a.status == "active"])
     print(f"[promote] active={active_n} candidates={len(candidates)}")
     if active_n > 10:
-        topn = int(os.environ.get("ORACLE_TOPN", "10"))
+        topn = int(os.environ.get("ECOM_ORACLE_TOPN", "10"))
         if topn >= active_n:
             print(f"[promote] WARNING: active={active_n} but ORACLE_TOPN={topn} — "
                   "lower ORACLE_TOPN (ceil(active*0.5)) so cosine filters.")

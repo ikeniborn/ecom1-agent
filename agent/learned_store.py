@@ -18,7 +18,7 @@ _VALID_RULE_STARTS = ("never", "always", "use", "do not", "when", "if", "prefer"
 def _learn_max_active() -> int:
     """Cap on active content-rules kept per task (re-bloat guard). Read live for tests."""
     try:
-        return max(1, int(os.environ.get("LEARN_MAX_ACTIVE", "3")))
+        return max(1, int(os.environ.get("ECOM_LEARN_MAX_ACTIVE", "3")))
     except ValueError:
         return 3
 

@@ -53,14 +53,14 @@ def test_prephase_sample_constants_default_and_override(monkeypatch):
     # Constants & budgets DoD: default AND one env override for each sample-tier constant.
     import importlib, agent.orchestrator as orch
     assert (orch._SAMPLE_ROWS_PER_TABLE, orch._SAMPLE_ROW_MAX_CHARS) == (3, 400)   # defaults
-    monkeypatch.setenv("PREPHASE_SAMPLE_ROWS", "1")
-    monkeypatch.setenv("PREPHASE_SAMPLE_ROW_CHARS", "50")
+    monkeypatch.setenv("ECOM_PREPHASE_SAMPLE_ROWS", "1")
+    monkeypatch.setenv("ECOM_PREPHASE_SAMPLE_ROW_CHARS", "50")
     importlib.reload(orch)
     try:
         assert (orch._SAMPLE_ROWS_PER_TABLE, orch._SAMPLE_ROW_MAX_CHARS) == (1, 50)  # overrides
     finally:
-        monkeypatch.delenv("PREPHASE_SAMPLE_ROWS", raising=False)
-        monkeypatch.delenv("PREPHASE_SAMPLE_ROW_CHARS", raising=False)
+        monkeypatch.delenv("ECOM_PREPHASE_SAMPLE_ROWS", raising=False)
+        monkeypatch.delenv("ECOM_PREPHASE_SAMPLE_ROW_CHARS", raising=False)
         importlib.reload(orch)
 
 
@@ -399,14 +399,14 @@ def test_extract_path_literals_any_root_strip_dedup():
 
 
 def test_extract_path_literals_respects_cap(monkeypatch):
-    monkeypatch.setenv("PREPHASE_PATH_LITERALS", "2")
+    monkeypatch.setenv("ECOM_PREPHASE_PATH_LITERALS", "2")
     import importlib, agent.orchestrator as orch
     importlib.reload(orch)
     try:
         out = orch._extract_path_literals("/a/b /c/d /e/f /g/h")
         assert out == ["/a/b", "/c/d"]
     finally:
-        monkeypatch.delenv("PREPHASE_PATH_LITERALS", raising=False)
+        monkeypatch.delenv("ECOM_PREPHASE_PATH_LITERALS", raising=False)
         importlib.reload(orch)   # restore default cap for later tests
 
 
@@ -427,12 +427,12 @@ def test_prephase_listing_bytes_default_and_override(monkeypatch):
     # Constants & budgets DoD: assert default AND one env override for this constant.
     import importlib, agent.orchestrator as orch
     assert orch._PATH_LISTING_BUDGET == 4096                 # default
-    monkeypatch.setenv("PREPHASE_LISTING_BYTES", "128")
+    monkeypatch.setenv("ECOM_PREPHASE_LISTING_BYTES", "128")
     importlib.reload(orch)
     try:
         assert orch._PATH_LISTING_BUDGET == 128              # override
     finally:
-        monkeypatch.delenv("PREPHASE_LISTING_BYTES", raising=False)
+        monkeypatch.delenv("ECOM_PREPHASE_LISTING_BYTES", raising=False)
         importlib.reload(orch)
 
 

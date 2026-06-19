@@ -58,8 +58,8 @@ def test_inline_validate_promotes_candidate_when_catches_bad_not_good(tmp_path, 
     from agent.ir_models import PlanIR
     checks = tmp_path / "checks.yaml"; checks.write_text("[]")
     monkeypatch.setattr(harness, "_DEFAULT_CHECKS", checks)
-    monkeypatch.setenv("HARNESS_DISTILL", "1")
-    monkeypatch.setenv("HARNESS_VALIDATE_INLINE", "1")
+    monkeypatch.setenv("ECOM_HARNESS_DISTILL", "1")
+    monkeypatch.setenv("ECOM_HARNESS_VALIDATE_INLINE", "1")
     monkeypatch.chdir(tmp_path)
     (tmp_path / "data" / "heuristics").mkdir(parents=True)
     good = {"discovery": [], "rowsets": [],

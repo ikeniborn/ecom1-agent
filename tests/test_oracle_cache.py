@@ -18,7 +18,7 @@ def _counting_embed(calls):
 
 
 def test_atom_embedded_once_across_instances(tmp_path, monkeypatch):
-    monkeypatch.setenv("ORACLE_FLOOR", "-1")  # disable floor for this test
+    monkeypatch.setenv("ECOM_ORACLE_FLOOR", "-1")  # disable floor for this test
     emb = tmp_path / "embeddings.json"
     atoms = [_atom("a", "C:alpha")]
     calls = []
@@ -35,7 +35,7 @@ def test_atom_embedded_once_across_instances(tmp_path, monkeypatch):
 
 
 def test_cache_persisted_to_file(tmp_path, monkeypatch):
-    monkeypatch.setenv("ORACLE_FLOOR", "-1")
+    monkeypatch.setenv("ECOM_ORACLE_FLOOR", "-1")
     emb = tmp_path / "embeddings.json"
     atoms = [_atom("a", "C:alpha")]
     o = KnowledgeOracle(atoms=atoms, embed_fn=_counting_embed([]),
@@ -47,7 +47,7 @@ def test_cache_persisted_to_file(tmp_path, monkeypatch):
 
 
 def test_corrupt_cache_file_rebuilds(tmp_path, monkeypatch):
-    monkeypatch.setenv("ORACLE_FLOOR", "-1")
+    monkeypatch.setenv("ECOM_ORACLE_FLOOR", "-1")
     emb = tmp_path / "embeddings.json"
     emb.write_text("{ this is not json")
     atoms = [_atom("a", "C:alpha")]

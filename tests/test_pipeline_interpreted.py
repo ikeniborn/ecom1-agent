@@ -177,8 +177,8 @@ def test_interpreter_max_steps_default_and_override(monkeypatch):
     import os
     from agent import pipeline
     assert pipeline._IMAX_STEPS == 6                                  # default
-    monkeypatch.setenv("INTERPRETER_MAX_STEPS", "9")
-    assert int(os.environ.get("INTERPRETER_MAX_STEPS", "6")) == 9     # override resolves
+    monkeypatch.setenv("ECOM_INTERPRETER_MAX_STEPS", "9")
+    assert int(os.environ.get("ECOM_INTERPRETER_MAX_STEPS", "6")) == 9     # override resolves
 
 
 def test_plan_signature_normalizes_sql_and_rpcs():

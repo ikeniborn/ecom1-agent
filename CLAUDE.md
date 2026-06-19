@@ -18,48 +18,45 @@ make proto                                       # rebuild protobuf stubs (requi
 
 ## Environment Variables
 
-Copy from `.env.example` + `.secrets.example`. Core vars:
+Copy `.env.example` → `.env` (single source for config AND credentials; gitignored via `**/.env`). Core vars:
 
 | Var | Purpose |
 |-----|---------|
-| `MODEL` | Primary LLM (`anthropic/claude-sonnet-4-6`, `openrouter/…`, `ollama/…`, or bare Ollama name) |
-| `MODEL_FALLBACK` | Fallback model after primary exhausts all tiers |
-| `MODEL_REASON` | Reason-tier model (INTENT/PLAN/iLEARN/distill). **Catch-all** for any phase not explicitly fast-tier — including unlisted phases. Defaults to `MODEL`. |
-| `MODEL_FAST` | Fast-tier model (DOC_SELECT/oracle rerank). Defaults to `MODEL`. |
-| `MODEL_LEARN` | Per-phase override for LEARN (defaults to its tier → `MODEL`) |
-| `MAX_TOKENS_INTENT` | Max tokens for INTENT phase response (default 4096) |
-| `MAX_TOKENS_PLAN` | Max tokens for PLAN phase response (default 8192) |
-| `MAX_TOKENS_LEARN` | Max tokens for LEARN/iLEARN phase response (default 2048) |
-| `COMPACTION_THRESHOLD` | Entry count in `learn_ctx` that triggers in-memory LLM compaction (default 15) |
-| `COMPACTION_KEEP_RECENT` | Recent `learn_ctx` entries kept verbatim after compaction (default 5) |
-| `LEARN_MAX_ACTIVE` | Cap on **active content-rules per task** in `data/learned/{tid}.yaml` (default 3). `apply_learn_diff` deactivates the oldest UNPINNED rules beyond the cap; a rule with `pinned: true` is exempt. Guards against iLEARN re-bloat (one rule appended per failing cycle → rule-overload → PLAN non-convergence). |
-| `INTERPRETER_MAX_STEPS` | Plan-IR interpreter cycle ceiling (default 6) |
-| `LOG_LEVEL=DEBUG` | Full LLM response logging |
-| `OLLAMA_BASE_URL` | Ollama endpoint (default `http://localhost:11434/v1`) |
-| `CC_ENABLED=1` | Enable Claude Code CLI tier (iclaude subprocess, OAuth) |
-| `LLM_HTTP_READ_TIMEOUT_S` | HTTP read timeout in seconds (default 180) |
-| `TRAIN_MAX_CYCLES` | Per-task training cycles (default 1 = no training). Each cycle is a fresh `StartRun → SubmitRun`; failing tasks (score < 1.0) get a LEARN rule distilled from grader feedback via `pipeline.learn_from_grader`, then re-run next cycle. Loop exits early when all targeted tasks reach score ≥ 1.0. |
-| `ORACLE_ENABLED` | Knowledge-oracle master toggle; `0` → pipeline behaves as before (default 1) |
-| `EMBED_MODEL` | Embedding model id for oracle retrieval (key into `models.json`, default `nomic-embed-text`) |
-| `EMBED_BASE_URL` | Embeddings endpoint; falls back to `OLLAMA_BASE_URL` |
-| `ORACLE_TOPN` | Stage-1 cosine candidate count (default 10) |
-| `ORACLE_K` | Final atoms injected into CODEGEN after re-rank (default 4) |
-| `ORACLE_FLOOR` | Minimum cosine similarity for a retrieved atom to be injected; below-floor atoms discarded (default 0.5) |
-| `MODEL_RANK` | Model for stage-2 re-rank; falls back to `MODEL` |
-| `ORACLE_RANK_ENABLED` | `0` → skip LLM re-rank, use cosine top-k (default 1) |
-| `ORACLE_DISTILL` | `1` → auto-distill a candidate atom after a successful cycle (default 0) |
-| `ORACLE_VALIDATE_INLINE` | **P0.** `1` (default) → when `ORACLE_DISTILL=1`, grader-validate each distilled atom inline and promote on improvement. This fires **live grader round-trips during a run** (a fresh StartRun per atom). Set `0` to suppress: distill writes a `candidate` atom and skips promotion (cheap bulk mode; promote offline later). No effect unless `ORACLE_DISTILL=1`. |
-| `ORACLE_DEDUP_COSINE` | Cosine ≥ this ⇒ two atoms are duplicates (default 0.92). Used by `oracle.prune()` (collapse near-duplicate active atoms; drop unvalidated candidates) and `add_candidate` dedup-on-insert (anti-rebloat). Lower → more aggressive collapse. |
-| `HARNESS_DISTILL` | `1` → after an F1-class compute contract failure, distill a `candidate` lint check-spec into `data/harness/checks.yaml` (LLM, reason tier). Default `0` (no cost). Candidates are enforced **warn-only** by `lint` until promoted. |
-| `HARNESS_VALIDATE_INLINE` | `1` (default) → when `HARNESS_DISTILL=1`, a freshly distilled candidate check is validated inline (`harness_validate.validate_check_via_grader`: must flag the failing plan ∧ must NOT flag the last known-good plan) and promoted (`candidate`→`active`) on success. `0` → leave it a warn-only candidate for an offline promote. Only meaningful when `HARNESS_DISTILL=1`. |
-| `PREPHASE_PATH_LITERALS` | Cap on path literals extracted from the instruction text (default 3); learned deep-read paths are probed in addition |
-| `PREPHASE_LISTING_BYTES` | Byte cap on a rendered dir listing; overflow → `… +N skipped` (default 4096) |
-| `PREPHASE_SAMPLE_ROWS` | `LIMIT` per sampled table — Tier-2 (default 3) |
-| `PREPHASE_SAMPLE_ROW_CHARS` | Per-row byte cap — Tier-2 safety rail (default 400) |
+| `ECOM_MODEL` | Primary LLM (`anthropic/claude-sonnet-4-6`, `openrouter/…`, `ollama/…`, or bare Ollama name) |
+| `ECOM_MODEL_FALLBACK` | Fallback model after primary exhausts all tiers |
+| `ECOM_MODEL_REASON` | Reason-tier model (INTENT/PLAN/iLEARN/distill). **Catch-all** for any phase not explicitly fast-tier — including unlisted phases. Defaults to `ECOM_MODEL`. |
+| `ECOM_MODEL_FAST` | Fast-tier model (DOC_SELECT/oracle rerank). Defaults to `ECOM_MODEL`. |
+| `ECOM_MODEL_LEARN` | Per-phase override for LEARN (defaults to its tier → `ECOM_MODEL`) |
+| `ECOM_MAX_TOKENS_INTENT` | Max tokens for INTENT phase response (default 4096) |
+| `ECOM_MAX_TOKENS_PLAN` | Max tokens for PLAN phase response (default 8192) |
+| `ECOM_MAX_TOKENS_LEARN` | Max tokens for LEARN/iLEARN phase response (default 2048) |
+| `ECOM_LEARN_MAX_ACTIVE` | Cap on **active content-rules per task** in `data/learned/{tid}.yaml` (default 3). `apply_learn_diff` deactivates the oldest UNPINNED rules beyond the cap; a rule with `pinned: true` is exempt. Guards against iLEARN re-bloat (one rule appended per failing cycle → rule-overload → PLAN non-convergence). |
+| `ECOM_INTERPRETER_MAX_STEPS` | Plan-IR interpreter cycle ceiling (default 6) |
+| `ECOM_LOG_LEVEL=DEBUG` | Full LLM response logging |
+| `ECOM_OLLAMA_BASE_URL` | Ollama endpoint (default `http://localhost:11434/v1`) |
+| `ECOM_CC_ENABLED=1` | Enable Claude Code CLI tier (iclaude subprocess, OAuth) |
+| `ECOM_LLM_HTTP_READ_TIMEOUT_S` | HTTP read timeout in seconds (default 180) |
+| `ECOM_TRAIN_MAX_CYCLES` | Per-task training cycles (default 1 = no training). Each cycle is a fresh `StartRun → SubmitRun`; failing tasks (score < 1.0) get a LEARN rule distilled from grader feedback via `pipeline.learn_from_grader`, then re-run next cycle. Loop exits early when all targeted tasks reach score ≥ 1.0. |
+| `ECOM_ORACLE_ENABLED` | Knowledge-oracle master toggle; `0` → pipeline behaves as before (default 1) |
+| `ECOM_MODEL_EMBED` | Embedding model id for oracle retrieval (key into `models.json`, default `nomic-embed-text`); endpoint is `ECOM_OLLAMA_BASE_URL` |
+| `ECOM_ORACLE_TOPN` | Stage-1 cosine candidate count (default 10) |
+| `ECOM_ORACLE_K` | Final atoms injected into PLAN after re-rank (default 4) |
+| `ECOM_ORACLE_FLOOR` | Minimum cosine similarity for a retrieved atom to be injected; below-floor atoms discarded (default 0.5) |
+| `ECOM_MODEL_RANK` | Model for stage-2 re-rank; falls back to `ECOM_MODEL` |
+| `ECOM_ORACLE_RANK_ENABLED` | `0` → skip LLM re-rank, use cosine top-k (default 1) |
+| `ECOM_ORACLE_DISTILL` | `1` → auto-distill a candidate atom after a successful cycle (default 0) |
+| `ECOM_ORACLE_VALIDATE_INLINE` | **P0.** `1` (default) → when `ECOM_ORACLE_DISTILL=1`, grader-validate each distilled atom inline and promote on improvement. This fires **live grader round-trips during a run** (a fresh StartRun per atom). Set `0` to suppress: distill writes a `candidate` atom and skips promotion (cheap bulk mode; promote offline later). No effect unless `ECOM_ORACLE_DISTILL=1`. |
+| `ECOM_ORACLE_DEDUP_COSINE` | Cosine ≥ this ⇒ two atoms are duplicates (default 0.92). Used by `oracle.prune()` (collapse near-duplicate active atoms; drop unvalidated candidates) and `add_candidate` dedup-on-insert (anti-rebloat). Lower → more aggressive collapse. |
+| `ECOM_HARNESS_DISTILL` | `1` → after an F1-class compute contract failure, distill a `candidate` lint check-spec into `data/harness/checks.yaml` (LLM, reason tier). Default `0` (no cost). Candidates are enforced **warn-only** by `lint` until promoted. |
+| `ECOM_HARNESS_VALIDATE_INLINE` | `1` (default) → when `ECOM_HARNESS_DISTILL=1`, a freshly distilled candidate check is validated inline (`harness_validate.validate_check_via_grader`: must flag the failing plan ∧ must NOT flag the last known-good plan) and promoted (`candidate`→`active`) on success. `0` → leave it a warn-only candidate for an offline promote. Only meaningful when `ECOM_HARNESS_DISTILL=1`. |
+| `ECOM_PREPHASE_PATH_LITERALS` | Cap on path literals extracted from the instruction text (default 3); learned deep-read paths are probed in addition |
+| `ECOM_PREPHASE_LISTING_BYTES` | Byte cap on a rendered dir listing; overflow → `… +N skipped` (default 4096) |
+| `ECOM_PREPHASE_SAMPLE_ROWS` | `LIMIT` per sampled table — Tier-2 (default 3) |
+| `ECOM_PREPHASE_SAMPLE_ROW_CHARS` | Per-row byte cap — Tier-2 safety rail (default 400) |
 
-Credentials (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `OLLAMA_API_KEY`) belong in `.secrets`, not `.env`.
+Credentials (`ECOM_ANTHROPIC_API_KEY`, `ECOM_OPENROUTER_API_KEY`, `ECOM_OLLAMA_API_KEY`, `ECOM_BITGN_API_KEY`) live in `.env` (single source; gitignored). There is no separate `.secrets` file. The agent reads `ECOM_`-prefixed keys ONLY — a stray system `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` can never leak into a call.
 
-**Model-tier resolution** (`llm.py:_resolve_model_for_phase`): per phase, `MODEL_<PHASE>` → tier env (`MODEL_REASON` / `MODEL_FAST` / `EMBED_MODEL`) → `MODEL`. Reason-tier phases (INTENT, PLAN, iLEARN, distill) map to `MODEL_REASON`; fast-tier phases (DOC_SELECT, oracle rerank) to `MODEL_FAST`; embeddings to `EMBED_MODEL`. **`MODEL_REASON` is the catch-all** — any phase not explicitly fast-tier, including unlisted phases, resolves through it. With only `MODEL` set, every phase resolves to `MODEL` (back-compatible). The reason tier requests `think=on`; the fast tier `think=off`.
+**Model-tier resolution** (`llm.py:_resolve_model_for_phase`): per phase, `ECOM_MODEL_<PHASE>` → tier env (`ECOM_MODEL_REASON` / `ECOM_MODEL_FAST` / `ECOM_MODEL_EMBED`) → `ECOM_MODEL`. Reason-tier phases (INTENT, PLAN, iLEARN, distill) map to `ECOM_MODEL_REASON`; fast-tier phases (DOC_SELECT, oracle rerank) to `ECOM_MODEL_FAST`; embeddings to `ECOM_MODEL_EMBED`. **`ECOM_MODEL_REASON` is the catch-all** — any phase not explicitly fast-tier, including unlisted phases, resolves through it. With only `ECOM_MODEL` set, every phase resolves to `ECOM_MODEL` (back-compatible). The reason tier requests `think=on`; the fast tier `think=off`.
 
 ## Architecture
 
@@ -70,7 +67,7 @@ There is **one** pipeline: the deterministic Plan-IR interpreter. Per task — I
 **Execution flow per task:**
 1. `orchestrator.py:run_agent()` — opens VM, reads `/AGENTS.MD` directly, gathers pre-phase facts (DOC_SELECT [fast tier] + schema + identity + listings), calls `run_pipeline`.
 2. `pipeline.py:run_pipeline(vm, instruction, task_id, agents_md_text, facts)`:
-   - **INTENT** (`reason.py:run_intent`, reason tier) — 1 LLM call, frozen for the run, retried on transient empty/parse failure (`DESIGN_MAX_ATTEMPTS`). Input `[facts, instruction, learn_ctx]` — INTENT receives the same active learned rules PLAN does, so a learned rule can shape `required_refs`/`success_criteria`/`outcome_space` (the channel for making a missing grounding ref learnable). Output: `IntentSpec` (`objective`, `desired_outcome`, `params`, `outcome_space`, `constraints`, `success_criteria`, `answer_shape`, `required_refs`). On hard failure → terminal `OUTCOME_NONE_CLARIFICATION`.
+   - **INTENT** (`reason.py:run_intent`, reason tier) — 1 LLM call, frozen for the run, retried on transient empty/parse failure (`ECOM_DESIGN_MAX_ATTEMPTS`). Input `[facts, instruction, learn_ctx]` — INTENT receives the same active learned rules PLAN does, so a learned rule can shape `required_refs`/`success_criteria`/`outcome_space` (the channel for making a missing grounding ref learnable). Output: `IntentSpec` (`objective`, `desired_outcome`, `params`, `outcome_space`, `constraints`, `success_criteria`, `answer_shape`, `required_refs`). On hard failure → terminal `OUTCOME_NONE_CLARIFICATION`.
    - **LOOP** — `cycle = 1..INTERPRETER_MAX_STEPS`:
      - **PLAN** (`reason.py:run_plan`, reason tier) — LLM call; input `[intent, facts, learn_ctx, prev_error?, oracle_atoms, observed?]`. Output: `PlanIR` (`discovery`, `rowsets`, `compute`, `decision`, `ops`, `answer`, `custom_extract`).
      - **lint** — `interpreter.lint_security_first(plan)` (no LLM). On `PlanError`/`InterpretError` → `_ilearn` → next cycle.
@@ -83,13 +80,13 @@ There is **one** pipeline: the deterministic Plan-IR interpreter. Per task — I
 
 `vm.answer` is called **exactly once** per task (the success path or one terminal CLARIFICATION).
 
-**Distill → validate → promote** (success path, `ORACLE_DISTILL=1`): `oracle.distill(...)` generalizes the working plan into a `candidate` atom; when `ORACLE_VALIDATE_INLINE=1` (default), `oracle_validate.validate_atom_via_grader` re-runs the task against the live grader and `oracle.promote(...)` on improvement. `ORACLE_VALIDATE_INLINE=0` leaves the atom a candidate for an offline promote.
+**Distill → validate → promote** (success path, `ECOM_ORACLE_DISTILL=1`): `oracle.distill(...)` generalizes the working plan into a `candidate` atom; when `ECOM_ORACLE_VALIDATE_INLINE=1` (default), `oracle_validate.validate_atom_via_grader` re-runs the task against the live grader and `oracle.promote(...)` on improvement. `ECOM_ORACLE_VALIDATE_INLINE=0` leaves the atom a candidate for an offline promote.
 
 **Training mode** (`TRAIN_MAX_CYCLES > 1`): `main.py` wraps the StartRun/SubmitRun pass in an outer loop. After each SubmitRun, tasks with `score < 1.0` get `pipeline.learn_from_grader(task_id, score_detail)` — loads the persisted `IntentSpec` + `PlanIR` and runs the same IR-framed `_learn_consolidate_text` LEARN call used in-pipeline. Next cycle a fresh StartRun targets only failing tasks; non-targets get `EndTrial` immediately. Successive cycles' trace files are named `{tid}.c{N}.jsonl`.
 
 **LLM call budget:** 1 (INTENT hard-stop) / 2 (best happy path: INTENT + 1 PLAN) / `1 + 2·INTERPRETER_MAX_STEPS` worst (each failing cycle costs PLAN + iLEARN).
 
-**LLM provider routing** (`llm.py`): provider prefix determines transport — `anthropic/` → Anthropic SDK; `openrouter/` → OpenRouter; `ollama/` or bare name → local Ollama; `claude-code` → CC CLI subprocess. All tiers tried in order per `models.json` before falling through to `MODEL_FALLBACK`. (Per-phase *model* selection is the tier resolution documented above.)
+**LLM provider routing** (`llm.py`): provider prefix determines transport — `anthropic/` → Anthropic SDK; `openrouter/` → OpenRouter; `ollama/` or bare name → local Ollama; `claude-code` → CC CLI subprocess. All tiers tried in order per `models.json` before falling through to `ECOM_MODEL_FALLBACK`. (Per-phase *model* selection is the tier resolution documented above.)
 
 **Protobuf layer:** `bitgn/` = generated stubs for harness + ECOM + PCM services. Source protos in `proto/`. Regenerate with `make proto`.
 

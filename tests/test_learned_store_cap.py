@@ -11,7 +11,7 @@ def _add(tid, c):
 
 def test_cap_keeps_newest_unpinned(tmp_path, monkeypatch):
     monkeypatch.setattr(learned_store, "_LEARNED_DIR", tmp_path)
-    monkeypatch.setenv("LEARN_MAX_ACTIVE", "2")
+    monkeypatch.setenv("ECOM_LEARN_MAX_ACTIVE", "2")
     _add("tX", "Always do A correctly for this particular test case")
     _add("tX", "Always do B correctly for this particular test case")
     _add("tX", "Always do C correctly for this particular test case")  # cap 2 -> A dropped
@@ -22,7 +22,7 @@ def test_cap_keeps_newest_unpinned(tmp_path, monkeypatch):
 
 def test_cap_exempts_pinned(tmp_path, monkeypatch):
     monkeypatch.setattr(learned_store, "_LEARNED_DIR", tmp_path)
-    monkeypatch.setenv("LEARN_MAX_ACTIVE", "1")
+    monkeypatch.setenv("ECOM_LEARN_MAX_ACTIVE", "1")
     (tmp_path / "tY.yaml").write_text(yaml.dump({"task_id": "tY", "entries": [{
         "id": "rc1", "content": "Always keep me — pinned authoritative rule for the task",
         "status": "active", "pinned": True, "surface": "ir", "created": "2026-06-19",

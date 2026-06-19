@@ -14,7 +14,7 @@ def _plan():
 
 
 def test_distill_skipped_when_flag_off(monkeypatch):
-    monkeypatch.setenv("ORACLE_DISTILL", "0")
+    monkeypatch.setenv("ECOM_ORACLE_DISTILL", "0")
     called = {"distill": False}
     monkeypatch.setattr(pipeline, "_distill_call",
                         lambda *a, **k: called.__setitem__("distill", True))
@@ -23,8 +23,8 @@ def test_distill_skipped_when_flag_off(monkeypatch):
 
 
 def test_distill_writes_candidate_and_promotes_when_validated(monkeypatch):
-    monkeypatch.setenv("ORACLE_DISTILL", "1")
-    monkeypatch.setenv("ORACLE_VALIDATE_INLINE", "1")
+    monkeypatch.setenv("ECOM_ORACLE_DISTILL", "1")
+    monkeypatch.setenv("ECOM_ORACLE_VALIDATE_INLINE", "1")
 
     class FakeAtom:
         id = "a1"
@@ -43,8 +43,8 @@ def test_distill_writes_candidate_and_promotes_when_validated(monkeypatch):
 
 
 def test_distill_keeps_candidate_when_inline_off(monkeypatch):
-    monkeypatch.setenv("ORACLE_DISTILL", "1")
-    monkeypatch.setenv("ORACLE_VALIDATE_INLINE", "0")
+    monkeypatch.setenv("ECOM_ORACLE_DISTILL", "1")
+    monkeypatch.setenv("ECOM_ORACLE_VALIDATE_INLINE", "0")
 
     class FakeAtom: id = "a1"
     class FakeOracle:

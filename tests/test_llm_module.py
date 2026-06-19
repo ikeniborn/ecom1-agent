@@ -50,5 +50,5 @@ def test_ollama_key_constant_exists_and_fallback():
     assert hasattr(llm_mod, "_OLLAMA_KEY"), "_OLLAMA_KEY not defined in agent.llm"
 
     # Value must match or-fallback of current env
-    expected = os.environ.get("OLLAMA_API_KEY") or "ollama"
+    expected = os.environ.get("ECOM_OLLAMA_API_KEY") or "ollama"
     assert llm_mod._OLLAMA_KEY == expected

@@ -17,11 +17,15 @@ from bitgn.vm.ecom.ecom_pb2 import Outcome
 # Secrets loader
 # ---------------------------------------------------------------------------
 
-def _load_secrets(path: str = ".secrets") -> None:
-    secrets_file = Path(path)
-    if not secrets_file.exists():
+def _load_env_file(path: str = ".env") -> None:
+    """Load KEY=value pairs from `.env` into os.environ (config + credentials,
+    single source of truth). An already-present, non-shadowing env var wins:
+    `key not in os.environ` keeps real shell/harness exports authoritative. EMPTY
+    values are skipped so a blank `KEY=` placeholder never shadows a real value."""
+    env_file = Path(path)
+    if not env_file.exists():
         return
-    for line in secrets_file.read_text().splitlines():
+    for line in env_file.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -29,33 +33,32 @@ def _load_secrets(path: str = ".secrets") -> None:
         key = key.strip()
         # Strip inline comments: split on unescaped '#' (e.g. "300   # comment")
         value = value.split("#")[0].strip() if "#" in value else value.strip()
-        if key and key not in os.environ:
+        if key and value and key not in os.environ:
             os.environ[key] = value
 
 
-_load_secrets(".env")   # model names (no credentials) — loads first; .secrets and real env vars override
-_load_secrets()         # credentials (.secrets)
+_load_env_file(".env")   # single source: all ECOM_* config + credentials; real env vars still override
 
 
 # ---------------------------------------------------------------------------
 # LLM clients
 # ---------------------------------------------------------------------------
 
-_ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY")
-_OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY")
-_OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-_OLLAMA_KEY = os.environ.get("OLLAMA_API_KEY") or "ollama"
-_CC_ENABLED = os.environ.get("CC_ENABLED") == "1"  # Claude Code tier (iclaude subprocess)
+_ANTHROPIC_KEY = os.environ.get("ECOM_ANTHROPIC_API_KEY")
+_OPENROUTER_KEY = os.environ.get("ECOM_OPENROUTER_API_KEY")
+_OLLAMA_URL = os.environ.get("ECOM_OLLAMA_BASE_URL", "http://localhost:11434/v1")
+_OLLAMA_KEY = os.environ.get("ECOM_OLLAMA_API_KEY") or "ollama"
+_CC_ENABLED = os.environ.get("ECOM_CC_ENABLED") == "1"  # Claude Code tier (iclaude subprocess)
 
 # FIX-215: explicit HTTP timeout — OpenAI SDK defaults to 600s; Ollama local can hang
 # silently on stuck sockets (observed 40+ min hang during COPRO). Read-timeout 180s keeps
 # us under TASK_TIMEOUT_S and lets TRANSIENT_KWS retry loop recover from stalled requests.
 try:
-    _HTTP_READ_TIMEOUT_S = float(os.environ.get("LLM_HTTP_READ_TIMEOUT_S", "180"))
+    _HTTP_READ_TIMEOUT_S = float(os.environ.get("ECOM_LLM_HTTP_READ_TIMEOUT_S", "180"))
 except ValueError:
     _HTTP_READ_TIMEOUT_S = 180.0
 try:
-    _HTTP_CONNECT_TIMEOUT_S = float(os.environ.get("LLM_HTTP_CONNECT_TIMEOUT_S", "10"))
+    _HTTP_CONNECT_TIMEOUT_S = float(os.environ.get("ECOM_LLM_HTTP_CONNECT_TIMEOUT_S", "10"))
 except ValueError:
     _HTTP_CONNECT_TIMEOUT_S = 10.0
 _HTTP_TIMEOUT = httpx.Timeout(
@@ -75,7 +78,7 @@ _PHASE_TIER: dict[str, str] = {
     "docselect": "fast",
     "rerank":    "fast",
 }
-_TIER_ENV = {"reason": "MODEL_REASON", "fast": "MODEL_FAST", "embed": "EMBED_MODEL"}
+_TIER_ENV = {"reason": "ECOM_MODEL_REASON", "fast": "ECOM_MODEL_FAST", "embed": "ECOM_MODEL_EMBED"}
 
 
 def _norm_phase(phase: str) -> str:
@@ -89,7 +92,7 @@ def _resolve_model_for_phase(phase: str, default_model: str) -> str:
     Live read so a test's monkeypatch.setenv applies without reloading the module.
     With only MODEL set, every phase resolves to MODEL (back-compatible)."""
     p = _norm_phase(phase)
-    per_phase = os.environ.get(f"MODEL_{p.upper()}")
+    per_phase = os.environ.get(f"ECOM_MODEL_{p.upper()}")
     if per_phase:
         return per_phase
     tier_env = _TIER_ENV.get(_PHASE_TIER.get(p, "reason"))
@@ -277,10 +280,10 @@ HARD_CONNECTION_KWS = (
 
 # FIX-417: fallback model used when all tiers of primary model fail completely.
 # Set MODEL_FALLBACK to any supported model string (same format as MODEL_DEFAULT).
-_FALLBACK_MODEL = os.environ.get("MODEL_FALLBACK", "")
+_FALLBACK_MODEL = os.environ.get("ECOM_MODEL_FALLBACK", "")
 
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
-_LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()  # DEBUG → log think blocks
+_LOG_LEVEL = os.environ.get("ECOM_LOG_LEVEL", "INFO").upper()  # DEBUG → log think blocks
 
 
 def _system_as_str(system: "str | list[dict]") -> str:
@@ -476,7 +479,7 @@ def _call_raw_single_model(
                 break
 
     # --- Tier 3: Ollama (local fallback) ---
-    ollama_model = cfg.get("ollama_model") or os.environ.get("OLLAMA_MODEL", model)
+    ollama_model = cfg.get("ollama_model") or os.environ.get("ECOM_OLLAMA_MODEL", model)
     # models.json ollama_think overrides the per-call/tier think; else use think.
     _cfg_think = cfg.get("ollama_think")
     _think_flag = _cfg_think if _cfg_think is not None else think
@@ -670,10 +673,10 @@ def embed_texts(texts, model, base_url=None, prefix=None):
     `prefix` applies the nomic task-prefix convention ("search_document"/"search_query")
     only for nomic-* model ids; other models receive raw text unchanged.
     """
-    base = (base_url or os.environ.get("EMBED_BASE_URL")
-            or os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434/v1")
+    base = (base_url or os.environ.get("ECOM_OLLAMA_BASE_URL")
+            or "http://localhost:11434/v1")
     url = base.rstrip("/") + "/embeddings"
-    key = os.environ.get("OLLAMA_API_KEY", "")
+    key = os.environ.get("ECOM_OLLAMA_API_KEY", "")
     headers = {"Authorization": f"Bearer {key}"} if key else {}
     inputs = list(texts)
     if prefix and model and model.lower().startswith("nomic"):
