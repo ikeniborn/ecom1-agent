@@ -127,3 +127,13 @@ def test_repair_moves_sql_args_to_stdin_then_lint_passes():
     spec = {"id": "chk_sql_stdin", "kind": "sql_stdin", "message": "m"}
     assert harness.check_sql_stdin(repaired, spec) == []
     lint(repaired)
+
+
+def test_sql_exact_match_flags_raw_equality_not_normalized():
+    spec = {"id": "chk_sql_exact_match", "kind": "sql_exact_match", "message": "normalize"}
+    bad = _plan(discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "args": [],
+        "stdin": "SELECT record_path FROM product_variants WHERE brand = 'Bosch'"}, "bind": "r"}])
+    assert harness.check_sql_exact_match(bad, spec)
+    good = _plan(discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "args": [],
+        "stdin": "SELECT record_path FROM product_variants WHERE LOWER(TRIM(brand)) LIKE '%bosch%'"}, "bind": "r"}])
+    assert harness.check_sql_exact_match(good, spec) == []

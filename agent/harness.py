@@ -126,12 +126,38 @@ def check_sql_stdin(plan, spec) -> list[str]:
     return out
 
 
+_MATCH_ATTRS = ("brand", "series", "model", "product_name")
+
+
+def check_sql_exact_match(plan, spec) -> list[str]:
+    """General control: catalogue matching over RE-SEEDED data must be NORMALIZED
+    (LOWER/TRIM + LIKE), not raw equality on a text attribute — `brand = 'X'` is brittle
+    because the stored value's case/spacing is randomized each run. Flags a /bin/sql query
+    that compares a product text attribute with raw `=` while never normalizing it. No task
+    values; purely structural — a generic anti-pattern guard, not a per-task rule."""
+    import re
+    msg = spec.get("message") or "match catalogue text attributes normalized (LOWER/TRIM + LIKE), not raw '='"
+    out: list[str] = []
+    for st in list(plan.discovery) + list(plan.ops):
+        if st.rpc != "Exec" or str(st.args.get("path", "")) != "/bin/sql":
+            continue
+        sql = str(st.args.get("stdin") or " ".join(str(a) for a in (st.args.get("args") or []))).lower()
+        if not sql:
+            continue
+        for attr in _MATCH_ATTRS:
+            if re.search(rf"\b{attr}\s*=", sql) and f"lower(trim({attr}))" not in sql:
+                out.append(f"{msg} (attr={attr})")
+                break
+    return out
+
+
 _HANDLERS = {
     "security_first": check_security_first,
     "primitive_contract": check_primitive_contract,
     "primitive_exists": check_primitive_exists,
     "primitive_arity": check_primitive_arity,
     "sql_stdin": check_sql_stdin,
+    "sql_exact_match": check_sql_exact_match,
 }
 
 
