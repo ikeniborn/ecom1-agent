@@ -20,6 +20,10 @@ _IMAX_STEPS = int(os.environ.get("INTERPRETER_MAX_STEPS", "6"))
 _MAX_TOKENS_LEARN = int(os.environ.get("MAX_TOKENS_LEARN", "2048"))
 # Retries for transient INTENT parse/empty failures (CC subprocess truncation).
 _DESIGN_MAX_ATTEMPTS = int(os.environ.get("DESIGN_MAX_ATTEMPTS", "3"))
+# Consecutive empty-PLAN responses tolerated before breaking to CLARIFICATION.
+# An empty body carries nothing to learn from, so these cycles skip iLEARN and
+# must not silently consume the whole INTERPRETER_MAX_STEPS budget.
+_EMPTY_PLAN_MAX = int(os.environ.get("EMPTY_PLAN_MAX", "2"))
 
 
 def _norm_sql(s: str) -> str:
@@ -317,7 +321,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     dict: {cycles_used, outcome, status, input_tokens, output_tokens, ...}.
     """
     from .interpreter import InterpretError, interpret, lint, repair_sql_stdin
-    from .reason import IntentError, PlanError, run_intent, run_plan
+    from .reason import IntentError, PlanEmptyError, PlanError, run_intent, run_plan
     from .verify import verify
 
     # Surface collapse (D5): PLAN sees all active rules; the grader-feedback
@@ -355,6 +359,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     last_error = None
     last_observed = None
     prev_sig = None
+    empty_streak = 0
     cycle = 0
     for cycle in range(1, _IMAX_STEPS + 1):
         set_cycle(cycle)
@@ -367,11 +372,26 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
                             observed=last_observed); _accum(tk)
             plan = repair_sql_stdin(plan)
             lint(plan)
+        except PlanEmptyError as e:
+            # Empty PLAN body: nothing to learn from. Skip iLEARN (it would also
+            # see no plan and emit no rule — a wasted LLM call) and retry cheaply;
+            # break early once the model keeps emitting nothing so we do not burn
+            # the whole cycle budget on a stuck model.
+            empty_streak += 1; _accum(tk)
+            last_error = f"plan: {e}"
+            print(f"{CLI_YELLOW}[pipeline] empty PLAN "
+                  f"({empty_streak}/{_EMPTY_PLAN_MAX}){CLI_CLR}")
+            if empty_streak >= _EMPTY_PLAN_MAX:
+                print(f"{CLI_YELLOW}[pipeline] repeated empty PLAN -> CLARIFICATION{CLI_CLR}")
+                break
+            continue
         except (PlanError, InterpretError) as e:
+            empty_streak = 0
             last_error = f"plan: {e}"; _accum(tk)
             _ilearn(task_id, learn_ctx, intent,
                     plan.model_dump_json() if plan is not None else "", last_error)
             continue
+        empty_streak = 0
 
         sig = _plan_signature(plan)
         if sig == prev_sig:

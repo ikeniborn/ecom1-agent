@@ -287,6 +287,39 @@ def test_ok_with_unresolved_required_ref_never_submits_ok(monkeypatch):
     assert vm.answer.call_args.kwargs["outcome"] != "OUTCOME_OK"
 
 
+def test_empty_plan_skips_ilearn_and_breaks_early(monkeypatch):
+    # Stability: an empty PLAN body carries nothing to learn from. The loop must NOT
+    # fire iLEARN (a wasted LLM call) and must break to CLARIFICATION after
+    # _EMPTY_PLAN_MAX consecutive empties instead of burning the whole cycle budget.
+    from agent import pipeline
+    monkeypatch.setattr(pipeline, "_IMAX_STEPS", 6)
+    monkeypatch.setattr(pipeline, "_EMPTY_PLAN_MAX", 2)
+    ilearn = MagicMock()
+    monkeypatch.setattr(pipeline, "_ilearn", ilearn)
+    vm = MagicMock(); vm.exec.return_value = {"stdout": "cnt\n5"}
+    # 1 INTENT + 2 empty PLAN bodies; if iLEARN fired it would need another seq item.
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(_INTENT, "", "")):
+        m = run_pipeline(vm, instruction="how many", task_id="t_empty", agents_md_text="A")
+    ilearn.assert_not_called()
+    assert m["outcome"] == "OUTCOME_NONE_CLARIFICATION"
+    assert m["cycles_used"] == 2          # broke at the 2nd empty, not at _IMAX_STEPS=6
+    vm.answer.assert_called_once()
+    assert vm.answer.call_args.kwargs["outcome"] != "OUTCOME_OK"
+
+
+def test_single_empty_plan_recovers_on_next_cycle(monkeypatch):
+    # A single transient empty PLAN must not kill the task: empty_streak resets when a
+    # valid plan arrives, and the task answers OK normally.
+    from agent import pipeline
+    monkeypatch.setattr(pipeline, "_IMAX_STEPS", 6)
+    monkeypatch.setattr(pipeline, "_EMPTY_PLAN_MAX", 2)
+    vm = MagicMock(); vm.exec.return_value = {"stdout": "cnt\n5"}
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(_INTENT, "", _PLAN)):
+        m = run_pipeline(vm, instruction="how many", task_id="t_empty_ok", agents_md_text="A")
+    assert m["outcome"] == "OUTCOME_OK"
+    vm.answer.assert_called_once()
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader

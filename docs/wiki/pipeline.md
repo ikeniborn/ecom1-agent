@@ -18,7 +18,7 @@ INTENT is retried up to `_DESIGN_MAX_ATTEMPTS` (env `DESIGN_MAX_ATTEMPTS`, defau
 
 ## PLAN — run_plan
 
-`run_plan(intent, facts, learn_ctx, prev_error, oracle_atoms, observed)` (`reason.py:77`) is the reason-tier LLM call inside the loop. Its user message assembles the oracle block, the `IntentSpec` JSON, the facts block, active LEARNED_RULES, prior OBSERVED_RPC_OUTPUTS, and any PREVIOUS_ERROR. It returns a `PlanIR` (discovery, rowsets, compute, decision, ops, answer, custom_extract). See [[oracle]].
+`run_plan(intent, facts, learn_ctx, prev_error, oracle_atoms, observed)` (`reason.py:77`) is the reason-tier LLM call inside the loop. Its user message assembles the oracle block, the `IntentSpec` JSON, the facts block, active LEARNED_RULES, prior OBSERVED_RPC_OUTPUTS, and any PREVIOUS_ERROR. It returns a `PlanIR` (discovery, rowsets, compute, decision, ops, answer, custom_extract). An empty LLM body raises `PlanEmptyError` (a `PlanError` subclass, `reason.py`) — distinguished from a substantive parse/validation `PlanError` so the loop can handle a transient empty cheaply (see [[pipeline#Empty-PLAN handling]]). See [[oracle]].
 
 ## Tiered pre-phase facts
 
@@ -34,7 +34,11 @@ The loop runs `cycle = 1..INTERPRETER_MAX_STEPS` (`_IMAX_STEPS`, env `INTERPRETE
 
 ## Pre-lint repair and lint
 
-`repair_sql_stdin(plan)` runs first, normalising any `/bin/sql` Exec step that delivers SQL via `args` (nondeterministic) to deliver it via `stdin` (reliable channel) instead. After repair, the registry dispatcher `interpreter.lint(plan)` runs — no LLM. A `PlanError` (bad/empty/unparseable PLAN response) or `InterpretError` raised by lint is caught together: `last_error` is set, `_ilearn` fires with the plan JSON, and the loop `continue`s to the next cycle. See [[interpreter#lint — registry-driven lint dispatcher]] and [[harness]].
+`repair_sql_stdin(plan)` runs first, normalising any `/bin/sql` Exec step that delivers SQL via `args` (nondeterministic) to deliver it via `stdin` (reliable channel) instead. After repair, the registry dispatcher `interpreter.lint(plan)` runs — no LLM. A substantive `PlanError` (unparseable/invalid PLAN response) or `InterpretError` raised by lint is caught: `last_error` is set, `_ilearn` fires with the plan JSON, and the loop `continue`s to the next cycle. The empty-body case (`PlanEmptyError`) is caught by a separate handler ordered first — it does NOT fire `_ilearn` (see [[pipeline#Empty-PLAN handling]]). See [[interpreter#lint — registry-driven lint dispatcher]] and [[harness]].
+
+## Empty-PLAN handling
+
+An empty PLAN body (`PlanEmptyError`, raised by `run_plan` when the LLM returns no content — e.g. a `think=on` model starving its visible output, or an endpoint read-timeout) is caught by a dedicated handler ordered before the generic `(PlanError, InterpretError)` catch (`pipeline.py`). Because an empty body carries nothing to learn from, it skips `_ilearn` entirely (which would be a wasted LLM call that emits no rule) and retries the cycle cheaply. A running `empty_streak` counter breaks the loop to terminal CLARIFICATION once it reaches `_EMPTY_PLAN_MAX` (env `EMPTY_PLAN_MAX`, default 2) consecutive empties, so a persistently-empty model does not silently burn the whole `INTERPRETER_MAX_STEPS` budget on `PLAN + iLEARN` pairs. A single transient empty followed by a valid plan resets the streak and the task proceeds normally.
 
 ## Plan signature and no-progress guard
 

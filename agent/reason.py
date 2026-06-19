@@ -61,6 +61,17 @@ class PlanError(RuntimeError):
     pass
 
 
+class PlanEmptyError(PlanError):
+    """PLAN LLM returned an empty body (no JSON to parse).
+
+    Distinguished from a substantive PlanError (lint/validation/parse) because an
+    empty response carries nothing to learn from — the pipeline skips iLEARN and
+    retries cheaply, breaking early after a few consecutive empties instead of
+    burning the whole interpreter-cycle budget on a model that keeps emitting
+    nothing (e.g. a think=on Ollama model starving its visible output)."""
+    pass
+
+
 def _call_llm_raw(*args, **kwargs):
     from . import pipeline as _pipeline
     return _pipeline.call_llm_raw(*args, **kwargs)
@@ -148,7 +159,7 @@ def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str |
     model = _resolve_model_for_phase("plan", os.environ.get("MODEL", ""))
     raw = _call_llm_raw(system, user, model, {}, max_tokens=_MAX_TOKENS_PLAN, token_out=token_out, phase="PLAN")
     if not raw:
-        raise PlanError("PLAN LLM returned empty response")
+        raise PlanEmptyError("PLAN LLM returned empty response")
     obj = _extract_json_from_text(raw)
     if not isinstance(obj, dict):
         raise PlanError(f"PLAN: could not parse JSON; head: {raw[:200]!r}")
