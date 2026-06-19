@@ -429,10 +429,15 @@ def _probe_catalogue_candidates(vm: VMAdapter, instruction: str) -> str:
         )
         conditions.append(cond)
     where = " OR ".join(conditions)
+    # Relevance-rank: ORDER BY how many distinct tokens a row matches (each condition is
+    # 0/1 in SQLite), DESC — so the row matching the most of brand+series+model+code (the
+    # exact product) surfaces in the top LIMIT, not 15 brand-only matches.
+    score = " + ".join(f"({c})" for c in conditions)
     sql = (
         f"SELECT product_sku, brand, series, model, product_name, record_path"
         f" FROM product_variants"
         f" WHERE {where}"
+        f" ORDER BY ({score}) DESC"
         f" LIMIT {_CATALOGUE_PROBE_LIMIT};"
     )
     try:
