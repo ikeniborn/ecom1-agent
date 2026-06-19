@@ -32,6 +32,7 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `MAX_TOKENS_LEARN` | Max tokens for LEARN/iLEARN phase response (default 2048) |
 | `COMPACTION_THRESHOLD` | Entry count in `learn_ctx` that triggers in-memory LLM compaction (default 15) |
 | `COMPACTION_KEEP_RECENT` | Recent `learn_ctx` entries kept verbatim after compaction (default 5) |
+| `LEARN_MAX_ACTIVE` | Cap on **active content-rules per task** in `data/learned/{tid}.yaml` (default 3). `apply_learn_diff` deactivates the oldest UNPINNED rules beyond the cap; a rule with `pinned: true` is exempt. Guards against iLEARN re-bloat (one rule appended per failing cycle → rule-overload → PLAN non-convergence). |
 | `INTERPRETER_MAX_STEPS` | Plan-IR interpreter cycle ceiling (default 6) |
 | `LOG_LEVEL=DEBUG` | Full LLM response logging |
 | `OLLAMA_BASE_URL` | Ollama endpoint (default `http://localhost:11434/v1`) |
@@ -48,6 +49,7 @@ Copy from `.env.example` + `.secrets.example`. Core vars:
 | `ORACLE_RANK_ENABLED` | `0` → skip LLM re-rank, use cosine top-k (default 1) |
 | `ORACLE_DISTILL` | `1` → auto-distill a candidate atom after a successful cycle (default 0) |
 | `ORACLE_VALIDATE_INLINE` | **P0.** `1` (default) → when `ORACLE_DISTILL=1`, grader-validate each distilled atom inline and promote on improvement. This fires **live grader round-trips during a run** (a fresh StartRun per atom). Set `0` to suppress: distill writes a `candidate` atom and skips promotion (cheap bulk mode; promote offline later). No effect unless `ORACLE_DISTILL=1`. |
+| `ORACLE_DEDUP_COSINE` | Cosine ≥ this ⇒ two atoms are duplicates (default 0.92). Used by `oracle.prune()` (collapse near-duplicate active atoms; drop unvalidated candidates) and `add_candidate` dedup-on-insert (anti-rebloat). Lower → more aggressive collapse. |
 | `HARNESS_DISTILL` | `1` → after an F1-class compute contract failure, distill a `candidate` lint check-spec into `data/harness/checks.yaml` (LLM, reason tier). Default `0` (no cost). Candidates are enforced **warn-only** by `lint` until promoted. |
 | `HARNESS_VALIDATE_INLINE` | `1` (default) → when `HARNESS_DISTILL=1`, a freshly distilled candidate check is validated inline (`harness_validate.validate_check_via_grader`: must flag the failing plan ∧ must NOT flag the last known-good plan) and promoted (`candidate`→`active`) on success. `0` → leave it a warn-only candidate for an offline promote. Only meaningful when `HARNESS_DISTILL=1`. |
 | `PREPHASE_PATH_LITERALS` | Cap on path literals extracted from the instruction text (default 3); learned deep-read paths are probed in addition |
