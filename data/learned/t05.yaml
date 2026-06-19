@@ -13,24 +13,27 @@ entries:
   submitted_refs:
   - /proc/catalog/CLN-NOLQX7ED.json
 - agents_md_anchor: null
-  content: 'Claim verify ("a note claims we stock X ... cite the record; <YES> if
-    it exists, <NO> if base exists but the extra property is absent"). ONE discovery
-    query: SELECT product_sku, record_path FROM product_variants WHERE brand + ONE
-    series/model token matched (LOWER/TRIM LIKE; use facts CATALOGUE_CANDIDATES).
-    compute: count(rows)->n; first(rows)->r. decision: n ge 1 -> present else absent.
-    answer (ONE top-level mapping, NO Answer op): present -> OUTCOME_OK, message contains
-    <YES> and the SKU, refs [$r.record_path]; absent -> OUTCOME_OK, message contains
-    <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space [OUTCOME_OK].
-    ALWAYS OUTCOME_OK, never CLARIFICATION/UNSUPPORTED. Keep the plan minimal.'
+  content: 'Claim verify ("a note claims we stock X with an extra property ... cite
+    the record; <YES> if the product exists WITH that extra property, <NO> if the
+    base product exists but the extra property is absent"). discovery: SELECT product_sku,
+    record_path FROM product_variants WHERE brand + ONE series/model token (LOWER/TRIM
+    LIKE; use facts CATALOGUE_CANDIDATES) -> bind base=first(rows). Determine extra=does
+    the claimed property hold for that base (a second predicate/EXISTS over product_variant_properties
+    on the claimed property_key/value). answer (ONE top-level mapping, NO Answer op):
+    base present AND extra holds -> OUTCOME_OK, message contains <YES> + the SKU,
+    refs [$base.record_path]; base present AND extra absent -> OUTCOME_OK, message
+    contains <NO> + the SKU, refs [$base.record_path]; base absent -> OUTCOME_OK,
+    message contains <NO>, refs []. INTENT: required_refs[OUTCOME_OK]=[]; outcome_space
+    [OUTCOME_OK]. ALWAYS OUTCOME_OK, never CLARIFICATION/UNSUPPORTED.'
   created: '2026-06-18'
   deactivated_reason: 'Superseded: rc1 directs the PLAN phase to use specific SQL/query-level
     constructs (CATALOGUE_CANDIDATES, first(rows)) that belong to the interpret phase,
     causing planner paralysis and empty responses.'
   id: rc1
   pinned: true
-  reasoning: 'Simplified-for-convergence (user-chosen): minimal single-query IR, terse
-    imperative, 1-cycle target. Trades some correctness for the plan actually reaching
-    a valid OUTCOME_OK answer (richer rules caused exhaust->CLARIFICATION on deepseek).'
+  reasoning: 'Convergence-simplified + targeted fixes: count uses a literal {n} template
+    (not concat -> no char-list bug); claim restores the extra-property check (present+extra=YES
+    / present+no-extra=NO) and cites the base record on both. Pinned canonical.'
   status: active
   surface: ir
 - content: null
@@ -192,17 +195,49 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v004
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/FST-APSRIZJW.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: <NO>
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
+- agents_md_anchor: null
+  content: Do not use Exec RPC with a raw SQL string argument for tabular discovery
+    queries; instead use a Query RPC that passes table, columns, and filter conditions
+    as structured JSON parameters to avoid escaping failures that corrupt PlanIR.
+  created: '2026-06-19'
+  deactivated_reason: superseded by pinned rc1
+  id: r008
+  reasoning: 'Error: `plan: PLAN: could not parse JSON; head: ''{"discovery":[{"rpc":"Exec","args":{"path":"/bin/sql","args":["WITH
+    base AS (SELECT product_sku, record_path FROM product_variants WHERE brand=\''Ajax\''
+    AND series=\''Eco\'' AND model=\''Classic 25C-DXE\'' ORDER...''`. The planner
+    emitted a discovery step as an `Exec` RPC to `/bin/sql` containing a complex multi-line
+    SQL CTE with string literals. Embedding raw SQL inside a JSON string field is
+    fragile: quotes, backslashes, and newlines easily break serialization, producing
+    unparseable PlanIR and leaving SCRIPT_CODE empty. The root cause is the choice
+    of `Exec` with an inline SQL payload instead of a structured query RPC. The rule
+    enforces using a native `Query` RPC with table/columns/filters as structured objects,
+    eliminating JSON escaping risks.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v005
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: 'Claim verification: <YES> CLN-GEF2EYP9 /proc/catalog/CLN-GEF2EYP9.json'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/CLN-GEF2EYP9.json
 last_run:
-  cycles_used: 2
+  cycles_used: 3
   date: '2026-06-19'
   outcome: OUTCOME_OK
   status: failure

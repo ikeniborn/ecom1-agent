@@ -90,18 +90,20 @@ entries:
 - agents_md_anchor: null
   content: 'Count ("how many X"). ONE discovery query: SELECT COUNT(*) AS n FROM product_variants
     WHERE the kind/type is matched by name (LOWER/TRIM LIKE). compute: get n as an
-    INTEGER. answer OUTCOME_OK with message in the instruction''s EXACT format with
-    n integer (e.g. ''<COUNT:3>'', never 3.0). If the instruction/policies cite a
-    governing /docs counting policy, INTENT sets required_refs[OUTCOME_OK]=[{kind:policy_doc,
+    INTEGER. answer OUTCOME_OK; set answer.message to the LITERAL template from the
+    instruction with a single {n} slot — e.g. answer.message = ''<COUNT:{n}>'' (the
+    interpreter fills {n} with the integer). Do NOT build the message with concat/char
+    primitives (that yields a char-list). If the instruction/policies cite a governing
+    /docs counting policy, INTENT sets required_refs[OUTCOME_OK]=[{kind:policy_doc,
     path:<that /docs...md>}]; else []. outcome_space [OUTCOME_OK]. Never CLARIFICATION.
     Keep the plan minimal.'
   created: '2026-06-18'
   deactivated_reason: null
   id: rc1
   pinned: true
-  reasoning: 'Simplified-for-convergence (user-chosen): minimal single-query IR, terse
-    imperative, 1-cycle target. Trades some correctness for the plan actually reaching
-    a valid OUTCOME_OK answer (richer rules caused exhaust->CLARIFICATION on deepseek).'
+  reasoning: 'Convergence-simplified + targeted fixes: count uses a literal {n} template
+    (not concat -> no char-list bug); claim restores the extra-property check (present+extra=YES
+    / present+no-extra=NO) and cites the base record on both. Pinned canonical.'
   status: active
   surface: ir
 - content: null
@@ -188,17 +190,106 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-19'
+  deactivated_reason: Rule v004 references a required policy document path for a previous
+    task (nuts-bolts-washers-graz-2025-06-22) that is unrelated to the current Wood
+    and Drywall Screw / Linz task.
   id: v004
   score: 0.0
   score_detail:
   - answer missing required reference '/docs/ops-policy-notes/catalogue-count-nuts-bolts-washers-graz-2025-06-22.md'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: <COUNT:0>
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
+- agents_md_anchor: null
+  content: Do not use named bind parameters (e.g., :product_kind_name) in Exec discovery
+    queries against /bin/sql when the SQL is supplied via stdin, because the CLI does
+    not resolve them; instead, embed the filter values directly into the query string
+    in the PlanIR so the SQL engine executes with valid literals and returns a countable
+    rowset.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: The verify failure shows $count was null, failing the 'ge 0' success
+    criterion. The OBSERVED_RPC_OUTPUTS show the [Exec /bin/sql] step produced completely
+    empty stdout, indicating the SQL did not return a parseable result. The PlanIR
+    emitted a query containing ':product_kind_name' but provided an empty args array,
+    leaving the parameter unbound. Because /bin/sql reads the statement from stdin
+    and cannot resolve named parameters, the execution yielded no rows; the subsequent
+    first/get/to_number chain then produced a null $count. The policy doc was read
+    successfully, so the failure is purely a PlanIR SQL-construction bug.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always compute a `message` variable in the compute section that holds the
+    fully materialized answer text matching the answer_shape msg_skeleton, then bind
+    `answer.ok.message` to `$message`; never place the raw msg_skeleton literal with
+    curly-brace placeholders directly into the answer object. Also ensure `answer.ok.refs`
+    includes every `required_refs` entry from TOOL_PLAN for the chosen outcome.
+  created: '2026-06-19'
+  deactivated_reason: superseded by pinned rc1
+  id: r009
+  reasoning: verify failed because $message was empty. The PlanIR computed `count`
+    via SQL and to_number, but never produced a compute variable named `message`.
+    Instead it placed the raw skeleton literal `<COUNT:{count}>` into `answer.ok.message`.
+    The verify phase evaluates the compute variable `$message`, which was absent,
+    causing the nonempty criterion to fail. Additionally, `answer.ok.refs` was empty
+    while TOOL_PLAN required a policy_doc reference for OUTCOME_OK.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not pass fewer or greater than exactly two arguments to the PlanIR `concat`
+    primitive in compute steps. To assemble a formatted message from multiple fragments
+    (e.g., prefix, variable, suffix), chain sequential binary `concat` operations
+    using intermediate binds. Do not use a single-argument `concat` to materialize
+    a literal string; place string literals directly into `answer.ok.refs` or other
+    answer fields.
+  created: '2026-06-19'
+  deactivated_reason: superseded by pinned rc1
+  id: r010
+  reasoning: 'ERROR: plan: primitive ''concat'' takes 2 arg(s), plan supplies 3; primitive
+    ''concat'' takes 2 arg(s), plan supplies 1. Root cause: the PlanIR compute section
+    treated `concat` as variadic and as an identity pass-through. Failing fragments:
+    (1) `{"prim":"concat","args":["<COUNT:","$count_str",">"],"into":"message"}` with
+    3 arguments, and (2) `{"prim":"concat","args":["/docs/current-updates/catalogue-counting-2025-06-22-wood-drywall-screws-linz.md"],"into":"policy_doc_path"}`
+    with 1 argument. The `concat` primitive is strictly binary. The 3-arg usage must
+    be split into two chained binary concats (e.g., concat("<COUNT:", $count_str)
+    into temp, then concat($temp, ">") into message). The 1-arg usage was an unnecessary
+    attempt to create a bind for a literal path; `answer.ok.refs` can hold the literal
+    string directly without a compute step. No existing rule governs `concat` arity,
+    so a new rule is required.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  id: v005
+  score: 0.0
+  score_detail:
+  - Answer should be "<COUNT:2>"
+  source: verdict
+  status: active
+  submitted_message: '[''<'', ''C'', ''O'', ''U'', ''N'', ''T'', '':'', ''>'']'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/current-updates/catalogue-counting-2025-06-22-wood-drywall-screws-linz.md
+  - 'path: "/docs/current-updates/catalogue-counting-2025-06-22-wood-drywall-screws-linz.md"
+
+    content_type: "text/markdown"
+
+    content: "# Catalogue Count Reporting Update\n\nOperating day: 2025-06-22\nWorkflow:
+    catalogue product-kind count questions\nRequested product kind: Wood and Drywall
+    Screw\nRequested product_kind_id: wood_drywall_screws\n\nFor today\''s count report,
+    count only catalogue SKUs for the requested product\nkind that have at least one
+    current inventory row in an open PowerTool store in\nLinz with available_today_quantity
+    greater than 0. Count each SKU once even if it is\navailable in multiple Linz
+    branches.\n"
+
+    sha256: "d8940e311d255c84bf2a26bae7a3649c57883c8afd49aba5adbdf433d3f4ace3"
+
+    '
 last_run:
-  cycles_used: 2
+  cycles_used: 4
   date: '2026-06-19'
   outcome: OUTCOME_OK
   status: failure
