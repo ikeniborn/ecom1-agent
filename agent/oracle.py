@@ -114,10 +114,54 @@ class KnowledgeOracle:
         "{id, description, domain:[..], content}. content is a general method or fact."
     )
 
+    def _dup_cosine(self) -> float:
+        return float(os.environ.get("ORACLE_DEDUP_COSINE", "0.92"))
+
     def add_candidate(self, atom):
+        # Anti-rebloat: skip a candidate that is near-identical (same polarity, cosine >=
+        # threshold) to an atom already in the bank — auto-distill otherwise piles up dozens
+        # of paraphrased duplicates that never add knowledge and crowd retrieval.
+        try:
+            nv = self._embed_atom(atom)
+            for a in self.atoms:
+                if getattr(a, "polarity", None) == getattr(atom, "polarity", None) \
+                        and _cosine(nv, self._embed_atom(a)) >= self._dup_cosine():
+                    return a
+        except Exception:
+            pass
         self.atoms.append(atom)
         save_atoms(self._path, self.atoms)
         return atom
+
+    def prune(self, drop_candidates: bool = True, dedup_active: bool = True):
+        """Maintenance: shrink the bank to VALIDATED, DISTINCT knowledge. Drops unvalidated
+        `candidate` atoms (they are never retrieved — retrieval is active-only — so they are
+        pure file bloat; a genuinely useful one re-distills + re-validates) and collapses
+        near-duplicate active atoms (same polarity, cosine >= threshold), keeping the
+        manually-validated one (else the first). Returns (removed, kept). Uses the cached
+        vectors, so it is mostly offline. Writes the bank back."""
+        survivors = [a for a in self.atoms if a.status == "active"] if drop_candidates else list(self.atoms)
+        if dedup_active:
+            survivors.sort(key=lambda a: 0 if getattr(a, "validated_by", "") == "manual" else 1)
+            keep: list = []
+            for a in survivors:
+                dup = False
+                try:
+                    av = self._embed_atom(a)
+                    for b in keep:
+                        if getattr(a, "polarity", None) == getattr(b, "polarity", None) \
+                                and _cosine(av, self._embed_atom(b)) >= self._dup_cosine():
+                            dup = True
+                            break
+                except Exception:
+                    pass
+                if not dup:
+                    keep.append(a)
+            survivors = keep
+        removed = len(self.atoms) - len(survivors)
+        self.atoms = survivors
+        save_atoms(self._path, self.atoms)
+        return removed, len(survivors)
 
     def distill(self, design_intent, error, script_code, source_task="",
                 polarity="method", status="candidate"):
