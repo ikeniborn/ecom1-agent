@@ -39,7 +39,7 @@ deterministic Plan-IR interpreter.
    `ECOM_INVESTIGATE_ENABLED=1`) — called once after INTENT, before the loop. Runs a
    bounded read-only ReAct loop (`ECOM_INVESTIGATE_MAX_STEPS` steps) fetching doc bodies,
    listings, and table samples on demand; per-step oracle retrieval uses
-   `ECOM_INVESTIGATE_ORACLE_K`. Read-only gate: `investigate.is_readonly(tool)` — mutations
+   `ECOM_INVESTIGATE_ORACLE_K`. Read-only gate: `investigate.is_readonly(tool, args)` — mutations
    are never dispatched here (they stay in the plan's `ops`). Stops on sufficiency (all
    `intent.required_refs` groundable from `env`) or step budget. Escalates from fast to
    reason tier on a deterministic stall (empty result or repeated tool signature). Per-step
