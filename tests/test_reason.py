@@ -89,3 +89,17 @@ def test_run_plan_renders_observed_block():
         run_plan(spec, _FACTS, [], None, observed=["[Exec /bin/sql] cnt 5", "[List /proc] /proc/x"])
     assert "OBSERVED_RPC_OUTPUTS:" in captured["user"]
     assert "/proc/x" in captured["user"]
+
+
+def test_facts_block_plan_tier_includes_policies():
+    from agent.reason import _facts_block
+
+    facts = {
+        "schema": "CREATE TABLE x(...)",
+        "docs_inventory": "/docs/refunds.md",
+        "policies": {"/docs/refunds.md": "Refunds allowed within 30 days."},
+        "gather_status": {"policies": "ok"},
+    }
+    block = _facts_block(facts, tier="plan")
+    assert "Refunds allowed within 30 days." in block
+    assert "/docs/refunds.md" in block

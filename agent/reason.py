@@ -86,8 +86,8 @@ def _facts_sufficiency(facts: Any) -> list[str]:
     return [k for k, v in status.items() if v != "ok"]
 
 
-_PLAN_KEYS = ("agents_md_inventory", "schema", "identity", "docs_inventory")
-_INTENT_KEYS = _PLAN_KEYS + ("policies",)
+_PLAN_KEYS = ("agents_md_inventory", "schema", "identity", "docs_inventory", "policies")
+_INTENT_KEYS = _PLAN_KEYS
 
 
 def _facts_block(facts: Any, tier: str = "plan") -> str:
@@ -99,8 +99,13 @@ def _facts_block(facts: Any, tier: str = "plan") -> str:
     parts = []
     for key in keys:
         val = facts.get(key) if isinstance(facts, dict) else None
-        if val:
-            parts.append(f"## {key}\n{val if isinstance(val, str) else val}")
+        if not val:
+            continue
+        if key == "policies" and isinstance(val, dict):
+            for path, body in val.items():
+                parts.append(f"## POLICY {path}\n{body}")
+        else:
+            parts.append(f"## {key}\n{val}")
     # Catalogue candidates: included for both intent and plan tiers when non-empty.
     cand = facts.get("catalogue_candidates", "") if isinstance(facts, dict) else ""
     if cand:
