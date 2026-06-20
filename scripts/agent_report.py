@@ -268,8 +268,93 @@ def render_report(tasks: list[TaskTrace]) -> str:
     return "\n".join(parts)
 
 
-def render_task_section(task: TaskTrace) -> str:  # replaced in Task 17
-    return f"<h2 id='{_esc(task.task_id)}'>{_esc(task.task_id)}</h2>"
+_STEP_COLOR = {
+    "INTENT": "var(--accent)", "PLAN": "var(--accent)", "INTERPRET": "var(--ok)",
+    "VERIFY": "var(--warn)", "ILEARN": "var(--bad)", "DOC_SELECT": "var(--muted)",
+    "ORACLE_RETRIEVE": "var(--muted)", "DISTILL": "var(--muted)",
+    "PREPHASE_GATHER": "var(--muted)", "ANSWER": "var(--ok)", "LINT": "var(--warn)",
+}
+
+
+def _cycle_svg() -> str:
+    """Static inline SVG of the per-cycle loop: PLAN -> lint -> interpret -> verify
+    -> answer, with the verify-fail -> iLEARN -> PLAN branch."""
+    boxes = [("PLAN", 10), ("lint", 110), ("interpret", 200), ("verify", 320), ("answer", 430)]
+    rects = []
+    for label, x in boxes:
+        rects.append(
+            f"<rect x='{x}' y='30' width='85' height='28' rx='4' fill='var(--panel)' "
+            f"stroke='var(--line)'/>"
+            f"<text x='{x + 42}' y='48' text-anchor='middle' font-size='12' "
+            f"fill='var(--fg)'>{label}</text>")
+    arrows = (
+        "<line x1='95' y1='44' x2='110' y2='44' stroke='var(--fg)'/>"
+        "<line x1='195' y1='44' x2='200' y2='44' stroke='var(--fg)'/>"
+        "<line x1='285' y1='44' x2='320' y2='44' stroke='var(--fg)'/>"
+        "<line x1='405' y1='44' x2='430' y2='44' stroke='var(--fg)'/>"
+        "<path d='M360 58 L360 90 L52 90 L52 58' fill='none' stroke='var(--bad)' "
+        "stroke-dasharray='4'/>"
+        "<text x='200' y='86' text-anchor='middle' font-size='11' fill='var(--bad)'>"
+        "verify fail -> iLEARN -> re-PLAN</text>")
+    return (f"<svg width='540' height='100' role='img' aria-label='cycle diagram'>"
+            f"{''.join(rects)}{arrows}</svg>")
+
+
+def _timeline(task: TaskTrace) -> str:
+    events = []
+    for c in task.llm_calls:
+        events.append((c.seq, c.step_type, f"{c.phase} c{c.cycle} {c.duration_ms}ms"))
+    for v in task.vm_calls:
+        events.append((v.seq, v.step_type, f"{v.rpc} c{v.cycle}"))
+    for g in task.gates:
+        events.append((g.seq, g.step_type, f"gate {'ok' if g.passed else 'FAIL'}"))
+    events.sort(key=lambda e: e[0])
+    spans = "".join(
+        f"<span style='border-left:4px solid {_STEP_COLOR.get(st, 'var(--line)')}' "
+        f"title='{_esc(detail)}'>{_esc(st)}</span>"
+        for _, st, detail in events)
+    return f"<div class='timeline'>{spans}</div>"
+
+
+def _task_tool_table(task: TaskTrace) -> str:
+    rows = "".join(
+        f"<tr><td class='l'>{_esc(v.rpc)}</td>"
+        f"<td class='l'>{_esc((v.args or {}).get('path') or (v.args or {}).get('root') or '')}</td>"
+        f"<td>{v.bytes}</td><td>{'data' if v.has_data else 'empty'}</td>"
+        f"<td class='{'ok' if v.validation.startswith('ok') else 'bad'}'>{_esc(v.validation)}</td></tr>"
+        for v in task.vm_calls)
+    if not rows:
+        rows = "<tr><td colspan='5' class='muted'>no tool calls</td></tr>"
+    return ("<table><tr><th class='l'>rpc</th><th class='l'>target</th><th>bytes</th>"
+            "<th>hit</th><th>validation</th></tr>" + rows + "</table>")
+
+
+def _reasoning_panels(task: TaskTrace) -> str:
+    out = []
+    for c in task.llm_calls:
+        avail = "yes" if c.reasoning_available else "no"
+        body = c.reasoning if c.reasoning_available else "(no reasoning captured)"
+        out.append(
+            f"<details><summary>{_esc(c.phase)} · cycle {c.cycle} · "
+            f"reasoning={avail} · tok {c.tokens_in}/{c.tokens_out}</summary>"
+            f"<pre>{_esc(body)}</pre></details>")
+    return "".join(out)
+
+
+def render_task_section(task: TaskTrace) -> str:
+    overlap = "" if task.facts_overlap is None else f" · facts-overlap {task.facts_overlap:.2f}"
+    detail = "".join(f"<li>{_esc(d)}</li>" for d in task.score_detail)
+    detail_html = f"<ul>{detail}</ul>" if detail else ""
+    return (
+        f"<h2 id='{_esc(task.task_id)}'>{_esc(task.task_id)} — "
+        f"<span class='{'ok' if task.outcome == 'OUTCOME_OK' else 'warn'}'>"
+        f"{_esc(task.outcome)}</span>{overlap}</h2>"
+        f"<pre class='muted'>{_esc(task.instruction)}</pre>"
+        f"<h3>Step timeline</h3>{_timeline(task)}"
+        f"<h3>Cycle</h3>{_cycle_svg()}"
+        f"<h3>Tool usage</h3>{_task_tool_table(task)}"
+        f"<h3>Reasoning</h3>{_reasoning_panels(task)}"
+        f"{('<h3>Grader feedback</h3>' + detail_html) if detail_html else ''}")
 
 
 def main() -> int:

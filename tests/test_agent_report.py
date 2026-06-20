@@ -68,3 +68,27 @@ def test_render_overview_no_external_resources(tmp_path):
     assert "src=" not in html_doc and "href=" not in html_doc
     assert "t38" in html_doc and "OUTCOME_OK" in html_doc
     assert "--bg" in html_doc and "prefers-color-scheme: dark" in html_doc
+
+
+def test_per_task_section_has_timeline_svg_reasoning(tmp_path):
+    p = tmp_path / "t38.jsonl"
+    _write_trace(p, _v2_records())
+    html_doc = R.render_report([R.parse_task_trace(p)])
+    # anchored section
+    assert "id='t38'" in html_doc
+    # step timeline mentions step types
+    assert "INTENT" in html_doc and "PLAN" in html_doc and "INTERPRET" in html_doc
+    # cycle diagram rendered as inline SVG (no external image)
+    assert "<svg" in html_doc and "verify" in html_doc.lower()
+    # reasoning panel for the INTENT call (reasoning_available True)
+    assert "thinking hard" in html_doc
+    # per-task tool-usage table shows validation failure
+    assert "fail(" in html_doc or "val-fail" in html_doc
+    # still self-contained
+    assert "src=" not in html_doc and "href='http" not in html_doc
+
+
+def test_cycle_svg_is_inline_and_static():
+    svg = R._cycle_svg()
+    assert svg.startswith("<svg") and "PLAN" in svg and "iLEARN" in svg
+    assert "http" not in svg  # no external refs
