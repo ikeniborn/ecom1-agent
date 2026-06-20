@@ -22,6 +22,14 @@ Built by `_failures_table` (`scripts/run_report.py:376`). A cell counts as a fai
 
 Invoke with a file path to render one trace, or a run directory to list available traces (`scripts/trace_view.py:42`): `uv run python scripts/trace_view.py logs/<run>/t09.jsonl`. The script inserts the repo root on `sys.path` so it runs from anywhere (`scripts/trace_view.py:23`). The timeline shows pre-phase facts, each VM RPC and result head, the LLM conversation per phase/cycle, the projected/captured answer (message + outcome + refs), and the final result. Flags: `--phase <NAME>` to filter one phase, `--no-system` / `--full-system` to control system-prompt display, `--llm-only` to hide non-LLM events, and `--max-chars N` to truncate bodies. See [[proto-api]] for the RPCs that appear in the timeline.
 
+## Reasoning Trace
+
+`scripts/trace_t38.py` runs ONE benchmark task through the real pipeline and records an enriched JSONL trace that — beyond the built-in `agent.trace` records — captures the model's chain-of-thought reasoning and the un-stripped raw response per LLM call. It exists because the production trace discards reasoning before it lands (see [[learning#trace.py (JSONL trace files)]]): `agent/llm.py` strips `<think>…</think>` and the Anthropic path keeps only `type="text"` blocks; the claude-code path requests `--output-format json`, whose envelope carries only the final text.
+
+Invoke from anywhere (the script `chdir`s to the repo root): `uv run python scripts/trace_t38.py [task_id] [model]` — defaults `t38` / `deepseek-v4-flash:cloud`; CC example `… t38 claude-code/haiku`. It forces `ECOM_MODEL` before importing `agent.llm`, locates the named task's trial (StartRun → start each trial, end non-matching), runs it with an enriched `ReasoningTrace`, then SubmitRun for the grader score. No repo source is modified — only runtime monkeypatches.
+
+Reasoning capture is per-provider: Ollama (`<think>` inline / `reasoning_content` / `reasoning`) and OpenRouter are teed at the OpenAI client `.create` seam; Anthropic thinking blocks at `messages.create`; claude-code is captured by swapping the spawn to `--output-format stream-json --verbose` and sniffing `thinking` blocks while `cc_client._parse_envelope` still reads the terminal `result` line unchanged. Outputs (under `logs/trace_<task>_<ts>_<model>/`): `<task>.jsonl` (enriched: `seq`, `cycle`, `phase`, `prev_llm_seq`, `reasoning`, `raw_response_full`), the auto `<task>.detail.log`, and `<task>.reasoning.md` (system/user/reasoning/response interleave). See [[pipeline#run_pipeline]] for the phases traced; an analysis built from these traces lives at `docs/reports/t38-trace-analysis.html`.
+
 ## Migrate Learned
 
 `scripts/migrate_learned.py` is a one-time, idempotent migration converting flat-list `data/learned/{task_id}.yaml` files into the current entry-schema format used by the [[learning]] store.
