@@ -422,7 +422,6 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
                 break
             continue
         empty_streak = 0
-        log_gate_auto("PLAN", True, "")
         log_gate_auto("LINT", True, "")
 
         sig = _plan_signature(plan)

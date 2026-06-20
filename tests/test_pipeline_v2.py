@@ -41,30 +41,41 @@ def test_log_gate_auto_emits_gate(tmp_path):
 
 
 def test_run_pipeline_emits_full_v2_trace(tmp_path, monkeypatch):
-    """A full run_pipeline over MockVMSpy yields a v2 trace exercising INTENT, PLAN,
-    LINT, INTERPRET, VERIFY gates, vm_call (logged by MockVMSpy), and ANSWER — every
-    llm_call phase named (no 'llm')."""
+    """Full run_pipeline over MockVMSpy yields a complete v2 trace: real INTENT + PLAN
+    llm_call records (named phases, never 'llm'), LINT/INTERPRET/VERIFY gates, vm_call
+    under INTERPRET (MockVMSpy), ANSWER, seq gap-free. The LLM is stubbed at the
+    funnel's single-model seam so the REAL run_intent/run_plan run and emit real
+    llm_call records (with step_type) — only the network call is faked."""
     import json
 
     from agent import trace
     from agent.trace import TraceLogger
-    import agent.reason as reason
-    from agent.ir_models import (AnswerShape, AnswerTemplateIR, DecisionTree,
-                                 IntentSpec, PlanIR, Step)
+    import agent.llm as llm
     from agent.mock_vm_spy import MockVMSpy, fixture_key
     import agent.pipeline as pipeline
 
-    intent = IntentSpec(objective="count", desired_outcome="OUTCOME_OK",
-                        outcome_space=["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
-                        answer_shape=AnswerShape(), success_criteria={}, required_refs={})
-    plan = PlanIR(
-        discovery=[Step(rpc="Exec", args={"path": "/bin/sql", "stdin": "SELECT 1 AS n"},
-                        bind="r")],
-        decision=DecisionTree(branches=[], default_label="d"),
-        answer={"d": AnswerTemplateIR(message="done", outcome="OUTCOME_OK", refs=[])},
-    )
-    monkeypatch.setattr(reason, "run_intent", lambda *a, **k: intent)
-    monkeypatch.setattr(reason, "run_plan", lambda *a, **k: plan)
+    _INTENT_JSON = json.dumps({
+        "objective": "count rows", "desired_outcome": "OUTCOME_OK",
+        "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
+        "params": {}, "constraints": [], "success_criteria": {},
+        "answer_shape": {"msg_skeleton": ""}, "required_refs": {},
+    })
+    _PLAN_JSON = json.dumps({
+        "discovery": [{"rpc": "Exec", "args": {"path": "/bin/sql", "stdin": "SELECT 1 AS n"}, "bind": "r"}],
+        "rowsets": [], "compute": [],
+        "decision": {"branches": [], "default_label": "d"}, "ops": [],
+        "answer": {"d": {"message": "done", "outcome": "OUTCOME_OK", "refs": []}},
+        "custom_extract": [],
+    })
+
+    def fake_single(system, user_msg, model, cfg, **kw):
+        text = system if isinstance(system, str) else "".join(
+            b.get("text", "") for b in system if isinstance(b, dict))
+        return _PLAN_JSON if "PHASE: PLAN" in text else _INTENT_JSON
+
+    monkeypatch.setenv("ECOM_MODEL", "stub-model")
+    monkeypatch.setenv("ECOM_ORACLE_ENABLED", "0")
+    monkeypatch.setattr(llm, "_call_raw_single_model", fake_single)
 
     fixtures = {fixture_key("Exec", "/bin/sql", ["SELECT 1 AS n"]): {"stdout": "n\n1\n"}}
     vm = MockVMSpy(fixtures)
@@ -81,15 +92,19 @@ def test_run_pipeline_emits_full_v2_trace(tmp_path, monkeypatch):
 
     recs = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
     step_types = {r.get("step_type") for r in recs if "step_type" in r}
-    assert {"PLAN", "INTERPRET", "VERIFY", "ANSWER"} <= step_types
+    assert {"INTENT", "PLAN", "INTERPRET", "VERIFY", "ANSWER"} <= step_types
     # vm_call logged by MockVMSpy under INTERPRET
     assert any(r["type"] == "vm_call" and r["step_type"] == "INTERPRET" for r in recs)
-    # gate records present with reasons
+    # gate records present (LINT + VERIFY); NO 'PLAN' gate (PLAN is an LLM phase)
     gates = [r for r in recs if r["type"] == "gate"]
-    assert any(g["step_type"] == "LINT" for g in gates)
-    assert any(g["step_type"] == "VERIFY" for g in gates)
-    # no llm_call left at the literal 'llm' phase
+    gate_types = {g["step_type"] for g in gates}
+    assert "LINT" in gate_types and "VERIFY" in gate_types
+    assert "PLAN" not in gate_types
+    # every llm_call phase is named (never the literal 'llm')
     assert all(r.get("phase") != "llm" for r in recs if r["type"] == "llm_call")
+    # at least the INTENT + PLAN llm_calls exist with their step_types
+    llm_phases = {r["step_type"] for r in recs if r["type"] == "llm_call"}
+    assert {"INTENT", "PLAN"} <= llm_phases
     # seq strictly monotonic and gap-free
     seqs = [r["seq"] for r in recs]
     assert seqs == list(range(len(seqs)))
