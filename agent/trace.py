@@ -27,6 +27,17 @@ def current_cycle() -> int:
     return getattr(_tl, "cycle", 0)
 
 
+def set_step_type(st: str) -> None:
+    """Record the active step_type so VM/gate records emitted by the VM layer
+    (which has no phase context) are tagged. PREPHASE_GATHER in the orchestrator,
+    INTERPRET in the interpreter."""
+    _tl.step_type = st
+
+
+def current_step_type() -> str:
+    return getattr(_tl, "step_type", "")
+
+
 # Truncation caps for the deterministic-execution records (keep traces analysis-sized).
 _VM_HEAD_CAP = 1000
 _FACT_HEAD_CAP = 2000
@@ -50,11 +61,15 @@ class TraceLogger:
         self._fh = path.open("w", buffering=1, encoding="utf-8")
         self._task_id = task_id
         self._seen_sha: set[str] = set()
+        self._seq = 0
+        self._last_llm_seq: int | None = None
 
     def _ts(self) -> str:
         return datetime.now(tz=timezone.utc).isoformat()
 
     def _write(self, record: dict) -> None:
+        record.setdefault("seq", self._seq)
+        self._seq += 1
         record.setdefault("ts", self._ts())
         record.setdefault("task_id", self._task_id)
         self._fh.write(json.dumps(record, ensure_ascii=False) + "\n")
