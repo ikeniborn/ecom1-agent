@@ -7,6 +7,7 @@ from typing import Any
 
 from .oracle_atoms import build_oracle_block
 from .ir_models import IntentSpec, PlanIR
+from .tools import build_tool_catalog_block
 from .json_extract import _extract_json_from_text
 from .learned_store import _format_entry
 from .llm import _resolve_model_for_phase
@@ -140,6 +141,7 @@ def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str |
              token_out: dict | None = None, oracle_atoms: list | None = None,
              observed: list[str] | None = None) -> PlanIR:
     guide = load_prompt("plan") or "# PHASE: PLAN"
+    guide = guide + "\n\n" + build_tool_catalog_block()
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
     parts = []
     ob = build_oracle_block(oracle_atoms)

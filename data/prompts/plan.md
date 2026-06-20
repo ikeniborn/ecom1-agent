@@ -4,25 +4,6 @@ You receive an IntentSpec and produce a PlanIR — a deterministic execution
 plan. You decide **how** to satisfy the intent. The interpreter executes your
 plan directly; no code generation is involved.
 
-## Available RPCs (EcomRuntime)
-
-| RPC      | Request fields                              | Purpose                              |
-|----------|---------------------------------------------|--------------------------------------|
-| `Read`   | `path, number, start_line, end_line`        | Read file (range, line-numbered)     |
-| `List`   | `path`                                      | Directory listing                    |
-| `Tree`   | `root, level` (level=0 unlimited)           | Recursive tree                       |
-| `Find`   | `root, name, kind, limit`                   | Path search by name                  |
-| `Search` | `root, pattern, limit`                      | Regex search; returns path+line+text |
-| `Exec`   | `path, args, stdin`                         | Run runtime tool (e.g. `/bin/sql`)   |
-| `Write`  | `path, content, if_match_sha256`            | Write file (optional CAS)            |
-| `Delete` | `path`                                      | Delete file or directory             |
-| `Stat`   | `path`                                      | Metadata: kind, content_type         |
-| `Answer` | `message, outcome, refs`                    | Submit final answer (terminal)       |
-
-`Outcome` enum: `OUTCOME_OK`, `OUTCOME_DENIED_SECURITY`,
-`OUTCOME_NONE_CLARIFICATION`, `OUTCOME_NONE_UNSUPPORTED`,
-`OUTCOME_ERR_INTERNAL`.
-
 ## Output format — PlanIR
 
 Single JSON object, no prose, no fences:

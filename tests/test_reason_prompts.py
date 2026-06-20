@@ -24,3 +24,23 @@ def test_ilearn_prompt_loads_and_is_planir_framed():
     assert txt and "PLAN" in txt.upper()
     assert "prephase_deep_read" in txt
     assert "fidelity" not in txt.lower()           # no codegen framing
+
+
+def test_plan_system_includes_tool_catalog(monkeypatch):
+    import agent.reason as reason
+    from agent.ir_models import AnswerShape, IntentSpec
+
+    captured = {}
+
+    def fake_raw(system, user, model, cfg, **kw):
+        captured["system"] = system
+        return '{"discovery": [], "decision": {"branches": [], "default_label": "d"}, ' \
+               '"answer": {"d": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}}}'
+
+    monkeypatch.setattr(reason, "_call_llm_raw", fake_raw)
+    intent = IntentSpec(objective="o", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK"], answer_shape=AnswerShape())
+    reason.run_plan(intent, None, [], None)
+    sys_text = "\n".join(b["text"] for b in captured["system"])
+    assert "TOOL CATALOG" in sys_text
+    assert "Frobnicate" not in sys_text  # only catalog rpcs
