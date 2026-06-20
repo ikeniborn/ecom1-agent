@@ -44,7 +44,6 @@ def test_catalog_keys_subset_of_proto_fields():
         ReadRequest, ListRequest, TreeRequest, FindRequest, SearchRequest,
         ExecRequest, WriteRequest, DeleteRequest, StatRequest,
     )
-    from agent.tools import TOOL_CATALOG
 
     req_cls = {
         "Read": ReadRequest, "List": ListRequest, "Tree": TreeRequest,
@@ -56,3 +55,10 @@ def test_catalog_keys_subset_of_proto_fields():
         keys = entry["required"] | entry["optional"]
         missing = keys - fields
         assert not missing, f"{rpc} catalog keys not in proto: {missing}"
+
+
+def test_all_catalog_examples_are_valid():
+    """Every catalog `example` must itself pass validate_step — guards copy-paste drift."""
+    for rpc, entry in TOOL_CATALOG.items():
+        ex = entry["example"]
+        assert validate_step(ex["rpc"], ex["args"]) is None, f"{rpc} example invalid"
