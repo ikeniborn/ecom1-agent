@@ -1,12 +1,8 @@
 {
-  "objective": "Determine whether the product catalogue contains an item matching the caller's description: Heco brand, Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer line, fastener type bolt, diameter 10 mm.",
+  "objective": "Determine whether the catalogue carries a Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer variant with fastener type bolt and diameter 8 mm.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "brand": "Heco, extracted from caller instruction",
-    "series_model_token": "distinctive model/series token from caller instruction product line (e.g. HECO 3DW-64B)",
-    "product_category": "Nut Bolt and Washer, from caller instruction",
-    "fastener_type": "bolt, from caller instruction",
-    "diameter_mm": "10, from caller instruction"
+    "matched_candidate": "lookup at most one row from product_variants (prefer the CATALOGUE_CANDIDATES fact rows) WHERE brand normalized = 'heco' AND model/series normalized matches 'heco 3dw-64b' / 'zinc plated' AND product_name normalized contains 'nut bolt and washer' AND fastener type 'bolt' AND diameter '8mm'; match case- and whitespace-insensitive; LIMIT 1"
   },
   "outcome_space": [
     "OUTCOME_OK"
@@ -16,16 +12,22 @@
     "OUTCOME_OK": [
       {
         "op": "ge",
-        "lhs": "$match_count",
+        "lhs": "$matched_candidate_count",
         "rhs": 0,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Catalogue search result: <YES> (record_path: {record_path}) if a matching product is found, otherwise <NO> if absent"
+    "msg_skeleton": "{yes_no}: Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer (fastener type bolt, 8 mm) — {product_sku}"
   },
   "required_refs": {
-    "OUTCOME_OK": []
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$matched_candidate.record_path"
+      }
+    ]
   }
 }

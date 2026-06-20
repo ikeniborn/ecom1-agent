@@ -1,0 +1,54 @@
+{
+  "objective": "Identify and cite all payment records from archived history belonging to a Risk Ops-confirmed fraud hit",
+  "desired_outcome": "OUTCOME_NONE_CLARIFICATION",
+  "params": {
+    "fraud_hit_identifier": "Unique ID or reference for the confirmed fraud hit (not provided in instruction)",
+    "fraud_membership_criteria": "Policy rule or operational signature (device fingerprint pattern, payment method pattern, geographic anomaly, transaction sequence, amount threshold, or incident reference ID) that determines which payments belong to this hit (not specified)",
+    "archived_scope": "Definition of 'older archived payment history' — time range, archive status flag, or data source selector (not clarified in instruction)"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_CLARIFICATION"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$rows",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "ge",
+        "lhs": "$rows_count",
+        "rhs": "1",
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$rows.0.record_path",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$rows.0.payment_id",
+        "rhs": null,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "Identified {row_count} payment records belonging to fraud hit. Records: {record_paths}"
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$rows.record_path"
+      }
+    ]
+  }
+}

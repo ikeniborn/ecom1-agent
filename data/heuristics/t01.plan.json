@@ -1,35 +1,33 @@
 {
   "discovery": [
     {
-      "rpc": "Read",
-      "args": {
-        "path": "/docs/README.md"
-      },
-      "bind": "docs_readme"
-    },
-    {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [
-          ":brand=Heco",
-          ":token=HECO 3DW-64B"
-        ],
-        "stdin": "SELECT record_path FROM product_variants WHERE LOWER(TRIM(brand)) = LOWER(TRIM(:brand)) AND (LOWER(TRIM(series)) LIKE '%' || LOWER(TRIM(:token)) || '%' OR LOWER(TRIM(model)) LIKE '%' || LOWER(TRIM(:token)) || '%') LIMIT 5"
+        "args": [],
+        "stdin": "SELECT product_sku, record_path FROM product_variants WHERE LOWER(TRIM(brand)) = 'heco' AND LOWER(TRIM(series)) = 'zinc plated' AND LOWER(TRIM(model)) = 'heco 3dw-64b' AND LOWER(product_name) LIKE '%nut bolt and washer%' AND LOWER(product_name) LIKE '% bolt 8mm%' LIMIT 1;"
       },
-      "bind": "catalog_text"
+      "bind": "matched_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "catalog_text",
+      "from_": "matched_raw",
       "format": "auto_delim",
-      "into": "catalog_rows",
+      "into": "matched_rows",
       "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku",
+            "sku"
+          ]
+        },
         {
           "into": "record_path",
           "candidates": [
-            "record_path"
+            "record_path",
+            "path"
           ]
         }
       ]
@@ -37,53 +35,51 @@
   ],
   "compute": [
     {
-      "prim": "count",
-      "args": [
-        "$catalog_rows"
-      ],
-      "into": "match_count"
-    },
-    {
       "prim": "first",
       "args": [
-        "$catalog_rows"
+        "$matched_rows"
       ],
-      "into": "first_record"
+      "into": "matched_candidate"
+    },
+    {
+      "prim": "count",
+      "args": [
+        "$matched_rows"
+      ],
+      "into": "matched_candidate_count"
     },
     {
       "prim": "get",
       "args": [
-        "$first_record",
-        "record_path"
+        "$matched_candidate",
+        "product_sku"
       ],
-      "into": "first_record_path"
+      "into": "product_sku"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "ge",
-          "lhs": "$match_count",
-          "rhs": 1,
+          "op": "gt",
+          "lhs": "$matched_candidate_count",
+          "rhs": 0,
           "args": []
         },
-        "label": "found"
+        "label": "present"
       }
     ],
     "default_label": "absent"
   },
   "ops": [],
   "answer": {
-    "found": {
-      "message": "Catalogue search result: <YES> (record_path: {first_record_path})",
+    "present": {
+      "message": "YES: Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer (fastener type bolt, 8 mm) — {product_sku}",
       "outcome": "OUTCOME_OK",
-      "refs": [
-        "$first_record_path"
-      ]
+      "refs": []
     },
     "absent": {
-      "message": "Catalogue search result: <NO>",
+      "message": "NO: Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer (fastener type bolt, 8 mm) — not in catalogue",
       "outcome": "OUTCOME_OK",
       "refs": []
     }

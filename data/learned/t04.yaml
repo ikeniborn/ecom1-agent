@@ -85,9 +85,26 @@ entries:
   submitted_message: <NO>
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
+- agents_md_anchor: null
+  content: Never emit an Answer RPC with empty args; always populate the op's args
+    with the resolved message text and explicit outcome so the VM receives a non-empty
+    final answer regardless of which decision branch is taken.
+  created: '2026-06-19'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'The real_vm error ''answer must be non empty'' correlates directly to
+    the PlanIR ops list where both Answer RPCs specify ''"args": {}''. Although the
+    top-level ''answer'' dictionary defines strings for the ''found'' and ''not_found''
+    labels, the VM evidently does not automatically inject those templates into the
+    operation arguments. When the branch executed—most likely ''not_found'' because
+    the rigid SQL filter produced no rows—the Answer call had no payload, causing
+    the VM to see an empty final answer and reject it. The fix is to shape the PlanIR
+    so the Answer op explicitly carries the message and outcome in its args.'
+  status: active
+  surface: ir
 last_run:
   cycles_used: 1
   date: '2026-06-19'
-  outcome: OUTCOME_OK
-  status: success
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
 task_id: t04

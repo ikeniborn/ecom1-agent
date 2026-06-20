@@ -4,51 +4,36 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT record_path, brand, series, model, product_name FROM product_variants WHERE LOWER(TRIM(brand)) LIKE '%' || LOWER(TRIM(:brand_token)) || '%' AND ( LOWER(TRIM(product_name)) LIKE '%' || LOWER(TRIM(:model_token)) || '%' OR LOWER(TRIM(series)) LIKE '%' || LOWER(TRIM(:model_token)) || '%' OR LOWER(TRIM(model)) LIKE '%' || LOWER(TRIM(:model_token)) || '%' ) LIMIT 25",
         "args": [
-          "brand_token=Fischer",
-          "model_token=7UY-G03"
-        ]
+          "SELECT product_sku, product_name, record_path FROM product_variants WHERE LOWER(TRIM(brand)) = LOWER(TRIM(:brand)) AND LOWER(TRIM(series)) = LOWER(TRIM(:series)) AND LOWER(TRIM(model)) = LOWER(TRIM(:model)) AND LOWER(TRIM(product_name)) LIKE '%' || LOWER(TRIM(:color)) || '%'"
+        ],
+        "stdin": "{\"brand\":\"Helios\",\"series\":\"Professional\",\"model\":\"Helios 29A-FTE\",\"color\":\"White\"}"
       },
-      "bind": "raw_rows"
+      "bind": "$catalog_matches_text"
     }
   ],
   "rowsets": [
     {
-      "from_": "raw_rows",
+      "from_": "$catalog_matches_text",
       "format": "auto_delim",
-      "into": "rows",
+      "into": "$catalog_matches",
       "columns": [
         {
-          "into": "record_path",
+          "into": "product_sku",
           "candidates": [
-            "record_path",
-            "record path"
-          ]
-        },
-        {
-          "into": "brand",
-          "candidates": [
-            "brand"
-          ]
-        },
-        {
-          "into": "series",
-          "candidates": [
-            "series"
-          ]
-        },
-        {
-          "into": "model",
-          "candidates": [
-            "model"
+            "product_sku"
           ]
         },
         {
           "into": "product_name",
           "candidates": [
-            "product_name",
-            "product name"
+            "product_name"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
           ]
         }
       ]
@@ -58,51 +43,43 @@
     {
       "prim": "count",
       "args": [
-        "$rows"
+        "$catalog_matches"
       ],
-      "into": "match_count"
+      "into": "$match_count"
     },
     {
       "prim": "first",
       "args": [
-        "$rows"
+        "$catalog_matches"
       ],
-      "into": "first_record"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$first_record",
-        "record_path"
-      ],
-      "into": "first_record_path"
+      "into": "$first_match"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "ge",
+          "op": "gt",
           "lhs": "$match_count",
-          "rhs": 1,
+          "rhs": "0",
           "args": []
         },
         "label": "found"
       }
     ],
-    "default_label": "absent"
+    "default_label": "not_found"
   },
   "ops": [],
   "answer": {
     "found": {
-      "message": "<YES> — catalogue contains the Fischer SX 7UY-G03 Anchor and Wall Plug (concrete anchor, diameter 6 mm). Matched record: {first_record_path}",
+      "message": "<YES> — {first_match.product_name} ({first_match.product_sku}) is in the catalogue.",
       "outcome": "OUTCOME_OK",
       "refs": [
-        "$first_record.record_path"
+        "$first_match.record_path"
       ]
     },
-    "absent": {
-      "message": "<NO> — catalogue does not contain the Fischer SX 7UY-G03 Anchor and Wall Plug (concrete anchor, diameter 6 mm).",
+    "not_found": {
+      "message": "<NO> — the specified product does not exist in the catalogue.",
       "outcome": "OUTCOME_OK",
       "refs": []
     }

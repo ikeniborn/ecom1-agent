@@ -1,0 +1,341 @@
+entries:
+- agents_md_anchor: null
+  content: When reading a file located via Find/listing under a named directory, project
+    a verified regular-file path into the Read ref and branch on the empty-listing
+    case; never pass a bare directory root or an unguarded index ref that can resolve
+    to a directory.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: 'Verbatim error: ''real_vm: read failed: is a directory''. Failing PlanIR
+    fragment: discovery step {"rpc":"Read","args":{"path":"$receipt_files.0.path"},"bind":"receipt_text"}
+    chained off Find(root=/uploads,kind=file,limit=5). Root cause: the path ref $receipt_files.0.path
+    did not project a concrete file — it resolved to a directory (the /uploads root
+    or an unfiltered entry), so Read was handed a directory and failed before receipt_text
+    was ever bound; every downstream ref (receipt_items, matched_products, totals)
+    was therefore empty. The PlanIR blindly indexed .0 with no guard that the entry
+    is a regular file and no branch for an empty/dir-only listing. Rule linkage: forces
+    the PLAN to project a verified file path into the Read ref and guard the listing,
+    so the next cycle grounds receipt_text on an actual file. Added /uploads to prephase_deep_read
+    so the pre-phase eagerly surfaces the real receipt filename, letting the PlanIR
+    reference a concrete file path instead of guessing index .0.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the target file lives under a named upload directory, make discovery
+    recursive and add a rowset that filters listing entries to regular files by entry
+    kind before projecting the first path into Read; do not trust Find's kind=file
+    argument or a bare index ref, since a non-recursive listing can still surface
+    a subdirectory at index 0.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'Verbatim ERROR: ''real_vm: read failed: is a directory''. Failing PlanIR
+    fragment: discovery step Read with path ''$receipt_files.0.path'' fed by Find{root:/uploads,
+    kind:file, limit:5}. Root cause: /uploads nests the receipt inside a subdirectory
+    (or Find did not honor kind=file), so the non-recursive listing returned a directory
+    at index 0; the unguarded index projection ''.0.path'' passed that directory path
+    straight to Read, which rejects directories. The in-session rule already bans
+    unguarded index refs but the PLAN rationalized that kind=file made the ref safe
+    — this rule closes that loophole: kind=file is not a guarantee, so the listing
+    must be recursive and explicitly type-filtered to regular files before any path
+    is projected into Read. Adds /uploads to prephase deep-read so the pre-phase surfaces
+    the actual receipt path next run instead of guessing via index projection.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always invoke the filter_rows primitive with exactly two arguments — the
+    rowset ref plus a single predicate/op-spec — and never pass column and value as
+    separate positional args (3-arg form); encode an equality filter as one op-spec
+    object, or push the row filter into the discovery query or rowset column projection
+    so the kind=regular-file selection happens before compute.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: 'Verbatim error: "plan: primitive ''filter_rows'' takes 2 arg(s), plan
+    supplies 3". Root cause: PlanIR arity mismatch — the compute step {"prim":"filter_rows","args":["$files","kind","file"],"into":"regular_files"}
+    supplies three positional args (rowset, column name, value), but the filter_rows
+    primitive signature accepts only two. The author followed the existing in-session
+    rule to filter listing entries to regular files by entry kind, but materialized
+    it with a 3-arg positional call instead of the supported 2-arg (rowset + predicate)
+    form. Pure PlanIR-shape bug — no grounding/data deficiency — so the fix is a plan-construction
+    technique on primitive arity: collapse column+value into one predicate/op-spec
+    or move the regular-file filter into the discovery SQL/rowset projection. Links
+    to and complements the prior ''filter to regular files by entry kind'' rules by
+    constraining HOW that filter is expressed; it does not supersede them.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always define each required ref from the success criteria as a named variable
+    in the PlanIR (via bind, into, or compute) using the exact name as specified in
+    the success criteria's lhs (e.g., $receipt_file, $receipt_products, $difference_cents).
+    Do not substitute alternative names like $receipt_path for a required ref.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: The verify failure occurred because the PlanIR produced an answer with
+    outcome OUTCOME_OK but the success criteria required nonempty $receipt_file and
+    $receipt_products, which were never defined. The plan used $receipt_path instead
+    of $receipt_file and did not define $receipt_products. The plan also lacked a
+    branch to handle the empty-listing case. The root cause is that the PlanIR did
+    not match the required ref names from the IntentSpec, causing the verify step
+    to fail. This rule ensures that the plan correctly populates all required refs
+    with the exact names expected by the success criteria.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always define each required list ref from the success criteria by including
+    a custom_extract step that parses the file and outputs that list variable; when
+    using that list in a filter_rows predicate, reference column names as plain strings
+    (without $) and the list variable as a variable (with $).
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: 'Error: ''sum_col'' expects list[dict]; got single row. Root cause: filter_rows
+    predicate used ''$sku'' (variable) instead of column name ''sku'', and ''$items.sku''
+    was undefined because $items was not defined. The PlanIR also omitted the required
+    $receipt_products list ref from success criteria. The fix is to extract the SKU
+    list from the receipt via custom_extract and use it in filter_rows with correct
+    column name reference.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use 'custom_extract' as a primitive in the compute array; instead,
+    define custom extraction logic in the dedicated 'custom_extract' section and rely
+    on its automatic binding of the output variable.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'Error: ''plan: unknown primitive ''custom_extract'' (compute -> receipt_parsed)''.
+    Root cause: The PlanIR compute array includes a step with prim=''custom_extract'',
+    which is not a recognized primitive. The PlanIR schema provides a separate top-level
+    ''custom_extract'' section for defining such extractions, and the output variable
+    is automatically bound when defined there. The failing fragment is: {"prim":"custom_extract","args":["fuzzy_sku_receipt","$receipt_raw"],"into":"receipt_parsed"}.
+    The correct approach is to omit this compute step entirely and let the custom_extract
+    section handle the binding. No existing rule covers this pattern.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the plan requires extracting a list of items from a file and then
+    computing a total based on current prices from a database, always include a Read
+    RPC to get the file content, a custom_extract step to parse the content into the
+    required list ref, and then use compute primitives (map/reduce) or a parameterized
+    SQL query to compute the total; never skip the file reading step or hardcode placeholder
+    values that are not populated from the extracted list.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: The verify step failed because required refs $receipt_file and $receipt_products
+    were not defined. The PlanIR skipped reading the file and extracting products,
+    instead attempting a SQL query with hardcoded placeholders that were never populated.
+    The discovery was non-recursive and did not filter to regular files. The compute
+    steps referenced $totals_result before it was bound. The plan did not define the
+    required refs as specified in the success criteria. This violates the in-session
+    rule about defining required refs and the general pattern for file-based data
+    extraction.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the TOOL_PLAN's param for a file location instructs to find a file
+    in a directory (e.g., 'Find the first regular file in /uploads/ directory'), the
+    PlanIR must include a discovery step (Find or List) that produces a rowset of
+    entries, filter to regular files using a rowset filter (filter_rows with kind
+    predicate), and then use the first entry's path as the Read ref; do not hardcode
+    a filename. Additionally, bind the discovered path to the required ref name as
+    specified in the success criteria (e.g., $receipt_file).
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: 'Error: ''real_vm: read failed: not found'' because PlanIR hardcoded
+    path ''/uploads/receipt.txt'' which does not exist. The TOOL_PLAN param says ''Find
+    the first regular file in /uploads/ directory using a directory listing, filter
+    to regular files, and read its content.'' The plan skipped discovery and directly
+    attempted to read a hardcoded filename. Existing rules r001 and r002 already advise
+    using discovery, but the plan ignored them. The plan also fails to define the
+    required ref $receipt_file (success criteria requires it). The correct PlanIR
+    should include a List RPC on /uploads/, filter entries to regular files, project
+    the first path into $receipt_file, then Read $receipt_file. This rule reinforces
+    that pattern.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the 'mul' primitive in the compute section; instead, perform
+    multiplication by including the arithmetic in a SQL query (e.g., SELECT price_cents
+    * ?) or by using a supported primitive if available.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: 'Error: unknown primitive ''mul''. The PlanIR used ''mul'' to multiply
+    $qty and $current_price_cents, but the system does not support this primitive.
+    The correct approach is to compute products within a SQL query, which supports
+    arithmetic operations. This rule prevents reliance on unsupported compute primitives
+    and ensures multiplication is handled by the database.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When using the filter_rows primitive, supply exactly 2 arguments — the
+    rowset ref and a single predicate (one structured condition object such as {column,
+    op, value}); never pass column, op, and value as separate positional args, and
+    pack any multi-field condition into that one predicate argument.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: 'Verbatim error: "plan: primitive ''filter_rows'' takes 2 arg(s), plan
+    supplies 4". Failing PlanIR fragment: {"prim":"filter_rows","args":["$uploads_rows","kind","eq","file"],"into":"regular_files"}.
+    Root cause: filter_rows has a 2-arg signature (rowset + one predicate), but the
+    plan unpacked the kind==''file'' condition into 4 flat positional args (rowset,
+    column, op, value). The arity check rejected it before execution. r008 mandates
+    filter_rows with a kind predicate to select regular files but never pinned its
+    calling convention, so the planner spread the predicate across positional slots.
+    New rule constrains the signature: pack the predicate into a single argument.
+    r008 remains valid (overall discovery+filter+first-path shape) and is supplemented,
+    not superseded.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never let a discovery-phase RPC (e.g. Read) reference a path ref that is
+    only produced by the later rowset/compute stage (List → rowset filter_rows → first
+    → get → $receipt_file); all discovery RPCs execute BEFORE rowsets and compute
+    run, so the unbound ref falls back to the raw IntentSpec param description string
+    and fails path validation. Stage the PlanIR so the directory-listing-and-filter
+    pipeline resolves the discovered path ref first, then consume it in a subsequent
+    execution stage that runs after the ref is bound.
+  created: '2026-06-20'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Verbatim error: real_vm: read failed: invalid path: path must be absolute:
+    "Discovery: list /uploads/, filter to regular files, take the first entry''s path
+    (do not hardcode a filename); bind to $receipt_file". Root cause: staging/ordering
+    bug. The failing PlanIR fragment places the Read in the discovery array — {"rpc":"Read","args":{"path":"$receipt_file"},"bind":"receipt_content"}
+    — but $receipt_file is only produced downstream in compute (filter_rows → first
+    → get path). All discovery RPCs run before the rowsets/compute stage, so during
+    discovery $receipt_file is unbound and the VM substituted the raw TOOL_PLAN param.receipt_file
+    description text, which is not an absolute path. Linkage: r008 already prescribes
+    the List→filter→first→Read-ref pattern but does not cover the execution-stage
+    dependency; this rule adds the staging constraint that a discovery RPC may not
+    consume a compute-derived ref, complementing r008 rather than superseding it.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When listing a directory to discover a file path, filter the list to only
+    entries that are files (e.g., by checking the 'type' field if available) before
+    selecting a path to read, to avoid attempting to read a directory.
+  created: '2026-06-20'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. The PlanIR''s discovery
+    phase includes a Read RPC on ''$uploads_list.0.path'', which resolved to a directory
+    entry from the List RPC. The root cause is that the PlanIR assumed the first entry
+    in /uploads/ is a file, but it may be a directory. The failing fragment is the
+    Read RPC in discovery. The rule ensures that the PlanIR filters the directory
+    listing to only files (e.g., using a rowset filter on type) before selecting a
+    path, preventing this runtime failure.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never apply the 'to_number' primitive to a value that is already numeric
+    (e.g., the result of 'sum_col', 'abs_diff', or any arithmetic primitive); instead,
+    use the numeric value directly without conversion, or if conversion is necessary,
+    ensure the input is a string representation of a number.
+  created: '2026-06-20'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'The error ''real_vm: bad argument type for built-in operation'' occurred
+    during compute. The PlanIR includes a ''to_number'' primitive applied to ''$diff_cents'',
+    which is the result of ''abs_diff'' and is already a numeric value. The ''to_number''
+    built-in expects a string argument, so passing a number causes a type error. The
+    fix is to remove the ''to_number'' step and use ''$diff_cents'' directly in the
+    decision condition.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-20'
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+last_run:
+  cycles_used: 2
+  date: '2026-06-20'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+prephase_deep_read:
+- /uploads
+task_id: t51

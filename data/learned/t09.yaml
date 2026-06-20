@@ -327,19 +327,197 @@ entries:
   - /docs/ops-policy-notes/catalogue-count-tool-boxes-bags-vienna-2025-06-22.md
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v007
   score: 0.0
   score_detail:
   - Answer should be "1"
   source: verdict
-  status: active
+  status: inactive
   submitted_message: '0'
   submitted_outcome: OUTCOME_OK
   submitted_refs:
   - /docs/catalogue-addenda/2025-06-22-reporting-cleaning-liquids-vienna.md
+- agents_md_anchor: null
+  content: When the objective requires deriving a filter key from a policy or configuration
+    document before querying a downstream table, the PlanIR must sequence a discovery
+    step that extracts the key into a named variable, then a query step that uses
+    that variable in its predicate, and finally a projection step that formats the
+    aggregate result into the required answer template.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r012
+  reasoning: 'Error: ''plan: PLAN LLM returned empty response''. Root cause: the planner
+    faced a cross-source dependency—extract product_kind_id from a policy document,
+    then count matching catalogue records—but had no pre-phase content from that document
+    and no mandated multi-step pattern, leaving it unable to materialize a concrete
+    PlanIR. The SCRIPT_CODE is completely empty. A rigid extraction→bind→query→format
+    sequence prevents the LLM from collapsing the two sources into an ungrounded or
+    omitted plan. Eagerly reading the literal policy path supplies the necessary fact
+    for grounding.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - Answer should be "[QTY:2]"
+  source: verdict
+  status: inactive
+  submitted_message: '[QTY:1]'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/catalogue-addenda/2025-06-22-reporting-wood-drywall-screws-linz.md
+- agents_md_anchor: null
+  content: When a PlanIR discovery step runs a CLI that reads its program text from
+    standard input (such as a SQL runner), deliver that text through the Exec RPC's
+    dedicated stdin channel exactly as the interpreter contract requires, never as
+    a nested key buried inside the positional args payload, otherwise the process
+    receives empty stdin and emits its usage banner instead of returning rows.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r013
+  reasoning: 'Verbatim error: ''interpret: sql returned usage banner — SQL not delivered
+    via stdin''. Root cause: the failing PlanIR fragment placed the query string as
+    a sibling key inside the Exec args object — {"rpc":"Exec","args":{"path":"/bin/sql","args":["--params",...],"stdin":"SELECT
+    DISTINCT pv.product_sku ..."}}. The interpreter did not route that nested ''stdin''
+    field to the /bin/sql process''s actual standard input, so the binary ran with
+    no input and printed its usage banner; sql_out then carried the banner, not rowset
+    data, so the rowset/count never grounded. This is a pure PlanIR-shape bug in how
+    the Exec step wires stdin, distinct from r012 (discovery→query→projection sequencing,
+    which is correct here) and rc1 (catalogue normalized-match method). New rule fixes
+    the stdin-delivery mechanism the sequence depends on.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - Answer should be "1"
+  source: verdict
+  status: inactive
+  submitted_message: '3'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/policy-updates/2025-06-22-catalogue-reporting-nuts-bolts-washers-graz.md
+- agents_md_anchor: null
+  content: Never pass more than two arguments to the concat primitive; if you need
+    to join three or more strings, chain multiple concat operations or use a template
+    primitive if available.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r014
+  reasoning: 'Error: ''plan: primitive ''concat'' takes 2 arg(s), plan supplies 3''.
+    Root cause: compute step uses concat with three args (prefix, variable, suffix).
+    The concat primitive only accepts exactly two arguments. Failing PlanIR fragment:
+    {"prim":"concat","args":["SELECT COUNT(DISTINCT pv.product_sku) FROM product_variants
+    pv WHERE pv.product_kind_id = ''","$kind_id_value","'' AND EXISTS ..."]}. This
+    violates the interpreter contract. New rule prevents this by requiring exactly
+    two args; chain concat or use template for longer strings.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a PlanIR compute section references a variable that is bound by an
+    Exec RPC in the ops section, restructure the PlanIR so that the Exec RPC is placed
+    in the discovery section instead, because compute executes before ops and cannot
+    access ops-bound variables. This prevents 'bad argument type' errors from undefined
+    variables.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r015
+  reasoning: 'Error: ''real_vm: bad argument type for built-in operation''. Root cause:
+    The PlanIR compute section uses primitives ''first'' and ''get'' on ''$count_rows'',
+    which is defined from ''count_raw'' bound by an Exec RPC in the ops section. However,
+    compute executes before ops, so ''$count_rows'' is undefined at compute time,
+    causing the built-in operation to receive a bad argument type. The failing fragment
+    is the compute block: {"prim":"first","args":["$count_rows"],"into":"count_row"},
+    {"prim":"get","args":["$count_row","count"],"into":"count"}. The rowsets section
+    also references ''count_raw'' before it is bound. Existing rule r012 correctly
+    requires sequencing discovery->query->projection but does not forbid compute from
+    depending on ops-bound variables. This new rule enforces that any data needed
+    for compute must be gathered in discovery, not ops.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Never add a `params` (or named-bind) field to an Exec RPC's args — the
+    ExecRequest protocol message accepts only path and stdin; inline every query parameter
+    value as a literal directly into the stdin SQL string (quote/normalize in-SQL
+    with LOWER/TRIM) instead of using :named placeholder binds.
+  created: '2026-06-20'
+  deactivated_reason: null
+  id: r016
+  reasoning: 'Verbatim error: `real_vm: Protocol message ExecRequest has no "params"
+    field.` Root cause: the PlanIR Exec discovery step passed args.params={kind_name,kind_id,city}
+    alongside :named placeholders in stdin, but the VM''s ExecRequest schema exposes
+    only path+stdin — any extra field is rejected before execution. Failing fragment:
+    {"rpc":"Exec","args":{"path":"/bin/sql","stdin":"...WHERE ...= :kind_name ...","params":{...}}}.
+    Fix shapes the PlanIR to inline literals into stdin (e.g. = LOWER(TRIM(''nut bolt
+    and washer''))) so the Exec args carry only the two supported fields. Complements
+    r015 (which governs discovery-vs-ops placement) by constraining Exec arg shape;
+    neither existing rule covers the params-field schema violation.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-20'
+  id: v012
+  score: 0.0
+  score_detail:
+  - Answer should be "2"
+  source: verdict
+  status: active
+  submitted_message: '3'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/policy-updates/2025-06-22-catalogue-reporting-wood-drywall-screws-linz.md
+- agents_md_anchor: null
+  content: When a PlanIR compute step needs to produce a literal string value (e.g.,
+    a file path, a constant), use the 'literal' primitive with a single argument containing
+    the string, not the 'concat' primitive which requires exactly two arguments.
+  created: '2026-06-20'
+  deactivated_reason: null
+  id: r017
+  reasoning: 'Error: plan: primitive ''concat'' takes 2 arg(s), plan supplies 1. Root
+    cause: In the compute section, concat is called with a single argument (the policy
+    doc path string) to produce $policy_doc_path. The concat primitive requires exactly
+    two arguments to concatenate. The intended operation is to assign a literal string,
+    which should use the ''literal'' primitive instead. This is a PlanIR shape bug,
+    not a data grounding issue. The rule will guide future plans to use ''literal''
+    for single string constants.'
+  status: active
+  surface: ir
 last_run:
   cycles_used: 1
-  date: '2026-06-19'
+  date: '2026-06-20'
   outcome: OUTCOME_OK
-  status: failure
+  status: success
+prephase_deep_read:
+- /docs/policy-updates/2025-06-22-catalogue-reporting-wood-drywall-screws.md
 task_id: t09

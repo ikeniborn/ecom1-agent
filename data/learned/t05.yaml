@@ -315,12 +315,13 @@ entries:
   submitted_refs: []
 - content: null
   created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
   id: v008
   score: 0.0
   score_detail:
   - Answer should contain '<NO>'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: <YES> CLN-NOLQX7ED
   submitted_outcome: OUTCOME_OK
   submitted_refs:
@@ -370,9 +371,480 @@ entries:
     list.'
   status: inactive
   surface: ir
+- agents_md_anchor: null
+  content: Always build PlanIR for catalogue claim-verification tasks that require
+    a negative answer template by first deriving the candidate rowset from pre-phase
+    CATALOGUE_CANDIDATES via normalized attribute matching, then projecting the record's
+    `record_path` into `checked_record_path` and the SKU into `checked_sku`, and finally
+    using a decision branch to bind `answer_text` to the required negative format
+    string containing both the checked SKU and the cited record path whenever the
+    claimed multi-attribute combination is absent from the matched record.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r014
+  reasoning: 'The error is `plan: PLAN LLM returned empty response`. The root cause
+    is the absence of a structural pattern telling the planner how to emit a conditional-verification
+    PlanIR that ends in a hardcoded negative answer shape with mandatory record citations.
+    With an empty PlanIR (no JSON produced), the cycle never reached execution. Existing
+    rule rc1 advises normalization and grounding but does not prescribe the decision-branch
+    shape or the explicit result-field projection (`checked_record_path`, `checked_sku`,
+    `answer_text`) needed when the instruction mandates a `<NO>`-style template. The
+    new rule supplies the missing PlanIR skeleton: match candidates → inspect claimed
+    attributes → branch → populate citation fields and bind the negative template.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always emit a non-empty PlanIR for catalogue claim-verification tasks that
+    require a negative-answer template by first defining a rowset against CATALOGUE_CANDIDATES
+    filtered with normalized case-/whitespace-insensitive product-line tokens, then
+    projecting the matched record's record_path and sku into checked_record_path and
+    checked_sku, and finally binding answer_text to the required negative format string
+    that includes both projected values; never return an empty plan even if the claimed
+    multi-attribute combination is absent.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r015
+  reasoning: 'Error is plan: PLAN LLM returned empty response. The failing PlanIR
+    fragment is the entirely empty SCRIPT_CODE. Root cause: the existing in-session
+    rule described the desired logic but did not explicitly forbid an empty plan output,
+    so the planner stalled instead of emitting the mandatory skeleton when it needed
+    to produce a negative answer. The new rule directly corrects this by mandating
+    the exact non-empty node sequence (rowset → projection → bind) and removing ambiguity
+    about whether to emit anything when the claim is false.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never wrap PlanIR JSON in markdown code fences; emit raw structured JSON
+    without language tags or triple-backtick delimiters so downstream parsers consume
+    it directly.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r016
+  reasoning: 'Error: ''plan: PLAN: could not parse JSON; head: \''```json\n{\''...''.
+    Root cause: the planner enclosed the PlanIR in a ```json markdown block, causing
+    the strict JSON parser to fail on the leading backticks and language tag. Failing
+    fragment: the JSON began with ''```json'' rather than a bare object. Existing
+    rules r014/r015 define the internal rowset and projection semantics but do not
+    constrain the outer envelope; this new rule closes that gap by mandating raw JSON
+    output.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never include a separate `params` (bound-parameter) field in an Exec RPC's
+    args — the ExecRequest protocol message has no `params` field; inline the normalized,
+    case-/whitespace-insensitive filter literals directly into the SQL stdin string
+    (e.g. LOWER(TRIM(brand)) = LOWER(TRIM('<value>'))) instead of using named placeholders
+    (:foo) backed by an external params map.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r017
+  reasoning: 'Verbatim error: ''real_vm: Protocol message ExecRequest has no "params"
+    field.'' Root cause: the PlanIR discovery step emits an Exec RPC whose args carry
+    a `params` object — failing fragment {"rpc":"Exec","args":{"path":"/bin/sql","stdin":"...WHERE
+    LOWER(TRIM(brand)) = LOWER(TRIM(:brand)) ...","params":{"brand":"Heco","series":"Zinc
+    Plated","model":"TopFix GTU-YPJ"}}}. The SQL uses named placeholders (:brand/:series/:model)
+    bound through a `params` map, but the ExecRequest schema accepts only path/stdin
+    — there is no parameter-binding channel, so the VM rejects the message before
+    any RPC runs. Fix is a PlanIR-shape change: drop the `params` field and inline
+    the literals into the stdin SQL itself. Linkage: complements rc1/r015 (normalized
+    matching, non-empty plan) by constraining HOW filter values reach the Exec RPC
+    — through the SQL string, never an external bound-params object.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-19'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/CLN-NOLQX7ED.json'
+  source: verdict
+  status: inactive
+  submitted_message: <NO> — base product 'Ajax Eco Classic 25C-DXE Cleaning Liquid
+    degreaser 750ml fresh' exists (SKU CLN-GEF2EYP9, /proc/catalog/CLN-GEF2EYP9.json),
+    but the combined catalogue claim (single SKU with both floor cleaner and degreaser
+    cleaner type) is absent.
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/CLN-GEF2EYP9.json
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: 'NOT FOUND — Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall
+    Screw with screw type ''drywall screw'' and drive type ''torx'': claim absent.
+    Checked SKU FST-1KPF96UD (/proc/catalog/FST-1KPF96UD.json).'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/FST-1KPF96UD.json
+- agents_md_anchor: null
+  content: Never use 'column' on a single row (dict); 'column' expects a list of dicts.
+    When you have a single row from 'first' or similar, use 'get' to extract a field.
+    If the row could be None, guard with a conditional or use 'get' with a default.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r018
+  reasoning: 'Error: ''column'' expects list[dict]; use ''get'' for a single row.
+    PlanIR used ''first'' to get a single row, then ''column'' on that row. ''column''
+    requires a list of dicts; ''get'' is for single dict. This caused plan failure.
+    Fix: replace ''column'' with ''get'' when operating on a single row.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always define the exact variable name required by the TOOL_PLAN's required_refs
+    (e.g., `$matched_product.record_path`) in the PlanIR's compute steps, and use
+    that variable as the source in the answer's refs, rather than using a differently
+    named variable like `$first_row.record_path`.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r019
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$matched_product.record_path'''']
+    on OK answer''. Root cause: The PlanIR answer''s ref source is `$first_row.record_path`,
+    but the TOOL_PLAN''s required_refs specify source `$matched_product.record_path`.
+    The interpreter cannot resolve the required ref because no variable with that
+    name exists. The PlanIR computes `first_row` but never extracts the record_path
+    into a variable named `$matched_product.record_path`. Fix: add a compute step
+    (e.g., `{"prim":"get","args":["$first_row","record_path"],"into":"$matched_product.record_path"}`)
+    and change the answer ref source to `$matched_product.record_path`. This rule
+    prevents future mismatches between required ref names and PlanIR variable names.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use raw equality ('=') for catalogue text attributes (brand, series,
+    model, product_name, etc.) in SQL WHERE clauses; always apply LOWER(TRIM(column))
+    = LOWER(TRIM(value)) or use LIKE with normalized patterns (e.g., LOWER(TRIM(product_name))
+    LIKE LOWER(TRIM('%wood screw%'))) to ensure case- and whitespace-insensitive matching.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r020
+  reasoning: 'Error: ''plan: match catalogue text attributes normalized (LOWER/TRIM
+    + LIKE), not raw ''='' (re-seeded values) (attr=brand)''. The PlanIR used `brand
+    = ''Heco''` which is raw equality, failing the requirement for normalized matching.
+    The existing rule [rc1] states the method but the PlanIR did not implement it.
+    This new rule explicitly forbids raw ''='' for text attributes and mandates LOWER/TRIM
+    normalization.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that for every answer branch whose outcome has required_refs
+    in the TOOL_PLAN, the answer's refs include each required ref with a source that
+    exactly matches the required ref's source string (e.g., '$matched_product.record_path').
+    To achieve this, create a compute step that extracts the field from the relevant
+    row (using 'get' or similar) and assigns it to a variable whose name is exactly
+    that source string (including dots, e.g., 'matched_product.record_path'). Then
+    use that variable as the source in the answer's refs. If the row may be null (e.g.,
+    product not found), still include the ref with the same source; the value will
+    be null.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r021
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$matched_product.record_path'''']
+    on OK answer''. The PlanIR''s answer for ''found'' uses source ''$record_path''
+    instead of ''$matched_product.record_path'', and the ''not_found'' branch has
+    empty refs. Root cause: the PlanIR did not match the exact required ref source
+    string. The existing in-session rule about exact variable naming was not followed.
+    The fix is to create a compute step that assigns the record_path to a variable
+    named exactly ''$matched_product.record_path'' and use that in both answer branches,
+    even when the product is not found (value will be null). This is a PlanIR shape
+    bug, not a data grounding issue.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include all required_refs from the TOOL_PLAN's success_criteria
+    in every answer branch that maps to that outcome, even when the data is absent
+    (e.g., product not found). To achieve this, define the required variable in compute
+    steps (using a guard or default to handle null rows) and reference it in the answer's
+    refs list for all branches that produce that outcome.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r022
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$matched_product.record_path'''']
+    on OK answer''. Root cause: The PlanIR''s ''not_found'' answer branch (outcome
+    OUTCOME_OK) omits the required ref ''$matched_product.record_path'', while the
+    ''found'' branch includes it. The TOOL_PLAN requires that ref for OUTCOME_OK,
+    so every branch producing that outcome must provide it. Additionally, the compute
+    step that creates ''matched_product.record_path'' uses ''get'' on ''first_row''
+    without guarding against None when query_rows is empty, which could cause the
+    variable to be undefined or the compute to fail. The fix: add the ref to the ''not_found''
+    branch''s refs list (with source ''$matched_product.record_path'') and ensure
+    the variable is defined (e.g., via a conditional or default) even when no row
+    is found. This rule generalizes the pattern to prevent similar unresolved ref
+    errors.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never supply a third argument to the 'get' primitive; it accepts exactly
+    two arguments (source variable and key name). If a default value is needed for
+    a potentially null row, use a conditional branch to check for null before the
+    'get', or use a separate 'get_or_default' primitive if available.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r023
+  reasoning: 'Error: ''primitive ''get'' takes 2 arg(s), plan supplies 3''. The PlanIR
+    compute steps use ''get'' with three arguments: source, key, and a default value.
+    The ''get'' primitive only accepts two arguments. This was caused by an in-session
+    rule that suggested using ''get'' with a default. The fix is to remove the third
+    argument and handle nulls via conditional branching or a different primitive.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always match catalogue text attributes (brand, series, model, product_name,
+    etc.) that originate from the instruction (re-seeded values) using LOWER(TRIM(column))
+    LIKE LOWER(TRIM(value)) instead of raw '=' equality, to handle case and whitespace
+    variations; for partial matches (e.g., product_name) include '%' wildcards as
+    appropriate.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r024
+  reasoning: 'Error: ''plan: match catalogue text attributes normalized (LOWER/TRIM
+    + LIKE), not raw ''='' (re-seeded values) (attr=brand)''. Root cause: The PlanIR
+    used raw ''='' for brand, series, and model in the SQL query, violating the requirement
+    for normalized comparison. Failing fragment: ''WHERE brand = ? AND series = ?
+    AND model = ? AND product_name LIKE ? AND product_name LIKE ?''. The existing
+    rule rc1 states ''matched NORMALIZED'' but does not specify the technique; this
+    new rule enforces the correct method (LIKE with LOWER/TRIM) for all re-seeded
+    text attributes.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always use LOWER(TRIM(column)) LIKE LOWER(TRIM(value)) in SQL WHERE clauses
+    for any catalogue text attribute that is re-seeded from the instruction (e.g.,
+    brand, series, model, product_name), never raw '=' equality. For partial matches
+    (e.g., product_name), include '%' wildcards as appropriate.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r025
+  reasoning: 'Error: ''plan: match catalogue text attributes normalized (LOWER/TRIM
+    + LIKE), not raw ''='' (re-seeded values) (attr=brand)''. Root cause: The PlanIR
+    SQL used raw ''='' for brand, series, and model (e.g., brand=''Heco''), violating
+    the existing rule [in-session] which requires LOWER/TRIM + LIKE. The failing fragment:
+    WHERE brand=''Heco'' AND series=''Zinc Plated'' AND model=''TopFix GTU-YPJ''.
+    The plan generator applied normalized matching only to product_name, not to the
+    other re-seeded attributes. The new rule reinforces that all such attributes must
+    be matched normalized, superseding the less specific [in-session] rule.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the exact variable names specified in the TOOL_PLAN's required_refs
+    source paths (e.g., '$matched_row.record_path') when defining compute steps and
+    answer refs; do not substitute a different variable name (like 'checked_row')
+    because the interpreter resolves refs by source name. If the required_refs source
+    is '$matched_row.record_path', then the PlanIR must have a compute step that sets
+    a variable named 'matched_row' (or a ref with that path) and reference it in the
+    answer branch's refs list with source '$matched_row.record_path'.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r026
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$matched_row.record_path'']
+    on OK answer. Root cause: The PlanIR answer branch ''absent'' references ref source
+    ''$checked_record_path'', but the TOOL_PLAN''s required_refs for OUTCOME_OK specify
+    source ''$matched_row.record_path''. The interpreter cannot resolve the required
+    ref because the variable name does not match. The PlanIR must define a variable
+    named ''matched_row'' (or a ref with that path) and use it in the answer refs.
+    This is a PlanIR shape bug, not a data grounding issue.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract required_ref fields (e.g., record_path) from row variables
+    into separate variables using a compute step (e.g., 'get $row field into $field_var')
+    before referencing them in the answer's refs list; never use a path expression
+    like '$row.field' directly as the ref source.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r027
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$matched_row.record_path'''']
+    on OK answer''. The PlanIR answer branch ''ok'' includes a ref with source ''$matched_row.record_path'',
+    which is a path expression into the row variable $matched_row. The interpreter
+    expects a simple variable name (e.g., ''$record_path'') as the ref source, not
+    a path. Root cause: the PlanIR did not extract the record_path field into a separate
+    variable before referencing it. The compute step only sets $matched_row (via ''first'')
+    and $sku (via ''get''), but no variable holds the record_path value. The required_refs
+    for OUTCOME_OK require a record_path, but the ref source is malformed. Existing
+    rule [r022] advises to ''define the required variable in compute steps'' but does
+    not explicitly forbid path expressions; this new rule clarifies the extraction
+    requirement and prohibits direct path usage.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the pre-phase fact (e.g., CATALOGUE_CANDIDATES) as the source
+    of candidate rows for catalogue existence/verification tasks, rather than constructing
+    a raw SQL query; when the fact is available, reference it directly in the discovery
+    step (e.g., via a 'from_fact' RPC or by using the fact's variable) to ensure the
+    data is grounded and matches the pre-phase's normalized values.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r028
+  reasoning: 'Error ''real_vm: answer must be non empty'' indicates the answer refs
+    or message were empty. The PlanIR used a raw SQL query instead of the pre-phase
+    CATALOGUE_CANDIDATES fact, which likely returned no rows, causing matched_row
+    to be null and record_path to be null, violating the required_refs nonempty constraint.
+    Additionally, the answer ref source was ''$record_path'' instead of the required
+    ''$matched_row.record_path''. The corrective rule mandates using the pre-phase
+    fact to ensure grounded data and avoid empty results.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-20'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-20'
+  id: v014
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/CLN-NOLQX7ED.json'
+  source: verdict
+  status: active
+  submitted_message: <NO> — base product exists but the claimed floor-cleaner+fresh
+    combination is absent; checked SKU CLN-GEF2EYP9.
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /proc/catalog/CLN-GEF2EYP9.json
+- agents_md_anchor: null
+  content: When a task's required_ref is a record file path (record_path), project
+    it from the grounded pre-phase CATALOGUE_CANDIDATES fact row for the matched SKU
+    — or derive the catalog's canonical per-record file path from that SKU — and never
+    from a guessed raw-SQL column named record_path that the queried table may not
+    expose; the discovery must bind a NON-EMPTY file-path value so the answer's refs
+    list carries the required reference.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r029
+  reasoning: 'Verbatim error: "grader: answer missing required reference ''/proc/catalog/CLN-NOLQX7ED.json''".
+    Root cause: the PlanIR ran a guessed raw SQL query (discovery step `SELECT pv.product_sku,
+    pv.record_path ... FROM product_variants pv`) and sourced the answer ref from
+    `$record_path` (refs: "source": "$record_path"). The `record_path` column on product_variants
+    is absent/empty, so `$record_path` resolved empty and the answer carried no required
+    reference — the canonical catalog file path `/proc/catalog/<SKU>.json` for matched
+    SKU CLN-NOLQX7ED was never surfaced. The compute did `get $matched_row record_path`
+    correctly (r027), but the SOURCE of record_path (a raw-SQL projection) was unreliable.
+    Linkage: complements rc1/r028 (prefer the grounded CATALOGUE_CANDIDATES fact rows
+    over a guessed query) and r027 (extract ref field into a var) by pinning that
+    the record_path REF VALUE must come from the grounded fact / canonical per-record
+    path and resolve non-empty, not from a possibly-absent SQL column.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When grounding a catalogue lookup, do not emit a raw stdin-driven CLI Exec
+    (e.g. /bin/sql with the query placed in a 'stdin' field) — the interpreter does
+    not pipe that field to the process, so the CLI prints its usage banner and returns
+    zero rows; instead project the matched row directly from the pre-phase CATALOGUE_CANDIDATES
+    rowset fact so the discovery exercises no fragile stdin contract and binds non-empty
+    product_sku/record_path values.
+  created: '2026-06-20'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r030
+  reasoning: 'Verbatim error: ''interpret: sql returned usage banner — SQL not delivered
+    via stdin''. Root cause: the discovery step issued an Exec RPC against /bin/sql
+    with the SELECT body in the Exec args'' ''stdin'' key — failing fragment {"rpc":"Exec","args":{"path":"/bin/sql","args":["--param",...],"stdin":"SELECT
+    pv.product_sku ... FROM product_variants pv ..."}}. The interpreter does not pipe
+    that ''stdin'' field into the process, so /bin/sql received no query, printed
+    its usage banner, and sql_out/rows/base_product/checked_sku/record_path all came
+    back empty, failing the nonempty success criteria. Linkage: rc1/r028 already direct
+    catalogue verification to source rows from the CATALOGUE_CANDIDATES fact rather
+    than a raw SQL query, and r029 warns against projecting record_path from a guessed
+    raw-SQL column; this PlanIR ignored all three AND tripped a new mechanical stdin-delivery
+    contract failure. The new rule captures that mechanical evidence and forbids the
+    fragile raw-CLI path, complementing (not replacing) the source-of-truth rules.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always supply each compute primitive exactly the arity it declares: express
+    a row filter as a single 2-arg call (rowset plus one predicate/condition object)
+    rather than passing extra positional column+value args, and never use concat —
+    a 2-arg join — to materialize a standalone constant; instead inline fixed answer
+    text and extra-claim labels directly into the answer message template or bind
+    them via a literal/const primitive.'
+  created: '2026-06-20'
+  deactivated_reason: null
+  id: r031
+  reasoning: 'Verbatim error: "plan: primitive ''filter_rows'' takes 2 arg(s), plan
+    supplies 3; primitive ''concat'' takes 2 arg(s), plan supplies 1; primitive ''concat''
+    takes 2 arg(s), plan supplies 1". Root cause: PlanIR built compute steps with
+    wrong primitive arity. Failing fragments: filter_rows args=["$candidate_rows","product_sku","<sku>"]
+    passes 3 positional args where filter_rows expects 2 (rowset + a single predicate
+    object, not column+value as separate positionals); and two concat steps args=["No
+    — ..."] and args=["<label>"] each pass 1 arg, abusing concat (a 2-arg join) to
+    bind a single literal constant. Fix in PLAN: collapse equality filter into one
+    predicate condition; do not use concat to emit a lone literal — inline the constant
+    in the answer template or use a literal-binding primitive. Linkage: existing rules
+    (rc1/r028/r029/in-session) cover grounding source, normalized match, and record_path
+    projection but none constrain primitive arity/shape, so a new IR-shape rule is
+    needed.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the IntentSpec params describe identifying a product by several normalized
+    attributes (brand, series, model, screw type, diameter, etc.), project every discriminating
+    attribute column the params reference into the rowset and express the filter as
+    one case/whitespace-insensitive predicate PER attribute, AND-combined — never
+    collapse the multi-attribute match into a single naive contains_any substring
+    on product_name, since that matches no real row, leaves first()->base_product
+    empty, and the answer's projected $base_product.record_path ref then resolves
+    to nothing on the OK answer.
+  created: '2026-06-20'
+  deactivated_reason: null
+  id: r032
+  reasoning: 'Verbatim error: ''interpret: unresolved required ref(s) [\''$base_product.record_path\'']
+    on OK answer''. Root cause: the PlanIR filter collapsed the IntentSpec''s normalized
+    multi-attribute match (brand=Heco, series=Zinc Plated, model=TopFix GTU-YPJ, screw
+    type wood screw, diameter 3mm) into a single brittle literal substring predicate
+    {op:''contains_any'', lhs:''product_name'', rhs:[''wood screw 3mm'']}. Failing
+    fragment: filter_rows($candidates, contains_any product_name [''wood screw 3mm''])
+    -> matched_rows; first(matched_rows) -> base_product. That literal substring matches
+    no real product_name in CATALOGUE_CANDIDATES, so matched_rows is empty, first()
+    yields an empty base_product, and the answer ref ''$base_product.record_path''
+    cannot resolve. The rowset also failed to project the discriminating columns (screw_type,
+    diameter) the params require. Rule linkage: rc1 states attributes must match NORMALIZED
+    but is only a principle; this rule adds the operational PlanIR shape — project
+    each discriminating column and AND one normalized per-attribute predicate — so
+    the filter binds a real row and the record_path ref is non-empty. Distinct from
+    r029, which concerns projecting record_path from the fact vs raw SQL (record_path
+    WAS projected here); the defect is the empty filter, not the column source.'
+  status: active
+  surface: ir
 last_run:
-  cycles_used: 1
-  date: '2026-06-19'
-  outcome: OUTCOME_OK
+  cycles_used: 4
+  date: '2026-06-20'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
+prephase_deep_read:
+- /proc/catalog/
 task_id: t05

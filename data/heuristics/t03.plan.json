@@ -1,0 +1,71 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "SELECT pv.product_sku, pv.record_path\nFROM product_variants pv\nJOIN product_kinds pk ON pk.product_kind_id = pv.product_kind_id\nWHERE LOWER(TRIM(pv.brand)) = LOWER(TRIM(:brand))\n  AND LOWER(TRIM(pv.series)) = LOWER(TRIM(:series))\n  AND LOWER(TRIM(pv.model)) = LOWER(TRIM(:model))\n  AND LOWER(TRIM(pk.product_kind_name)) = LOWER(TRIM(:product_line))\n  AND EXISTS (\n    SELECT 1 FROM product_variant_properties pvp\n    WHERE pvp.product_sku = pv.product_sku\n      AND LOWER(TRIM(pvp.property_key)) = 'color_family'\n      AND LOWER(TRIM(pvp.property_value_text)) = LOWER(TRIM(:color_family))\n  )\n  AND EXISTS (\n    SELECT 1 FROM product_variant_properties pvp\n    WHERE pvp.product_sku = pv.product_sku\n      AND LOWER(TRIM(pvp.property_key)) = 'size'\n      AND LOWER(TRIM(pvp.property_value_text)) = LOWER(TRIM(:size))\n  )\n  AND EXISTS (\n    SELECT 1 FROM product_variant_properties pvp\n    WHERE pvp.product_sku = pv.product_sku\n      AND LOWER(TRIM(pvp.property_key)) = 'fit'\n      AND LOWER(TRIM(pvp.property_value_text)) = LOWER(TRIM(:fit))\n  );"
+      },
+      "bind": "$sql_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "$sql_result",
+      "format": "auto_delim",
+      "into": "$matches",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$matches"
+      ],
+      "into": "$match_count"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "gt",
+          "lhs": "$match_count",
+          "rhs": "0",
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "The requested variant is available.",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    },
+    "not_found": {
+      "message": "The requested variant is not available.",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

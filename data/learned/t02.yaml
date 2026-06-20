@@ -390,9 +390,59 @@ entries:
   submitted_message: <NO>
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
+- agents_md_anchor: null
+  content: When embedding a multi-line SQL script into a PlanIR Exec RPC stdin field,
+    encode newlines as \n and backslashes as \\, and do not escape single quotes,
+    so the emitted PlanIR remains strict JSON.
+  created: '2026-06-19'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r014
+  reasoning: 'Error was ''plan: PLAN: could not parse JSON''. Root cause: the PlanIR
+    discovery step placed a raw SQL payload into the stdin string of an Exec RPC but
+    used invalid JSON escaping—specifically \'' around the value Viega and likely
+    literal newline characters—causing the JSON parser to fail before the plan could
+    execute. Failing fragment head: "stdin": ".mode csv\\n.headers on\\n.parameter
+    set :brand \''Viega\''...". The new rule prevents this by requiring strict JSON
+    string escaping for all RPC string arguments.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When pre-phase CATALOGUE_CANDIDATES rowsets are absent, always emit a non-empty
+    PlanIR containing at least one discovery RPC that queries known product catalogue
+    tables using the normalized attributes from the TOOL_PLAN params and projects
+    the matched row's record_path into the required ref $catalogue_match.record_path.
+  created: '2026-06-19'
+  deactivated_reason: null
+  id: r015
+  reasoning: 'Verbatim error: ''PLAN LLM returned empty response''. Root cause: the
+    planner had no pre-surfaced catalogue rows to lean on and responded with an empty
+    PlanIR instead of generating a fallback discovery query. Failing PlanIR fragment
+    was completely empty (no JSON object / no RPCs). Linkage: the new rule mandates
+    a concrete discovery step against catalogue tables whenever CATALOGUE_CANDIDATES
+    are missing, guaranteeing a non-empty PlanIR that populates the required $catalogue_match.record_path
+    ref.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always encode numeric threshold literals in PlanIR decision `when` predicates
+    as JSON numbers, never as quoted strings, so that `ge`, `gt`, `le`, and `lt` comparisons
+    against computed counts or measures evaluate without type mismatch and the chosen
+    answer branch populates `$answer.text`.
+  created: '2026-06-19'
+  deactivated_reason: null
+  id: r016
+  reasoning: 'verify failed because `$answer.text` was empty even though the SQL discovery
+    returned a matching row (OBSERVED_RPC_OUTPUTS: AUT-3TE8KXP4). The PlanIR decision
+    branch compared `$match_count` (an integer produced by `count`) using `ge` against
+    `"rhs":"1"`, i.e., the literal 1 encoded as a JSON string. A numeric/string type
+    mismatch in the comparison likely caused silent evaluation failure, preventing
+    any answer branch from binding its message to `$answer.text`. Using an unquoted
+    JSON number `1` would allow the `found` branch to fire and fill the answer.'
+  status: active
+  surface: ir
 last_run:
-  cycles_used: 1
+  cycles_used: 2
   date: '2026-06-19'
-  outcome: OUTCOME_OK
-  status: success
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
 task_id: t02

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>check-spec — Observability / Tool-catalog / Report</title>
+<style>
+  :root{
+    --bg:#0f1419;--panel:#171d26;--panel2:#1e2630;--ink:#e6edf3;--muted:#9aa7b4;
+    --line:#2a3340;--accent:#4ea1ff;--accent2:#7ee787;--warn:#ffb454;--bad:#ff6b6b;
+    --good:#3fb950;--chip:#243040;--th:#1b2531;--rowalt:#141a22;--code:#0b0f14;
+  }
+  [data-theme="light"]{
+    --bg:#f6f8fa;--panel:#fff;--panel2:#f0f3f6;--ink:#1f2328;--muted:#57606a;
+    --line:#d0d7de;--accent:#0969da;--accent2:#1a7f37;--warn:#9a6700;--bad:#cf222e;
+    --good:#1a7f37;--chip:#eaeef2;--th:#eef2f6;--rowalt:#f7f9fb;--code:#f6f8fa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 80px}
+  header.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  h1{font-size:24px;margin:0 0 4px}
+  h2{font-size:19px;margin:34px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+  h3{font-size:15px;margin:20px 0 8px;color:var(--accent)}
+  p{margin:8px 0}.sub{color:var(--muted);margin:0}
+  .toggle{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+          border-radius:8px;padding:8px 14px;font-size:13px}
+  .toggle:hover{border-color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:12px 0;background:var(--panel);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:13.5px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--th);font-weight:600;font-size:12.5px;text-transform:uppercase;color:var(--muted)}
+  tbody tr:nth-child(even){background:var(--rowalt)}
+  code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 5px;
+       font:12.5px/1.4 "SFMono-Regular",Consolas,monospace}
+  .badge{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600}
+  .b-bad{background:rgba(255,107,107,.16);color:var(--bad);border:1px solid var(--bad)}
+  .b-warn{background:rgba(255,180,84,.16);color:var(--warn);border:1px solid var(--warn)}
+  .b-good{background:rgba(63,185,80,.16);color:var(--good);border:1px solid var(--good)}
+  .b-info{background:rgba(78,161,255,.14);color:var(--accent);border:1px solid var(--accent)}
+  .note{border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 10px 10px 0;
+        padding:10px 14px;margin:14px 0}
+  .note.good{border-color:var(--good)}
+  figure{margin:18px 0;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  figcaption{color:var(--muted);font-size:13px;margin-top:8px;text-align:center}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:8px}
+  .legend span::before{content:"■ "}
+  .l-found::before{color:var(--accent2)} .l-dep::before{color:var(--accent)} .l-base::before{color:var(--warn)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:14px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card .k{color:var(--muted);font-size:12px;text-transform:uppercase}
+  .card .v{font-size:24px;font-weight:700;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <h1>check-spec — Observability · Tool-catalog · Report</h1>
+    <p class="sub">Спека: <code>docs/superpowers/specs/2026-06-20-agent-observability-tooling-design.md</code>
+       · spec_hash <code>10b83de36b765939</code> · 2026-06-20</p>
+  </div>
+  <button class="toggle" onclick="var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark')">☀ / ☾ тема</button>
+</header>
+
+<div class="note good">
+  <b>Вердикт: OK.</b> 4 фазы passed · CRITICAL open: 0 · WARNING open: 0.
+  4 WARNING исправлены inline (fixed), 4 INFO закрыты (fixed/wontfix). IDD-гейт открыт.
+</div>
+
+<div class="grid">
+  <div class="card"><div class="k">Фазы</div><div class="v">4 / 4 <span style="font-size:13px">passed</span></div></div>
+  <div class="card"><div class="k">CRITICAL open</div><div class="v">0</div></div>
+  <div class="card"><div class="k">WARNING open</div><div class="v">0</div></div>
+  <div class="card"><div class="k">Findings</div><div class="v">8</div></div>
+</div>
+
+<!-- ============================================================= -->
+<h2>1. Резюме спецификации (требования по секциям)</h2>
+<table>
+  <thead><tr><th>ID</th><th>Секция</th><th>Требование</th><th>Задача</th></tr></thead>
+  <tbody>
+    <tr><td>R-S</td><td>§4 Schema v2</td><td>Единый JSONL: на каждой записи <code>seq/cycle/step_type</code>; <code>llm_call</code> +reasoning/phase/prev_llm_seq/cache-токены; <code>vm_call</code> +validation/bytes/has_data; новый <code>gate</code></td><td>B (база)</td></tr>
+    <tr><td>B1</td><td>§5.1</td><td>Именовать все фазы; убрать безымянный <code>llm</code> (RERANK/DISTILL)</td><td>B</td></tr>
+    <tr><td>B2</td><td>§5.2</td><td>Захват рассуждений в проде (<code>reasoning_capture.py</code>), <code>ECOM_TRACE_REASONING=1</code>; DoD: <code>reasoning_available</code> iff непустой reasoning</td><td>B</td></tr>
+    <tr><td>B3</td><td>§5.3</td><td>VMAdapter trace-aware → лог VM RPC пре-фазы и interpret через один шов</td><td>B</td></tr>
+    <tr><td>B4</td><td>§5.4</td><td>Записи <code>gate</code> для lint/interpret/verify (passed+reason)</td><td>B</td></tr>
+    <tr><td>B5</td><td>§5.5</td><td>Учёт <code>cache_read</code>/<code>cache_creation</code> в llm_call</td><td>B</td></tr>
+    <tr><td>C1</td><td>§6</td><td><code>TOOL_CATALOG</code> — декларативный реестр VM RPC (purpose/args_schema/mode/when_to_use)</td><td>C</td></tr>
+    <tr><td>C2</td><td>§6</td><td><code>build_tool_catalog_block()</code> → инжект в PLAN-промпт</td><td>C</td></tr>
+    <tr><td>C3</td><td>§6</td><td>Валидация в интерпретаторе: rpc∈catalog ∧ args keys⊆schema → иначе InterpretError→iLEARN</td><td>C</td></tr>
+    <tr><td>C4</td><td>§6</td><td>Лог использования инструментов (validation/bytes/has_data/mutated)</td><td>C</td></tr>
+    <tr><td>A1</td><td>§7.1</td><td><code>policies</code> → <code>_PLAN_KEYS</code> (PLAN видит критерии)</td><td>A</td></tr>
+    <tr><td>A2</td><td>§7.2</td><td>deep_read читает тело <code>/docs</code>-файла, не только наличие</td><td>A</td></tr>
+    <tr><td>A3</td><td>§7.3</td><td>Анти-«сдался» гейт: clarify-only план с NONE_CLARIFICATION при OK∈outcome_space → reject→iLEARN</td><td>A</td></tr>
+    <tr><td>A4</td><td>§7.4 (D6)</td><td>INTENT-валидация требует <code>OUTCOME_OK∈outcome_space</code>, кроме security-deny</td><td>A</td></tr>
+    <tr><td>R-R</td><td>§8</td><td>Один self-contained HTML: run-overview + per-task drill-down (timeline, диаграмма цикла, таблица инструментов, панели рассуждений)</td><td>B</td></tr>
+  </tbody>
+</table>
+
+<h3>Success criteria</h3>
+<table>
+  <thead><tr><th>#</th><th>Критерий</th></tr></thead>
+  <tbody>
+    <tr><td>SC1</td><td>t38 фикс проверен end-to-end через новый отчёт (§11 шаг 6)</td></tr>
+    <tr><td>SC2</td><td>В трейсе нет <code>llm_call.phase=="llm"</code>; пре-фаза VM залогирована; <code>gate</code>-записи есть</td></tr>
+    <tr><td>SC3</td><td>Каталог-валидация отклоняет неизвестный rpc / неверный ключ / отсутствующий required</td></tr>
+    <tr><td>SC4</td><td>Отчёт самодостаточен (обе темы, без внешних ресурсов)</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================= -->
+<h2>2. Схема решения</h2>
+<figure>
+<svg viewBox="0 0 860 430" width="100%" role="img" aria-label="Схема решения">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="var(--muted)"/></marker>
+    <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.25"/></filter>
+  </defs>
+  <style>
+    .n{rx:10;filter:url(#ds)} .base{fill:var(--th);stroke:var(--warn)}
+    .mod{fill:var(--panel2);stroke:var(--accent)} .out{fill:var(--th);stroke:var(--accent2)}
+    .lbl{fill:var(--ink);font:600 13px sans-serif} .s{fill:var(--muted);font:11px sans-serif}
+    .e{stroke:var(--muted);stroke-width:1.6;fill:none;marker-end:url(#arr)}
+  </style>
+  <!-- base -->
+  <rect class="n base" x="300" y="20" width="260" height="56"/>
+  <text class="lbl" x="318" y="44">Trace schema v2 (agent/trace.py)</text>
+  <text class="s" x="318" y="62">seq · step_type · gate · reasoning · tokens</text>
+  <!-- B -->
+  <rect class="n mod" x="40" y="150" width="220" height="80"/>
+  <text class="lbl" x="56" y="174">B · логирование шагов</text>
+  <text class="s" x="56" y="192">named phases · VMAdapter-лог</text>
+  <text class="s" x="56" y="208">reasoning_capture · gates · tokens</text>
+  <!-- C -->
+  <rect class="n mod" x="320" y="150" width="220" height="80"/>
+  <text class="lbl" x="336" y="174">C · каталог инструментов</text>
+  <text class="s" x="336" y="192">tools.py: TOOL_CATALOG</text>
+  <text class="s" x="336" y="208">PLAN-инжект · валидация→iLEARN</text>
+  <!-- A -->
+  <rect class="n mod" x="600" y="150" width="220" height="80"/>
+  <text class="lbl" x="616" y="174">A · архитектурный фикс</text>
+  <text class="s" x="616" y="192">policies→PLAN · deep_read тело</text>
+  <text class="s" x="616" y="208">анти-«сдался» · INTENT-guard</text>
+  <!-- out -->
+  <rect class="n out" x="300" y="320" width="260" height="56"/>
+  <text class="lbl" x="318" y="344">scripts/agent_report.py</text>
+  <text class="s" x="318" y="362">HTML: overview + per-task drill-down</text>
+  <!-- edges -->
+  <path class="e" d="M360,76 L200,148"/>
+  <path class="e" d="M430,76 L430,148"/>
+  <path class="e" d="M500,76 L660,148"/>
+  <path class="e" d="M200,230 L380,318"/>
+  <path class="e" d="M430,230 L430,318"/>
+  <path class="e" d="M660,230 L480,318"/>
+</svg>
+<figcaption>Жёлтый = база (schema v2) · синий = модули B/C/A · зелёный = выход (отчёт).
+Все модули пишут в schema v2; отчёт читает её.</figcaption>
+</figure>
+
+<h2>3. Граф зависимостей требований</h2>
+<figure>
+<svg viewBox="0 0 860 360" width="100%" role="img" aria-label="Граф зависимостей">
+  <defs>
+    <marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="var(--accent)"/></marker>
+  </defs>
+  <style>
+    .nd{rx:8;fill:var(--panel2);stroke:var(--accent);filter:url(#ds)}
+    .nb{rx:8;fill:var(--th);stroke:var(--warn);filter:url(#ds)}
+    .t{fill:var(--ink);font:600 12px sans-serif;text-anchor:middle}
+    .d{stroke:var(--accent);stroke-width:1.5;fill:none;marker-end:url(#a2)}
+  </style>
+  <!-- base node -->
+  <rect class="nb" x="350" y="20" width="160" height="40"/><text class="t" x="430" y="44">R-S Schema v2</text>
+  <!-- row B -->
+  <rect class="nd" x="60" y="120" width="120" height="38"/><text class="t" x="120" y="143">B3 VMAdapter</text>
+  <rect class="nd" x="200" y="120" width="120" height="38"/><text class="t" x="260" y="143">B4 gates</text>
+  <rect class="nd" x="340" y="120" width="120" height="38"/><text class="t" x="400" y="143">B1/B5 phases</text>
+  <rect class="nd" x="480" y="120" width="130" height="38"/><text class="t" x="545" y="143">B2 reasoning</text>
+  <rect class="nd" x="630" y="120" width="130" height="38"/><text class="t" x="695" y="143">C3 validation</text>
+  <!-- row 2 -->
+  <rect class="nd" x="630" y="210" width="130" height="38"/><text class="t" x="695" y="233">C1 TOOL_CATALOG</text>
+  <rect class="nd" x="480" y="210" width="130" height="38"/><text class="t" x="545" y="233">C4 tool-log</text>
+  <rect class="nd" x="60" y="210" width="120" height="38"/><text class="t" x="120" y="233">A1 policies→PLAN</text>
+  <rect class="nd" x="200" y="210" width="120" height="38"/><text class="t" x="260" y="233">A3 anti-give-up</text>
+  <rect class="nd" x="340" y="210" width="120" height="38"/><text class="t" x="400" y="233">A2 deep_read</text>
+  <!-- report -->
+  <rect class="nd" x="350" y="300" width="160" height="40" style="stroke:var(--accent2)"/><text class="t" x="430" y="324">R-R Report</text>
+  <!-- edges: depend-on points up to schema -->
+  <path class="d" d="M120,120 L400,62"/>
+  <path class="d" d="M260,120 L410,62"/>
+  <path class="d" d="M400,120 L425,62"/>
+  <path class="d" d="M545,120 L450,62"/>
+  <path class="d" d="M695,120 L460,62"/>
+  <path class="d" d="M695,210 L695,158"/>
+  <path class="d" d="M545,210 L545,158"/>
+  <path class="d" d="M430,300 L430,62"/>
+  <path class="d" d="M260,210 L260,158"/>
+  <text class="s" x="250" y="285" style="fill:var(--muted);font:11px sans-serif">A3 ← B4(gate)</text>
+</svg>
+<figcaption>Рёбра = «зависит от». Всё опирается на Schema v2 (жёлтый). C4 зависит от C1; C3 — валидация
+использует каталог; A3 (анти-«сдался») эмитит через gate-механику; Report читает schema v2.</figcaption>
+</figure>
+<div class="legend"><span class="l-base">база</span><span class="l-dep">требование</span><span class="l-found">выход</span></div>
+
+<h2>4. Карта покрытия (задача → требования)</h2>
+<table>
+  <thead><tr><th>Задача</th><th>Покрывающие требования</th><th>Тесты (§10)</th></tr></thead>
+  <tbody>
+    <tr><td><b>A</b> архитектурный фикс t38</td><td>A1, A2, A3, A4, R-S(gate)</td><td>A-fix: policies в PLAN; deep_read тело; reject clarify-only; INTENT-guard</td></tr>
+    <tr><td><b>B</b> логирование всех шагов + отчёт</td><td>R-S, B1, B2, B3, B4, B5, R-R</td><td>schema v2 (seq монотонен, нет phase=="llm", пре-фаза vm_call, gate); report renderer</td></tr>
+    <tr><td><b>C</b> явный выбор + лог инструментов</td><td>C1, C2, C3, C4, R-S(vm_call.validation)</td><td>catalog: known ok / unknown rpc / bad key / missing required → error</td></tr>
+  </tbody>
+</table>
+<p class="sub">Каждая из A/B/C покрыта ≥1 требованием; лишних (orphan) требований не выявлено.</p>
+
+<!-- ============================================================= -->
+<h2>5. Результаты проверки</h2>
+<table>
+  <thead><tr><th>Фаза</th><th>Статус</th><th>Findings</th></tr></thead>
+  <tbody>
+    <tr><td>1 · structure</td><td><span class="badge b-good">passed</span></td><td>0</td></tr>
+    <tr><td>2 · coverage</td><td><span class="badge b-good">passed</span></td><td>1 INFO</td></tr>
+    <tr><td>3 · clarity</td><td><span class="badge b-good">passed</span></td><td>3 WARNING (fixed) + 1 INFO</td></tr>
+    <tr><td>4 · consistency</td><td><span class="badge b-good">passed</span></td><td>1 WARNING (fixed) + 2 INFO</td></tr>
+  </tbody>
+</table>
+
+<h3>Findings</h3>
+<table>
+  <thead><tr><th>ID</th><th>Severity</th><th>Секция</th><th>Описание</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>F-001</td><td><span class="badge b-warn">WARNING</span></td><td>§5.2</td><td>DoD захвата рассуждений не определён</td><td><span class="badge b-good">fixed</span></td></tr>
+    <tr><td>F-002</td><td><span class="badge b-warn">WARNING</span></td><td>§8</td><td>Метрика prompt-redundancy без определения</td><td><span class="badge b-good">fixed</span></td></tr>
+    <tr><td>F-003</td><td><span class="badge b-warn">WARNING</span></td><td>§7.3/§10</td><td>Расхождение DoD и теста анти-«сдался» (конъюнкт NONE_CLARIFICATION)</td><td><span class="badge b-good">fixed</span></td></tr>
+    <tr><td>F-004</td><td><span class="badge b-warn">WARNING</span></td><td>§7/§11</td><td>Неоднозначность владельца файла гейта (verify vs interpreter)</td><td><span class="badge b-good">fixed</span></td></tr>
+    <tr><td>F-005</td><td><span class="badge b-info">INFO</span></td><td>§6</td><td>Подтверждение покрытия C (без дефекта)</td><td>wontfix</td></tr>
+    <tr><td>F-006</td><td><span class="badge b-info">INFO</span></td><td>§4</td><td>Область step_type для LLM-фаз vs VM rpc</td><td>wontfix</td></tr>
+    <tr><td>F-007</td><td><span class="badge b-info">INFO</span></td><td>§4/§5.3</td><td>either/or шва логирования интерпретатора</td><td><span class="badge b-good">fixed</span></td></tr>
+    <tr><td>F-008</td><td><span class="badge b-info">INFO</span></td><td>§4</td><td>gate замещает gate_check (согласовано)</td><td>wontfix</td></tr>
+  </tbody>
+</table>
+
+<div class="note good">
+  <b>Сводка:</b> CRITICAL open: 0 · WARNING open: 0 · INFO open: 0 · <b>Финальный вердикт: OK</b>.
+</div>
+
+<p class="sub" style="margin-top:30px;border-top:1px solid var(--line);padding-top:12px">
+  chain: intent → null · spec → <code>2026-06-20-agent-observability-tooling-design.md</code>.
+  Автогенерируемый артефакт <code>/check-spec</code>.
+</p>
+
+</div>
+</body>
+</html>

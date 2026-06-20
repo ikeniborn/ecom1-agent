@@ -1,10 +1,12 @@
 {
-  "objective": "Verify against the live catalogue whether the Heco Zinc Plated TopFix GTU-YPJ wood/drywall screw line includes a variant with screw type wood screw, diameter 6 mm, and length 120 mm, and report YES/NO with the checked SKU.",
+  "objective": "Verify the support note's catalogue claim that an Ajax Eco Classic 25C-DXE Cleaning Liquid SKU exists with cleaner type 'floor cleaner' AND fragrance 'fresh', and report the verdict citing the exact product record.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "base_product": "lookup base product from product_variants WHERE brand normalized-matches 'Heco' AND series/line normalized-matches a short 'TopFix GTU-YPJ' / wood-and-drywall-screw token (LOWER/TRIM + LIKE on a minimal token); SELECT product_sku, record_path; bind base = first matching row",
-    "extra_claim_holds": "for $base.product_sku, test via product_variant_properties (and product_variants) whether the claimed extra properties all hold: screw type = wood screw AND diameter = 6 mm AND length = 120 mm",
-    "checked_sku": "$base.product_sku"
+    "base_line": "match product_variants / CATALOGUE_CANDIDATES rows NORMALIZED (case- and whitespace-insensitive) where brand='Ajax', series='Eco', model='Classic 25C-DXE', product kind='Cleaning Liquid'",
+    "claim_cleaner_type": "support-note claim attribute: cleaner type = 'floor cleaner'",
+    "claim_fragrance": "support-note claim attribute: fragrance = 'fresh'",
+    "combined_claim_present": "true iff any base-line SKU has BOTH cleaner type 'floor cleaner' AND fragrance 'fresh' (check product_variant_properties / product attributes, normalized)",
+    "checked_sku": "$matched_row.product_sku — SKU of the base-line catalogue record examined for the floor-cleaner+fresh combination"
   },
   "outcome_space": [
     "OUTCOME_OK"
@@ -14,16 +16,28 @@
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$answer.message",
+        "lhs": "$checked_sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$matched_row.record_path",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Base product found (SKU {checked_sku}); claimed variant (wood screw / 6 mm / 120 mm) {YES_NO}. <NO> with checked SKU when base exists but extra claim absent; <YES> with SKU when present; <NO> when base absent."
+    "msg_skeleton": "{verdict} — base product exists but the claimed floor-cleaner+fresh combination is absent; checked SKU {checked_sku}. verdict=<NO> when base line present and combined claim absent."
   },
   "required_refs": {
-    "OUTCOME_OK": []
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$matched_row.record_path"
+      }
+    ]
   }
 }
