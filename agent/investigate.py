@@ -46,6 +46,27 @@ def render_brief(brief: "Brief") -> str:
 _READ_RPCS = {"read", "list", "tree", "stat", "search"}
 _SELECT_RE = re.compile(r"^\s*(?:with\b.*?\bselect\b|select\b)", re.IGNORECASE | re.DOTALL)
 
+# Mutating keywords that must never appear in an investigator SQL probe — even
+# wrapped in a CTE (e.g. `WITH x AS (DELETE ... RETURNING) SELECT`).
+_SQL_MUTATION_RE = re.compile(
+    r"\b(?:insert|update|delete|drop|alter|truncate|create|replace|merge|grant|revoke|attach|copy)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_readonly_sql(sql: str) -> bool:
+    """A SQL probe is read-only iff it starts with SELECT/CTE, is a single
+    statement (one optional trailing ';'), and contains no mutating keyword
+    (the keyword scan catches CTE-wrapped DML the leading-SELECT check misses)."""
+    if not _SELECT_RE.match(sql or ""):
+        return False
+    body = re.sub(r"'[^']*'", "", sql)          # drop string literals before scanning
+    if ";" in body.rstrip().rstrip(";"):        # reject multi-statement (allow one trailing ';')
+        return False
+    if _SQL_MUTATION_RE.search(body):           # reject embedded DML/DDL
+        return False
+    return True
+
 
 class ToolRejected(Exception):
     """Raised when the investigator picks a tool that would mutate state."""
@@ -56,10 +77,9 @@ def is_readonly(tool: str, args: dict) -> bool:
     if t in _READ_RPCS:
         return True
     if t == "exec":                                  # only /bin/sql, SELECT/CTE only
-        if (args.get("path") or "") != "/bin/sql":
+        if (args.get("path") or "").lower() != "/bin/sql":
             return False
-        sql = args.get("stdin") or args.get("sql") or ""
-        return bool(_SELECT_RE.match(sql))
+        return _is_readonly_sql(args.get("stdin") or args.get("sql") or "")
     return False
 
 
@@ -77,9 +97,13 @@ def run_tool(vm, tool: str, args: dict) -> str:
     if t == "stat":
         return _text(vm.stat(path=args.get("path", "")), "content")
     if t == "search":
+        try:
+            limit = int(args.get("limit", 30))
+        except (TypeError, ValueError):
+            limit = 30
         return _text(vm.search(root=args.get("root", "/docs"),
                                pattern=args.get("pattern", ""),
-                               limit=int(args.get("limit", 30))), "matches")
+                               limit=limit), "matches")
     # exec /bin/sql
     res = vm.exec(path="/bin/sql", args=args.get("args", []),
                   stdin=args.get("stdin") or args.get("sql") or "")

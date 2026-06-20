@@ -81,3 +81,21 @@ def test_run_tool_rejects_mutation():
     with pytest.raises(ToolRejected):
         run_tool(vm, "write", {"path": "/x", "content": "y"})
     assert not any(c[0] == "Write" for c in vm.calls)   # never dispatched
+
+
+# append to tests/test_investigate.py  (Task 3 security hardening)
+def test_is_readonly_rejects_cte_wrapped_dml():
+    assert not is_readonly("exec", {"path": "/bin/sql",
+                                    "stdin": "WITH x AS (DELETE FROM t RETURNING id) SELECT * FROM x"})
+
+
+def test_is_readonly_rejects_multi_statement():
+    assert not is_readonly("exec", {"path": "/bin/sql", "stdin": "SELECT 1; DROP TABLE t"})
+
+
+def test_is_readonly_allows_single_trailing_semicolon():
+    assert is_readonly("exec", {"path": "/bin/sql", "stdin": "SELECT * FROM t;"})
+
+
+def test_is_readonly_normalises_sql_binary_path_case():
+    assert is_readonly("exec", {"path": "/BIN/SQL", "stdin": "SELECT 1"})
