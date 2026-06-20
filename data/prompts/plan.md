@@ -83,7 +83,7 @@ Args are resolved: `$name` → env lookup; anything else → literal.
 
 **`answer`** — keyed by decision label. Each `AnswerTemplateIR`:
 - `message` — f-string-style template; `{slot}` resolves from env (same as `$slot`).
-- `outcome` — one of the `Outcome` enum values.
+- `outcome` — one of the `Outcome` enum values: `OUTCOME_OK`, `OUTCOME_DENIED_SECURITY`, `OUTCOME_NONE_CLARIFICATION`, `OUTCOME_NONE_UNSUPPORTED`, `OUTCOME_ERR_INTERNAL`.
 - `refs` — always-required grounding is PROJECTED from `INTENT.required_refs[selected_outcome]`,
   so for an unconditional ref leave this `[]` and just bind the env key the INTENT `source`
   points at. For **conditional** grounding — a ref needed on SOME branches only (e.g. a
