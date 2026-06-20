@@ -593,3 +593,34 @@ def test_prephase_vm_calls_tagged(tmp_path):
         t.close()
     recs = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
     assert any(r["type"] == "vm_call" and r["step_type"] == "PREPHASE_GATHER" for r in recs)
+
+
+def test_deep_read_docs_file_reads_body_into_policies(monkeypatch, tmp_path):
+    import agent.orchestrator as orch
+
+    # deep_read hint resolves to a /docs file literal
+    monkeypatch.setattr(orch, "load_prephase_deep_read", lambda tid: ["/docs/policy.md"])
+
+    class _VM:
+        def exec(self, **k):
+            return {"stdout": ""}
+
+        def list(self, **k):
+            return {"entries": []}
+
+        def stat(self, **k):
+            return {"kind": "file"} if k.get("path") == "/docs/policy.md" else {"kind": ""}
+
+        def read(self, **k):
+            if k.get("path") == "/docs/policy.md":
+                return {"content": "DEEP POLICY BODY"}
+            return {"content": ""}
+
+        def tree(self, **k):
+            return {"root": None}
+
+        def search(self, **k):
+            return {"matches": []}
+
+    facts = orch.gather_prephase_facts(_VM(), "do the thing", "", task_id="t38")
+    assert facts.policies.get("/docs/policy.md") == "DEEP POLICY BODY"

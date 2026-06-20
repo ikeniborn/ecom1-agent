@@ -649,8 +649,16 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
             if paths:
                 path_listings[lit] = _render_budget(paths, _PATH_LISTING_BUDGET)
         elif kind == "file":
-            path_listings[lit] = f"file {lit}"           # existence; body NOT read
+            # A /docs deep-read literal is a criteria source — read its BODY into
+            # policies (not just existence), so PLAN sees the rule. General: scoped
+            # to /docs files named by a learned prephase_deep_read hint or instruction.
+            if lit.startswith("/docs") and lit in deep_paths and lit not in policies:
+                body = _extract_text(vm.read(path=lit), "content")
+                if body:
+                    policies[lit] = body[:_DOC_CONTENT_CAP]
+            path_listings[lit] = f"file {lit}"           # existence; body recorded above
         # kind == "" -> non-existent / non-data path -> skipped
+    _mark("policies", policies)
     _mark("path_listings", path_listings)
 
     return PrePhaseFacts(
