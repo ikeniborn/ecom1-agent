@@ -1,4 +1,3 @@
-# agent/investigate.py
 """Step-wise read-only investigator: gathers a compact evidence Brief that the
 deterministic PLAN consumes in place of a front-loaded facts dump."""
 from __future__ import annotations
@@ -147,7 +146,6 @@ def is_stalled(result: str, signature: str, seen_signatures: set[str]) -> bool:
     return False
 
 
-# add to agent/investigate.py
 def sufficient(intent, env: dict) -> bool:
     """True when every required_ref for the desired (happy) outcome is groundable
     from env. Conservative: a policy_doc is grounded when env has key

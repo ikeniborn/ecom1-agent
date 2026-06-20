@@ -1,4 +1,3 @@
-# tests/test_investigate.py
 import os
 from agent.llm import _resolve_model_for_phase, _think_for_phase
 
@@ -16,7 +15,6 @@ def test_investigate_phase_override_wins(monkeypatch):
     assert _resolve_model_for_phase("INVESTIGATE", "default-model") == "explicit-model"
 
 
-# append to tests/test_investigate.py
 from agent.investigate import Note, Brief, render_brief
 
 
@@ -83,7 +81,6 @@ def test_run_tool_rejects_mutation():
     assert not any(c[0] == "Write" for c in vm.calls)   # never dispatched
 
 
-# append to tests/test_investigate.py  (Task 3 security hardening)
 def test_is_readonly_rejects_cte_wrapped_dml():
     assert not is_readonly("exec", {"path": "/bin/sql",
                                     "stdin": "WITH x AS (DELETE FROM t RETURNING id) SELECT * FROM x"})
@@ -124,7 +121,6 @@ def test_not_stalled_on_fresh_nonempty():
                           seen_signatures={"read:/docs/x.md"})
 
 
-# append to tests/test_investigate.py
 from agent.investigate import sufficient
 from agent.ir_models import IntentSpec, RefSpec
 
