@@ -19,4 +19,7 @@ def test_slim_gather_drops_policy_bodies_and_samples():
     assert facts.path_listings == {}       # no listings
     assert facts.catalogue_candidates == ""
     # identity + docs_inventory (paths) are still gathered as the navigation map
-    assert facts.gather_status.get("identity") in {"ok", "empty", None} or True
+    assert facts.gather_status.get("identity") != "skipped(slim)"
+    # the dropped seed fields are explicitly marked skipped in the status (observability)
+    for _k in ("policies", "catalogue_candidates", "target_records", "path_listings"):
+        assert facts.gather_status.get(_k) == "skipped(slim)"

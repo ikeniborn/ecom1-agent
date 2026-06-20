@@ -555,7 +555,7 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
             status[_k] = "skipped(slim)"
     else:
         # policies: security.md + path-named docs (existing behaviour)
-        policies: dict[str, str] = {}
+        policies = {}
         wanted = ["/docs/security.md"]
         for name in re.findall(r"/docs/[\w/.-]+\.md", (instruction or "") + " " + (agents_md_text or "")):
             if name not in wanted:
@@ -625,7 +625,7 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
         _mark("catalogue_candidates", catalogue_candidates)
 
         # target_records (H1 — VM-discovered subdirs; no static prefix list / plural map)
-        target_records: dict[str, str] = {}
+        target_records = {}
         proc_subdirs = [d.rstrip("/").rsplit("/", 1)[-1].lower()
                         for d in _list_entries(vm, "/proc")]
         seen_ids: list[str] = []
@@ -651,7 +651,7 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
         _mark("target_records", target_records)
 
         # literal-path listings (1.2) — VM is the filter; no /proc allowlist, no hardcoded roots.
-        path_listings: dict[str, str] = {}
+        path_listings = {}
         literals = _extract_path_literals(instruction)
         for d in deep_paths:
             if d not in literals:
