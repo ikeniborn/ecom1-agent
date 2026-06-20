@@ -58,3 +58,54 @@ def test_no_llm_call_phase_is_literal_llm(tmp_path):
     rec = next(r for r in _records(p) if r["type"] == "llm_call")
     assert rec["phase"] != "llm"
     assert rec["step_type"] == "ORACLE_RETRIEVE"  # RERANK maps to ORACLE_RETRIEVE
+
+
+def test_vm_call_v2_fields(tmp_path):
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    t.log_vm_call(1, "INTERPRET", "Exec",
+                  {"path": "/bin/sql", "args": ["SELECT 1"]},
+                  "n\n1\n", mutated=False, validation="ok", duration_ms=12)
+    t.log_vm_call(2, "INTERPRET", "Exec",
+                  {"path": "/bin/sql", "stdin": "SELECT 1"},
+                  "", mutated=False, validation="fail(rpc 'Foo' not in catalog)")
+    t.close()
+    recs = [r for r in _records(p) if r["type"] == "vm_call"]
+    ok, bad = recs
+    assert ok["step_type"] == "INTERPRET" and ok["phase"] == "INTERPRET"
+    assert ok["validation"] == "ok" and ok["has_data"] is True
+    assert ok["bytes"] == len("n\n1\n") and ok["duration_ms"] == 12
+    assert bad["has_data"] is False and bad["validation"].startswith("fail(")
+
+
+def test_gate_record(tmp_path):
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    t.log_gate(1, "LINT", True, "")
+    t.log_gate(2, "VERIFY", False, "I1: unresolved refs")
+    t.close()
+    g = [r for r in _records(p) if r["type"] == "gate"]
+    assert g[0]["step_type"] == "LINT" and g[0]["passed"] is True
+    assert g[1]["step_type"] == "VERIFY" and g[1]["passed"] is False
+    assert "unresolved" in g[1]["reason"]
+
+
+def test_log_vm_auto_reads_thread_local(tmp_path):
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    trace.set_trace(t)
+    trace.set_cycle(3)
+    trace.set_step_type("PREPHASE_GATHER")
+    try:
+        trace.log_vm_auto("Read", {"path": "/d.md"}, {"content": "hello"})
+    finally:
+        trace.set_trace(None)
+        trace.set_step_type("")
+    rec = next(r for r in _records(p) if r["type"] == "vm_call")
+    assert rec["step_type"] == "PREPHASE_GATHER" and rec["cycle"] == 3
+    assert rec["rpc"] == "Read" and rec["has_data"] is True
+
+
+def test_log_vm_auto_noop_without_logger():
+    trace.set_trace(None)
+    trace.log_vm_auto("Read", {"path": "/x"}, {"content": "y"})  # must not raise

@@ -62,6 +62,19 @@ def _head(text: str, cap: int) -> str:
     return text
 
 
+def _result_text(result) -> str:
+    """Best-effort payload text from an RPC result (proto object or dict)."""
+    if isinstance(result, str):
+        return result
+    stdout = getattr(result, "stdout", None)
+    if stdout is None and isinstance(result, dict):
+        stdout = result.get("stdout")
+    content = getattr(result, "content", None)
+    if content is None and isinstance(result, dict):
+        content = result.get("content")
+    return str(stdout or content or "")
+
+
 class TraceLogger:
     def __init__(self, path: Path, task_id: str) -> None:
         self.path = path
@@ -263,17 +276,39 @@ class TraceLogger:
             "gather_status": data.get("gather_status", {}),
         })
 
-    def log_vm_call(self, cycle: int, phase: str, rpc: str, args: dict,
-                    result: str, mutated: bool = False) -> None:
-        """One VM RPC: which call (filtered args) and the head of its result."""
+    def log_vm_call(self, cycle: int, step_type: str, rpc: str, args: dict,
+                    result, mutated: bool = False, *,
+                    validation: str = "ok", duration_ms: int = 0) -> None:
+        """One VM RPC: which call (filtered args), validation verdict, and result head.
+
+        `step_type` is also mirrored to `phase` for backward-compatible readers.
+        `bytes`/`has_data` are computed from the full result text before capping.
+        """
+        text = _result_text(result)
         self._write({
             "type": "vm_call",
             "cycle": cycle,
-            "phase": phase,
+            "step_type": step_type,
+            "phase": step_type,
             "rpc": rpc,
             "args": {k: v for k, v in (args or {}).items() if k in _VM_ARG_KEYS},
-            "result_head": _head(str(result or ""), _VM_HEAD_CAP),
+            "validation": validation,
+            "bytes": len(text),
+            "has_data": bool(text.strip()),
+            "result_head": _head(text, _VM_HEAD_CAP),
             "mutated": bool(mutated),
+            "duration_ms": duration_ms,
+        })
+
+    def log_gate(self, cycle: int, step_type: str, passed: bool, reason: str) -> None:
+        """A deterministic gate verdict (LINT | INTERPRET | VERIFY). Supersedes the
+        ad-hoc gate_check record."""
+        self._write({
+            "type": "gate",
+            "cycle": cycle,
+            "step_type": step_type,
+            "passed": bool(passed),
+            "reason": reason or "",
         })
 
     def log_answer(self, cycle: int, message: str, outcome: str, refs: list) -> None:
@@ -468,3 +503,31 @@ def render_trace(source, *, color: bool = False, max_chars: int = 0, phase: str 
             event(r)
 
     return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------
+# Best-effort auto-emit — used by the VM layer and the pipeline. Read the active
+# logger + thread-local cycle/step_type. NEVER raise into a run (observability).
+# ---------------------------------------------------------------------------
+
+def log_vm_auto(rpc: str, args: dict, result, *, mutated: bool = False,
+                validation: str = "ok", duration_ms: int = 0) -> None:
+    t = get_trace()
+    if t is None:
+        return
+    try:
+        t.log_vm_call(current_cycle(), current_step_type() or "INTERPRET", rpc, args,
+                      result, mutated=mutated, validation=validation,
+                      duration_ms=duration_ms)
+    except Exception:
+        pass
+
+
+def log_gate_auto(step_type: str, passed: bool, reason: str) -> None:
+    t = get_trace()
+    if t is None:
+        return
+    try:
+        t.log_gate(current_cycle(), step_type, passed, reason)
+    except Exception:
+        pass

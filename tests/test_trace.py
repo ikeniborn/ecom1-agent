@@ -226,6 +226,8 @@ def test_log_vm_call_record_filters_args_and_caps(tmp_path):
     assert r["args"] == {"path": "/bin/sql", "args": ["SELECT 1"]}  # 'secret' dropped
     assert len(r["result_head"]) <= 1000 + 40 and "[+" in r["result_head"]
     assert r["mutated"] is False
+    assert r["validation"] == "ok"
+    assert r["bytes"] >= 0 and isinstance(r["has_data"], bool)
 
 
 def test_log_answer_keeps_refs_full(tmp_path):
