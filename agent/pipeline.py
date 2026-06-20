@@ -351,8 +351,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     oracle_atoms: list = []
     _oracle = None
     try:
-        from .oracle import KnowledgeOracle
-        _oracle = KnowledgeOracle()
+        _oracle = _new_oracle()
         if not _investigate_on:
             oracle_atoms = _oracle.retrieve(instruction)   # legacy whole-instruction dump
     except Exception:
@@ -371,7 +370,6 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         answer_once("INTENT failed", "OUTCOME_NONE_CLARIFICATION", [])
         return {"cycles_used": 0, "outcome": "OUTCOME_NONE_CLARIFICATION",
                 "status": "failure", "input_tokens": total_in, "output_tokens": total_out}
-
 
     # INVESTIGATE (read-only ReAct) — build a compact brief the PLAN consumes in place
     # of the front-loaded facts dump. Skipped (oracle dumped eagerly above) when off.
