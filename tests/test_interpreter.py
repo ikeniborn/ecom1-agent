@@ -419,14 +419,15 @@ def test_anti_give_up_gate_rejects_clarify_only_when_ok_possible():
 
 def test_anti_give_up_gate_allows_clarify_when_ok_not_in_space():
     from agent.interpreter import interpret
-    from agent.ir_models import (AnswerShape, AnswerTemplateIR, DecisionTree,
-                                  IntentSpec, PlanIR)
+    from agent.ir_models import (AnswerShape, AnswerTemplateIR, Constraint, DecisionTree,
+                                  IntentSpec, PlanIR, PredExpr)
     from agent.mock_vm_spy import MockVMSpy
 
     intent = IntentSpec(objective="o", desired_outcome="OUTCOME_NONE_CLARIFICATION",
                         outcome_space=["OUTCOME_NONE_CLARIFICATION"],
                         answer_shape=AnswerShape(), success_criteria={}, required_refs={},
-                        constraints=[])
+                        constraints=[Constraint(anchor="a", rule="r", security=True,
+                                                deny_when=PredExpr(op="nonempty", lhs="$x"))])
     plan = PlanIR(
         discovery=[], rowsets=[],
         decision=DecisionTree(branches=[], default_label="clar"),

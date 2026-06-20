@@ -98,6 +98,21 @@ class IntentSpec(BaseModel):
             data["success_criteria"] = {"OUTCOME_OK": data["success_criteria"]}
         return data
 
+    @model_validator(mode="after")
+    def _require_ok_outcome(self) -> "IntentSpec":
+        # D6: OUTCOME_OK must be reachable unless a security deny is declared. Closes
+        # the frozen-clarification leg where INTENT pre-commits an OK-less space and
+        # no in-loop iLEARN can recover (INTENT is frozen for the run).
+        has_security_deny = any(
+            c.security and c.deny_when is not None for c in self.constraints
+        )
+        if "OUTCOME_OK" not in self.outcome_space and not has_security_deny:
+            raise ValueError(
+                "outcome_space must include OUTCOME_OK unless a security constraint "
+                "with deny_when is present"
+            )
+        return self
+
 
 # --- PlanIR (SDD layer) ----------------------------------------------------
 

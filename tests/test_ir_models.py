@@ -136,3 +136,37 @@ def test_answer_shape_rejects_dropped_field():
     from agent.ir_models import AnswerShape
     with pytest.raises(ValidationError):
         AnswerShape(required_ref_kinds=["static"])
+
+
+# --- Task 15: IntentSpec OUTCOME_OK-in-outcome_space guard (D6) ---
+
+def test_intent_requires_ok_in_outcome_space():
+    import pytest
+    from agent.ir_models import AnswerShape, IntentSpec
+
+    with pytest.raises(Exception):
+        IntentSpec(objective="o", desired_outcome="OUTCOME_NONE_CLARIFICATION",
+                   outcome_space=["OUTCOME_NONE_CLARIFICATION"],
+                   answer_shape=AnswerShape())
+
+
+def test_intent_ok_less_allowed_with_security_deny():
+    from agent.ir_models import (AnswerShape, Constraint, IntentSpec, PredExpr)
+
+    intent = IntentSpec(
+        objective="o", desired_outcome="OUTCOME_DENIED_SECURITY",
+        outcome_space=["OUTCOME_DENIED_SECURITY"],
+        answer_shape=AnswerShape(),
+        constraints=[Constraint(anchor="a", rule="r", security=True,
+                                deny_when=PredExpr(op="nonempty", lhs="$x"))],
+    )
+    assert "OUTCOME_OK" not in intent.outcome_space  # accepted: security deny present
+
+
+def test_intent_with_ok_is_fine():
+    from agent.ir_models import AnswerShape, IntentSpec
+
+    intent = IntentSpec(objective="o", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
+                        answer_shape=AnswerShape())
+    assert "OUTCOME_OK" in intent.outcome_space
