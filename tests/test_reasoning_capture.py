@@ -31,3 +31,13 @@ def test_enabled_reads_env(monkeypatch):
     assert rc.enabled() is False
     monkeypatch.setenv("ECOM_TRACE_REASONING", "1")
     assert rc.enabled() is True
+
+
+def test_parse_stream_reasoning_extracts_thinking_blocks():
+    lines = [
+        '{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"cot"},{"type":"text","text":"ans"}]}}',
+        '{"type":"result","subtype":"success","result":"ans"}',
+    ]
+    reasoning, text = rc._parse_stream_reasoning(lines)
+    assert reasoning == "cot"
+    assert text == "ans"
