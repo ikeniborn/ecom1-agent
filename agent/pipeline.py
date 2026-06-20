@@ -15,6 +15,7 @@ from .oracle_validate import validate_atom_via_grader
 from .models import LearnConsolidateOutput
 from .prompt import load_prompt
 from .trace import log_gate_auto, set_cycle
+from .investigate import investigate, render_brief
 
 _IMAX_STEPS = int(os.environ.get("ECOM_INTERPRETER_MAX_STEPS", "6"))
 _MAX_TOKENS_LEARN = int(os.environ.get("ECOM_MAX_TOKENS_LEARN", "2048"))
@@ -346,12 +347,16 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         total_in += int(tk.get("input", 0) or 0)
         total_out += int(tk.get("output", 0) or 0)
 
+    _investigate_on = os.environ.get("ECOM_INVESTIGATE_ENABLED", "1") != "0"
     oracle_atoms: list = []
+    _oracle = None
     try:
         from .oracle import KnowledgeOracle
-        oracle_atoms = KnowledgeOracle().retrieve(instruction)
+        _oracle = KnowledgeOracle()
+        if not _investigate_on:
+            oracle_atoms = _oracle.retrieve(instruction)   # legacy whole-instruction dump
     except Exception:
-        pass
+        _oracle = None
 
     # INTENT (frozen, retried on transient parse/empty)
     intent = None
@@ -366,6 +371,20 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         answer_once("INTENT failed", "OUTCOME_NONE_CLARIFICATION", [])
         return {"cycles_used": 0, "outcome": "OUTCOME_NONE_CLARIFICATION",
                 "status": "failure", "input_tokens": total_in, "output_tokens": total_out}
+
+
+    # INVESTIGATE (read-only ReAct) — build a compact brief the PLAN consumes in place
+    # of the front-loaded facts dump. Skipped (oracle dumped eagerly above) when off.
+    brief = None                                  # kept in scope for the success-path distill (Task 11)
+    brief_block = None
+    if _investigate_on:
+        try:
+            brief = investigate(vm, intent, seed=facts, oracle=_oracle)
+            brief_block = render_brief(brief) or None
+        except Exception as e:                    # graceful: fall back to the slim seed facts
+            print(f"{CLI_YELLOW}[pipeline] investigate failed, using seed facts: {e}{CLI_CLR}")
+            brief = None
+            brief_block = None
 
     last_error = None
     last_observed = None
@@ -395,7 +414,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         try:
             plan = run_plan(intent, facts, learn_ctx, last_error,
                             token_out=tk, oracle_atoms=oracle_atoms,
-                            observed=last_observed); _accum(tk)
+                            observed=last_observed, brief_block=brief_block); _accum(tk)
             plan = repair_sql_stdin(plan)
             lint(plan)
         except PlanEmptyError as e:
