@@ -99,3 +99,27 @@ def test_is_readonly_allows_single_trailing_semicolon():
 
 def test_is_readonly_normalises_sql_binary_path_case():
     assert is_readonly("exec", {"path": "/BIN/SQL", "stdin": "SELECT 1"})
+
+
+# append to tests/test_investigate.py  (Task 4 stall detection)
+from agent.investigate import tool_signature, is_stalled
+
+
+def test_tool_signature_normalises_sql_whitespace_and_case():
+    a = tool_signature("exec", {"path": "/bin/sql", "stdin": "SELECT  *\nFROM t"})
+    b = tool_signature("exec", {"path": "/bin/sql", "stdin": "select * from t"})
+    assert a == b
+
+
+def test_is_stalled_on_empty_result():
+    assert is_stalled(result="", signature="read:/docs/x.md", seen_signatures=set())
+
+
+def test_is_stalled_on_repeated_signature():
+    assert is_stalled(result="rows", signature="read:/docs/x.md",
+                      seen_signatures={"read:/docs/x.md"})
+
+
+def test_not_stalled_on_fresh_nonempty():
+    assert not is_stalled(result="rows", signature="read:/docs/y.md",
+                          seen_signatures={"read:/docs/x.md"})

@@ -121,3 +121,24 @@ def _text(res, key: str) -> str:
         return val if isinstance(val, str) else str(val) if val else ""
     val = getattr(res, key, "")
     return val if isinstance(val, str) else (str(val) if val else "")
+
+
+def tool_signature(tool: str, args: dict) -> str:
+    """Stable signature for stall/repeat detection. SQL is whitespace/case-normalised
+    (mirrors pipeline._plan_signature); other args are stringified verbatim, sorted."""
+    t = (tool or "").lower()
+    if t == "exec":
+        sql = (args.get("stdin") or args.get("sql") or "")
+        norm = re.sub(r"\s+", " ", sql).strip().lower()
+        return f"exec:{args.get('path','')}:{norm}"
+    body = ";".join(f"{k}={args[k]}" for k in sorted(args))
+    return f"{t}:{body}"
+
+
+def is_stalled(result: str, signature: str, seen_signatures: set) -> bool:
+    """Deterministic stall: empty tool result OR a signature already seen this run."""
+    if not (result or "").strip():
+        return True
+    if signature in seen_signatures:
+        return True
+    return False
