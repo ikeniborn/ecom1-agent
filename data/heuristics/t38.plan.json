@@ -1,15 +1,89 @@
 {
-  "discovery": [],
-  "rowsets": [],
-  "compute": [],
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT payment_id, record_path, payment_status, three_ds_failure_reason FROM payment_transactions WHERE payment_status LIKE '%fraud%' OR three_ds_failure_reason IS NOT NULL ORDER BY payment_created_at DESC LIMIT 1000"
+      },
+      "bind": "fraud_payments_sql"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "fraud_payments_sql",
+      "format": "json",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "payment_id",
+          "candidates": [
+            "payment_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "payment_status",
+          "candidates": [
+            "payment_status"
+          ]
+        },
+        {
+          "into": "three_ds_failure_reason",
+          "candidates": [
+            "three_ds_failure_reason"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$rows"
+      ],
+      "into": "count"
+    }
+  ],
   "decision": {
-    "branches": [],
-    "default_label": "params_missing"
+    "branches": [
+      {
+        "when": {
+          "op": "gt",
+          "lhs": "$count",
+          "rhs": "0",
+          "args": []
+        },
+        "label": "fraud_payments_identified"
+      }
+    ],
+    "default_label": "fraud_incident_id_required"
   },
   "ops": [],
   "answer": {
-    "params_missing": {
-      "message": "Cannot identify payment records for fraud hit without required parameters: (1) fraud_hit_identifier — unique ID or reference for the confirmed fraud hit, (2) fraud_membership_criteria — operational signature (device fingerprint pattern, payment method pattern, geographic anomaly, transaction sequence, amount threshold, or incident reference ID) determining which payments belong to this hit, (3) archived_scope — time range, archive status flag, or data source definition for older archived payment history.",
+    "fraud_payments_identified": {
+      "message": "Fraud incident: {count} payment records identified and cited",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        "$rows.record_path",
+        "/docs/security.md"
+      ]
+    },
+    "fraud_incident_id_required": {
+      "message": "Fraud incident ID not provided and no fraud-marked payments found in archived history. Please supply fraud_incident_id to identify and cite associated payment records.",
       "outcome": "OUTCOME_NONE_CLARIFICATION",
       "refs": []
     }

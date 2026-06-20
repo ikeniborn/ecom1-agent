@@ -1073,3 +1073,157 @@
   embedding_hash: c66b922fa845dc13b44bd11eb03578d7aa68eedb5184a2564fe44ca3db1d6888
   source_task: t38
   polarity: anti_pattern
+- id: count_sql_first_row
+  description: Retrieve a count value by executing a SQL query and extracting the first row's first column.
+  domain:
+  - sql
+  - count
+  - database
+  content: To count records, execute a SQL SELECT COUNT(*) or similar aggregate query, fetch the first
+    row of the result set, and extract the numeric value from the first column. This pattern works for
+    any query that returns a single row with a numeric count.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: a900f5888f1b9957fbf7477e819ff54268283c1b2a22b71f020326ea1f47770c
+  source_task: t_iso
+  polarity: method
+- id: count_from_sql
+  description: Count rows in a table using a direct SQL query
+  domain:
+  - core_sql
+  - query
+  content: To count rows in a table, execute a direct SQL query using SELECT COUNT(*) AS cnt FROM table_name
+    (or similar). Use an alias for the count column to access it later in the script.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9b8bc4f57073a43f7c59d01baf3b95093bf9fbba9fad1fd04da5f6163b01fa5a
+  source_task: t_seed
+  polarity: method
+- id: sql_scalar_result
+  description: Execute a SQL query that returns a single scalar value and pass that value to the answer
+    message.
+  domain:
+  - data extraction
+  - SQL
+  - workflow
+  content: Define a discovery step that runs a SQL query (e.g., SELECT <expression> AS <alias>) via stdin.
+    Bind the result to a raw variable. Use auto_delim format to parse output into rows. Compute the first
+    row and store it. In the answer, reference the column alias (e.g., {row0.<alias>}) in the message.
+    Set the decision default branch to 'ok'.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 7fcdc7b76a87c2e7eeeb6ba2aed6247b2934a34b653c9802f957152a0b0e54fe
+  source_task: t_int
+  polarity: method
+- id: count-rows-via-sql
+  description: Count rows in a database table using a SQL COUNT query and extract the scalar result.
+  domain:
+  - database
+  - sql
+  - data-processing
+  content: Execute a SQL query of the form 'SELECT COUNT(*) AS cnt FROM <table> [WHERE <condition>]'.
+    After execution, retrieve the first row of the result set and access the column named 'cnt' to obtain
+    the count as a scalar value. This pattern is reusable for any table or condition.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 269082567572a87e34be91cf835b2e0f01b0eef7a52940cc97a767900599841a
+  source_task: t_seed
+  polarity: method
+- id: atom-001
+  description: Retrieve a single scalar value from command output by taking the first row and referencing
+    its column.
+  domain:
+  - data processing
+  - command execution
+  - SQL
+  content: To extract a single value from a command's output, execute the command via a discovery RPC,
+    parse the output into rows using an appropriate format (e.g., auto_delim), apply the 'first' primitive
+    to obtain the first row, and then reference the desired column in the answer message to output the
+    scalar value.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 28133d6fe089f7cf942c1aa236b5af7268e6168a8b301f4f1d72856559d887cf
+  source_task: t_int
+  polarity: method
+- id: verify-database-connectivity
+  description: Validate database connection by executing a trivial query
+  domain:
+  - database
+  - testing
+  - validation
+  content: To confirm that a database connection is operational, execute a simple query (e.g., SELECT
+    1) and verify that it returns a result without error. This pattern is used to test connectivity before
+    performing more complex operations.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 06b8ce7f3437369fa302b1fba16275c0bf3f65f951c256857548542280b0fd22
+  source_task: t01
+  polarity: method
+- id: verify-count-with-simple-query
+  description: How to verify a count operation using a minimal SQL query that returns a single row with
+    a known value.
+  domain:
+  - database
+  - testing
+  - verification
+  content: To verify that a count operation returns a specific value, execute a SELECT statement that
+    returns a single row with a literal value (e.g., SELECT 1) and check that the execution outcome is
+    successful. This confirms that the database is accessible and the query is valid, without relying
+    on specific table data.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 806414658abdc7bad2bd08dba7c65da9b4638cb154807640c3a54390b05923f8
+  source_task: t01
+  polarity: method
+- id: multi-signal-pattern-matching-discovery
+  description: Identify record sets via implicit signals when explicit identifiers unavailable; use OR
+    conditions combining explicit status markers and implicit failure indicators; branch response on result
+    count
+  domain:
+  - data-discovery
+  - fraud-detection
+  - pattern-matching
+  - sql-patterns
+  content: 'When query target lacks explicit identifier (incident_id unknown), detect via multiple signals
+    in single query: explicit markers (status LIKE patterns) OR implicit indicators (null/non-null failure
+    columns). LIMIT results to scale. Count results → branch: count > 0 = process and cite record paths;
+    count == 0 = request missing identifier. Reference policy docs alongside discovery.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: 9aea5d90703dbd63a96aa9cfef648228d3e278fe2673f0c7f4b56830ec0b21d1
+  source_task: t38
+  polarity: method
+- id: extract-sql-scalar
+  description: Method to extract a scalar value from a SQL query result by taking the first row and accessing
+    a named column.
+  domain:
+  - data-processing
+  - SQL
+  - workflow
+  content: Execute a SQL query that returns a single-row result with a named column (e.g., 'cnt'). Capture
+    the output using auto_delim format into a rows variable. Use a step (e.g., prim:first) to extract
+    the first row into a variable (e.g., row0). The value can then be accessed as row0.column_name. This
+    pattern is commonly used for counts, sums, averages, and other scalar aggregates.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: candidate
+  embedding_hash: f6dac06b5b354e0a7703840244918b75ea887ac3abb5ebb7a614d5b6a2c5c9ec
+  source_task: t_empty_ok
+  polarity: method
