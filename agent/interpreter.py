@@ -21,7 +21,7 @@ from .trace import current_cycle, get_trace
 
 
 def _trace_answer(message: str, outcome: str, refs: list) -> None:
-    """Best-effort answer trace (see `_trace_vm`)."""
+    """Best-effort answer trace (see `log_vm_auto` in trace.py for the VM-call seam)."""
     t = get_trace()
     if t is None:
         return
