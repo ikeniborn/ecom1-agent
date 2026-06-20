@@ -56,3 +56,26 @@ def test_call_llm_raw_no_trace_is_noop(monkeypatch):
 def test_current_cycle_defaults_zero():
     set_cycle(0)
     assert current_cycle() == 0
+
+
+def test_call_llm_raw_threads_cache_tokens(tmp_path, monkeypatch):
+    def fake_single(system, user_msg, model, cfg, **kw):
+        tok = kw.get("token_out")
+        if tok is not None:
+            tok["input"] = 5
+            tok["output"] = 3
+            tok["cache_read"] = 900
+            tok["cache_creation"] = 1200
+        return "REPLY"
+
+    monkeypatch.setattr(llm, "_call_raw_single_model", fake_single)
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    set_trace(t)
+    try:
+        llm.call_llm_raw([{"type": "text", "text": "S"}], "U", "m", {}, phase="PLAN")
+    finally:
+        set_trace(None)
+        t.close()
+    call = next(r for r in _records(p) if r["type"] == "llm_call")
+    assert call["cache_read"] == 900 and call["cache_creation"] == 1200

@@ -612,6 +612,8 @@ def call_llm_raw(
                 tokens_in=_tok.get("input", 0),
                 tokens_out=_tok.get("output", 0),
                 duration_ms=int((time.monotonic() - _t0) * 1000),
+                cache_read=_tok.get("cache_read", 0),
+                cache_creation=_tok.get("cache_creation", 0),
             )
         except Exception:
             pass
