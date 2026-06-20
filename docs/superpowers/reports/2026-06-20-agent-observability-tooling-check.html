@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка плана — Agent Observability &amp; Tooling</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1c2024; --muted:#6b7177; --line:#d6dadf; --panel:#f5f7fa;
+  --accent:#1565c0; --ok:#2e7d32; --warn:#e08600; --bad:#c62828;
+  --node:#eef3fb; --node-stroke:#1565c0; --edge:#5b6470; --edge-warn:#c62828;
+}
+:root[data-theme="dark"]{
+  --bg:#15171a; --fg:#e6e8ea; --muted:#9aa0a6; --line:#39414a; --panel:#1e2227;
+  --accent:#64b5f6; --ok:#66bb6a; --warn:#ffca28; --bad:#ef5350;
+  --node:#222a33; --node-stroke:#64b5f6; --edge:#8b94a0; --edge-warn:#ef5350;
+}
+@media (prefers-color-scheme: dark){
+  :root[data-theme="auto"]{
+    --bg:#15171a; --fg:#e6e8ea; --muted:#9aa0a6; --line:#39414a; --panel:#1e2227;
+    --accent:#64b5f6; --ok:#66bb6a; --warn:#ffca28; --bad:#ef5350;
+    --node:#222a33; --node-stroke:#64b5f6; --edge:#8b94a0; --edge-warn:#ef5350;
+  }
+}
+*{box-sizing:border-box}
+body{font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;
+  background:var(--bg);color:var(--fg)}
+.wrap{max-width:1180px;margin:0 auto;padding:24px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:18px;border-bottom:2px solid var(--line);padding-bottom:6px;margin-top:34px}
+h3{font-size:15px;margin-top:22px}
+.sub{color:var(--muted);margin:0 0 18px}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--panel);font-weight:600}
+td.c,th.c{text-align:center;white-space:nowrap}
+code{background:var(--panel);padding:1px 5px;border-radius:4px;font-size:12px}
+.badge{display:inline-block;padding:1px 8px;border-radius:11px;font-size:12px;font-weight:600}
+.b-ok{background:var(--ok);color:#fff}
+.b-warn{background:var(--warn);color:#1c2024}
+.b-bad{background:var(--bad);color:#fff}
+.b-info{background:var(--accent);color:#fff}
+.muted{color:var(--muted)}
+.note{border-left:4px solid var(--accent);background:var(--panel);padding:10px 14px;
+  border-radius:0 6px 6px 0;margin:14px 0}
+figure{margin:14px 0;border:1px solid var(--line);border-radius:8px;padding:12px;
+  background:var(--panel);overflow-x:auto}
+figcaption{color:var(--muted);font-size:12px;margin-bottom:8px}
+.legend span{display:inline-block;margin-right:16px;font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;
+  vertical-align:middle}
+.toggle{position:fixed;top:14px;right:16px;background:var(--panel);color:var(--fg);
+  border:1px solid var(--line);border-radius:18px;padding:6px 14px;cursor:pointer;
+  font:13px system-ui;z-index:9}
+.matrix td.c{font-weight:600}
+.hit{background:var(--accent);color:#fff}
+.x{color:var(--bad);font-weight:700}
+svg text{fill:var(--fg);font:11px system-ui}
+svg .nlabel{font-weight:600}
+</style>
+</head>
+<body>
+<button class="toggle" id="tg">◐ Тема</button>
+<div class="wrap">
+
+<h1>Проверка плана — Agent Observability, Tool Catalog &amp; HTML Report</h1>
+<p class="sub">IDD-гейт <code>/check-plan</code> · 2026-06-20 ·
+вердикт: <span class="badge b-ok">OK</span> &nbsp; 0 CRITICAL · 4 WARNING (все закрыты)</p>
+
+<div class="note">
+<b>Файлы.</b> План: <code>docs/superpowers/plans/2026-06-20-agent-observability-tooling.md</code>
+(plan_hash <code>e735e71945afc0f8</code>). Спека:
+<code>docs/superpowers/specs/2026-06-20-agent-observability-tooling-design.md</code>
+(spec_hash <code>10b83de36b765939</code>). Цепочка: <code>intent: null → spec → plan</code>.
+</div>
+
+<!-- ================= БЛОК 1 — РЕЗЮМЕ ШАГОВ ================= -->
+<h2>1. Резюме шагов плана и критерии готовности (DoD)</h2>
+<p class="muted">20 задач в 6 фазах. Каждая задача — TDD-цикл (red → green → commit); DoD = команда проверки + ожидаемый результат.</p>
+
+<table>
+<tr><th class="c">Задача</th><th>Что делает</th><th>Ключевые файлы</th><th>DoD (критерий готовности)</th></tr>
+<tr><td class="c"><b>Фаза 0</b></td><td colspan="3"><i>Бэкбон — схема трейса v2</i></td></tr>
+<tr><td class="c">T1</td><td>Глобальный <code>seq</code> + thread-local <code>step_type</code></td><td>trace.py</td><td><code>pytest test_trace_v2_schema</code> — seq монотонен/без пропусков</td></tr>
+<tr><td class="c">T2</td><td>Расширить <code>log_llm_call</code> (reasoning, prev_llm_seq, cache-токены, step_type)</td><td>trace.py</td><td>v2-поля присутствуют; RERANK→ORACLE_RETRIEVE; нет <code>phase=="llm"</code></td></tr>
+<tr><td class="c">T3</td><td><code>log_vm_call</code> (validation/bytes/has_data), <code>log_gate</code>, авто-хелперы</td><td>trace.py</td><td>vm_call/gate-записи + <code>log_vm_auto</code> читает thread-local; no-op без логгера</td></tr>
+<tr><td class="c"><b>Фаза 1</b></td><td colspan="3"><i>Workstream B — лог каждого шага</i></td></tr>
+<tr><td class="c">T4</td><td>Именовать все фазы (<code>call_llm_json(phase=)</code>)</td><td>llm.py, oracle*.py, harness.py</td><td><code>test_oracle_rank</code> — phase=="RERANK"</td></tr>
+<tr><td class="c">T5</td><td>Протянуть cache_read/cache_creation в llm_call</td><td>llm.py</td><td><code>test_trace_llm_funnel</code> — cache-токены попадают в запись</td></tr>
+<tr><td class="c">T6</td><td><code>reasoning_capture.py</code> + врезка в воронку</td><td>reasoning_capture.py, llm.py</td><td><code>test_reasoning_capture</code> — pop предпочитает item с reasoning</td></tr>
+<tr><td class="c">T7</td><td>VMAdapter+MockVMSpy логируют vm_call; убрать <code>_trace_vm</code></td><td>vm_adapter.py, mock_vm_spy.py, interpreter.py, orchestrator.py</td><td>vm_call с step_type=INTERPRET/PREPHASE_GATHER</td></tr>
+<tr><td class="c">T8</td><td>gate-записи после lint/interpret/verify</td><td>pipeline.py</td><td><code>log_gate_auto</code> эмитит gate; suite зелёный</td></tr>
+<tr><td class="c"><b>Фаза 2</b></td><td colspan="3"><i>Workstream C — каталог инструментов</i></td></tr>
+<tr><td class="c">T9</td><td><code>TOOL_CATALOG</code> + <code>validate_step</code> + <code>build_tool_catalog_block</code></td><td>tools.py</td><td><code>test_tools</code> — unknown rpc / bad arg / missing required отклонены</td></tr>
+<tr><td class="c">T10</td><td>Валидация диспетчера перед каждым RPC</td><td>interpreter.py</td><td>InterpretError на unknown rpc/arg; replay-корпус не ломается</td></tr>
+<tr><td class="c">T11</td><td>Инъекция каталога в PLAN; убрать таблицу RPC из plan.md</td><td>reason.py, plan.md</td><td><code>test_reason_prompts</code> — "TOOL CATALOG" в system</td></tr>
+<tr><td class="c"><b>Фаза 3</b></td><td colspan="3"><i>Workstream A — архитектурный фикс t38</i></td></tr>
+<tr><td class="c">T12</td><td><code>policies</code> доходят до PLAN (CRITERIA-блок)</td><td>reason.py</td><td><code>test_reason</code> — тело политики в plan-tier блоке</td></tr>
+<tr><td class="c">T13</td><td>deep_read /docs читает тело в <code>policies</code></td><td>orchestrator.py</td><td><code>test_orchestrator</code> — body в policies, не только existence</td></tr>
+<tr><td class="c">T14</td><td>Anti-give-up gate в интерпретаторе</td><td>interpreter.py</td><td>clarify-only план при достижимом OK → InterpretError</td></tr>
+<tr><td class="c">T15</td><td>INTENT-гард: OUTCOME_OK в outcome_space (D6)</td><td>ir_models.py</td><td><code>test_ir_models</code> — OK-less без security-deny отклонён</td></tr>
+<tr><td class="c"><b>Фаза 4</b></td><td colspan="3"><i>HTML-отчёт</i></td></tr>
+<tr><td class="c">T16</td><td>Парсер v2 + run-overview (грид/ошибки/инструменты/redundancy)</td><td>agent_report.py</td><td><code>test_agent_report</code> — нет внешних src/href; оба темо-набора</td></tr>
+<tr><td class="c">T17</td><td>Per-task drill-down (timeline, cycle SVG, reasoning)</td><td>agent_report.py</td><td>inline SVG; reasoning-панели; tool-таблица</td></tr>
+<tr><td class="c"><b>Фаза 5</b></td><td colspan="3"><i>Интеграция + тонкий trace_t38</i></td></tr>
+<tr><td class="c">T18</td><td>Урезать <code>trace_t38.py</code> до тонкого вызова</td><td>trace_t38.py</td><td>ast.parse ok; <code>test_trace_main</code> зелёный</td></tr>
+<tr><td class="c">T19</td><td>Интеграция: run_pipeline над MockVMSpy → полный v2-трейс</td><td>test_pipeline_v2.py</td><td>все step_type; gate-записи; seq без пропусков</td></tr>
+<tr><td class="c">T20</td><td>E2E: ре-ран t38 + генерация отчёта + iwiki</td><td>—</td><td>отчёт сгенерён; POLICY+CATALOG видны в PLAN; зафиксирован score</td></tr>
+</table>
+
+<!-- ================= БЛОК 2 — СХЕМЫ ================= -->
+<h2>2. Зависимости и пересечения</h2>
+
+<figure>
+<figcaption>Граф зависимостей задач (ребро M→N: артефакт/символ из M используется в N; M&lt;N). Циклов и нарушений порядка фаза <i>dependencies</i> не нашла.</figcaption>
+<svg viewBox="0 0 1160 380" width="100%" role="img" aria-label="Граф зависимостей задач">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="var(--edge)"/>
+    </marker>
+    <marker id="arrw" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="var(--edge-warn)"/>
+    </marker>
+  </defs>
+
+  <!-- phase column captions -->
+  <text x="20"  y="14" class="muted">Фаза 0</text>
+  <text x="210" y="14" class="muted">Фаза 1</text>
+  <text x="410" y="14" class="muted">Фаза 2</text>
+  <text x="590" y="14" class="muted">Фаза 3</text>
+  <text x="790" y="14" class="muted">Фаза 4</text>
+  <text x="970" y="14" class="muted">Фаза 5</text>
+
+  <!-- edges (drawn first, under nodes) -->
+  <!-- backbone -->
+  <line x1="100" y1="62"  x2="20"  y2="62"  display="none"/>
+  <line x1="170" y1="62"  x2="20"  y2="140" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="170" y1="62"  x2="20"  y2="220" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="170" y1="140" x2="20"  y2="220" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <!-- T2 -> T5,T6 -->
+  <line x1="170" y1="140" x2="210" y2="120" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="170" y1="140" x2="210" y2="185" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <!-- T3 -> T7,T8,T10,T16 -->
+  <line x1="170" y1="220" x2="210" y2="250" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="170" y1="220" x2="210" y2="315" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="170" y1="222" x2="410" y2="160" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="170" y1="224" x2="790" y2="120" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <!-- T9 -> T10,T11 -->
+  <line x1="490" y1="82"  x2="410" y2="160" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="490" y1="82"  x2="410" y2="240" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <!-- T14 -> T15 -->
+  <line x1="660" y1="212" x2="590" y2="290" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <!-- T16 -> T17 -->
+  <line x1="860" y1="122" x2="790" y2="200" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <!-- T6 -> T18 -->
+  <line x1="280" y1="185" x2="970" y2="80"  stroke="var(--edge)" marker-end="url(#arr)"/>
+  <!-- T7,T8 -> T19 -->
+  <line x1="280" y1="252" x2="970" y2="180" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="280" y1="318" x2="970" y2="182" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <!-- T17,T11,T13,T18 -> T20 -->
+  <line x1="860" y1="202" x2="970" y2="300" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="490" y1="242" x2="970" y2="302" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="660" y1="132" x2="970" y2="304" stroke="var(--edge)" marker-end="url(#arr)"/>
+  <line x1="1040" y1="100" x2="1040" y2="280" stroke="var(--edge)" marker-end="url(#arr)"/>
+
+  <!-- nodes -->
+  <!-- helper: rect 70x34 -->
+  <g>
+    <!-- Phase0 -->
+    <rect x="20"  y="46"  width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="60"  y="67"  text-anchor="middle" class="nlabel">T1</text>
+    <rect x="20"  y="124" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="60"  y="145" text-anchor="middle" class="nlabel">T2</text>
+    <rect x="20"  y="204" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="60"  y="225" text-anchor="middle" class="nlabel">T3</text>
+    <!-- Phase1 -->
+    <rect x="210" y="24"  width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="250" y="45"  text-anchor="middle" class="nlabel">T4</text>
+    <rect x="210" y="103" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="250" y="124" text-anchor="middle" class="nlabel">T5</text>
+    <rect x="210" y="168" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="250" y="189" text-anchor="middle" class="nlabel">T6</text>
+    <rect x="210" y="233" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="250" y="254" text-anchor="middle" class="nlabel">T7</text>
+    <rect x="210" y="301" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="250" y="322" text-anchor="middle" class="nlabel">T8</text>
+    <!-- Phase2 -->
+    <rect x="410" y="65"  width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="450" y="86"  text-anchor="middle" class="nlabel">T9</text>
+    <rect x="410" y="143" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="450" y="164" text-anchor="middle" class="nlabel">T10</text>
+    <rect x="410" y="223" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="450" y="244" text-anchor="middle" class="nlabel">T11</text>
+    <!-- Phase3 -->
+    <rect x="590" y="43"  width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="630" y="64"  text-anchor="middle" class="nlabel">T12</text>
+    <rect x="590" y="115" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="630" y="136" text-anchor="middle" class="nlabel">T13</text>
+    <rect x="590" y="195" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="630" y="216" text-anchor="middle" class="nlabel">T14</text>
+    <rect x="590" y="273" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="630" y="294" text-anchor="middle" class="nlabel">T15</text>
+    <!-- Phase4 -->
+    <rect x="790" y="105" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="830" y="126" text-anchor="middle" class="nlabel">T16</text>
+    <rect x="790" y="185" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="830" y="206" text-anchor="middle" class="nlabel">T17</text>
+    <!-- Phase5 -->
+    <rect x="970" y="63"  width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="1010" y="84"  text-anchor="middle" class="nlabel">T18</text>
+    <rect x="970" y="163" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="1010" y="184" text-anchor="middle" class="nlabel">T19</text>
+    <rect x="970" y="283" width="80" height="34" rx="5" fill="var(--node)" stroke="var(--node-stroke)"/><text x="1010" y="304" text-anchor="middle" class="nlabel">T20</text>
+  </g>
+</svg>
+<div class="legend">
+  <span><span class="dot" style="background:var(--node-stroke)"></span>задача</span>
+  <span><span class="dot" style="background:var(--edge)"></span>зависимость (M→N)</span>
+  <span>цикл/нарушение порядка: <b>не обнаружено</b></span>
+</div>
+</figure>
+
+<h3>Матрица пересечений по артефактам (один файл правят несколько задач)</h3>
+<p class="muted">Перекрытия не конфликтны: правки в общих файлах идут последовательными задачами одной/смежных фаз и не затрагивают одни строки.</p>
+<table class="matrix">
+<tr><th>Файл / артефакт</th><th>Задачи</th><th>Риск</th></tr>
+<tr><td><code>agent/trace.py</code></td><td>T1, T2, T3</td><td><span class="badge b-ok">нет</span> последовательный бэкбон</td></tr>
+<tr><td><code>agent/llm.py</code></td><td>T4, T5, T6</td><td><span class="badge b-warn">F-001</span> один блок <code>log_llm_call</code> правят T5+T6 — указан явный порядок</td></tr>
+<tr><td><code>agent/interpreter.py</code></td><td>T7, T10, T14</td><td><span class="badge b-ok">нет</span> разные участки (vm-лог / validate / gate)</td></tr>
+<tr><td><code>agent/reason.py</code></td><td>T11, T12</td><td><span class="badge b-ok">нет</span> system-prompt vs facts-block</td></tr>
+<tr><td><code>agent/orchestrator.py</code></td><td>T7, T13</td><td><span class="badge b-ok">нет</span> step_type vs deep-read</td></tr>
+<tr><td><code>scripts/agent_report.py</code></td><td>T16, T17</td><td><span class="badge b-ok">нет</span> T17 заменяет stub T16 (та же сигнатура)</td></tr>
+<tr><td><code>tests/test_interpreter.py</code></td><td>T7, T10, T14, T15</td><td><span class="badge b-ok">нет</span> добавление тестов; T15 правит фикстуру T14 (оговорено)</td></tr>
+</table>
+
+<h3>Покрытие требований спеки (требование → задачи)</h3>
+<table>
+<tr><th>Раздел спеки</th><th>Задачи</th></tr>
+<tr><td>§4 схема v2</td><td>T1, T2, T3, T5, T6, T7, T8</td></tr>
+<tr><td>§5.1 имена фаз</td><td>T4</td></tr>
+<tr><td>§5.2 reasoning-capture (DoD: avail iff reasoning≠"")</td><td>T6</td></tr>
+<tr><td>§5.3 pre-phase VM-лог / убрать _trace_vm</td><td>T7</td></tr>
+<tr><td>§5.4 gate-записи</td><td>T8</td></tr>
+<tr><td>§5.5 токены кэша</td><td>T5</td></tr>
+<tr><td>§6 каталог + валидация + prompt-блок</td><td>T9, T10, T11</td></tr>
+<tr><td>§7.1 policies→PLAN</td><td>T12</td></tr>
+<tr><td>§7.2 deep_read тело</td><td>T13</td></tr>
+<tr><td>§7.3 anti-give-up gate (в interpreter)</td><td>T14</td></tr>
+<tr><td>§7.4 INTENT-гард (D6)</td><td>T15</td></tr>
+<tr><td>§8 отчёт (overview + drill-down, redundancy)</td><td>T16, T17</td></tr>
+<tr><td>§10 тестирование (интеграция над MockVM)</td><td>T19 (+ per-task тесты)</td></tr>
+<tr><td>§11 секвенирование</td><td>Фазы 0→5</td></tr>
+<tr><td>§12 / D6 флаг</td><td>T15, T6 (ECOM_TRACE_REASONING)</td></tr>
+</table>
+
+<!-- ================= БЛОК 3 — РЕЗУЛЬТАТЫ ================= -->
+<h2>3. Результаты проверки (5 фаз)</h2>
+<table>
+<tr><th>Фаза</th><th class="c">Статус</th><th>Резюме</th></tr>
+<tr><td>structure</td><td class="c"><span class="badge b-ok">passed</span></td><td>T1–T20 последовательны, без пропусков/дублей; нет TODO/TBD/FIXME/???; нет дублей заголовков</td></tr>
+<tr><td>coverage</td><td class="c"><span class="badge b-ok">passed</span></td><td>каждое требование §4–§12 покрыто ≥1 задачей; лишней области нет</td></tr>
+<tr><td>dependencies</td><td class="c"><span class="badge b-ok">passed</span></td><td>все forward-ссылки резолвятся (T8←T3, T10/T11←T9, T17←T16, T15←T14); циклов нет</td></tr>
+<tr><td>verifiability</td><td class="c"><span class="badge b-ok">passed</span></td><td>у каждого шага измеримый DoD (pytest + ожидаемый результат); расплывчатых шагов нет</td></tr>
+<tr><td>consistency</td><td class="c"><span class="badge b-ok">passed</span></td><td>сигнатуры/датаклассы согласованы между задачами; нет противоречий со спекой (seam=VMAdapter, gate в interpreter)</td></tr>
+</table>
+
+<h3>Findings</h3>
+<table>
+<tr><th class="c">ID</th><th class="c">severity</th><th>фаза / секция</th><th>описание</th><th class="c">verdict</th></tr>
+<tr><td class="c">F-001</td><td class="c"><span class="badge b-warn">WARNING</span></td><td>consistency · T5/§5.5</td><td>cache_read/cache_creation заполняет только CC-провайдер; Anthropic/OpenAI-пути пишут лишь input/output (overview-колонка кэша недооценит для SDK-провайдера)</td><td class="c"><span class="badge b-info">wontfix</span><br><span class="muted">спекой ограничено CC</span></td></tr>
+<tr><td class="c">F-002</td><td class="c"><span class="badge b-warn">WARNING</span></td><td>verifiability · T8</td><td>тест gate-эмита проверяет хелпер T3, а не red-green драйвит правку pipeline; правка покрыта E2E в T19</td><td class="c"><span class="badge b-info">accepted</span></td></tr>
+<tr><td class="c">F-003</td><td class="c"><span class="badge b-warn">WARNING</span></td><td>dependencies · T7</td><td>нестрогая ссылка на строки orchestrator — искать по символу</td><td class="c"><span class="badge b-ok">fixed</span></td></tr>
+<tr><td class="c">F-004</td><td class="c"><span class="badge b-warn">WARNING</span></td><td>consistency · T12</td><td>сворачивает <code>_INTENT_KEYS=_PLAN_KEYS+('policies',)</code> без явной пометки; поведение сохранено</td><td class="c"><span class="badge b-ok">fixed</span></td></tr>
+</table>
+
+<h3>Сводка</h3>
+<table>
+<tr><th>CRITICAL open</th><th>WARNING open</th><th>Вердикт</th></tr>
+<tr><td class="c"><b>0</b></td><td class="c"><b>0</b> <span class="muted">(4 закрыты: 2 fixed, 1 accepted, 1 wontfix)</span></td><td class="c"><span class="badge b-ok">OK — план реализуем как есть</span></td></tr>
+</table>
+
+<div class="note">
+<b>Верификация против реального кода (clean-context subagent).</b> Все 7 критических точек подтверждены: trace.py <code>log_llm_call</code> 90–115 / <code>log_vm_call</code> 225–236; cc_client пишет cache-токены; interpreter <code>_trace_vm</code> 23–35 + вызовы 302/350; reason <code>_PLAN_KEYS</code> 88; interpreter:364 <code>outcome=…</code>; run_report.py как образец; IntentSpec имеет <code>model_validator</code> + <code>_coerce_success_criteria</code>. Ни один шаг не ссылается на несуществующий символ/диапазон.
+</div>
+
+<p class="muted" style="margin-top:28px">
+Previous step: <code>docs/superpowers/specs/2026-06-20-agent-observability-tooling-design.md</code><br>
+Chain: <code>null → docs/superpowers/specs/2026-06-20-agent-observability-tooling-design.md → docs/superpowers/plans/2026-06-20-agent-observability-tooling.md</code>
+</p>
+
+</div>
+<script>
+(function(){
+  var root=document.documentElement, btn=document.getElementById('tg');
+  btn.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    var next = cur==='dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+  });
+})();
+</script>
+</body>
+</html>
