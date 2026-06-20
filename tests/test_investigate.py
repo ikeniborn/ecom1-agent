@@ -255,3 +255,14 @@ def test_investigate_escalates_on_empty(monkeypatch):
                             calls.append(("digest", escalate)) or (Note(tool=tool, args=args), {})))
     inv.investigate(vm, intent, seed=None, oracle=None, max_steps=1)
     assert any(c == ("digest", True) for c in calls)   # empty result escalated the digest
+
+
+def test_investigate_never_raises_on_step_error(monkeypatch):
+    intent = _intent_with_refs()
+    vm = MockVMSpy({})
+    def boom(*a, **k):
+        raise RuntimeError("router blew up")
+    monkeypatch.setattr(inv, "router", boom)
+    brief = inv.investigate(vm, intent, seed=None, oracle=None, max_steps=2)
+    assert isinstance(brief, Brief)               # returned gracefully, did not raise
+    assert any("step error" in n.lesson for n in brief.notes)
