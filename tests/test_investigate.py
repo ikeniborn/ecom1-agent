@@ -46,3 +46,38 @@ def test_render_brief_is_compact_and_contains_env_and_lessons():
 
 def test_render_brief_empty_is_falsy_marker():
     assert render_brief(Brief()) == ""
+
+
+# --- Task 3: read-only whitelist + tool dispatch ---
+import pytest
+from agent.investigate import is_readonly, run_tool, ToolRejected
+from agent.mock_vm_spy import MockVMSpy, fixture_key
+
+
+def test_is_readonly_allows_reads_and_select():
+    assert is_readonly("read", {"path": "/docs/x.md"})
+    assert is_readonly("tree", {"root": "/docs"})
+    assert is_readonly("exec", {"path": "/bin/sql", "stdin": "SELECT * FROM t"})
+
+
+def test_is_readonly_rejects_mutations():
+    assert not is_readonly("write", {"path": "/x", "content": "y"})
+    assert not is_readonly("delete", {"path": "/x"})
+    assert not is_readonly("exec", {"path": "/bin/sql", "stdin": "UPDATE t SET a=1"})
+    assert not is_readonly("exec", {"path": "/bin/id"})   # only /bin/sql exec allowed
+
+
+def test_run_tool_executes_read_only_and_records():
+    # MockVMSpy records/keys RPCs CAPITALIZED ("Read"), though vm.read() is the method.
+    fx = {fixture_key("Read", "/docs/x.md"): {"content": "# Policy\nN=2"}}
+    vm = MockVMSpy(fx)
+    out = run_tool(vm, "read", {"path": "/docs/x.md"})   # investigator tool name is lowercase
+    assert "N=2" in out
+    assert vm.calls and vm.calls[-1][0] == "Read"
+
+
+def test_run_tool_rejects_mutation():
+    vm = MockVMSpy({})
+    with pytest.raises(ToolRejected):
+        run_tool(vm, "write", {"path": "/x", "content": "y"})
+    assert not any(c[0] == "Write" for c in vm.calls)   # never dispatched
