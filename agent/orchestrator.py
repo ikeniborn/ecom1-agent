@@ -487,7 +487,7 @@ def _doc_select_fallback(doc_paths: list[str], instruction: str, tokens: list[st
     return out
 
 
-def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: str = "") -> PrePhaseFacts:
+def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: str = "", slim: bool = False) -> PrePhaseFacts:
     status: dict[str, str] = {}
 
     def _mark(key: str, value, err: str = "") -> None:
@@ -505,14 +505,18 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
     # schema + sample rows (P5 tier split: names/DDL uncapped; samples relevance-gated)
     schema = _discover_schema(vm)
     _mark("schema", schema)
-    tables = _discover_table_names(vm) if schema else []
-    sample_set = _relevant_tables(tables, instruction, deep_read=deep_tables)
-    samples = _discover_sample_rows(vm, sample_set) if sample_set else ""
-    skipped = [t for t in tables if t not in sample_set]
-    if skipped:                                  # no silent truncation
-        print(f"[prephase] sample_rows: {len(skipped)} table(s) not relevant, not sampled: "
-              + ", ".join(skipped[:10]) + (" …" if len(skipped) > 10 else ""))
-    _mark("sample_rows", samples)
+    if slim:
+        samples = ""                             # slim seed: schema NAMES only, no row samples
+        status["sample_rows"] = "skipped(slim)"
+    else:
+        tables = _discover_table_names(vm) if schema else []
+        sample_set = _relevant_tables(tables, instruction, deep_read=deep_tables)
+        samples = _discover_sample_rows(vm, sample_set) if sample_set else ""
+        skipped = [t for t in tables if t not in sample_set]
+        if skipped:                              # no silent truncation
+            print(f"[prephase] sample_rows: {len(skipped)} table(s) not relevant, not sampled: "
+                  + ", ".join(skipped[:10]) + (" …" if len(skipped) > 10 else ""))
+        _mark("sample_rows", samples)
 
     # identity (P4 robust parse)
     try:
@@ -540,126 +544,136 @@ def gather_prephase_facts(vm, instruction: str, agents_md_text: str, task_id: st
         doc_paths, docs_inventory = [], ""
         _mark("docs_inventory", None, str(e))
 
-    # policies: security.md + path-named docs (existing behaviour)
+    # The investigator (when slim) fetches bodies/listings/catalogue/record-bodies on
+    # demand as read-only tools; the slim seed is identity + schema NAMES + doc PATHS only.
     policies: dict[str, str] = {}
-    wanted = ["/docs/security.md"]
-    for name in re.findall(r"/docs/[\w/.-]+\.md", (instruction or "") + " " + (agents_md_text or "")):
-        if name not in wanted:
-            wanted.append(name)
-    for path in wanted[:_POLICY_CAP]:
-        try:
-            txt = _extract_text(vm.read(path=path), "content")
-            if txt:
-                policies[path] = txt[:_DOC_CONTENT_CAP]
-        except Exception:
-            continue
-
-    # policies enrichment via entity-token Search (S1-R3)
-    tokens = _extract_entity_tokens(instruction)
-    search_hit = False
-    search_err = ""
-    for tok in tokens:
-        try:
-            hits = _search_paths(vm.search(root="/docs", pattern=tok, limit=30))
-        except Exception as e:
-            search_err = str(e)
-            continue
-        if hits:
-            search_hit = True
-        for p in hits[:_DOC_HITS_PER_TOKEN]:
-            if p in policies:
-                continue
-            try:
-                txt = _extract_text(vm.read(path=p), "content")
-                if txt:
-                    policies[p] = txt[:_DOC_CONTENT_CAP]
-            except Exception:
-                continue
-    _mark("policies", policies, search_err if (not policies and search_err) else "")
-
-    # LLM DOC-SELECT fallback (S1-R4) — only when Search found nothing.
-    if not search_hit and tokens and doc_paths:
-        picked = _doc_select_fallback(doc_paths, instruction, tokens)
-        for p in picked:
-            if p in policies:
-                continue
-            try:
-                txt = _extract_text(vm.read(path=p), "content")
-                if txt:
-                    policies[p] = txt[:_DOC_CONTENT_CAP]
-            except Exception:
-                continue
-        if picked and policies:
-            status["policies"] = "ok"
-
-    # F7: catalogue query but entity-token Search found no /docs match — log the gap
-    # (defensive; no break, no prompt change). Many catalogue tasks have no doc.
-    if _is_catalogue_query(instruction) and not search_hit:
-        print(f"[prephase] DOC_SELECT gap: catalogue query, no /docs matched entity tokens "
-              f"(tokens={tokens[:5]})")
-
-    # catalogue candidate probe — broad normalized query by entity tokens (no LLM, read-only).
-    # Fire on a catalogue hint OR whenever the instruction carries >=2 distinctive entity
-    # tokens (a product reference like "Heco ... Nut Bolt" or "Wiha Screwdriver 13X-B49"
-    # that the narrow _is_catalogue_query hint-list misses).
     catalogue_candidates = ""
-    if _is_catalogue_query(instruction) or len(_probe_keywords(instruction)) >= 2:
-        try:
-            catalogue_candidates = _probe_catalogue_candidates(vm, instruction)
-        except Exception:
-            pass  # best-effort; never break gather
-    _mark("catalogue_candidates", catalogue_candidates)
-
-    # target_records (H1 — VM-discovered subdirs; no static prefix list / plural map)
     target_records: dict[str, str] = {}
-    proc_subdirs = [d.rstrip("/").rsplit("/", 1)[-1].lower()
-                    for d in _list_entries(vm, "/proc")]
-    seen_ids: list[str] = []
-    for m in _RECORD_ID_RE.finditer(instruction or ""):
-        full = m.group(0)
-        prefix = full.split("_", 1)[0].lower()
-        # structural id-shape; the /proc listing decides which prefixes are real
-        if not any(name.startswith(prefix) for name in proc_subdirs):
-            continue
-        if full in seen_ids:
-            continue
-        seen_ids.append(full)
-        if len(seen_ids) > _RECORD_CAP:
-            break
-        for proc in _proc_candidates(proc_subdirs, full):
+    path_listings: dict[str, str] = {}
+    if slim:
+        for _k in ("policies", "catalogue_candidates", "target_records", "path_listings"):
+            status[_k] = "skipped(slim)"
+    else:
+        # policies: security.md + path-named docs (existing behaviour)
+        policies: dict[str, str] = {}
+        wanted = ["/docs/security.md"]
+        for name in re.findall(r"/docs/[\w/.-]+\.md", (instruction or "") + " " + (agents_md_text or "")):
+            if name not in wanted:
+                wanted.append(name)
+        for path in wanted[:_POLICY_CAP]:
             try:
-                txt = _extract_text(vm.read(path=proc), "content")
+                txt = _extract_text(vm.read(path=path), "content")
                 if txt:
-                    target_records[proc] = txt
-                    break
+                    policies[path] = txt[:_DOC_CONTENT_CAP]
             except Exception:
                 continue
-    _mark("target_records", target_records)
 
-    # literal-path listings (1.2) — VM is the filter; no /proc allowlist, no hardcoded roots.
-    path_listings: dict[str, str] = {}
-    literals = _extract_path_literals(instruction)
-    for d in deep_paths:
-        if d not in literals:
-            literals.append(d)
-    for lit in literals:
-        kind = _stat_kind(vm, lit)
-        if kind == "dir":
-            paths = _list_entries(vm, lit)               # Tier-1, cheap
-            if paths:
-                path_listings[lit] = _render_budget(paths, _PATH_LISTING_BUDGET)
-        elif kind == "file":
-            # A /docs deep-read literal is a criteria source — read its BODY into
-            # policies (not just existence), so PLAN sees the rule. General: scoped
-            # to /docs files named by a learned prephase_deep_read hint or instruction.
-            if lit.startswith("/docs") and lit in deep_paths and lit not in policies:
-                body = _extract_text(vm.read(path=lit), "content")
-                if body:
-                    policies[lit] = body[:_DOC_CONTENT_CAP]
-            path_listings[lit] = f"file {lit}"           # existence; body recorded above
-        # kind == "" -> non-existent / non-data path -> skipped
-    _mark("policies", policies)
-    _mark("path_listings", path_listings)
+        # policies enrichment via entity-token Search (S1-R3)
+        tokens = _extract_entity_tokens(instruction)
+        search_hit = False
+        search_err = ""
+        for tok in tokens:
+            try:
+                hits = _search_paths(vm.search(root="/docs", pattern=tok, limit=30))
+            except Exception as e:
+                search_err = str(e)
+                continue
+            if hits:
+                search_hit = True
+            for p in hits[:_DOC_HITS_PER_TOKEN]:
+                if p in policies:
+                    continue
+                try:
+                    txt = _extract_text(vm.read(path=p), "content")
+                    if txt:
+                        policies[p] = txt[:_DOC_CONTENT_CAP]
+                except Exception:
+                    continue
+        _mark("policies", policies, search_err if (not policies and search_err) else "")
+
+        # LLM DOC-SELECT fallback (S1-R4) — only when Search found nothing.
+        if not search_hit and tokens and doc_paths:
+            picked = _doc_select_fallback(doc_paths, instruction, tokens)
+            for p in picked:
+                if p in policies:
+                    continue
+                try:
+                    txt = _extract_text(vm.read(path=p), "content")
+                    if txt:
+                        policies[p] = txt[:_DOC_CONTENT_CAP]
+                except Exception:
+                    continue
+            if picked and policies:
+                status["policies"] = "ok"
+
+        # F7: catalogue query but entity-token Search found no /docs match — log the gap
+        # (defensive; no break, no prompt change). Many catalogue tasks have no doc.
+        if _is_catalogue_query(instruction) and not search_hit:
+            print(f"[prephase] DOC_SELECT gap: catalogue query, no /docs matched entity tokens "
+                  f"(tokens={tokens[:5]})")
+
+        # catalogue candidate probe — broad normalized query by entity tokens (no LLM, read-only).
+        # Fire on a catalogue hint OR whenever the instruction carries >=2 distinctive entity
+        # tokens (a product reference like "Heco ... Nut Bolt" or "Wiha Screwdriver 13X-B49"
+        # that the narrow _is_catalogue_query hint-list misses).
+        catalogue_candidates = ""
+        if _is_catalogue_query(instruction) or len(_probe_keywords(instruction)) >= 2:
+            try:
+                catalogue_candidates = _probe_catalogue_candidates(vm, instruction)
+            except Exception:
+                pass  # best-effort; never break gather
+        _mark("catalogue_candidates", catalogue_candidates)
+
+        # target_records (H1 — VM-discovered subdirs; no static prefix list / plural map)
+        target_records: dict[str, str] = {}
+        proc_subdirs = [d.rstrip("/").rsplit("/", 1)[-1].lower()
+                        for d in _list_entries(vm, "/proc")]
+        seen_ids: list[str] = []
+        for m in _RECORD_ID_RE.finditer(instruction or ""):
+            full = m.group(0)
+            prefix = full.split("_", 1)[0].lower()
+            # structural id-shape; the /proc listing decides which prefixes are real
+            if not any(name.startswith(prefix) for name in proc_subdirs):
+                continue
+            if full in seen_ids:
+                continue
+            seen_ids.append(full)
+            if len(seen_ids) > _RECORD_CAP:
+                break
+            for proc in _proc_candidates(proc_subdirs, full):
+                try:
+                    txt = _extract_text(vm.read(path=proc), "content")
+                    if txt:
+                        target_records[proc] = txt
+                        break
+                except Exception:
+                    continue
+        _mark("target_records", target_records)
+
+        # literal-path listings (1.2) — VM is the filter; no /proc allowlist, no hardcoded roots.
+        path_listings: dict[str, str] = {}
+        literals = _extract_path_literals(instruction)
+        for d in deep_paths:
+            if d not in literals:
+                literals.append(d)
+        for lit in literals:
+            kind = _stat_kind(vm, lit)
+            if kind == "dir":
+                paths = _list_entries(vm, lit)               # Tier-1, cheap
+                if paths:
+                    path_listings[lit] = _render_budget(paths, _PATH_LISTING_BUDGET)
+            elif kind == "file":
+                # A /docs deep-read literal is a criteria source — read its BODY into
+                # policies (not just existence), so PLAN sees the rule. General: scoped
+                # to /docs files named by a learned prephase_deep_read hint or instruction.
+                if lit.startswith("/docs") and lit in deep_paths and lit not in policies:
+                    body = _extract_text(vm.read(path=lit), "content")
+                    if body:
+                        policies[lit] = body[:_DOC_CONTENT_CAP]
+                path_listings[lit] = f"file {lit}"           # existence; body recorded above
+            # kind == "" -> non-existent / non-data path -> skipped
+        _mark("policies", policies)
+        _mark("path_listings", path_listings)
 
     return PrePhaseFacts(
         agents_md=agents_md_text, agents_md_inventory=render_inventory(agents_md_text),
@@ -683,7 +697,8 @@ def run_agent(
     vm = VMAdapter(raw_vm)
     from agent.trace import set_step_type
     set_step_type("PREPHASE_GATHER")
-    facts = gather_prephase_facts(vm, task_text, agents_md_text, task_id=task_id)
+    _slim = os.environ.get("ECOM_INVESTIGATE_ENABLED", "1") != "0"
+    facts = gather_prephase_facts(vm, task_text, agents_md_text, task_id=task_id, slim=_slim)
     set_step_type("")
     _t = get_trace()
     if _t is not None:
