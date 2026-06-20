@@ -144,7 +144,7 @@ def run_intent(facts, instruction: str, token_out: dict | None = None,
 
 def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str | None,
              token_out: dict | None = None, oracle_atoms: list | None = None,
-             observed: list[str] | None = None) -> PlanIR:
+             observed: list[str] | None = None, brief_block: str | None = None) -> PlanIR:
     guide = load_prompt("plan") or "# PHASE: PLAN"
     guide = guide + "\n\n" + build_tool_catalog_block()
     system = [{"type": "text", "text": guide, "cache_control": {"type": "ephemeral"}}]
@@ -154,6 +154,8 @@ def run_plan(intent: IntentSpec, facts, learn_ctx: list[dict], prev_error: str |
         parts.append(ob)
     parts.append(f"INTENT_SPEC:\n{intent.model_dump_json(indent=2)}")
     parts.append(_facts_block(facts, tier="plan"))
+    if brief_block:
+        parts.append(brief_block)
     if learn_ctx:
         parts.append("LEARNED_RULES (active):\n" + "\n".join(_format_entry(e) for e in learn_ctx))
     if observed:
