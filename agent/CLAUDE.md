@@ -18,6 +18,7 @@ Key env vars (authoritative table is the root `../CLAUDE.md`):
 - `ECOM_MODEL` — primary LLM (e.g. `anthropic/claude-sonnet-4-6`)
 - `ECOM_MODEL_REASON` / `ECOM_MODEL_FAST` — model tiers (see routing below)
 - `ECOM_INTERPRETER_MAX_STEPS` — interpreter cycle ceiling (default 6)
+- `ECOM_INVESTIGATE_ENABLED` / `ECOM_INVESTIGATE_MAX_STEPS` / `ECOM_INVESTIGATE_ORACLE_K` / `ECOM_MODEL_INVESTIGATE` — INVESTIGATE phase controls (see root `../CLAUDE.md`)
 
 ## Agent Package Architecture
 
@@ -34,8 +35,20 @@ deterministic Plan-IR interpreter.
    `IntentSpec` (objective, desired_outcome, params, outcome_space, constraints,
    success_criteria, answer_shape, required_refs). Hard failure → terminal
    `OUTCOME_NONE_CLARIFICATION`.
-2. **LOOP** (`cycle = 1..INTERPRETER_MAX_STEPS`):
-   - **PLAN** (`reason.py:run_plan(intent, facts, learn_ctx, prev_error, oracle_atoms, observed)`)
+2. **INVESTIGATE** (`investigate.py:investigate(vm, intent, seed, oracle)`, fast tier,
+   `ECOM_INVESTIGATE_ENABLED=1`) — called once after INTENT, before the loop. Runs a
+   bounded read-only ReAct loop (`ECOM_INVESTIGATE_MAX_STEPS` steps) fetching doc bodies,
+   listings, and table samples on demand; per-step oracle retrieval uses
+   `ECOM_INVESTIGATE_ORACLE_K`. Read-only gate: `investigate.is_readonly(tool)` — mutations
+   are never dispatched here (they stay in the plan's `ops`). Stops on sufficiency (all
+   `intent.required_refs` groundable from `env`) or step budget. Escalates from fast to
+   reason tier on a deterministic stall (empty result or repeated tool signature). Per-step
+   errors become lessons; hard failure falls back to the slim seed facts. Returns a `Brief`
+   (step-notes + bound `env`); `render_brief(brief)` is injected into every PLAN cycle via
+   `run_plan(..., brief_block=...)`. When `ECOM_INVESTIGATE_ENABLED=0`, this step is skipped
+   and the pipeline uses the legacy eager gather + whole-instruction oracle dump.
+3. **LOOP** (`cycle = 1..INTERPRETER_MAX_STEPS`):
+   - **PLAN** (`reason.py:run_plan(intent, brief_block, learn_ctx, prev_error, oracle_atoms, observed)`)
      — LLM call (reason tier), system prompt `plan.md` → `PlanIR`
      (discovery, rowsets, compute, decision, ops, answer, custom_extract).
    - **lint** (`interpreter.py:lint_security_first(plan)`) — no LLM. On `PlanError` /
@@ -53,7 +66,7 @@ deterministic Plan-IR interpreter.
        distill→validate→promote, return success metrics.
      - Fail → `_ilearn(prev_error + observed RPC outputs)` → next cycle (break if a mutation
        landed).
-3. Loop exhaust / no-progress → terminal `OUTCOME_NONE_CLARIFICATION`.
+4. Loop exhaust / no-progress → terminal `OUTCOME_NONE_CLARIFICATION`.
 
 `vm.answer` is called **exactly once** per task. The quality gate is `verify()`
 (deterministic) — there is no LLM-graded answer check.
@@ -85,9 +98,10 @@ sees all active rules.
   `ollama/` → local Ollama; `ECOM_CC_ENABLED=1` / `claude-code/` → `cc_client.py` subprocess.
 - *Per-phase model* via `_resolve_model_for_phase(phase, MODEL)`: `ECOM_MODEL_<PHASE>` → tier env
   (`ECOM_MODEL_REASON` / `ECOM_MODEL_FAST` / `ECOM_MODEL_EMBED`) → `ECOM_MODEL`. Reason-tier phases (INTENT, PLAN,
-  iLEARN, distill) → `ECOM_MODEL_REASON`; fast-tier (DOC_SELECT, oracle rerank) → `ECOM_MODEL_FAST`;
+  iLEARN, distill) → `ECOM_MODEL_REASON`; fast-tier (DOC_SELECT, oracle rerank, INVESTIGATE) → `ECOM_MODEL_FAST`;
   embeddings → `ECOM_MODEL_EMBED`. **`ECOM_MODEL_REASON` is the catch-all** for any phase not explicitly
-  fast-tier (including unlisted phases). Reason tier → `think=on`; fast tier → `think=off`.
+  fast-tier (including unlisted phases). Reason tier → `think=on`; fast tier → `think=off`. INVESTIGATE
+  router/digest steps run fast-tier and escalate to reason tier on a deterministic stall.
 
 Transient errors (503, rate-limit, timeout) retry with exponential backoff before falling
 through to the next provider tier, then `ECOM_MODEL_FALLBACK`.
