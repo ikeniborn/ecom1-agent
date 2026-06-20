@@ -395,6 +395,48 @@ def test_fill_slots_renders_integral_float_as_int():
     assert _fill_slots("{x}", {"x": "Festool"}) == "Festool"
 
 
+def test_anti_give_up_gate_rejects_clarify_only_when_ok_possible():
+    import pytest
+    from agent.interpreter import InterpretError, interpret
+    from agent.ir_models import (AnswerShape, AnswerTemplateIR, DecisionTree,
+                                  IntentSpec, PlanIR)
+    from agent.mock_vm_spy import MockVMSpy
+
+    intent = IntentSpec(objective="o", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
+                        answer_shape=AnswerShape(), success_criteria={}, required_refs={})
+    # clarify-only plan: no discovery, no rowsets, default label -> CLARIFICATION
+    plan = PlanIR(
+        discovery=[], rowsets=[],
+        decision=DecisionTree(branches=[], default_label="clar"),
+        answer={"clar": AnswerTemplateIR(message="please clarify",
+                                         outcome="OUTCOME_NONE_CLARIFICATION", refs=[])},
+    )
+    with pytest.raises(InterpretError) as ei:
+        interpret(plan, intent, MockVMSpy({}), None)
+    assert "grounded discovery" in str(ei.value)
+
+
+def test_anti_give_up_gate_allows_clarify_when_ok_not_in_space():
+    from agent.interpreter import interpret
+    from agent.ir_models import (AnswerShape, AnswerTemplateIR, DecisionTree,
+                                  IntentSpec, PlanIR)
+    from agent.mock_vm_spy import MockVMSpy
+
+    intent = IntentSpec(objective="o", desired_outcome="OUTCOME_NONE_CLARIFICATION",
+                        outcome_space=["OUTCOME_NONE_CLARIFICATION"],
+                        answer_shape=AnswerShape(), success_criteria={}, required_refs={},
+                        constraints=[])
+    plan = PlanIR(
+        discovery=[], rowsets=[],
+        decision=DecisionTree(branches=[], default_label="clar"),
+        answer={"clar": AnswerTemplateIR(message="please clarify",
+                                         outcome="OUTCOME_NONE_CLARIFICATION", refs=[])},
+    )
+    res = interpret(plan, intent, MockVMSpy({}), None)
+    assert res.captured.outcome == "OUTCOME_NONE_CLARIFICATION"
+
+
 def test_vmadapter_logs_vm_call_with_step_type(tmp_path):
     import json
     from agent import trace

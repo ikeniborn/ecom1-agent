@@ -360,6 +360,17 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
     #    (resolved $refs that land, dropped if they resolve to nothing — per-branch refs).
     tmpl = plan.answer.get(label) or next(iter(plan.answer.values()))
     outcome = exit_outcome or tmpl.outcome
+
+    # Anti-give-up gate (A3): if OK is reachable and the plan did no grounding
+    # (empty discovery AND rowsets) yet chose to clarify, reject -> iLEARN. General
+    # (no task-specific prose): attempt grounded discovery before clarifying.
+    if (outcome == "OUTCOME_NONE_CLARIFICATION"
+            and "OUTCOME_OK" in (intent.outcome_space or [])
+            and not plan.discovery and not plan.rowsets):
+        raise _refuse("attempt grounded discovery before clarifying "
+                      "(clarify-only plan rejected while OUTCOME_OK is reachable)",
+                      mutation_landed)
+
     message = _fill_slots(tmpl.message, env)
     refs, unresolved = _project_required_refs(intent, outcome, env)
 
