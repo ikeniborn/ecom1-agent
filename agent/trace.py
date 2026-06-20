@@ -43,6 +43,17 @@ _VM_HEAD_CAP = 1000
 _FACT_HEAD_CAP = 2000
 _VM_ARG_KEYS = ("path", "root", "pattern", "args", "stdin")
 
+_PHASE_TO_STEP_TYPE = {
+    "INTENT": "INTENT", "PLAN": "PLAN", "ILEARN": "ILEARN", "LEARN": "ILEARN",
+    "DOC_SELECT": "DOC_SELECT", "RERANK": "ORACLE_RETRIEVE",
+    "DISTILL": "DISTILL", "HARNESS_DISTILL": "DISTILL",
+}
+
+
+def _step_type_for_phase(phase: str) -> str:
+    p = (phase or "").upper()
+    return _PHASE_TO_STEP_TYPE.get(p, p)
+
 
 def _head(text: str, cap: int) -> str:
     text = text or ""
@@ -113,21 +124,36 @@ class TraceLogger:
         tokens_in: int,
         tokens_out: int,
         duration_ms: int,
+        reasoning: str = "",
+        reasoning_available: "bool | None" = None,
+        raw_response_full: str = "",
+        cache_read: int = 0,
+        cache_creation: int = 0,
     ) -> None:
         sha = self._ensure_header_system(system)
-        self._write({
+        avail = bool(reasoning) if reasoning_available is None else bool(reasoning_available)
+        rec = {
             "type": "llm_call",
             "cycle": cycle,
             "phase": phase,
+            "step_type": _step_type_for_phase(phase),
+            "prev_llm_seq": self._last_llm_seq,
             "system_sha256": sha,
             "user_msg": user_msg,
             "raw_response": raw_response,
+            "raw_response_full": raw_response_full or raw_response,
+            "reasoning": reasoning or "",
+            "reasoning_available": avail,
             "parsed_output": parsed_output,
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
+            "cache_read": cache_read,
+            "cache_creation": cache_creation,
             "duration_ms": duration_ms,
             "success": parsed_output is not None or bool(raw_response),
-        })
+        }
+        self._last_llm_seq = self._seq  # seq this record will receive in _write
+        self._write(rec)
 
     def log_gate_check(
         self,
