@@ -30,7 +30,7 @@ TOOL_CATALOG: dict[str, dict] = {
     "Tree": {
         "purpose": "Recursive tree under a root (level=0 unlimited).",
         "required": {"root"},
-        "optional": {"level", "kind"},
+        "optional": {"level"},
         "mode": "read",
         "when_to_use": "Discover a subtree's shape; prefer Find/Search when targeted.",
         "example": {"rpc": "Tree", "args": {"root": "/docs", "level": 0}},
@@ -66,7 +66,7 @@ TOOL_CATALOG: dict[str, dict] = {
     "Write": {
         "purpose": "Write a file (optional compare-and-swap).",
         "required": {"path", "content"},
-        "optional": {"if_match_sha256"},
+        "optional": {"if_match_sha256", "idempotency_key"},
         "mode": "mutate",
         "when_to_use": "Persist a mutation; belongs in `ops`, never `discovery`.",
         "example": {"rpc": "Write", "args": {"path": "/proc/x.json", "content": "{}"}},

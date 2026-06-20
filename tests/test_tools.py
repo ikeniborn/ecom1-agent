@@ -35,3 +35,24 @@ def test_exec_catalog_documents_sql_stdin_channel():
     exec_entry = TOOL_CATALOG["Exec"]
     note = (exec_entry.get("note") or "").lower()
     assert "stdin" in note and "/bin/sql" in note
+
+
+def test_catalog_keys_subset_of_proto_fields():
+    """General drift guard: every required|optional arg key must be a real field on
+    the matching proto Request, so validate_step never permits a key the runtime rejects."""
+    from bitgn.vm.ecom.ecom_pb2 import (
+        ReadRequest, ListRequest, TreeRequest, FindRequest, SearchRequest,
+        ExecRequest, WriteRequest, DeleteRequest, StatRequest,
+    )
+    from agent.tools import TOOL_CATALOG
+
+    req_cls = {
+        "Read": ReadRequest, "List": ListRequest, "Tree": TreeRequest,
+        "Find": FindRequest, "Search": SearchRequest, "Exec": ExecRequest,
+        "Write": WriteRequest, "Delete": DeleteRequest, "Stat": StatRequest,
+    }
+    for rpc, entry in TOOL_CATALOG.items():
+        fields = {f.name for f in req_cls[rpc].DESCRIPTOR.fields}
+        keys = entry["required"] | entry["optional"]
+        missing = keys - fields
+        assert not missing, f"{rpc} catalog keys not in proto: {missing}"
