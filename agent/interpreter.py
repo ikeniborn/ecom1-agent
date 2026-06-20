@@ -20,21 +20,6 @@ from .predicates import evaluate, resolve
 from .trace import current_cycle, get_trace
 
 
-def _trace_vm(phase: str, rpc: str, kwargs: dict, payload: str, mutated: bool) -> None:
-    """Best-effort VM-call trace; no-op when no TraceLogger is attached (tests).
-
-    Tracing is pure observability and must NEVER break execution — any logger
-    error (e.g. a stale/closed handle) is swallowed.
-    """
-    t = get_trace()
-    if t is None:
-        return
-    try:
-        t.log_vm_call(current_cycle(), phase, rpc, kwargs, payload, mutated)
-    except Exception:
-        pass
-
-
 def _trace_answer(message: str, outcome: str, refs: list) -> None:
     """Best-effort answer trace (see `_trace_vm`)."""
     t = get_trace()
@@ -285,6 +270,8 @@ def lint(plan: PlanIR) -> None:
 
 def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResult:
     lint_security_first(plan)
+    from .trace import set_step_type
+    set_step_type("INTERPRET")
     env: dict = dict(intent.params or {})
     if facts is not None:
         env["_facts"] = facts
@@ -299,7 +286,6 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
         if step.bind:
             env[step.bind] = result
         pay = _payload(result)
-        _trace_vm("INTERPRET", step.rpc, kwargs, pay, mutated=False)
         observations.append(f"[{step.rpc} {kwargs.get('path', kwargs.get('root', ''))}] {pay[:_OBS_PER_CALL]}")
         if step.rpc == "Exec" and kwargs.get("path") == "/bin/sql":
             sql_results.append(pay)
@@ -347,7 +333,6 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
                                        and kwargs.get("path") != "/bin/sql")
         if _mut:
             mutation_landed = True
-        _trace_vm("INTERPRET", op.rpc, kwargs, _payload(result), mutated=_mut)
         if op.rpc == "Exec" and kwargs.get("path") == "/bin/sql":
             pay = _payload(result)
             sql_results.append(pay)

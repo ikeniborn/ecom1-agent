@@ -50,32 +50,46 @@ class VMAdapter:
     def __init__(self, client):
         self._c = client
 
+    def _call(self, rpc, fn, req_cls, kwargs, *, mutated=False, req_kwargs=None):
+        import time
+
+        from . import trace
+        t0 = time.monotonic()
+        result = fn(req_cls(**(req_kwargs if req_kwargs is not None else kwargs)))
+        trace.log_vm_auto(rpc, kwargs, result, mutated=mutated,
+                          duration_ms=int((time.monotonic() - t0) * 1000))
+        return result
+
     def read(self, **kwargs):
-        return self._c.read(ReadRequest(**kwargs))
+        return self._call("Read", self._c.read, ReadRequest, kwargs)
 
     def list(self, **kwargs):
-        return self._c.list(ListRequest(**kwargs))
+        return self._call("List", self._c.list, ListRequest, kwargs)
 
     def tree(self, **kwargs):
-        return self._c.tree(TreeRequest(**_normalise_kind(kwargs)))
+        return self._call("Tree", self._c.tree, TreeRequest, kwargs,
+                          req_kwargs=_normalise_kind(kwargs))
 
     def find(self, **kwargs):
-        return self._c.find(FindRequest(**_normalise_kind(kwargs)))
+        return self._call("Find", self._c.find, FindRequest, kwargs,
+                          req_kwargs=_normalise_kind(kwargs))
 
     def search(self, **kwargs):
-        return self._c.search(SearchRequest(**kwargs))
+        return self._call("Search", self._c.search, SearchRequest, kwargs)
 
     def exec(self, **kwargs):
-        return self._c.exec(ExecRequest(**kwargs))
+        path = str(kwargs.get("path", ""))
+        mutated = path.startswith("/bin/") and path != "/bin/sql"
+        return self._call("Exec", self._c.exec, ExecRequest, kwargs, mutated=mutated)
 
     def write(self, **kwargs):
-        return self._c.write(WriteRequest(**kwargs))
+        return self._call("Write", self._c.write, WriteRequest, kwargs, mutated=True)
 
     def delete(self, **kwargs):
-        return self._c.delete(DeleteRequest(**kwargs))
+        return self._call("Delete", self._c.delete, DeleteRequest, kwargs, mutated=True)
 
     def stat(self, **kwargs):
-        return self._c.stat(StatRequest(**kwargs))
+        return self._call("Stat", self._c.stat, StatRequest, kwargs)
 
     def answer(self, **kwargs):
         return self._c.answer(AnswerRequest(**kwargs))

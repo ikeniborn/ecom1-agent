@@ -568,3 +568,28 @@ def test_catalogue_candidate_probe_surfaces_rows(monkeypatch):
     facts = gather_prephase_facts(vm2, instruction, agents_md_text="", task_id="t01")
     assert "FST-1" in facts.catalogue_candidates
     assert "/proc/catalog/FST-1.json" in facts.catalogue_candidates
+
+
+def test_prephase_vm_calls_tagged(tmp_path):
+    import json
+    from agent import trace
+    from agent.trace import TraceLogger
+
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    trace.set_trace(t)
+    trace.set_step_type("PREPHASE_GATHER")
+    try:
+        from agent.vm_adapter import VMAdapter
+
+        class _C:
+            def stat(self, req):
+                return {"kind": "file"}
+
+        VMAdapter(_C()).stat(path="/docs/x.md")
+    finally:
+        trace.set_trace(None)
+        trace.set_step_type("")
+        t.close()
+    recs = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+    assert any(r["type"] == "vm_call" and r["step_type"] == "PREPHASE_GATHER" for r in recs)

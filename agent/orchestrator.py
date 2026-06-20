@@ -673,7 +673,10 @@ def run_agent(
     raw_vm = EcomRuntimeClientSync(harness_url)
     agents_md_text = _read_agents_md(raw_vm)
     vm = VMAdapter(raw_vm)
+    from agent.trace import set_step_type
+    set_step_type("PREPHASE_GATHER")
     facts = gather_prephase_facts(vm, task_text, agents_md_text, task_id=task_id)
+    set_step_type("")
     _t = get_trace()
     if _t is not None:
         try:                                    # observability must never break a run

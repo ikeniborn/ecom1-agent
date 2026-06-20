@@ -29,29 +29,43 @@ class MockVMSpy:
     def _lookup(self, rpc: str, path: str, args: list[str] | None = None) -> Any:
         return self.fixtures.get(fixture_key(rpc, path, args), _DEFAULT_STUB)
 
+    def _emit(self, rpc: str, kwargs: dict, result, *, mutated: bool = False) -> None:
+        from agent import trace
+        trace.log_vm_auto(rpc, kwargs, result, mutated=mutated)
+
     # Signatures accept **kwargs so the spy doesn't reject calls that pass valid
     # proto fields it didn't pre-declare (e.g. read(number=True), find(limit=20)).
     # Only the RPC name + key args drive the fixture lookup, not arg signatures.
 
     def read(self, path: str = "", **kwargs: Any) -> Any:
         self._record("Read", path=path, **kwargs)
-        return self._lookup("Read", path)
+        result = self._lookup("Read", path)
+        self._emit("Read", {"path": path, **kwargs}, result)
+        return result
 
     def list(self, path: str = "", **kwargs: Any) -> Any:
         self._record("List", path=path, **kwargs)
-        return self._lookup("List", path)
+        result = self._lookup("List", path)
+        self._emit("List", {"path": path, **kwargs}, result)
+        return result
 
     def tree(self, root: str = "", **kwargs: Any) -> Any:
         self._record("Tree", root=root, **kwargs)
-        return self._lookup("Tree", root)
+        result = self._lookup("Tree", root)
+        self._emit("Tree", {"root": root, **kwargs}, result)
+        return result
 
     def find(self, root: str = "", **kwargs: Any) -> Any:
         self._record("Find", root=root, **kwargs)
-        return self._lookup("Find", root)
+        result = self._lookup("Find", root)
+        self._emit("Find", {"root": root, **kwargs}, result)
+        return result
 
     def search(self, root: str = "", **kwargs: Any) -> Any:
         self._record("Search", root=root, **kwargs)
-        return self._lookup("Search", root)
+        result = self._lookup("Search", root)
+        self._emit("Search", {"root": root, **kwargs}, result)
+        return result
 
     def exec(self, path: str = "", args: list[str] | None = None, stdin: str = "", **kwargs: Any) -> Any:
         args_list = list(args or [])
@@ -59,19 +73,29 @@ class MockVMSpy:
         # Fixture-key fallback: a repaired /bin/sql call delivers SQL on stdin with empty
         # args; key the lookup on [stdin] so fixtures recorded under the SQL string match.
         lookup_args = args_list or ([stdin] if stdin else None)
-        return self._lookup("Exec", path, lookup_args)
+        result = self._lookup("Exec", path, lookup_args)
+        mutated = path.startswith("/bin/") and path != "/bin/sql"
+        self._emit("Exec", {"path": path, "args": args_list, "stdin": stdin}, result,
+                   mutated=mutated)
+        return result
 
     def write(self, path: str = "", content: str = "", **kwargs: Any) -> Any:
         self._record("Write", path=path, content=content, **kwargs)
-        return self._lookup("Write", path)
+        result = self._lookup("Write", path)
+        self._emit("Write", {"path": path, "content": content, **kwargs}, result, mutated=True)
+        return result
 
     def delete(self, path: str = "", **kwargs: Any) -> Any:
         self._record("Delete", path=path, **kwargs)
-        return self._lookup("Delete", path)
+        result = self._lookup("Delete", path)
+        self._emit("Delete", {"path": path, **kwargs}, result, mutated=True)
+        return result
 
     def stat(self, path: str = "", **kwargs: Any) -> Any:
         self._record("Stat", path=path, **kwargs)
-        return self._lookup("Stat", path)
+        result = self._lookup("Stat", path)
+        self._emit("Stat", {"path": path, **kwargs}, result)
+        return result
 
     def answer(self, message: str = "", outcome: str = "", refs: list[str] | None = None, **kwargs: Any) -> None:
         self._record("Answer", message=message, outcome=outcome, refs=list(refs or []), **kwargs)

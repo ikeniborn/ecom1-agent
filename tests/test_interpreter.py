@@ -354,3 +354,30 @@ def test_fill_slots_renders_integral_float_as_int():
     assert _fill_slots("{n}", {"n": 3.0}) == "3"
     assert _fill_slots("{n}", {"n": 1.5}) == "1.5"   # non-integral unchanged
     assert _fill_slots("{x}", {"x": "Festool"}) == "Festool"
+
+
+def test_vmadapter_logs_vm_call_with_step_type(tmp_path):
+    import json
+    from agent import trace
+    from agent.trace import TraceLogger
+    from agent.vm_adapter import VMAdapter
+
+    class _FakeClient:
+        def read(self, req):
+            return {"content": "hello world"}
+
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    trace.set_trace(t)
+    trace.set_cycle(1)
+    trace.set_step_type("INTERPRET")
+    try:
+        VMAdapter(_FakeClient()).read(path="/d.md")
+    finally:
+        trace.set_trace(None)
+        trace.set_step_type("")
+        t.close()
+    recs = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
+    vm = next(r for r in recs if r["type"] == "vm_call")
+    assert vm["rpc"] == "Read" and vm["step_type"] == "INTERPRET"
+    assert vm["has_data"] is True and vm["duration_ms"] >= 0
