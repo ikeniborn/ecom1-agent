@@ -347,6 +347,45 @@ def test_authored_conditional_ref_resolves_present_and_drops_absent():
     assert res2.captured.refs == []   # unresolved authored ref dropped, not refused
 
 
+def _intent_ok():
+    from agent.ir_models import AnswerShape, IntentSpec
+    return IntentSpec(objective="o", desired_outcome="OUTCOME_OK",
+                      outcome_space=["OUTCOME_OK"], answer_shape=AnswerShape(),
+                      success_criteria={}, required_refs={})
+
+
+def test_interpret_rejects_unknown_rpc():
+    import pytest
+    from agent.interpreter import InterpretError, interpret
+    from agent.ir_models import (AnswerTemplateIR, DecisionTree, PlanIR, Step)
+    from agent.mock_vm_spy import MockVMSpy
+
+    plan = PlanIR(
+        discovery=[Step(rpc="Frobnicate", args={"path": "/x"})],
+        decision=DecisionTree(branches=[], default_label="d"),
+        answer={"d": AnswerTemplateIR(message="m", outcome="OUTCOME_OK", refs=[])},
+    )
+    with pytest.raises(InterpretError) as ei:
+        interpret(plan, _intent_ok(), MockVMSpy({}), None)
+    assert "not in catalog" in str(ei.value)
+
+
+def test_interpret_rejects_bad_arg_key():
+    import pytest
+    from agent.interpreter import InterpretError, interpret
+    from agent.ir_models import (AnswerTemplateIR, DecisionTree, PlanIR, Step)
+    from agent.mock_vm_spy import MockVMSpy
+
+    plan = PlanIR(
+        discovery=[Step(rpc="Read", args={"pathh": "/x"})],
+        decision=DecisionTree(branches=[], default_label="d"),
+        answer={"d": AnswerTemplateIR(message="m", outcome="OUTCOME_OK", refs=[])},
+    )
+    with pytest.raises(InterpretError) as ei:
+        interpret(plan, _intent_ok(), MockVMSpy({}), None)
+    assert "pathh" in str(ei.value)
+
+
 def test_fill_slots_renders_integral_float_as_int():
     # F: a SQL COUNT(*) -> to_number yields 1.0; a count token must read <COUNT:1>, not 1.0.
     from agent.interpreter import _fill_slots

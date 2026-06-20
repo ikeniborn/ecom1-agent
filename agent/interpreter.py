@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from .ir_models import IntentSpec, PlanIR, RowSet
 from .predicates import evaluate, resolve
+from .tools import validate_step
 from .trace import current_cycle, get_trace
 
 
@@ -168,6 +169,16 @@ def _refuse(msg: str, mutation_landed: bool) -> InterpretError:
     return err
 
 
+def _validate_dispatch(rpc: str, args: dict, mutation_landed: bool):
+    """Structural tool-catalog check before any VM dispatch. On violation, log a
+    fail vm_call (observability) and raise InterpretError (functional -> iLEARN)."""
+    err = validate_step(rpc, args)
+    if err is not None:
+        from .trace import log_vm_auto
+        log_vm_auto(rpc, args or {}, "", validation=f"fail({err})")
+        raise _refuse(f"tool validation: {err}", mutation_landed)
+
+
 def _delim_for(text: str, fmt: str) -> str:
     if fmt == "tsv":
         return "\t"
@@ -282,6 +293,7 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
     # 2. discovery (read-only, in order)
     for step in plan.discovery:
         kwargs = _resolve_args(step.args, env)
+        _validate_dispatch(step.rpc, step.args, mutation_landed)
         result = getattr(vm, step.rpc.lower())(**kwargs)
         if step.bind:
             env[step.bind] = result
@@ -326,6 +338,7 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
         if op.guard_label is not None and op.guard_label != label:
             continue                                   # decide-then-guard
         kwargs = _resolve_args(op.args, env)
+        _validate_dispatch(op.rpc, op.args, mutation_landed)
         result = getattr(vm, op.rpc.lower())(**kwargs)
         if op.bind:
             env[op.bind] = result
