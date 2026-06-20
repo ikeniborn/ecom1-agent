@@ -101,7 +101,6 @@ def test_is_readonly_normalises_sql_binary_path_case():
     assert is_readonly("exec", {"path": "/BIN/SQL", "stdin": "SELECT 1"})
 
 
-# append to tests/test_investigate.py  (Task 4 stall detection)
 from agent.investigate import tool_signature, is_stalled
 
 

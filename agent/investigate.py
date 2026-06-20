@@ -125,7 +125,10 @@ def _text(res, key: str) -> str:
 
 def tool_signature(tool: str, args: dict) -> str:
     """Stable signature for stall/repeat detection. SQL is whitespace/case-normalised
-    (mirrors pipeline._plan_signature); other args are stringified verbatim, sorted."""
+    in the same spirit as pipeline._plan_signature; the investigator always sends SQL
+    via stdin, so positional /bin/sql args are not part of the signature. Other tools'
+    args are stringified verbatim, sorted by key."""
+    args = args or {}
     t = (tool or "").lower()
     if t == "exec":
         sql = (args.get("stdin") or args.get("sql") or "")
@@ -135,7 +138,7 @@ def tool_signature(tool: str, args: dict) -> str:
     return f"{t}:{body}"
 
 
-def is_stalled(result: str, signature: str, seen_signatures: set) -> bool:
+def is_stalled(result: str, signature: str, seen_signatures: set[str]) -> bool:
     """Deterministic stall: empty tool result OR a signature already seen this run."""
     if not (result or "").strip():
         return True
