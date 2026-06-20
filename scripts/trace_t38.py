@@ -6,15 +6,9 @@ live benchmark trial, and records a structured JSONL trace that — beyond the
 built-in agent.trace records — also captures the model's chain-of-thought
 reasoning and the un-stripped raw response per LLM call.
 
-Why a standalone script (no repo source touched): the production trace
-(agent/trace.py) logs system+user prompts and the *stripped* assistant text, but
-the model's reasoning is discarded before it reaches the trace
-(`_THINK_RE.sub(...)` in agent/llm.py strips `<think>...</think>`; the Anthropic
-path keeps only `type="text"` blocks; the claude-code path requests
-`--output-format json`, whose envelope carries only the final text). This script
-monkeypatches the LLM call seams at runtime to tee the reasoning into a
-thread-local sink, and subclasses TraceLogger to fold it into each `llm_call`
-record.
+Reasoning capture is handled by the production machinery in agent/reasoning_capture.py
+(active when ECOM_TRACE_REASONING=1, set below). TraceLogger natively stamps
+seq / prev_llm_seq / reasoning / raw_response_full on every llm_call record.
 
 Reasoning capture per provider:
   * Ollama (`<think>` inline content, or `reasoning_content` / `reasoning`
@@ -52,9 +46,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
-import re
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -71,6 +63,7 @@ _IS_CC = MODEL.startswith("claude-code/")
 # Force the model for THIS run BEFORE importing agent.llm (it reads env at import,
 # and _load_env_file uses `key not in os.environ`, so our value wins over .env).
 os.environ["ECOM_MODEL"] = MODEL
+os.environ.setdefault("ECOM_TRACE_REASONING", "1")  # prod reasoning capture (B2)
 
 # claude-code mode: the pipeline calls the CC tier with cfg={}, so cc_model /
 # cc_effort are resolved from ECOM_CC_DEFAULT_* — seed them from models.json so a
@@ -95,8 +88,7 @@ if _IS_CC:
 
 # Importing agent.llm triggers _load_env_file(".env") -> all ECOM_* config loads,
 # including the harness/benchmark vars and the Ollama base URL.
-import agent.cc_client as CC  # noqa: E402
-import agent.llm as L  # noqa: E402
+import agent.llm as _llm_init  # noqa: E402,F401  triggers env load + reasoning-capture install
 from agent import run_agent  # noqa: E402
 from agent.trace import TraceLogger, set_trace  # noqa: E402
 
@@ -120,256 +112,6 @@ RUN_NAME = (
     if _base_run_name
     else ""
 )
-
-# ---------------------------------------------------------------------------
-# Reasoning capture — thread-local sink shared by all provider seams
-# ---------------------------------------------------------------------------
-_sink = threading.local()
-_THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
-
-
-def _push(reasoning: str, raw_full: str) -> None:
-    items = getattr(_sink, "items", None)
-    if items is None:
-        items = []
-        _sink.items = items
-    items.append({"reasoning": reasoning or "", "raw_full": raw_full or ""})
-
-
-def _pop() -> dict:
-    """Return the capture for the just-completed logical LLM call and reset.
-
-    A logical call may issue several spawns/creates (retries / fallback model);
-    take the last one carrying reasoning, else the last one at all."""
-    items = getattr(_sink, "items", [])
-    _sink.items = []
-    chosen = None
-    for it in items:
-        if it["reasoning"]:
-            chosen = it
-    if chosen is None and items:
-        chosen = items[-1]
-    return chosen or {"reasoning": "", "raw_full": ""}
-
-
-# ---------------------------------------------------------------------------
-# Seam 1 — OpenAI-compatible clients (Ollama / OpenRouter): tee reasoning
-# ---------------------------------------------------------------------------
-def _reasoning_from_openai_resp(resp) -> tuple[str, str]:
-    """(reasoning, full_content) from an OpenAI-compatible chat completion.
-
-    Handles three reasoning conventions: a `reasoning_content` field (DeepSeek),
-    a `reasoning` field (OpenRouter-normalized), and `<think>...</think>` inlined
-    in the message content (Ollama think models)."""
-    reasoning = ""
-    full = ""
-    try:
-        data = resp.model_dump()
-    except Exception:
-        data = None
-    if isinstance(data, dict):
-        choices = data.get("choices") or []
-        if choices and isinstance(choices[0], dict):
-            msg = choices[0].get("message") or {}
-            full = msg.get("content") or ""
-            reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
-            if not reasoning and full:
-                m = _THINK_RE.search(full)
-                if m:
-                    reasoning = m.group(1).strip()
-    return (reasoning or ""), (full or "")
-
-
-def _wrap_openai_client(client) -> None:
-    if client is None:
-        return
-    comp = client.chat.completions  # cached_property -> stable instance
-    orig = comp.create
-
-    def wrapped(*a, **k):
-        resp = orig(*a, **k)
-        try:
-            _push(*_reasoning_from_openai_resp(resp))
-        except Exception:
-            pass
-        return resp
-
-    comp.create = wrapped
-
-
-def _wrap_anthropic_client(client) -> None:
-    if client is None:
-        return
-    orig = client.messages.create
-
-    def wrapped(*a, **k):
-        resp = orig(*a, **k)
-        try:
-            think = "".join(
-                getattr(b, "thinking", "") or ""
-                for b in resp.content
-                if getattr(b, "type", None) == "thinking"
-            )
-            text = "\n".join(
-                getattr(b, "text", "") or ""
-                for b in resp.content
-                if getattr(b, "type", None) == "text"
-            )
-            _push(think, text)
-        except Exception:
-            pass
-        return resp
-
-    client.messages.create = wrapped
-
-
-# ---------------------------------------------------------------------------
-# Seam 2 — claude-code: swap json -> stream-json at the spawn, sniff thinking
-# ---------------------------------------------------------------------------
-def _parse_stream_reasoning(lines: list[str]) -> tuple[str, str]:
-    """(reasoning, assistant_text) from iclaude --output-format stream-json NDJSON.
-
-    Collects every `thinking` content block from `assistant` events; the final
-    `result` line is left untouched for cc_client._parse_envelope to consume."""
-    parts: list[str] = []
-    text_parts: list[str] = []
-    for ln in lines:
-        ln = ln.strip()
-        if not ln.startswith("{"):
-            continue
-        try:
-            obj = json.loads(ln)
-        except (json.JSONDecodeError, ValueError):
-            continue
-        tt = obj.get("type")
-        if tt == "assistant":
-            msg = obj.get("message") or {}
-            for b in msg.get("content") or []:
-                if not isinstance(b, dict):
-                    continue
-                bt = b.get("type")
-                if bt == "thinking":
-                    parts.append(b.get("thinking") or "")
-                elif bt == "redacted_thinking":
-                    parts.append("[redacted_thinking]")
-                elif bt == "text":
-                    text_parts.append(b.get("text") or "")
-        elif tt == "thinking":  # some versions emit a top-level thinking event
-            parts.append(obj.get("thinking") or obj.get("text") or "")
-    return "\n".join(p for p in parts if p), "\n".join(t for t in text_parts if t)
-
-
-def _install_cc_stream_capture() -> None:
-    """Wrap cc_client._spawn_once so every iclaude spawn uses stream-json (exposing
-    thinking) while cc_client._parse_envelope still parses the terminal result line
-    unchanged. Pushes captured reasoning into the sink."""
-    _orig_spawn = CC._spawn_once
-
-    def _spawn(cmd, cwd, env, timeout_s, stdin_data=None):
-        cmd = list(cmd)
-        if "--output-format" in cmd:
-            i = cmd.index("--output-format")
-            if i + 1 < len(cmd):
-                cmd[i + 1] = "stream-json"
-        else:
-            cmd += ["--output-format", "stream-json"]
-        if "--verbose" not in cmd:  # required with --print --output-format stream-json
-            cmd.append("--verbose")
-        lines, exit_code, fail = _orig_spawn(cmd, cwd, env, timeout_s, stdin_data=stdin_data)
-        try:
-            _push(*_parse_stream_reasoning(lines))
-        except Exception:
-            pass
-        return lines, exit_code, fail
-
-    CC._spawn_once = _spawn
-
-
-# install the seams relevant to this run
-if _IS_CC:
-    _install_cc_stream_capture()
-else:
-    _wrap_openai_client(L.ollama_client)
-    _wrap_openai_client(L.openrouter_client)
-    _wrap_anthropic_client(L.anthropic_client)
-
-
-# ---------------------------------------------------------------------------
-# Enriched trace logger — adds seq, prev_llm_seq, reasoning, raw_response_full
-# ---------------------------------------------------------------------------
-class ReasoningTrace(TraceLogger):
-    def __init__(self, path: Path, task_id: str) -> None:
-        super().__init__(path, task_id)
-        self._seq = 0
-        self._last_llm_seq = None
-        self.llm_count = 0
-        self.reasoning_count = 0
-
-    def _write(self, record: dict) -> None:
-        record["seq"] = self._seq
-        self._seq += 1
-        super()._write(record)
-
-    def log_meta(self, model: str) -> None:
-        self._write(
-            {
-                "type": "meta",
-                "schema_version": 1,
-                "task_id": self._task_id,
-                "model": model,
-                "dependency_model": (
-                    "Records ordered by `seq`. llm_call carries `cycle`+`phase`: "
-                    "cycle 0 = pre-phase (DOC_SELECT/rerank) + INTENT (frozen); "
-                    "cycle N = PLAN/LEARN of interpreter cycle N. `prev_llm_seq` "
-                    "chains llm_calls. A PLAN user_msg at cycle N embeds "
-                    "PREVIOUS_ERROR + OBSERVED_RPC_OUTPUTS from cycle N-1 (the "
-                    "request<-answer data dependency). `reasoning` = model "
-                    "chain-of-thought when the provider exposes it; "
-                    "`raw_response_full` = un-stripped assistant content."
-                ),
-            }
-        )
-
-    def log_llm_call(
-        self,
-        phase: str,
-        cycle: int,
-        system,
-        user_msg: str,
-        raw_response: str,
-        parsed_output,
-        tokens_in: int,
-        tokens_out: int,
-        duration_ms: int,
-    ) -> None:
-        sha = self._ensure_header_system(system)
-        cap = _pop()
-        reasoning = cap.get("reasoning", "")
-        raw_full = cap.get("raw_full", "")
-        avail = bool(reasoning)
-        self.llm_count += 1
-        if avail:
-            self.reasoning_count += 1
-        rec = {
-            "type": "llm_call",
-            "cycle": cycle,
-            "phase": phase,
-            "prev_llm_seq": self._last_llm_seq,
-            "system_sha256": sha,
-            "user_msg": user_msg,
-            "reasoning": reasoning,
-            "reasoning_available": avail,
-            "raw_response": raw_response,
-            "raw_response_full": raw_full,
-            "parsed_output": parsed_output,
-            "tokens_in": tokens_in,
-            "tokens_out": tokens_out,
-            "duration_ms": duration_ms,
-            "success": parsed_output is not None or bool(raw_response),
-        }
-        self._last_llm_seq = self._seq  # seq this record will receive in _write
-        self._write(rec)
-
 
 # ---------------------------------------------------------------------------
 # Readable companion: interleave system / user / reasoning / response per call
@@ -518,9 +260,8 @@ def main() -> None:
         client.submit_run(SubmitRunRequest(run_id=run.run_id, force=True))
         sys.exit(2)
 
-    trace = ReasoningTrace(run_dir / f"{TASK}.jsonl", TASK)
+    trace = TraceLogger(run_dir / f"{TASK}.jsonl", TASK)
     set_trace(trace)
-    trace.log_meta(MODEL)
     trace.log_header(target.instruction, model=MODEL)
     print(f"\n{'=' * 30} {TASK} {'=' * 30}\n{target.instruction}\n{'-' * 72}")
 
@@ -578,9 +319,11 @@ def main() -> None:
         f"out={token_stats.get('output_tokens', 0):,}  "
         f"elapsed={elapsed:.1f}s"
     )
+    llm_records = [r for r in records if r.get("type") == "llm_call"]
+    reasoning_records = [r for r in llm_records if r.get("reasoning_available")]
     print(
-        f"[trace] llm_calls={trace.llm_count}  "
-        f"with_reasoning={trace.reasoning_count}  "
+        f"[trace] llm_calls={len(llm_records)}  "
+        f"with_reasoning={len(reasoning_records)}  "
         f"records={len(records)}"
     )
     if detail:
