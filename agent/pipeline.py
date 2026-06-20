@@ -24,6 +24,17 @@ _DESIGN_MAX_ATTEMPTS = int(os.environ.get("ECOM_DESIGN_MAX_ATTEMPTS", "3"))
 # An empty body carries nothing to learn from, so these cycles skip iLEARN and
 # must not silently consume the whole INTERPRETER_MAX_STEPS budget.
 _EMPTY_PLAN_MAX = int(os.environ.get("ECOM_EMPTY_PLAN_MAX", "2"))
+# Consecutive cycles failing with the SAME (normalized) error before breaking to
+# CLARIFICATION. Complements the plan-signature guard: when iLEARN keeps tweaking the
+# plan (so signatures differ) but the interpret/verify error is identical every cycle,
+# the model is stuck — break early instead of burning the whole budget + iLEARN calls
+# (e.g. an OK answer whose required record_path ref the SQL never selects).
+_SAME_ERROR_MAX = int(os.environ.get("ECOM_SAME_ERROR_MAX", "3"))
+
+
+def _norm_err(e: str) -> str:
+    """Stable, volatility-trimmed error key for the consecutive-error guard."""
+    return " ".join(str(e or "").split())[:120]
 
 
 def _norm_sql(s: str) -> str:
@@ -360,6 +371,21 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     last_observed = None
     prev_sig = None
     empty_streak = 0
+    err_streak = 0
+    prev_err_norm = None
+
+    def _stuck_on_same_error(err: str) -> bool:
+        """Track consecutive identical (normalized) errors; True once the same one
+        has recurred _SAME_ERROR_MAX times (the model is not making progress on it)."""
+        nonlocal err_streak, prev_err_norm
+        norm = _norm_err(err)
+        if norm and norm == prev_err_norm:
+            err_streak += 1
+        else:
+            err_streak = 1
+            prev_err_norm = norm
+        return err_streak >= _SAME_ERROR_MAX
+
     cycle = 0
     for cycle in range(1, _IMAX_STEPS + 1):
         set_cycle(cycle)
@@ -390,6 +416,9 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             last_error = f"plan: {e}"; _accum(tk)
             _ilearn(task_id, learn_ctx, intent,
                     plan.model_dump_json() if plan is not None else "", last_error)
+            if _stuck_on_same_error(last_error):
+                print(f"{CLI_YELLOW}[pipeline] same plan error x{_SAME_ERROR_MAX} -> CLARIFICATION{CLI_CLR}")
+                break
             continue
         empty_streak = 0
 
@@ -409,6 +438,9 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             _maybe_harness_distill(plan, last_error, task_id)
             if getattr(e, "mutation_landed", False):
                 break
+            if _stuck_on_same_error(last_error):
+                print(f"{CLI_YELLOW}[pipeline] same interpret error x{_SAME_ERROR_MAX} -> CLARIFICATION{CLI_CLR}")
+                break
             continue
         except Exception as e:                                   # real-VM exception
             last_error = f"real_vm: {e}"
@@ -422,6 +454,9 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
                 for op in plan.ops
             )
             if _is_retryable_vm_error(str(e)) and not plan_mutates:
+                if _stuck_on_same_error(last_error):
+                    print(f"{CLI_YELLOW}[pipeline] same real_vm error x{_SAME_ERROR_MAX} -> CLARIFICATION{CLI_CLR}")
+                    break
                 continue
             break
 
@@ -446,6 +481,9 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             break
         _ilearn(task_id, learn_ctx, intent, plan.model_dump_json(), last_error,
                 observed=result.observations)
+        if _stuck_on_same_error(last_error):
+            print(f"{CLI_YELLOW}[pipeline] same verify fail x{_SAME_ERROR_MAX} -> CLARIFICATION{CLI_CLR}")
+            break
 
     save_last_run(task_id, "failure", "OUTCOME_NONE_CLARIFICATION", cycle)
     answer_once(last_error or "interpreter cycles exhausted", "OUTCOME_NONE_CLARIFICATION", [])

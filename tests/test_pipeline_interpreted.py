@@ -320,6 +320,41 @@ def test_single_empty_plan_recovers_on_next_cycle(monkeypatch):
     vm.answer.assert_called_once()
 
 
+def test_same_error_streak_breaks_before_imax(monkeypatch):
+    # Stability: when iLEARN keeps changing the plan (so signatures differ → the
+    # no-progress guard never fires) but the verify error is identical every cycle,
+    # the same-error guard must break to CLARIFICATION at _SAME_ERROR_MAX instead of
+    # burning the whole _IMAX_STEPS budget. Locks the t38-class refuse-loop fix.
+    from agent import pipeline
+    from agent.ir_models import PlanIR
+    monkeypatch.setattr(pipeline, "_IMAX_STEPS", 6)
+    monkeypatch.setattr(pipeline, "_SAME_ERROR_MAX", 3)
+    intent = json.dumps({
+        "objective": "o", "desired_outcome": "d", "params": {},
+        "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
+        "constraints": [], "success_criteria": [{"op": "eq", "lhs": "$row0.cnt", "rhs": "999"}],
+        "answer_shape": {},
+    })
+    learn = json.dumps({"rule_content": "x", "reasoning": "y", "deactivate_ids": [], "skip": False})
+    n = {"c": 0}
+
+    def _vary_plan(*a, **kw):
+        # Each cycle: a DIFFERENT SQL literal → different _plan_signature, so the
+        # identical-plan guard does NOT fire; the verify failure is identical though.
+        n["c"] += 1
+        d = json.loads(_PLAN)
+        d["discovery"][0]["args"]["args"] = [f"SELECT {n['c']} AS cnt"]
+        return PlanIR(**d)
+
+    vm = MagicMock(); vm.exec.return_value = {"stdout": "cnt\n5"}   # 5 != 999 → verify fails every cycle
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(intent, *([learn] * 8))), \
+         patch("agent.reason.run_plan", side_effect=_vary_plan):
+        m = run_pipeline(vm, instruction="x", task_id="t_serr", agents_md_text="A")
+    assert m["outcome"] == "OUTCOME_NONE_CLARIFICATION"
+    assert m["cycles_used"] == 3          # broke at the 3rd identical verify error, not _IMAX_STEPS=6
+    vm.answer.assert_called_once()
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader
