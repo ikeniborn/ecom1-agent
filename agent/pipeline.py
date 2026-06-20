@@ -14,7 +14,7 @@ from .llm import (
 from .oracle_validate import validate_atom_via_grader
 from .models import LearnConsolidateOutput
 from .prompt import load_prompt
-from .trace import set_cycle
+from .trace import log_gate_auto, set_cycle
 
 _IMAX_STEPS = int(os.environ.get("ECOM_INTERPRETER_MAX_STEPS", "6"))
 _MAX_TOKENS_LEARN = int(os.environ.get("ECOM_MAX_TOKENS_LEARN", "2048"))
@@ -414,6 +414,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         except (PlanError, InterpretError) as e:
             empty_streak = 0
             last_error = f"plan: {e}"; _accum(tk)
+            log_gate_auto("LINT", False, last_error)
             _ilearn(task_id, learn_ctx, intent,
                     plan.model_dump_json() if plan is not None else "", last_error)
             if _stuck_on_same_error(last_error):
@@ -421,6 +422,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
                 break
             continue
         empty_streak = 0
+        log_gate_auto("LINT", True, "")
 
         sig = _plan_signature(plan)
         if sig == prev_sig:
@@ -433,6 +435,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             result = interpret(plan, intent, vm, facts)
         except InterpretError as e:
             last_error = f"interpret: {e}"
+            log_gate_auto("INTERPRET", False, last_error)
             _ilearn(task_id, learn_ctx, intent, plan.model_dump_json(), last_error,
                     observed=None)
             _maybe_harness_distill(plan, last_error, task_id)
@@ -444,6 +447,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             continue
         except Exception as e:                                   # real-VM exception
             last_error = f"real_vm: {e}"
+            log_gate_auto("INTERPRET", False, last_error)
             _ilearn(task_id, learn_ctx, intent, plan.model_dump_json(), last_error)
             # A mutating plan may have landed a Write/Delete/bin-mutation before the
             # raise - retry only when the plan is read-only (mirrors legacy has_mutations).
@@ -460,8 +464,10 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
                 continue
             break
 
+        log_gate_auto("INTERPRET", True, "")
         last_observed = result.observations
         ok, verr = verify(result, intent)
+        log_gate_auto("VERIFY", ok, "" if ok else verr)
         if ok:
             ans = result.captured
             refs = _ground_security_refs(ans.outcome, list(ans.refs))
