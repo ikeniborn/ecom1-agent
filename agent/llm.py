@@ -599,6 +599,15 @@ def call_llm_raw(
             plain_text=plain_text, token_out=_tok, logprobs=logprobs,
         )
 
+    reasoning = raw_full = ""
+    try:
+        from . import reasoning_capture
+        if reasoning_capture.enabled():
+            cap = reasoning_capture.pop_capture()
+            reasoning, raw_full = cap.get("reasoning", ""), cap.get("raw_full", "")
+    except Exception:
+        pass
+
     _tr = get_trace()
     if _tr is not None:
         try:
@@ -614,6 +623,8 @@ def call_llm_raw(
                 duration_ms=int((time.monotonic() - _t0) * 1000),
                 cache_read=_tok.get("cache_read", 0),
                 cache_creation=_tok.get("cache_creation", 0),
+                reasoning=reasoning,
+                raw_response_full=raw_full or (result or ""),
             )
         except Exception:
             pass
@@ -699,3 +710,12 @@ def call_llm_json(system, user_msg, model, max_tokens=1024, token_out=None, phas
         return {}
     obj = _extract_json_from_text(raw)
     return obj if isinstance(obj, dict) else {}
+
+
+# Reasoning capture (B2): wrap provider seams when ECOM_TRACE_REASONING=1. Done at
+# import end so the clients above already exist; install() is idempotent + best-effort.
+try:
+    from . import reasoning_capture as _rc
+    _rc.install()
+except Exception:
+    pass
