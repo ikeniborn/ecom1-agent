@@ -83,6 +83,18 @@ Priority (highest first): (1) a ` ```json ` fenced block returns immediately; (2
 
 Checks, in order: **I2** — `outcome` must be within `intent.outcome_space` (`verify.py:18`); **I1** — on `OUTCOME_OK`, no ref may be an unresolved `$` placeholder and the ref count must meet `required_refs` (defense-in-depth, since the interpreter already projects refs); **I3** — an independent security re-check from the frozen `IntentSpec` (`constraints` with `security` + `deny_when`) demanding `OUTCOME_DENIED_SECURITY` when a deny predicate holds; finally every `success_criteria` PredExpr **for the chosen outcome** must hold (`verify.py:41`). `success_criteria` is a `dict[str, list[PredExpr]]` keyed by outcome, so verify applies only `success_criteria.get(ans.outcome, [])` — a valid negative outcome with no criteria passes here (it is still gated by I2). Security re-grounding here complements [[oracle]] knowledge injected upstream.
 
+## IntentSpec D6 guard (outcome_space must include OUTCOME_OK)
+
+`IntentSpec` has a `@model_validator(mode="after")` that enforces the D6 invariant (`agent/ir_models.py:101`): `outcome_space` must include `"OUTCOME_OK"` unless at least one `Constraint` carries `security=True` and a `deny_when` predicate. This closes the frozen-clarification failure mode where INTENT pre-commits an OK-less outcome_space and no in-loop iLEARN can recover (INTENT is frozen for the run). On violation Pydantic raises a `ValidationError`, which surfaces as an `IntentError` in `run_intent` and causes a terminal `OUTCOME_NONE_CLARIFICATION`. The exception for security-deny constraints preserves legitimate "deny-only" flows (e.g. tasks where every outcome is a denial by policy). See [[pipeline#INTENT retry and hard failure]] for the retry and terminal path.
+
+## Tool validation
+
+`_validate_dispatch(rpc, args, mutation_landed)` (`agent/interpreter.py:172`) is called before every VM dispatch in both the `discovery` loop and the `ops` loop. It delegates to `validate_step(rpc, args)` from `agent/tools.py` (see [[tooling#Tool catalog]]). On a violation it emits a `fail(reason)` `vm_call` trace record for observability and raises `InterpretError` (tagged with `mutation_landed`) so the pipeline routes the error to iLEARN. Unknown rpc names, extra arg keys, and missing required args are all caught here before the actual VM call is made. A valid pair returns `None` and execution continues normally.
+
+## Anti-give-up gate
+
+The anti-give-up gate (A3) runs inside `interpret()` after answer assembly (`agent/interpreter.py:367`). If the assembled `outcome` is `OUTCOME_NONE_CLARIFICATION`, `OUTCOME_OK` is in `intent.outcome_space`, and the plan has neither `discovery` steps nor `rowsets`, the gate raises `InterpretError` with the message `"attempt grounded discovery before clarifying (clarify-only plan rejected while OUTCOME_OK is reachable)"`. This prevents a plan that skipped all grounding from prematurely clarifying when a correct answer is achievable. The error routes to iLEARN, which should produce a rule instructing the next cycle to attempt grounded discovery first. See [[pipeline#Gate records]] for the `INTERPRET` gate record that captures this failure.
+
 ## InterpretError vs PlanError handling
 
 The interpreter raises only `InterpretError` (`agent/interpreter.py:49`), a `RuntimeError` carrying a `mutation_landed` flag set by `_refuse(...)` (`interpreter.py:144`). `PlanError` is a separate, structural/lint failure surfaced elsewhere in the loop; both route into the LEARN seam, but retry-safety differs.

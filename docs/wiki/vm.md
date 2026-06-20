@@ -32,6 +32,12 @@ It is constructed with a `fixtures` dict and an empty `calls` list. Every RPC ca
 
 The parser walks lines: a line beginning `## ` starts a new section whose key is the heading text lower-cased with spaces replaced by underscores; subsequent lines accumulate under the current section. Lines before the first `## ` are dropped, and the heading line itself is excluded from its section's body.
 
+## VM-layer trace logging
+
+`VMAdapter` and `MockVMSpy` both emit a `vm_call` trace record per RPC via `log_vm_auto` from `agent/trace.py`. `VMAdapter` wraps each method with a call to `log_vm_auto(rpc, args, result, validation=..., duration_ms=...)` after the RPC returns; `MockVMSpy` does the same in its `_record` helper. The `validation` field carries `"ok"` on a successful dispatch or `"fail(reason)"` when the tool-catalog pre-check in `_validate_dispatch` rejects the call before it even reaches the VM — in that case the record is emitted by the interpreter, not the adapter (see [[interpreter#Tool validation]]).
+
+The `step_type` on each `vm_call` record reflects the pipeline phase that triggered the RPC: the orchestrator sets `set_step_type("PREPHASE_GATHER")` around `gather_prephase_facts()`, and `interpret()` sets `set_step_type("INTERPRET")` at entry — both via `agent/trace.set_step_type()`. These tags let the [[tooling#Agent report]] timeline distinguish discovery-phase RPCs from interpreter-phase RPCs. The old `_trace_vm` helper that was inlined in `interpreter.py` was removed; all VM tracing now flows through `log_vm_auto`. See [[tooling#Trace schema v2]] for the full `vm_call` record schema.
+
 ## vm.answer-called-exactly-once contract
 
 `vm.answer` is invoked **exactly once** per task — on the single success path or one terminal CLARIFICATION — and the test doubles encode this invariant. The quality gate before answering is the deterministic `verify()`, not an LLM check (see [[pipeline]]).

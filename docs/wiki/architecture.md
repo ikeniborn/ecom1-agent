@@ -50,6 +50,12 @@ There is exactly one pipeline: the deterministic Plan-IR interpreter. Once `run_
 
 INTENT is a single reason-tier LLM call, frozen for the run. The loop runs up to `ECOM_INTERPRETER_MAX_STEPS` cycles: each cycle a PLAN call emits a `PlanIR`, which is repaired (`repair_sql_stdin`) then linted via the registry dispatcher (`lint`), interpreted against the VM (no LLM), then checked by the deterministic `verify()` gate — the only quality gate before answering. Pass calls `vm.answer` exactly once (idempotency guard) and persists artifacts; fail feeds an iLEARN step and retries. Loop exhaustion or a no-progress (identical-plan) short-circuit yields a terminal clarification. Full detail lives in [[pipeline]], with the executor in [[interpreter]], the lint registry in [[harness]], knowledge injection in [[oracle]], and the LEARN mechanism in [[learning]].
 
+## Policy-doc flow and observability backbone
+
+Two cross-cutting additions landed with the agent-observability workstream. First, **policy-doc content now reaches PLAN**: `_PLAN_KEYS` in `agent/reason.py` includes `policies`, so `_facts_block(..., tier="plan")` renders each loaded policy as a `## POLICY {path}` block in the PLAN user message, and the orchestrator reads `/docs` literal bodies into `facts.policies` (not just their paths). This means a task requiring a policy rule to resolve correctly no longer needs PLAN to perform a separate `Read` discovery step for the policy doc. See [[pipeline#Tiered pre-phase facts]].
+
+Second, **trace schema v2** (`agent/trace.py`) provides a structured observability backbone: every JSONL record carries a global monotonic `seq` and a `step_type` from a fixed taxonomy, VM RPCs log `validation`/`bytes`/`has_data`/`duration_ms`, and deterministic gate verdicts (LINT/INTERPRET/VERIFY) emit `gate` records. Reasoning capture (`agent/reasoning_capture.py`) tees chain-of-thought into `llm_call` records when `ECOM_TRACE_REASONING=1`. The explicit tool catalog (`agent/tools.py`) grounds the PLAN prompt and validates every RPC dispatch structurally. See [[tooling#Trace schema v2]], [[tooling#Tool catalog]], [[tooling#Reasoning capture]], and [[tooling#Agent report]].
+
 ## Makefile Targets
 
 The `Makefile` provides thin `uv run` wrappers kept aligned with the README so a fresh checkout runs trivially. See [[tooling]] for the broader command surface.

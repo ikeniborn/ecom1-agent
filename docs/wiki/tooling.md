@@ -24,11 +24,9 @@ Invoke with a file path to render one trace, or a run directory to list availabl
 
 ## Reasoning Trace
 
-`scripts/trace_t38.py` runs ONE benchmark task through the real pipeline and records an enriched JSONL trace that — beyond the built-in `agent.trace` records — captures the model's chain-of-thought reasoning and the un-stripped raw response per LLM call. It exists because the production trace discards reasoning before it lands (see [[learning#trace.py (JSONL trace files)]]): `agent/llm.py` strips `<think>…</think>` and the Anthropic path keeps only `type="text"` blocks; the claude-code path requests `--output-format json`, whose envelope carries only the final text.
+`scripts/trace_t38.py` is a thin harness that runs ONE benchmark task through the real pipeline against a live trial, recording an enriched JSONL trace that includes chain-of-thought reasoning and un-stripped raw responses per LLM call. The reasoning capture now delegates entirely to the production `agent/reasoning_capture.py` machinery (active when `ECOM_TRACE_REASONING=1`) — no monkeypatching; the script sets the env var and imports the agent normally.
 
-Invoke from anywhere (the script `chdir`s to the repo root): `uv run python scripts/trace_t38.py [task_id] [model]` — defaults `t38` / `deepseek-v4-flash:cloud`; CC example `… t38 claude-code/haiku`. It forces `ECOM_MODEL` before importing `agent.llm`, locates the named task's trial (StartRun → start each trial, end non-matching), runs it with an enriched `ReasoningTrace`, then SubmitRun for the grader score. No repo source is modified — only runtime monkeypatches.
-
-Reasoning capture is per-provider: Ollama (`<think>` inline / `reasoning_content` / `reasoning`) and OpenRouter are teed at the OpenAI client `.create` seam; Anthropic thinking blocks at `messages.create`; claude-code is captured by swapping the spawn to `--output-format stream-json --verbose` and sniffing `thinking` blocks while `cc_client._parse_envelope` still reads the terminal `result` line unchanged. Outputs (under `logs/trace_<task>_<ts>_<model>/`): `<task>.jsonl` (enriched: `seq`, `cycle`, `phase`, `prev_llm_seq`, `reasoning`, `raw_response_full`), the auto `<task>.detail.log`, and `<task>.reasoning.md` (system/user/reasoning/response interleave). See [[pipeline#run_pipeline]] for the phases traced; an analysis built from these traces lives at `docs/reports/t38-trace-analysis.html`.
+Invoke from anywhere (the script `chdir`s to the repo root): `uv run python scripts/trace_t38.py [task_id] [model]` — defaults `t38` / `deepseek-v4-flash:cloud`; CC example `… t38 claude-code/haiku`. It forces `ECOM_MODEL` and `ECOM_TRACE_REASONING=1` before importing `agent.llm`, locates the named task's trial (StartRun → start each trial, end non-matching), runs it, then SubmitRun for the grader score. Outputs (under `logs/trace_<task>_<ts>_<model>/`): `<task>.jsonl` (v2 trace with `seq`, `prev_llm_seq`, `reasoning`, `raw_response_full`, `cache_read`/`cache_creation`), the auto `<task>.detail.log`. See [[tooling#Reasoning capture]] for the per-provider capture seams; see [[pipeline#run_pipeline]] for the phases traced.
 
 ## Migrate Learned
 
@@ -41,6 +39,34 @@ Run once via `uv run python scripts/migrate_learned.py` before the first pipelin
 `scripts/migrate_rules_to_atoms.py` is a one-off operator step that distils existing per-task learned rules into general knowledge-oracle atoms as **candidates** — nothing is promoted automatically.
 
 Run with `uv run python -m scripts.migrate_rules_to_atoms`. As written, `main()` (`scripts/migrate_rules_to_atoms.py:23`) walks `data/learned/*.yaml` and prints the intended pipeline: run `KnowledgeOracle().distill` per active rule, then `dedup_by_cosine`. The module ships a working `dedup_by_cosine` helper (`scripts/migrate_rules_to_atoms.py:13`) that drops any atom whose cosine similarity to an already-kept atom meets a threshold, reusing `agent.oracle._cosine`. Distilled candidates land in `data/oracle/atoms.yaml`; the LLM + embeddings backend is required. See [[learning]] for how atoms are retrieved into PLAN.
+
+## Trace schema v2
+
+Every JSONL record in `logs/<run>/<task>.jsonl` carries a global monotonic `seq` (scoped to the task logger, incremented on every `_write`) and a `step_type` from a fixed taxonomy: `PREPHASE_GATHER`, `DOC_SELECT`, `ORACLE_RETRIEVE`, `INTENT`, `PLAN`, `LINT`, `INTERPRET`, `VERIFY`, `ILEARN`, `ANSWER`, `DISTILL`, `TASK_RESULT`. Record types and their v2 fields:
+
+- **`llm_call`** — phase, `step_type` (via `_PHASE_TO_STEP_TYPE`; `RERANK`→`ORACLE_RETRIEVE`, `LEARN`→`ILEARN`), `prev_llm_seq` (links to prior LLM call in the same task), `reasoning`/`reasoning_available`, `raw_response_full` (unstripped), `cache_read`/`cache_creation` token counts (`agent/trace.py:148`).
+- **`vm_call`** — `validation` (`ok` or `fail(reason)` from the tool-catalog check), `bytes`, `has_data`, `duration_ms`; `step_type` mirrored to `phase` for backward-compatible readers (`agent/trace.py:279`).
+- **`gate`** — `cycle`, `step_type` (`LINT`|`INTERPRET`|`VERIFY`), `passed`, `reason`. Emitted by `log_gate_auto` after each deterministic gate in the pipeline. Supersedes the older `gate_check` record type.
+
+Thread-local helpers `log_vm_auto` / `log_gate_auto` (`agent/trace.py:514`) read the active `TraceLogger` and the thread-local `cycle`/`step_type` (set via `set_step_type`/`set_cycle`); they are best-effort and never raise into a run. The orchestrator sets `step_type=PREPHASE_GATHER`; `interpret()` sets `step_type=INTERPRET` (see [[vm#VM-layer trace logging]]). See [[interpreter#Tool validation]] for how validation failures appear in `vm_call` records, and [[pipeline#Gate records]] for where `gate` records are emitted.
+
+## Reasoning capture
+
+`agent/reasoning_capture.py` tees per-provider chain-of-thought into a thread-local sink, active only when `ECOM_TRACE_REASONING=1`. Provider seams: Ollama/OpenRouter wrap the OpenAI `.chat.completions.create` call and extract `reasoning_content`/`reasoning` fields or `<think>…</think>` inline; Anthropic wraps `messages.create` and collects `thinking`-type blocks; claude-code swaps the spawn to `--output-format stream-json --verbose` and parses `thinking`/`redacted_thinking` blocks from the stream.
+
+`install()` (`reasoning_capture.py:155`) is idempotent and wraps all three provider seams at import time (triggered by `agent.llm` import). `call_llm_raw` calls `pop_capture()` after each LLM call and folds the result into the `llm_call` record's `reasoning` / `raw_response_full` fields. On any failure, `reasoning_available=false` is recorded; the capture never interferes with the run. See [[llm#Named phases]] for how `phase=` is threaded through `call_llm_raw`.
+
+## Tool catalog
+
+`agent/tools.py` is the single source of truth for the VM RPC surface. `TOOL_CATALOG` is a declarative dict keyed by RPC name (`Read`, `List`, `Tree`, `Find`, `Search`, `Exec`, `Write`, `Delete`, `Stat`) with `purpose`, `required`/`optional` arg key sets, `mode` (`read`|`mutate`), `when_to_use`, `example`, and an optional `note` (the `/bin/sql` stdin requirement for `Exec`).
+
+`validate_step(rpc, args)` (`tools.py:93`) returns `None` on a valid (rpc, args) pair, or a precise error string: unknown rpc, extra arg key, or missing required arg. `build_tool_catalog_block()` (`tools.py:116`) renders the catalog as a Markdown block injected into the PLAN system prompt by `run_plan` (`reason.py:149`), replacing the ad-hoc RPC table that was previously inline in `data/prompts/plan.md`. A drift-guard test keeps catalog arg-key declarations ⊆ actual proto fields. See [[interpreter#Tool validation]] for how `validate_step` is called before every dispatch.
+
+## Agent report
+
+`scripts/agent_report.py` builds a self-contained HTML report directly from v2 JSONL traces (no `logs/` run-dir convention; any JSONL file works). It includes a **run-overview grid** (outcome/score/cycles/tokens including cache_read+cache_creation/elapsed/facts-overlap), error and tool-usage summaries, and a **per-task drill-down**: a `seq`-ordered timeline colored by `step_type`, inline cycle SVG, tool-call table with validation status, and collapsible reasoning panels.
+
+The **prompt-redundancy metric** (`facts_overlap`) is a `difflib.SequenceMatcher` ratio over the shared `PRE-PHASE FACTS:` block extracted from the INTENT and PLAN user messages. A high ratio flags wasted tokens (PLAN pays to re-read facts INTENT already consumed). Invoke as `uv run python scripts/agent_report.py --logs logs/<run_dir> --out docs/reports/agent-report.html`. The parser halts on an unreadable trace rather than fabricating data. See [[tooling#Trace schema v2]] for the record types it consumes.
 
 ## Generate Excalidraw
 

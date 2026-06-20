@@ -56,6 +56,16 @@ An empty PLAN body (`PlanEmptyError`, raised by `run_plan` when the LLM returns 
 
 **answer-once idempotency guard (F4):** `_make_answer_once(vm)` (`pipeline.py:250`) returns a closure that tracks whether `vm.answer` has already been called. The first call submits; subsequent calls are suppressed no-ops (logging a yellow warning). Both the success path and all terminal exits share the same `answer_once` closure, so a success followed by a loop-exhaust terminal can never double-submit. This eliminates the "answer already provided" dead-end that previously required a separate `_terminal_clarification` helper.
 
+## Gate records
+
+`log_gate_auto(step_type, passed, reason)` (`agent/trace.py:527`) is called by `run_pipeline` after each of the three deterministic gates in the cycle loop. A `gate` record (type, cycle, step_type, passed bool, reason string) is appended to the task JSONL. Emission points:
+
+- After `lint(plan)` succeeds: `log_gate_auto("LINT", True, "")`. After a `PlanError`/`InterpretError` from lint: `log_gate_auto("LINT", False, last_error)` (`pipeline.py:417`).
+- After `interpret(...)` succeeds: `log_gate_auto("INTERPRET", True, "")`. After `InterpretError` or a real-VM exception: `log_gate_auto("INTERPRET", False, last_error)` (`pipeline.py:438`).
+- After `verify(...)`: `log_gate_auto("VERIFY", ok, "" if ok else verr)` (`pipeline.py:470`).
+
+Gate records are consumed by [[tooling#Agent report]] (step-type timeline, cycle SVG) and are best-effort: `log_gate_auto` never raises into a run. See [[tooling#Trace schema v2]] for the record schema.
+
 ## _ilearn retry seam
 
 `_ilearn(task_id, learn_ctx, intent, plan_text, error, observed)` (`pipeline.py:155`) is the between-cycle LEARN seam for the interpreted path. It calls `_learn_consolidate_text` with the IR-framed `ilearn.md` prompt and `surface="ir"`, passing the rendered `IntentSpec` as context and `PlanIR` as artifact. It writes a diff to `data/learned/{tid}.yaml`, mutates `learn_ctx` in place, and persists any `prephase_deep_read` hints. See [[learning]].
