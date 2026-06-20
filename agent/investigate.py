@@ -145,3 +145,24 @@ def is_stalled(result: str, signature: str, seen_signatures: set[str]) -> bool:
     if signature in seen_signatures:
         return True
     return False
+
+
+# add to agent/investigate.py
+def sufficient(intent, env: dict) -> bool:
+    """True when every required_ref for the desired (happy) outcome is groundable
+    from env. Conservative: a policy_doc is grounded when env has key
+    'policy_doc:<path>'; a record_path is grounded when env has the bound source
+    key (RefSpec.source '$row.record_path' -> env key 'row.record_path')."""
+    outcome = intent.desired_outcome
+    refs = (intent.required_refs or {}).get(outcome, [])
+    if not refs:
+        return True
+    for ref in refs:
+        if ref.kind == "policy_doc":
+            if not env.get(f"policy_doc:{ref.path}"):
+                return False
+        elif ref.kind == "record_path":
+            key = (ref.source or "").lstrip("$")
+            if not env.get(key):
+                return False
+    return True

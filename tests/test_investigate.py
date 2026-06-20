@@ -122,3 +122,36 @@ def test_is_stalled_on_repeated_signature():
 def test_not_stalled_on_fresh_nonempty():
     assert not is_stalled(result="rows", signature="read:/docs/y.md",
                           seen_signatures={"read:/docs/x.md"})
+
+
+# append to tests/test_investigate.py
+from agent.investigate import sufficient
+from agent.ir_models import IntentSpec, RefSpec
+
+
+def _intent_with_refs():
+    return IntentSpec(
+        objective="cite fraud payments",
+        desired_outcome="OUTCOME_OK",
+        outcome_space=["OUTCOME_OK"],
+        answer_shape={},
+        required_refs={"OUTCOME_OK": [
+            RefSpec(kind="policy_doc", path="/docs/security.md"),
+            RefSpec(kind="record_path", source="$row.record_path"),
+        ]},
+    )
+
+
+def test_sufficient_false_when_refs_unbound():
+    assert not sufficient(_intent_with_refs(), env={})
+
+
+def test_sufficient_true_when_all_refs_grounded():
+    env = {"policy_doc:/docs/security.md": True, "row.record_path": "/payments/p_1.json"}
+    assert sufficient(_intent_with_refs(), env=env)
+
+
+def test_sufficient_true_when_no_required_refs():
+    intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
+    assert sufficient(intent, env={})
