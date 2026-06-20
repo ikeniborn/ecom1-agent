@@ -2,9 +2,15 @@
 deterministic PLAN consumes in place of a front-loaded facts dump."""
 from __future__ import annotations
 
+import json
+import os
 import re
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from .llm import call_llm_raw, _resolve_model_for_phase
+from .prompt import load_prompt
+from .json_extract import _extract_json_from_text
 
 
 class Note(BaseModel):
@@ -164,3 +170,57 @@ def sufficient(intent, env: dict) -> bool:
             if not env.get(key):
                 return False
     return True
+
+
+def _call_json(system: str, user: str, phase: str, escalate: bool) -> dict:
+    """One LLM round-trip returning a parsed JSON object. FAST tier by default;
+    escalate=True forces the REASON tier (think=on) for a stalled step."""
+    default = os.environ.get("ECOM_MODEL", "")
+    model = (_resolve_model_for_phase("reason", default) if escalate
+             else _resolve_model_for_phase(phase, default))
+    sys_blocks = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+    raw = call_llm_raw(sys_blocks, user, model, {}, max_tokens=1024,
+                       think=True if escalate else False, phase=phase)
+    obj = _extract_json_from_text(raw or "")
+    return obj if isinstance(obj, dict) else {}
+
+
+def _atoms_block(atoms: list) -> str:
+    if not atoms:
+        return ""
+    lines = ["KNOWLEDGE (scoped to this step):"]
+    for a in atoms:
+        content = getattr(a, "content", None) or (a.get("content") if isinstance(a, dict) else str(a))
+        lines.append(f"- {content}")
+    return "\n".join(lines)
+
+
+def _refs_targets(intent) -> str:
+    refs = (intent.required_refs or {}).get(intent.desired_outcome, [])
+    return "; ".join(r.path if r.kind == "policy_doc" else f"{r.kind}:{r.source}" for r in refs)
+
+
+def router(intent, brief: "Brief", atoms: list, escalate: bool) -> dict:
+    guide = load_prompt("investigate") or "# PHASE: INVESTIGATE"
+    user = "\n\n".join(p for p in [
+        f"OBJECTIVE:\n{intent.objective}",
+        f"REQUIRED_REFS:\n{_refs_targets(intent)}",
+        render_brief(brief),
+        _atoms_block(atoms),
+        "Choose the next read-only action (or {\"done\": true}).",
+    ] if p)
+    return _call_json(guide, user, phase="INVESTIGATE", escalate=escalate)
+
+
+def digest(goal: str, tool: str, args: dict, observation: str, escalate: bool):
+    guide = load_prompt("investigate") or "# PHASE: INVESTIGATE"
+    user = (f"GOAL:\n{goal}\n\nTOOL: {tool} {args}\n\n"
+            f"RAW_RESULT (condense this):\n{observation[:4000]}\n\n"
+            "Return the digest JSON.")
+    obj = _call_json(guide, user, phase="INVESTIGATE", escalate=escalate)
+    note = Note(goal=goal, tool=tool, args=args,
+                observation_digest=str(obj.get("observation_digest", ""))[:200],
+                lesson=str(obj.get("lesson", "")),
+                refs_found=list(obj.get("refs_found", []) or []))
+    env_updates = obj.get("env_updates", {}) if isinstance(obj.get("env_updates"), dict) else {}
+    return note, env_updates

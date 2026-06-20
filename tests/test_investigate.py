@@ -151,3 +151,49 @@ def test_sufficient_true_when_no_required_refs():
     intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
                         outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
     assert sufficient(intent, env={})
+
+
+import agent.investigate as inv
+
+
+def test_router_parses_tool_choice(monkeypatch):
+    monkeypatch.setattr(inv, "_call_json",
+                        lambda system, user, phase, escalate: {
+                            "tool": "read", "args": {"path": "/docs/security.md"},
+                            "why": "need the governing rule"})
+    act = inv.router(_intent_with_refs(), Brief(), atoms=[], escalate=False)
+    assert act["tool"] == "read"
+    assert act["args"]["path"] == "/docs/security.md"
+
+
+def test_router_emits_done(monkeypatch):
+    monkeypatch.setattr(inv, "_call_json",
+                        lambda system, user, phase, escalate: {"done": True})
+    act = inv.router(_intent_with_refs(), Brief(), atoms=[], escalate=False)
+    assert act.get("done") is True
+
+
+def test_digest_returns_note_fields(monkeypatch):
+    monkeypatch.setattr(inv, "_call_json",
+                        lambda system, user, phase, escalate: {
+                            "observation_digest": "security.md requires citing record_path",
+                            "lesson": "cite the payment record_path",
+                            "env_updates": {"policy_doc:/docs/security.md": True},
+                            "refs_found": []})
+    note, env_updates = inv.digest(goal="read policy", tool="read",
+                                   args={"path": "/docs/security.md"},
+                                   observation="# Security…", escalate=False)
+    assert note.lesson == "cite the payment record_path"
+    assert env_updates["policy_doc:/docs/security.md"] is True
+
+
+def test_escalate_switches_model(monkeypatch):
+    seen = {}
+    def fake_raw(system, user_msg, model, cfg, **kw):
+        seen["model"] = model
+        return '{"done": true}'
+    monkeypatch.setenv("ECOM_MODEL_FAST", "fast-m")
+    monkeypatch.setenv("ECOM_MODEL_REASON", "reason-m")
+    monkeypatch.setattr(inv, "call_llm_raw", fake_raw)
+    inv._call_json("sys", "user", phase="INVESTIGATE", escalate=True)
+    assert seen["model"] == "reason-m"   # escalation forces the reason tier
