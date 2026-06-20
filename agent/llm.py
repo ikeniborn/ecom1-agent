@@ -75,8 +75,9 @@ _PHASE_TIER: dict[str, str] = {
     "ilearn":    "reason",
     "learn":     "reason",
     "distill":   "reason",
-    "docselect": "fast",
-    "rerank":    "fast",
+    "docselect":   "fast",
+    "rerank":      "fast",
+    "investigate": "fast",
 }
 _TIER_ENV = {"reason": "ECOM_MODEL_REASON", "fast": "ECOM_MODEL_FAST", "embed": "ECOM_MODEL_EMBED"}
 
