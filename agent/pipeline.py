@@ -194,6 +194,13 @@ def _new_oracle():
     return KnowledgeOracle()
 
 
+def _brief_lessons_text(brief) -> str:
+    """One-line-per-step lessons from an investigation brief, for distillation."""
+    if brief is None or not getattr(brief, "notes", None):
+        return ""
+    return "\n".join(f"- {n.lesson}" for n in brief.notes if n.lesson)
+
+
 def _distill_call(oracle, intent, plan, task_id, outcome_note):
     # `error` param is repurposed as a short success note; the distill prompt
     # strips all run-specific values, so a success note is fine (spec §Distill).
@@ -490,8 +497,11 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             refs = _ground_security_refs(ans.outcome, list(ans.refs))
             answer_once(ans.message, ans.outcome, refs)
             _persist_artifacts(task_id, intent, plan)
-            _maybe_distill_and_validate(intent, plan, task_id,
-                                        f"OK: {verr or 'verify passed'}")
+            _note = f"OK: {verr or 'verify passed'}"
+            _lessons = _brief_lessons_text(brief)
+            if _lessons:
+                _note = _note + "\nINVESTIGATION_LESSONS:\n" + _lessons
+            _maybe_distill_and_validate(intent, plan, task_id, _note)
             status = "success" if ans.outcome == "OUTCOME_OK" else "failure"
             save_last_run(task_id, status, ans.outcome, cycle)
             return {"cycles_used": cycle, "outcome": ans.outcome, "status": status,
