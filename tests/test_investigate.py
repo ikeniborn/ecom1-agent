@@ -197,3 +197,18 @@ def test_escalate_switches_model(monkeypatch):
     monkeypatch.setattr(inv, "call_llm_raw", fake_raw)
     inv._call_json("sys", "user", phase="INVESTIGATE", escalate=True)
     assert seen["model"] == "reason-m"   # escalation forces the reason tier
+
+
+def test_fast_tier_used_when_not_escalating(monkeypatch):
+    seen = {}
+    def fake_raw(system, user_msg, model, cfg, **kw):
+        seen["model"] = model
+        seen["think"] = kw.get("think")
+        return '{"done": true}'
+    monkeypatch.setenv("ECOM_MODEL_FAST", "fast-m")
+    monkeypatch.setenv("ECOM_MODEL_REASON", "reason-m")
+    monkeypatch.delenv("ECOM_MODEL_INVESTIGATE", raising=False)
+    monkeypatch.setattr(inv, "call_llm_raw", fake_raw)
+    inv._call_json("sys", "user", phase="INVESTIGATE", escalate=False)
+    assert seen["model"] == "fast-m"     # non-escalate hot path uses the fast tier
+    assert seen["think"] is False        # fast tier → think off

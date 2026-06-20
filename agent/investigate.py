@@ -2,7 +2,6 @@
 deterministic PLAN consumes in place of a front-loaded facts dump."""
 from __future__ import annotations
 
-import json
 import os
 import re
 
