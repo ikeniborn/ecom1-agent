@@ -169,7 +169,8 @@ class KnowledgeOracle:
                 f"SCRIPT:\n{(script_code or '')[:4000]}\n\nReturn the atom JSON.")
         from .llm import _resolve_model_for_phase
         out = call_llm_json(self._DISTILL_SYS, user,
-                            _resolve_model_for_phase("distill", os.environ.get("ECOM_MODEL", "")))
+                            _resolve_model_for_phase("distill", os.environ.get("ECOM_MODEL", "")),
+                            phase="DISTILL")
         if not isinstance(out, dict) or not out.get("content"):
             return None
         atom = Atom(id=out["id"], description=out.get("description", ""),

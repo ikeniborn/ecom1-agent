@@ -17,7 +17,7 @@ def llm_rerank(task_text, candidates, k):
     user = (f"TASK:\n{task_text}\n\nCANDIDATE KNOWLEDGE:\n{catalog}\n\n"
             f"Return at most {k} ids in JSON {{\"keep\": [...]}}.")
     model = os.environ.get("ECOM_MODEL_RANK") or os.environ.get("ECOM_MODEL", "")
-    out = call_llm_json(_SYS, user, model)
+    out = call_llm_json(_SYS, user, model, phase="RERANK")
     keep = list(out.get("keep", [])) if isinstance(out, dict) else []
     by_id = {a.id: a for a in candidates}
     return [by_id[i] for i in keep if i in by_id]

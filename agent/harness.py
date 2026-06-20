@@ -186,7 +186,8 @@ def distill(plan, error, source_task=""):
     user = f"PLAN:\n{plan.model_dump_json()[:4000]}\n\nERROR:\n{error}\n\nReturn the check JSON."
     try:
         out = call_llm_json(_DISTILL_SYS, user,
-                            _resolve_model_for_phase("distill", os.environ.get("ECOM_MODEL", "")))
+                            _resolve_model_for_phase("distill", os.environ.get("ECOM_MODEL", "")),
+                            phase="HARNESS_DISTILL")
     except Exception:
         return None
     if not isinstance(out, dict) or out.get("kind") not in _HANDLERS:
