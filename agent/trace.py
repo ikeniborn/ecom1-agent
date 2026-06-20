@@ -316,6 +316,7 @@ class TraceLogger:
         self._write({
             "type": "answer",
             "cycle": cycle,
+            "step_type": "ANSWER",
             "message": message,
             "outcome": outcome,
             "refs": list(refs or []),
