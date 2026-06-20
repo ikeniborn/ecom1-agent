@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .llm import call_llm_raw, _resolve_model_for_phase
 from .prompt import load_prompt
 from .json_extract import _extract_json_from_text
+from .trace import set_step_type, current_step_type
 
 
 class Note(BaseModel):
@@ -247,27 +248,17 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
     brief = Brief()
     seen: set[str] = set()
     steps = max_steps if max_steps is not None else _MAX_STEPS
-    for _ in range(steps):
-        goal = intent.objective if not brief.notes else (brief.notes[-1].lesson or intent.objective)
-        try:
-            atoms = _retrieve_atoms(oracle, goal)
-            act = router(intent, brief, atoms, escalate=False)
-            if act.get("done"):
-                break
-            tool, args = act.get("tool", ""), act.get("args", {}) or {}
+    _prev_step = current_step_type()
+    set_step_type("INVESTIGATE")
+    try:
+        for _ in range(steps):
+            goal = intent.objective if not brief.notes else (brief.notes[-1].lesson or intent.objective)
             try:
-                observation = run_tool(vm, tool, args)
-            except ToolRejected as e:
-                brief.notes.append(Note(goal=goal, tool=tool, args=args,
-                                        lesson=f"rejected (mutation): {e}"))
-                continue
-            sig = tool_signature(tool, args)
-            escalate = is_stalled(observation, sig, seen)
-            if escalate:                                   # one re-run on the reason tier
-                act2 = router(intent, brief, atoms, escalate=True)
-                if act2.get("done"):
+                atoms = _retrieve_atoms(oracle, goal)
+                act = router(intent, brief, atoms, escalate=False)
+                if act.get("done"):
                     break
-                tool, args = act2.get("tool", tool), act2.get("args", args) or args
+                tool, args = act.get("tool", ""), act.get("args", {}) or {}
                 try:
                     observation = run_tool(vm, tool, args)
                 except ToolRejected as e:
@@ -275,17 +266,32 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
                                             lesson=f"rejected (mutation): {e}"))
                     continue
                 sig = tool_signature(tool, args)
-                if is_stalled(observation, sig, seen):     # still stalled after escalation → stop
-                    note, env_updates = digest(goal, tool, args, observation, escalate=True)
-                    brief.notes.append(note); brief.env.update(env_updates)
+                escalate = is_stalled(observation, sig, seen)
+                if escalate:                                   # one re-run on the reason tier
+                    act2 = router(intent, brief, atoms, escalate=True)
+                    if act2.get("done"):
+                        break
+                    tool, args = act2.get("tool", tool), act2.get("args", args) or args
+                    try:
+                        observation = run_tool(vm, tool, args)
+                    except ToolRejected as e:
+                        brief.notes.append(Note(goal=goal, tool=tool, args=args,
+                                                lesson=f"rejected (mutation): {e}"))
+                        continue
+                    sig = tool_signature(tool, args)
+                    if is_stalled(observation, sig, seen):     # still stalled after escalation → stop
+                        note, env_updates = digest(goal, tool, args, observation, escalate=True)
+                        brief.notes.append(note); brief.env.update(env_updates)
+                        break
+                seen.add(sig)
+                note, env_updates = digest(goal, tool, args, observation, escalate=escalate)
+                brief.notes.append(note)
+                brief.env.update(env_updates)
+                if sufficient(intent, brief.env):
                     break
-            seen.add(sig)
-            note, env_updates = digest(goal, tool, args, observation, escalate=escalate)
-            brief.notes.append(note)
-            brief.env.update(env_updates)
-            if sufficient(intent, brief.env):
-                break
-        except Exception as e:                             # graceful: never raise out of a step
-            brief.notes.append(Note(goal=goal, lesson=f"step error: {e}"))
-            continue
+            except Exception as e:                             # graceful: never raise out of a step
+                brief.notes.append(Note(goal=goal, lesson=f"step error: {e}"))
+                continue
+    finally:
+        set_step_type(_prev_step)
     return brief

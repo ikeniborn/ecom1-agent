@@ -266,3 +266,29 @@ def test_investigate_never_raises_on_step_error(monkeypatch):
     brief = inv.investigate(vm, intent, seed=None, oracle=None, max_steps=2)
     assert isinstance(brief, Brief)               # returned gracefully, did not raise
     assert any("step error" in n.lesson for n in brief.notes)
+
+
+def test_investigate_steps_appear_in_trace(monkeypatch, tmp_path):
+    import json
+    from agent import trace
+    logpath = tmp_path / "t.jsonl"
+    logger = trace.TraceLogger(path=logpath, task_id="tT")   # real ctor: (path, task_id)
+    trace.set_trace(logger)
+    try:
+        intent = _intent_with_refs()
+        vm = MockVMSpy({fixture_key("Read", "/docs/security.md"): {"content": "cite record_path"}})
+        monkeypatch.setattr(inv, "router",
+                            lambda i, b, atoms, escalate: {"tool": "read", "args": {"path": "/docs/security.md"}})
+        monkeypatch.setattr(inv, "digest",
+                            lambda goal, tool, args, observation, escalate: (
+                                Note(tool=tool, lesson="x"),
+                                {"policy_doc:/docs/security.md": True, "row.record_path": "/p.json"}))
+        inv.investigate(vm, intent, seed=None, oracle=None, max_steps=2)
+    finally:
+        logger.close()
+        trace.set_trace(None)
+    records = [json.loads(l) for l in logpath.read_text(encoding="utf-8").splitlines() if l.strip()]
+    vm_calls = [r for r in records if r.get("type") == "vm_call"]
+    assert vm_calls, "investigator VM call not captured in trace"
+    assert any(r.get("rpc") == "Read" for r in vm_calls)
+    assert any(r.get("step_type") == "INVESTIGATE" for r in vm_calls)   # tagged as the investigate phase
