@@ -223,3 +223,62 @@ def digest(goal: str, tool: str, args: dict, observation: str, escalate: bool):
                 refs_found=list(obj.get("refs_found", []) or []))
     env_updates = obj.get("env_updates", {}) if isinstance(obj.get("env_updates"), dict) else {}
     return note, env_updates
+
+
+_MAX_STEPS = int(os.environ.get("ECOM_INVESTIGATE_MAX_STEPS", "6"))
+_ORACLE_K = int(os.environ.get("ECOM_INVESTIGATE_ORACLE_K", "2"))
+
+
+def _retrieve_atoms(oracle, goal: str) -> list:
+    if oracle is None or not goal:
+        return []
+    try:
+        return oracle.retrieve(goal, k=_ORACLE_K)
+    except Exception:
+        return []
+
+
+def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None) -> "Brief":
+    """Bounded read-only ReAct loop → Brief. Never raises: any per-step failure is
+    recorded as a lesson and the loop continues (caller falls back to seed facts)."""
+    brief = Brief()
+    seen: set[str] = set()
+    steps = max_steps if max_steps is not None else _MAX_STEPS
+    for _ in range(steps):
+        goal = intent.objective if not brief.notes else (brief.notes[-1].lesson or intent.objective)
+        atoms = _retrieve_atoms(oracle, goal)
+        act = router(intent, brief, atoms, escalate=False)
+        if act.get("done"):
+            break
+        tool, args = act.get("tool", ""), act.get("args", {}) or {}
+        try:
+            observation = run_tool(vm, tool, args)
+        except ToolRejected as e:
+            brief.notes.append(Note(goal=goal, tool=tool, args=args,
+                                    lesson=f"rejected (mutation): {e}"))
+            continue
+        sig = tool_signature(tool, args)
+        escalate = is_stalled(observation, sig, seen)
+        if escalate:                                   # one re-run on the reason tier
+            act2 = router(intent, brief, atoms, escalate=True)
+            if act2.get("done"):
+                break
+            tool, args = act2.get("tool", tool), act2.get("args", args) or args
+            try:
+                observation = run_tool(vm, tool, args)
+            except ToolRejected as e:
+                brief.notes.append(Note(goal=goal, tool=tool, args=args,
+                                        lesson=f"rejected (mutation): {e}"))
+                continue
+            sig = tool_signature(tool, args)
+            if is_stalled(observation, sig, seen):     # still stalled after escalation → stop
+                note, env_updates = digest(goal, tool, args, observation, escalate=True)
+                brief.notes.append(note); brief.env.update(env_updates)
+                break
+        seen.add(sig)
+        note, env_updates = digest(goal, tool, args, observation, escalate=escalate)
+        brief.notes.append(note)
+        brief.env.update(env_updates)
+        if sufficient(intent, brief.env):
+            break
+    return brief

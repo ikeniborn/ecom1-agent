@@ -212,3 +212,46 @@ def test_fast_tier_used_when_not_escalating(monkeypatch):
     inv._call_json("sys", "user", phase="INVESTIGATE", escalate=False)
     assert seen["model"] == "fast-m"     # non-escalate hot path uses the fast tier
     assert seen["think"] is False        # fast tier → think off
+
+
+def test_investigate_stops_on_sufficiency(monkeypatch):
+    intent = _intent_with_refs()
+    fx = {fixture_key("Read", "/docs/security.md"): {"content": "cite record_path"}}
+    vm = MockVMSpy(fx)
+    # router asks to read the policy, then would loop; digest grounds both refs at once.
+    monkeypatch.setattr(inv, "router",
+                        lambda i, b, atoms, escalate: {"tool": "read", "args": {"path": "/docs/security.md"}})
+    monkeypatch.setattr(inv, "digest",
+                        lambda goal, tool, args, observation, escalate: (
+                            Note(tool=tool, args=args, lesson="cite it"),
+                            {"policy_doc:/docs/security.md": True, "row.record_path": "/payments/p_1.json"}))
+    brief = inv.investigate(vm, intent, seed=None, oracle=None, max_steps=6)
+    assert brief.env["row.record_path"] == "/payments/p_1.json"
+    assert len(brief.notes) == 1            # stopped right after sufficiency met
+
+
+def test_investigate_respects_budget(monkeypatch):
+    intent = _intent_with_refs()             # two refs, never grounded -> never sufficient
+    # distinct non-empty results per step: no empty-stall, no repeated-signature stall
+    fx = {fixture_key("Read", f"/docs/{i}.md"): {"content": f"data{i}"} for i in range(3)}
+    vm = MockVMSpy(fx)
+    monkeypatch.setattr(inv, "router",
+                        lambda i, b, atoms, escalate: {"tool": "read", "args": {"path": f"/docs/{len(b.notes)}.md"}})
+    monkeypatch.setattr(inv, "digest",
+                        lambda goal, tool, args, observation, escalate: (Note(tool=tool, args=args), {}))
+    brief = inv.investigate(vm, intent, seed=None, oracle=None, max_steps=3)
+    assert len(brief.notes) == 3            # stopped at budget
+
+
+def test_investigate_escalates_on_empty(monkeypatch):
+    intent = _intent_with_refs()
+    vm = MockVMSpy({})                       # every read returns empty -> stall -> escalate
+    calls = []
+    monkeypatch.setattr(inv, "router",
+                        lambda i, b, atoms, escalate: (calls.append(("router", escalate)) or
+                                                       {"tool": "read", "args": {"path": "/docs/x.md"}}))
+    monkeypatch.setattr(inv, "digest",
+                        lambda goal, tool, args, observation, escalate: (
+                            calls.append(("digest", escalate)) or (Note(tool=tool, args=args), {})))
+    inv.investigate(vm, intent, seed=None, oracle=None, max_steps=1)
+    assert any(c == ("digest", True) for c in calls)   # empty result escalated the digest
