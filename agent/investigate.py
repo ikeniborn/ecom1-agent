@@ -3,10 +3,12 @@
 deterministic PLAN consumes in place of a front-loaded facts dump."""
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Note(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     goal: str = ""                       # the micro-goal this step pursued
     tool: str = ""                       # read-only RPC chosen
     args: dict = Field(default_factory=dict)
@@ -16,6 +18,8 @@ class Note(BaseModel):
 
 
 class Brief(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     notes: list[Note] = Field(default_factory=list)
     env: dict = Field(default_factory=dict)   # bound facts: incident_id, governing_doc, candidate paths…
 
