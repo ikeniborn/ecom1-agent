@@ -49,7 +49,8 @@ class KnowledgeOracle:
             pass
 
     def _active(self):
-        return [a for a in self.atoms if a.status == "active"]
+        force = {x for x in os.environ.get("ECOM_ORACLE_FORCE_ACTIVE", "").split(",") if x}
+        return [a for a in self.atoms if a.status == "active" or a.id in force]
 
     def _embed_atom(self, a: Atom):
         h = content_hash(a.content)
