@@ -53,3 +53,36 @@ def test_log_lint_fire_auto_no_logger_is_noop():
     set_trace(None)
     # Must not raise when there is no active logger.
     log_lint_fire_auto("chk_x", "k", "error", True, "msg")
+
+
+def _denied_after_business():
+    # Trips the security_first handler: a DENIED_SECURITY branch follows a business branch.
+    return _plan(
+        decision={"branches": [{"when": {"op": "eq", "lhs": "$x", "rhs": 1}, "label": "ok"},
+                               {"when": {"op": "eq", "lhs": "$y", "rhs": 1}, "label": "deny"}],
+                  "default_label": "ok"},
+        answer={"ok": {"message": "m", "outcome": "OUTCOME_OK", "refs": []},
+                "deny": {"message": "no", "outcome": "OUTCOME_DENIED_SECURITY", "refs": []}},
+    )
+
+
+def test_lint_emits_fire_for_warn_and_blocking(tmp_path, monkeypatch):
+    # warn spec first (records, does not block), then an active error spec (records, blocks).
+    monkeypatch.setattr(harness, "load_checks", lambda *a, **k: [
+        {"id": "warn1", "kind": "security_first", "severity": "warn", "status": "active"},
+        {"id": "err1", "kind": "security_first", "severity": "error", "status": "active"},
+    ])
+    p = tmp_path / "t01.jsonl"
+    t = TraceLogger(p, "t01")
+    set_trace(t)
+    set_cycle(1)
+    try:
+        with pytest.raises(InterpretError):
+            lint(_denied_after_business())
+    finally:
+        t.close()
+        set_trace(None)
+    fires = [r for r in _records(p) if r.get("type") == "lint_fire"]
+    assert [f["check_id"] for f in fires] == ["warn1", "err1"]
+    assert fires[0]["blocking"] is False
+    assert fires[1]["blocking"] is True

@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from .ir_models import IntentSpec, PlanIR, RowSet
 from .predicates import evaluate, resolve
 from .tools import validate_step
-from .trace import current_cycle, get_trace
+from .trace import current_cycle, get_trace, log_lint_fire_auto
 
 
 def _trace_answer(message: str, outcome: str, refs: list) -> None:
@@ -274,6 +274,8 @@ def lint(plan: PlanIR) -> None:
             continue
         blocking = (spec.get("status", "active") == "active"
                     and spec.get("severity", "error") == "error")
+        log_lint_fire_auto(spec.get("id", ""), spec.get("kind", ""),
+                           spec.get("severity", "error"), blocking, violations[0])
         if blocking:
             raise InterpretError("; ".join(violations))
         print(f"[lint] warn ({spec.get('id')}): {violations[0]}")
