@@ -62,7 +62,24 @@ def test_is_readonly_rejects_mutations():
     assert not is_readonly("write", {"path": "/x", "content": "y"})
     assert not is_readonly("delete", {"path": "/x"})
     assert not is_readonly("exec", {"path": "/bin/sql", "stdin": "UPDATE t SET a=1"})
-    assert not is_readonly("exec", {"path": "/bin/id"})   # only /bin/sql exec allowed
+    assert not is_readonly("exec", {"path": "/bin/rm", "args": ["-rf", "/"]})  # arbitrary binary rejected
+
+
+def test_is_readonly_allows_bin_id():
+    # /bin/id is a read-only identity probe (no SQL, no mutation)
+    assert is_readonly("exec", {"path": "/bin/id"})
+    assert is_readonly("exec", {"path": "/bin/id", "stdin": ""})
+    assert is_readonly("exec", {"path": "/BIN/ID"})            # case-normalised
+
+
+def test_run_tool_dispatches_bin_id_identity_probe():
+    fx = {fixture_key("Exec", "/bin/id"): {"stdout": "user=cust_016 role=customer"}}
+    vm = MockVMSpy(fx)
+    out = run_tool(vm, "exec", {"path": "/bin/id"})
+    assert "cust_016" in out
+    assert vm.calls and vm.calls[-1][0] == "Exec"
+    # dispatched the real /bin/id binary, NOT coerced to /bin/sql
+    assert vm.calls[-1][1].get("path") == "/bin/id"
 
 
 def test_run_tool_executes_read_only_and_records():

@@ -81,8 +81,11 @@ def is_readonly(tool: str, args: dict) -> bool:
     t = (tool or "").lower()
     if t in _READ_RPCS:
         return True
-    if t == "exec":                                  # only /bin/sql, SELECT/CTE only
-        if (args.get("path") or "").lower() != "/bin/sql":
+    if t == "exec":
+        path = (args.get("path") or "").lower()
+        if path == "/bin/id":                        # read-only identity probe (no mutation)
+            return True
+        if path != "/bin/sql":                       # only /bin/sql otherwise, SELECT/CTE only
             return False
         return _is_readonly_sql(args.get("stdin") or args.get("sql") or "")
     return False
@@ -109,8 +112,9 @@ def run_tool(vm, tool: str, args: dict) -> str:
         return _text(vm.search(root=args.get("root", "/docs"),
                                pattern=args.get("pattern", ""),
                                limit=limit), "matches")
-    # exec /bin/sql
-    res = vm.exec(path="/bin/sql", args=args.get("args", []),
+    # exec: /bin/sql (SELECT/CTE) or /bin/id (read-only identity probe)
+    exec_path = "/bin/id" if (args.get("path") or "").lower() == "/bin/id" else "/bin/sql"
+    res = vm.exec(path=exec_path, args=args.get("args", []),
                   stdin=args.get("stdin") or args.get("sql") or "")
     return _text(res, "stdout")
 
