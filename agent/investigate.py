@@ -187,6 +187,16 @@ def _ground_doc_refs(env: dict, tool: str, args: dict, refs: list) -> None:
             env[f"policy_doc:{path}"] = True
 
 
+def _forced_doc_read(env: dict, refs: list) -> "dict | None":
+    """If a required policy_doc ref is still ungrounded, return a forced read
+    action for its path (prioritized over free routing); else None."""
+    for r in refs:
+        if getattr(r, "kind", "") == "policy_doc" and r.path:
+            if not env.get(f"policy_doc:{r.path}"):
+                return {"tool": "read", "args": {"path": r.path}}
+    return None
+
+
 def _call_json(system: str, user: str, phase: str, escalate: bool) -> dict:
     """One LLM round-trip returning a parsed JSON object. FAST tier by default;
     escalate=True forces the REASON tier (think=on) for a stalled step."""
@@ -271,7 +281,12 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
             goal = intent.objective if not brief.notes else (brief.notes[-1].lesson or intent.objective)
             try:
                 atoms = _retrieve_atoms(oracle, goal)
-                act = router(intent, brief, atoms, escalate=False)
+                forced = _forced_doc_read(brief.env, req_refs)
+                if forced is not None and tool_signature(
+                        forced["tool"], forced["args"]) not in seen:
+                    act = forced  # prioritize grounding the governing doc
+                else:
+                    act = router(intent, brief, atoms, escalate=False)
                 if act.get("done"):
                     break
                 tool, args = act.get("tool", ""), act.get("args", {}) or {}

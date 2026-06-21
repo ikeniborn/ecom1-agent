@@ -28,3 +28,19 @@ def test_ground_noop_without_policy_refs():
     env = {}
     _ground_doc_refs(env, "read", {"path": "/docs/fraud.md"}, [])
     assert env == {}
+
+
+from agent.investigate import _forced_doc_read
+
+
+def test_forced_read_targets_ungrounded_policy_doc():
+    act = _forced_doc_read({}, _policy_refs())
+    assert act == {"tool": "read", "args": {"path": "/docs/fraud.md"}}
+
+
+def test_forced_read_none_when_already_grounded():
+    assert _forced_doc_read({"policy_doc:/docs/fraud.md": True}, _policy_refs()) is None
+
+
+def test_forced_read_none_without_policy_refs():
+    assert _forced_doc_read({}, []) is None
