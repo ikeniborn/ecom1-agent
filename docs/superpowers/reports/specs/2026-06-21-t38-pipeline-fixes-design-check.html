@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка спецификации — t38 Pipeline Fixes</title>
+<style>
+:root{
+  --bg:#f6f7fb; --surface:#ffffff; --fg:#2b2b3a; --muted:#6b6b80;
+  --accent:#5c6bc0; --accent-2:#3949ab; --border:#d6d8e6; --line:#9aa0b4; --zebra:#eef0f8;
+  --ok:#43a047; --ok-2:#2e7d32; --warn:#fb8c00; --warn-2:#ef6c00; --danger:#e53935; --danger-2:#c62828;
+  --shadow:rgba(40,40,80,.18);
+}
+body:has(#theme-toggle:checked){
+  --bg:#181825; --surface:#262637; --fg:#cdd6f4; --muted:#a6adc8;
+  --accent:#89b4fa; --accent-2:#5e95f0; --border:#3a3b52; --line:#6c7086; --zebra:#21222f;
+  --ok:#a6e3a1; --ok-2:#74c46e; --warn:#f9e2af; --warn-2:#f5c95b; --danger:#f38ba8; --danger-2:#e8638a;
+  --shadow:rgba(0,0,0,.45);
+}
+body{
+  margin:0 auto; padding:1.5rem 2rem 4rem; max-width:1080px;
+  font:16px/1.55 system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb,var(--accent) 10%, transparent), transparent),
+    var(--bg);
+  color:var(--fg);
+  transition:background .3s, color .3s;
+}
+.theme-btn{
+  position:sticky; top:.5rem; float:right; z-index:5;
+  cursor:pointer; user-select:none;
+  padding:.25rem .6rem; border:1px solid var(--border); border-radius:6px;
+  background:var(--surface);
+}
+h1{font-size:1.7rem; margin:.2rem 0 .3rem}
+h2{font-size:1.25rem; margin:2rem 0 .6rem; padding-bottom:.3rem; border-bottom:2px solid color-mix(in srgb,var(--accent) 40%, var(--border))}
+h3{font-size:1.05rem; margin:1.3rem 0 .4rem; color:var(--accent-2)}
+.sub{color:var(--muted); margin:.1rem 0}
+code{background:color-mix(in srgb,var(--accent) 12%, var(--surface)); padding:.08em .35em; border-radius:4px; font-size:.9em}
+table{border-collapse:collapse; width:100%; margin:.6rem 0 1rem; background:var(--surface); box-shadow:0 1px 3px var(--shadow); border-radius:8px; overflow:hidden}
+th,td{text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--border); vertical-align:top}
+th{background:color-mix(in srgb,var(--accent) 16%, var(--surface)); font-weight:600}
+tbody tr:nth-child(even){background:var(--zebra)}
+.badge{display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.8rem; font-weight:600; line-height:1.5}
+.b-ok{background:color-mix(in srgb,var(--ok) 22%, var(--surface)); color:var(--ok-2)}
+.b-warn{background:color-mix(in srgb,var(--warn) 22%, var(--surface)); color:var(--warn-2)}
+.b-crit{background:color-mix(in srgb,var(--danger) 22%, var(--surface)); color:var(--danger-2)}
+.b-prio-c{background:color-mix(in srgb,var(--danger) 22%, var(--surface)); color:var(--danger-2)}
+.b-prio-h{background:color-mix(in srgb,var(--warn) 22%, var(--surface)); color:var(--warn-2)}
+.b-prio-l{background:color-mix(in srgb,var(--accent) 18%, var(--surface)); color:var(--accent-2)}
+.note{background:color-mix(in srgb,var(--accent) 8%, var(--surface)); border-left:4px solid var(--accent); padding:.7rem 1rem; border-radius:0 8px 8px 0; margin:1rem 0}
+.note.ok{border-left-color:var(--ok)}
+.verdict{font-size:1.3rem; font-weight:700; color:var(--ok-2); display:flex; align-items:center; gap:.5rem}
+.meta-grid{display:grid; grid-template-columns:auto 1fr; gap:.25rem 1.2rem; margin:.5rem 0 1rem}
+.meta-grid dt{color:var(--muted)} .meta-grid dd{margin:0; font-family:ui-monospace,monospace}
+/* cluster block diagram */
+.flow{display:flex; flex-wrap:wrap; gap:1rem; margin:1rem 0}
+.cluster{flex:1 1 280px; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 1px 4px var(--shadow); overflow:hidden}
+.cluster header{padding:.55rem .8rem; font-weight:700; color:#fff; background:linear-gradient(120deg,var(--accent),var(--accent-2))}
+.cluster.cb header{background:linear-gradient(120deg,var(--warn),var(--warn-2))}
+.cluster.cc header{background:linear-gradient(120deg,var(--ok),var(--ok-2))}
+.cluster .body{padding:.7rem .8rem}
+.item{border:1px solid var(--border); border-radius:7px; padding:.4rem .6rem; margin:.4rem 0; background:color-mix(in srgb,var(--accent) 6%, var(--surface))}
+.item b{font-family:ui-monospace,monospace}
+.files{color:var(--muted); font-size:.82rem; font-family:ui-monospace,monospace; margin-top:.3rem}
+figure{margin:1rem 0; text-align:center}
+figcaption{color:var(--muted); font-size:.85rem; margin-top:.4rem}
+.rpt-graph svg{max-width:100%; height:auto}
+.chain{display:flex; align-items:center; gap:.6rem; font-family:ui-monospace,monospace; margin:.6rem 0}
+.chain .node{padding:.35rem .8rem; border:1px solid var(--accent); border-radius:7px; background:color-mix(in srgb,var(--accent) 10%, var(--surface))}
+.chain .arrow{color:var(--line); font-size:1.2rem}
+.chain .null{border-style:dashed; color:var(--muted)}
+.summ{display:flex; gap:1rem; flex-wrap:wrap; margin:1rem 0}
+.summ .card{flex:1 1 150px; text-align:center; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:.8rem; box-shadow:0 1px 3px var(--shadow)}
+.summ .num{font-size:1.8rem; font-weight:700}
+.summ .num.z{color:var(--ok-2)}
+</style>
+</head>
+<body>
+<input type="checkbox" id="theme-toggle" hidden>
+<label for="theme-toggle" class="theme-btn" title="Переключить тему">🌙 / ☀️</label>
+
+<main class="report">
+<h1>Проверка спецификации</h1>
+<p class="sub"><b>t38 Pipeline Robustness &amp; Correctness Fixes — Design</b></p>
+
+<dl class="meta-grid">
+  <dt>Файл</dt><dd>docs/superpowers/specs/2026-06-21-t38-pipeline-fixes-design.md</dd>
+  <dt>Дата проверки</dt><dd>2026-06-21</dd>
+  <dt>spec_hash</dt><dd>b342c02a7b3fd966</dd>
+  <dt>prev_hash</dt><dd>— (первый прогон)</dd>
+  <dt>chain.intent</dt><dd>null</dd>
+</dl>
+
+<div class="note ok">
+  <span class="verdict">✅ Вердикт: OK</span>
+  <div>Все 4 фазы пройдены. CRITICAL open = 0, WARNING open = 0. Тело спецификации не изменялось.</div>
+</div>
+
+<!-- ============ 1. РЕЗЮМЕ СПЕЦИФИКАЦИИ ============ -->
+<h2>1. Резюме спецификации — требования по секциям</h2>
+<table>
+  <thead><tr><th>Секция</th><th>Требование / содержание</th><th>Критерий приёмки (DoD)</th></tr></thead>
+  <tbody>
+    <tr><td>§1 Problem</td><td>t38 = 0.0, <code>OUTCOME_NONE_CLARIFICATION</code> за 1934 с; механический сбой PLAN (пустое тело ×2)</td><td>Контекст (диагностика, не требование)</td></tr>
+    <tr><td>§2 Root-cause</td><td>Подтверждённый механический сбой + INVESTIGATE sufficiency gap; 2 ложных диагноза помечены «НЕ баги»</td><td>Привязка к коду (reason.py:171, pipeline.py:425, cc_client.py:218, llm.py:595)</td></tr>
+    <tr><td>§3 Scope</td><td>8 пунктов в 3 кластерах: A (PLAN robustness), B (INVESTIGATE), C (Observability)</td><td>Таблица кластер→пункты→файлы→приоритет</td></tr>
+    <tr><td>§4 H1</td><td>Достижимый CC-cfg из <code>models.json</code> в <code>llm.py</code> + <code>ECOM_CC_MAX_RETRIES</code></td><td>Unit: CC получает непустой cfg; пустой вызов укладывается в одно timeout-окно (не 4)</td></tr>
+    <tr><td>§4 C2</td><td>Кросс-провайдер fallback на empty: CC → <code>anthropic/&lt;same&gt;</code> → env fallback; флаг <code>ECOM_CC_API_FALLBACK</code></td><td>Unit: mocked CC empty → диспетчеризуется anthropic retry; флаг off → нет retry</td></tr>
+    <tr><td>§4 C1</td><td>Fail-fast — покрыт H1 + C2, отдельных изменений нет</td><td>Производное от H1/C2</td></tr>
+    <tr><td>§5 H2</td><td>Детерминированный grounding governing-doc: <code>env["policy_doc:&lt;path&gt;"]=true</code> в коде + pre-router приоритет</td><td>Unit: чтение governing-doc на mock VM ставит env-ключ без LLM; <code>sufficient()</code> = true</td></tr>
+    <tr><td>§5 H3</td><td>Authority-confirmed сигнал вместо 3DS-proxy; усилен правилом <code>r015</code>; без <code>data/prompts/</code>-патча</td><td>Интеграционный re-run t38 (записи по confirmed-сигналу) — gate §7</td></tr>
+    <tr><td>§5 M3</td><td>Слияние <code>digest(N)</code> + <code>router(N+1)</code> в один LLM-вызов (3→~2 на шаг)</td><td>Unit: merged-вызов возвращает digest-поля и next action; sufficiency в пределах MAX_STEPS</td></tr>
+    <tr><td>§6 M1</td><td>Cache-токены (<code>cache_read</code>/<code>cache_creation</code>) в run-summary</td><td>Verify: summary CC-прогона показывает ненулевые cache-колонки</td></tr>
+    <tr><td>§6 M2</td><td>parsed_output в trace для INTENT/PLAN (сейчас всегда None, llm.py:621)</td><td>Verify: trace-событие успешного INTENT несёт non-null parsed_output</td></tr>
+    <tr><td>§8 Env</td><td>Новые переменные: <code>ECOM_CC_MAX_RETRIES=1</code>, <code>ECOM_CC_API_FALLBACK=1</code></td><td>Таблица var→default→назначение</td></tr>
+    <tr><td>§9 Non-goals</td><td>Нет patch <code>data/prompts/</code>; нет правки кэш-семантики; нет переработки envelope-парсера; не исследуется первопричина пустого CC</td><td>Явный out-of-scope</td></tr>
+    <tr><td>§10 Order</td><td>Порядок реализации: Cluster A → B → C</td><td>Упорядочено по риску</td></tr>
+  </tbody>
+</table>
+
+<h3>Success Criteria (§7 Verification strategy)</h3>
+<table>
+  <thead><tr><th>#</th><th>Критерий</th></tr></thead>
+  <tbody>
+    <tr><td>SC-1 (Unit)</td><td><code>uv run python -m pytest tests/ -v</code> — focused-тест на каждый фикс (CC cfg resolution, empty→fallback, det. doc-grounding, merged investigate call, summary cache columns, parsed_output threading)</td></tr>
+    <tr><td>SC-2 (Integration gate)</td><td>re-run t38 против live grader (<code>make task TASKS='t38'</code>), ожидаемо <code>score 0 → 1.0</code>. Cluster A — необходим, Cluster B — достаточен для верного ответа</td></tr>
+    <tr><td>SC-3 (Caveat)</td><td>grader-прогоны медленные; <code>pgrep</code> перед timed-прогонами; не убивать прогоны другой сессии</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ 2. СХЕМЫ РЕШЕНИЯ И ЗАВИСИМОСТЕЙ ============ -->
+<h2>2. Схемы решения и зависимостей</h2>
+
+<h3>Схема решения — три кластера и затрагиваемые файлы</h3>
+<div class="flow">
+  <section class="cluster ca">
+    <header>Cluster A — PLAN robustness &nbsp;<span class="badge b-prio-c">🔴 critical</span></header>
+    <div class="body">
+      <div class="item"><b>H1</b> — достижимый CC-cfg + bounded retries</div>
+      <div class="item"><b>C2</b> — кросс-провайдер fallback на empty</div>
+      <div class="item"><b>C1</b> — fail-fast (производное H1+C2)</div>
+      <div class="files">agent/llm.py · agent/cc_client.py · agent/reason.py</div>
+    </div>
+  </section>
+  <section class="cluster cb">
+    <header>Cluster B — INVESTIGATE correctness &nbsp;<span class="badge b-prio-h">🟠 high</span></header>
+    <div class="body">
+      <div class="item"><b>H2</b> — детерминированный grounding governing-doc</div>
+      <div class="item"><b>H3</b> — authority-confirmed сигнал вместо proxy</div>
+      <div class="item"><b>M3</b> — слияние digest + next-router</div>
+      <div class="files">agent/investigate.py (+ LEARN-канал)</div>
+    </div>
+  </section>
+  <section class="cluster cc">
+    <header>Cluster C — Observability &nbsp;<span class="badge b-prio-l">🟡 low</span></header>
+    <div class="body">
+      <div class="item"><b>M1</b> — cache-токены в run-summary</div>
+      <div class="item"><b>M2</b> — parsed_output в trace (INTENT/PLAN)</div>
+      <div class="files">agent/trace.py · run-summary builder</div>
+    </div>
+  </section>
+</div>
+<p class="sub">Порядок реализации (§10): Cluster A → Cluster B → Cluster C (по возрастанию риска / убыванию приоритета).</p>
+
+<h3>Граф зависимостей требований</h3>
+<figure class="rpt-graph">
+  <svg viewBox="0 0 560 260" width="560" role="img" aria-label="граф зависимостей требований">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+      </marker>
+    </defs>
+    <!-- edges: H3 -> H2 ; C1 -> H1 ; C1 -> C2 ; SC-2(gate) -> H3 -->
+    <line x1="150" y1="60" x2="80"  y2="60"  stroke="var(--line)" stroke-width="2" marker-end="url(#arr)"/>
+    <line x1="320" y1="130" x2="80" y2="60"  stroke="var(--line)" stroke-width="2" marker-end="url(#arr)"/>
+    <line x1="320" y1="130" x2="80" y2="130" stroke="var(--line)" stroke-width="2" marker-end="url(#arr)"/>
+    <line x1="300" y1="200" x2="180" y2="78"  stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+    <!-- Cluster A nodes -->
+    <g><circle cx="55" cy="60" r="26" fill="color-mix(in srgb,var(--danger) 18%, var(--surface))" stroke="var(--danger-2)" stroke-width="2"/><text x="55" y="64" text-anchor="middle" font-size="13" font-weight="700" fill="var(--fg)">H1</text></g>
+    <g><circle cx="55" cy="130" r="26" fill="color-mix(in srgb,var(--danger) 18%, var(--surface))" stroke="var(--danger-2)" stroke-width="2"/><text x="55" y="134" text-anchor="middle" font-size="13" font-weight="700" fill="var(--fg)">C2</text></g>
+    <g><circle cx="170" cy="60" r="26" fill="color-mix(in srgb,var(--danger) 18%, var(--surface))" stroke="var(--danger-2)" stroke-width="2"/><text x="170" y="64" text-anchor="middle" font-size="12" font-weight="700" fill="var(--fg)">H2</text></g>
+    <g><circle cx="345" cy="130" r="26" fill="color-mix(in srgb,var(--warn) 20%, var(--surface))" stroke="var(--warn-2)" stroke-width="2"/><text x="345" y="134" text-anchor="middle" font-size="12" font-weight="700" fill="var(--fg)">C1</text></g>
+    <g><circle cx="345" cy="60" r="26" fill="color-mix(in srgb,var(--warn) 20%, var(--surface))" stroke="var(--warn-2)" stroke-width="2"/><text x="345" y="64" text-anchor="middle" font-size="12" font-weight="700" fill="var(--fg)">H3</text></g>
+    <g><circle cx="325" cy="218" r="24" fill="color-mix(in srgb,var(--accent) 16%, var(--surface))" stroke="var(--accent)" stroke-width="2"/><text x="325" y="222" text-anchor="middle" font-size="10" font-weight="700" fill="var(--fg)">gate §7</text></g>
+    <!-- standalone -->
+    <g><circle cx="470" cy="50" r="26" fill="color-mix(in srgb,var(--ok) 18%, var(--surface))" stroke="var(--ok-2)" stroke-width="2"/><text x="470" y="54" text-anchor="middle" font-size="12" font-weight="700" fill="var(--fg)">M3</text></g>
+    <g><circle cx="470" cy="120" r="26" fill="color-mix(in srgb,var(--ok) 18%, var(--surface))" stroke="var(--ok-2)" stroke-width="2"/><text x="470" y="124" text-anchor="middle" font-size="12" font-weight="700" fill="var(--fg)">M1</text></g>
+    <g><circle cx="470" cy="190" r="26" fill="color-mix(in srgb,var(--ok) 18%, var(--surface))" stroke="var(--ok-2)" stroke-width="2"/><text x="470" y="194" text-anchor="middle" font-size="12" font-weight="700" fill="var(--fg)">M2</text></g>
+  </svg>
+  <figcaption>Рёбра «зависит от»: H3 → H2 (governing-doc сначала прочитан), C1 → {H1, C2} (fail-fast — производное), gate §7 → H3 (интеграционный re-run валидирует). M1, M2, M3 — самостоятельные.</figcaption>
+</figure>
+
+<h3>Карта покрытия — задача → требование(я) спеки</h3>
+<table>
+  <thead><tr><th>Задача (из §1–§2)</th><th>Покрывающее(ие) требование(я)</th><th>Кластер</th></tr></thead>
+  <tbody>
+    <tr><td>Пустое тело PLAN → ~732 с на вызов</td><td>H1 (достижимый cfg + bounded retries)</td><td><span class="badge b-prio-c">A</span></td></tr>
+    <tr><td>Fallback не сработал (env unset)</td><td>C2 (код-fallback CC→anthropic→env)</td><td><span class="badge b-prio-c">A</span></td></tr>
+    <tr><td>2 пустых подряд → CLARIFICATION (нет fail-fast)</td><td>C1 (= H1 + C2)</td><td><span class="badge b-prio-c">A</span></td></tr>
+    <tr><td>INVESTIGATE sufficiency gap (policy_doc от LLM-digest)</td><td>H2 (детерминированный env-ключ + pre-router)</td><td><span class="badge b-prio-h">B</span></td></tr>
+    <tr><td>Записи выбраны по 3DS-proxy, не по confirmed-сигналу</td><td>H3 (authority-confirmed) + правило r015</td><td><span class="badge b-prio-h">B</span></td></tr>
+    <tr><td>3 LLM-вызова на шаг INVESTIGATE (стоимость)</td><td>M3 (слияние digest + next-router)</td><td><span class="badge b-prio-h">B</span></td></tr>
+    <tr><td>Плоский tokens_in (cache-поля игнорируются)</td><td>M1 (cache-колонки в summary)</td><td><span class="badge b-prio-l">C</span></td></tr>
+    <tr><td>parsed_output=null в trace</td><td>M2 (threading parsed-объекта)</td><td><span class="badge b-prio-l">C</span></td></tr>
+  </tbody>
+</table>
+<div class="note">Каждая задача из §1–§2 покрыта ≥1 требованием; «лишних» требований нет. Два ранних ложных диагноза (token accounting, parsed_output=null by design) явно помечены «НЕ баги» и вынесены в §9 Non-goals — противоречий нет.</div>
+
+<!-- ============ 3. РЕЗУЛЬТАТЫ ПРОВЕРКИ ============ -->
+<h2>3. Результаты проверки</h2>
+<table>
+  <thead><tr><th>Фаза</th><th>Чек-лист</th><th>Статус</th></tr></thead>
+  <tbody>
+    <tr><td><b>structure</b></td><td>Плейсхолдеры (нет TODO/TBD/???/FIXME); внутр. ссылки (§7 → существует); нумерация 1–10 (без пропусков/дублей); дубли заголовков (нет)</td><td><span class="badge b-ok">passed</span></td></tr>
+    <tr><td><b>coverage</b></td><td>Каждая задача §1–§2 покрыта ≥1 требованием; нет «лишних» требований; нет противоречий (ложные диагнозы в §9)</td><td><span class="badge b-ok">passed</span></td></tr>
+    <tr><td><b>clarity</b></td><td>У каждого фикса явные Goal + Verify (DoD); количественные границы (≤ one timeout window, 180→732 с, defaults 1); термины (H1/C2/H2…) согласованы</td><td><span class="badge b-ok">passed</span></td></tr>
+    <tr><td><b>consistency</b></td><td>Первый прогон — базлайн хешей 21 секции записан; изменившихся секций нет</td><td><span class="badge b-ok">passed</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Findings</h3>
+<table>
+  <thead><tr><th>id</th><th>severity</th><th>section</th><th>text</th><th>verdict</th></tr></thead>
+  <tbody>
+    <tr><td colspan="5" style="text-align:center; color:var(--muted)">— findings нет (пустой список) —</td></tr>
+  </tbody>
+</table>
+
+<h3>Сводка</h3>
+<div class="summ">
+  <div class="card"><div class="num z">0</div><div>CRITICAL open</div></div>
+  <div class="card"><div class="num z">0</div><div>WARNING open</div></div>
+  <div class="card"><div class="num z">4 / 4</div><div>фаз passed</div></div>
+  <div class="card"><div class="num z">OK</div><div>вердикт</div></div>
+</div>
+
+<h3>Chain</h3>
+<div class="chain">
+  <span class="node null">intent: null</span>
+  <span class="arrow">→</span>
+  <span class="node">spec: 2026-06-21-t38-pipeline-fixes-design.md</span>
+</div>
+<p class="sub">Intent-документ для t38 не найден (<code>docs/superpowers/intents/</code> не содержит *t38*intent.md), поэтому <code>chain.intent = null</code>. Это не блокирует проверку.</p>
+
+<div class="note ok"><b>Итог:</b> спецификация прошла все 4 фазы без findings. Блок <code>review:</code> записан во frontmatter (<code>spec_hash: b342c02a7b3fd966</code>), тело документа ниже второго <code>---</code> не изменялось. IDD phase-gate разблокирует следующую фазу (writing-plans).</div>
+
+</main>
+</body>
+</html>

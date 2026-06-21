@@ -1,3 +1,16 @@
+---
+review:
+  spec_hash: b342c02a7b3fd966
+  last_run: 2026-06-21
+  phases:
+    structure:    { status: passed }
+    coverage:     { status: passed }
+    clarity:      { status: passed }
+    consistency:  { status: passed }
+  findings: []
+chain:
+  intent: null
+---
 # t38 Pipeline Robustness & Correctness Fixes — Design
 
 **Date:** 2026-06-21
