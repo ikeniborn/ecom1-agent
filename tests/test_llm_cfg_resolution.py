@@ -51,3 +51,17 @@ def test_call_llm_raw_unknown_model_keeps_empty_cfg(monkeypatch):
     monkeypatch.setattr(llm, "_call_raw_single_model", _fake_single)
     llm.call_llm_raw([], "u", "no/such-model", {}, max_tokens=8, phase="PLAN")
     assert captured["cfg"] == {}
+
+
+def test_fallback_model_dispatched_when_primary_returns_none(monkeypatch):
+    monkeypatch.setattr(llm, "_FALLBACK_MODEL", "anthropic/claude-sonnet-4-6")
+    seen = []
+
+    def _fake_single(system, user, model, cfg, **kw):
+        seen.append(model)
+        return None if model == "claude-code/sonnet" else "recovered"
+
+    monkeypatch.setattr(llm, "_call_raw_single_model", _fake_single)
+    out = llm.call_llm_raw([], "u", "claude-code/sonnet", {}, max_tokens=8, phase="PLAN")
+    assert out == "recovered"
+    assert seen == ["claude-code/sonnet", "anthropic/claude-sonnet-4-6"]
