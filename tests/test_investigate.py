@@ -70,6 +70,7 @@ def test_is_readonly_allows_bin_id():
     assert is_readonly("exec", {"path": "/bin/id"})
     assert is_readonly("exec", {"path": "/bin/id", "stdin": ""})
     assert is_readonly("exec", {"path": "/BIN/ID"})            # case-normalised
+    assert is_readonly("exec", {"path": "/bin/id", "stdin": "ignored by id"})
 
 
 def test_run_tool_dispatches_bin_id_identity_probe():

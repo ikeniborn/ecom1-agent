@@ -74,7 +74,7 @@ class MockVMSpy:
         # args; key the lookup on [stdin] so fixtures recorded under the SQL string match.
         lookup_args = args_list or ([stdin] if stdin else None)
         result = self._lookup("Exec", path, lookup_args)
-        mutated = path.startswith("/bin/") and path != "/bin/sql"
+        mutated = path.startswith("/bin/") and path not in ("/bin/sql", "/bin/id")
         self._emit("Exec", {"path": path, "args": args_list, "stdin": stdin}, result,
                    mutated=mutated)
         return result
