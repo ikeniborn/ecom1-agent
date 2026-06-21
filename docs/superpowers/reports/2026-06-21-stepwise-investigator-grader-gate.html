@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stepwise Investigator — Grader Gate (Task 15)</title>
+<style>
+  body{font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;max-width:920px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
+  h1{font-size:1.5rem;border-bottom:2px solid #ddd;padding-bottom:.3rem}
+  h2{font-size:1.15rem;margin-top:1.6rem}
+  table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:14px}
+  th,td{border:1px solid #ccc;padding:6px 10px;text-align:right}
+  th:first-child,td:first-child{text-align:left}
+  thead{background:#f4f4f4}
+  .ok{color:#197a19;font-weight:600}
+  .bad{color:#b30000;font-weight:600}
+  .note{background:#fafafa;border-left:3px solid #888;padding:.5rem .9rem;margin:.8rem 0}
+  code{background:#f0f0f0;padding:1px 4px;border-radius:3px}
+</style>
+</head>
+<body>
+<h1>Stepwise Investigator — Real Grader Gate (Task 15)</h1>
+<p><strong>Date:</strong> 2026-06-21 · <strong>Branch:</strong> heuristics · <strong>Model:</strong> <code>deepseek-v4-flash:cloud</code> · <strong>Live BitGN grader</strong></p>
+<p>Baseline (<code>ECOM_INVESTIGATE_ENABLED=0</code>, eager pre-phase gather + legacy whole-instruction oracle dump) vs. treatment (<code>=1</code>, slim seed + read-only INVESTIGATE ReAct → brief). One StartRun→SubmitRun per cell.</p>
+
+<h2>Results</h2>
+<table>
+<thead><tr><th>Run</th><th>Score</th><th>PLAN prompt chars</th><th>Cycles</th><th>Tokens in/out*</th><th>Task time</th><th>Wall clock</th></tr></thead>
+<tbody>
+<tr><td>t38 OFF (baseline)</td><td class="bad">0.00</td><td>~29,100</td><td>3</td><td>34,032 / 18,469</td><td>148.5s</td><td>3:02</td></tr>
+<tr><td>t38 ON (treatment)</td><td class="bad">0.00</td><td><strong>11,597</strong></td><td>1</td><td>9,711 / 16,966</td><td>112.0s</td><td>2:16</td></tr>
+<tr><td>t01 OFF (baseline)</td><td class="bad">0.00</td><td>~28,400</td><td>5</td><td>50,955 / 27,597</td><td>598.0s</td><td>10:13</td></tr>
+<tr><td>t01 ON (treatment)</td><td class="bad">0.00</td><td><strong>12,623</strong></td><td>6</td><td>51,513 / 36,606</td><td>305.5s</td><td>5:22</td></tr>
+</tbody>
+</table>
+<p style="font-size:13px;color:#555">* Reported tokens count INTENT/PLAN/iLEARN only; the investigator's FAST-tier router/digest calls are NOT accumulated into these figures (pipeline <code>_accum</code> threads token_out only for INTENT/PLAN/iLEARN), so treatment's true token spend is higher than the in/out shown.</p>
+
+<h2>Success-criteria assessment (from the spec)</h2>
+<ul>
+<li><span class="ok">PASS</span> — PLAN prompt chars drop sharply ON vs OFF: t38 ~29.1k→11.6k (−60%), t01 ~28.4k→12.6k (−55%). The slim-seed + focused-brief hypothesis is confirmed mechanically.</li>
+<li><span class="ok">PASS</span> — No 492 s-class CC timeout on PLAN (and none possible here: the active model is deepseek-flash, not the Claude Code tier).</li>
+<li><span class="ok">PASS</span> — Fewer/cheaper cycles &amp; wall-clock: t38 3→1 cycles, 3:02→2:16; t01 wall 10:13→5:22 (~half).</li>
+<li><span class="bad">FAIL</span> — <strong>t38 score did NOT improve from 0 to &gt; 0.</strong> Both baseline and treatment return <code>OUTCOME_DENIED_SECURITY</code> (expected <code>OUTCOME_OK</code>).</li>
+<li><span class="ok">no regression</span> — t01 ON did not drop a passing score, but t01 was <em>already failing</em> at baseline (0.00) with this model, so the spot-check is only weakly informative.</li>
+</ul>
+
+<h2>Diagnosis (from the treatment trace)</h2>
+<p>The decisive criterion failed. Root cause is <strong>not</strong> context overload, so the investigator (a context-efficiency mechanism) cannot fix it:</p>
+<ol>
+<li><strong>The baseline fails with full context too.</strong> t38 OFF carries the entire eager facts dump (all doc bodies + identity + samples, ~29k chars) and still returns DENIED_SECURITY. The failure is a decision/grounding error, not floundering-from-overload. Shrinking the prompt (the investigator's job) is therefore not expected to flip it — and didn't.</li>
+<li><strong>Weak model.</strong> The benchmark ran on <code>deepseek-v4-flash:cloud</code>, which fails <em>both</em> t38 and t01 at baseline. The plan's t38 fix presumed a Claude-Code-tier timeout/floundering symptom; under this model the bottleneck is reasoning capability, not prompt size. t38 is also a known-hard task (prior note: fraud "impossible-leg" caps ~73%).</li>
+<li><strong>Investigator flaw surfaced (minor, not the t38 root cause).</strong> In the t38 ON brief, the router correctly read <code>/docs/security.md</code> then tried <code>/bin/id</code> to confirm identity — but <code>is_readonly</code> rejects all <code>exec</code> except <code>/bin/sql</code>, so <code>/bin/id</code> was rejected twice and the router gave up (<code>done</code>). The brief bound only <code>policy_doc:/docs/security.md</code> and never the identity. This is wasted steps + brief noise, <em>not</em> the t38 score cause: the slim seed still gathers identity into <code>facts.identity</code> (kept in both modes), which reaches PLAN regardless — and PLAN still denied. Still, <code>/bin/id</code> is a legitimate read-only identity probe the investigator should be allowed to run on demand.</li>
+</ol>
+
+<h2>Verdict</h2>
+<p>The INVESTIGATE feature (Tasks 1–14) is <strong>implemented and works as designed</strong>: it builds a compact brief, runs strictly read-only, cuts the PLAN prompt ~55–60%, reduces cycles/wall-clock, traces under the INVESTIGATE phase, and degrades gracefully — all behind <code>ECOM_INVESTIGATE_ENABLED</code> with the <code>=0</code> baseline preserved exactly (108 deterministic-core tests + 30 investigator unit tests green). The mechanical efficiency goals are met. The hoped-for <strong>t38 score flip (0→&gt;0) was not achieved</strong> on this model run, because the t38 failure is decision/capability-bound, not context-bound.</p>
+
+<h2>Recommendations (not done here — for a follow-up decision)</h2>
+<ul>
+<li>Allow <code>/bin/id</code> (and only that) in <code>investigate.is_readonly</code> exec whitelist — it is a read-only identity probe; today the investigator wastes steps on it. Small, well-scoped; will <em>not</em> by itself flip t38 (identity already flows via the slim seed).</li>
+<li>Re-run the gate on a stronger model (Claude tier) before judging the t38 hypothesis — the plan's floundering/timeout premise targets the CC tier, not deepseek-flash.</li>
+<li>t38's DENIED_SECURITY decision is a LEARN/oracle + model-capability problem, not a pre-phase problem; pursue it via the LEARN rule (never <code>data/prompts/</code>), separately from this feature.</li>
+</ul>
+</body>
+</html>
