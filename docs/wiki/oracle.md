@@ -26,7 +26,7 @@ Flow: `k = ORACLE_K` (default 4), `topn = ORACLE_TOPN` (default 10). `_cosine_to
 
 `_cosine_topn` (`agent/oracle.py:63`) embeds the query (`prefix="search_query"`) and every active atom (`prefix="search_document"`, cached by content hash), scores them with cosine similarity, and keeps the top-N.
 
-`ECOM_ORACLE_FLOOR` (default 0.5) is a hard cutoff: any candidate scoring below the floor is discarded (logged at `ECOM_LOG_LEVEL=DEBUG`). Only `status == "active"` atoms are considered (`_active`, `agent/oracle.py:51`). `_cosine` (`agent/oracle.py:17`) returns 0.0 for empty/zero-norm vectors.
+`ECOM_ORACLE_FLOOR` (default 0.5) is a hard cutoff: any candidate scoring below the floor is discarded (logged at `ECOM_LOG_LEVEL=DEBUG`). Only `status == "active"` atoms are considered (`_active`, `agent/oracle.py:51`) — plus any atom whose id appears in `ECOM_ORACLE_FORCE_ACTIVE`, a comma-separated transient seam that makes one freshly-distilled `candidate` retrievable during efficacy validation without mutating its persisted status (see [[oracle#Efficacy Validation via Full Run]]). `_cosine` (`agent/oracle.py:17`) returns 0.0 for empty/zero-norm vectors.
 
 ## Stage-2: LLM Re-rank
 
@@ -56,6 +56,12 @@ A non-dict response or one with empty `content` yields `None`. Otherwise it buil
 
 It builds an answer via `interpret(plan, intent, vm, facts=None)` and runs it through `grade_candidate` (`agent/oracle_validate.py:27`), which serializes harness trials: start the target trial, answer it, then `end_trial` immediately to lock DONE-with-answer before later trials start. `parse_score` extracts the score from the matching trial. Known limitation: plans whose predicates read `$_facts.*` degrade on the fresh facts-less VM and may under-promote (conservative by design). `ECOM_ORACLE_VALIDATE_INLINE=1` (default) gates this inline pass.
 
+## Efficacy Validation via Full Run
+
+`validate_atom_via_full_run(atom, task_id, min_score=1.0)` (`agent/oracle_validate.py:109`) is a stronger efficacy gate than `validate_atom_via_grader`: instead of replaying a fixed plan, it re-runs the source task **end-to-end through the whole agent** with the candidate atom force-active, so the atom must actually help the live PLAN reach a grader score of `min_score`. Best-effort — any failure returns `False`, leaving the atom a candidate; it never raises. It is the default `validate_fn` of the teach bridge (see [[harness-to-oracle#Validation via full run]]).
+
+`grade_full_run(task_id, force_active_id)` (`agent/oracle_validate.py:78`) drives it: a fresh `StartRun`, then for the matching trial it sets `ECOM_ORACLE_FORCE_ACTIVE=force_active_id` around a full `run_agent(...)` call (cleared in a `finally`, even on error) and returns `parse_score`. Unlike `grade_candidate` the agent answers the VM itself, so there is no `vm.answer` here. `run_agent` is imported lazily to break the `orchestrator → pipeline → oracle_validate` import cycle. The force-active env is read by `_active` (see [[oracle#Stage-1: Cosine Top-N]]), making the just-persisted candidate retrievable into PLAN for exactly that one run.
+
 ## Promote (Inline)
 
 `promote()` (`agent/oracle.py:137`) flips a candidate atom to `active`, stamping `validated_by` and `validated_at`, then persists the bank. On the success path it is called after `validate_atom_via_grader` confirms an improvement (distill → validate → promote). See [[pipeline]].
@@ -65,6 +71,10 @@ It builds an answer via `interpret(plan, intent, vm, facts=None)` and runs it th
 `agent/promote.py` is a separate offline distill→candidate→promote pass — score is only visible post-`SubmitRun`, so this never runs on production tasks. `run_promote` (`agent/promote.py:50`) iterates candidates, runs a baseline and a candidate-active pass over `source ∪ green-suite`, and applies `promote_decision`.
 
 `promote_decision` (`agent/promote.py:28`) returns `halt` if any green-suite task regressed below its reference, `promote` if green held AND the source task improved over baseline, else `no_improve`. Only `promote` calls `oracle.promote`; any run error leaves the candidate untouched (fail-safe). `load_green_suite` reads `data/oracle/green_suite.yaml` and raises if missing — the gate must never silently proceed. A warning fires when `active > 10` but `ORACLE_TOPN >= active` (top-N must drop below the bank for cosine to filter).
+
+## Teach bridge from hot lint checks
+
+`scripts/harness_to_oracle.py` is a separate offline pass that seeds the bank from the lint registry rather than from working plans: it distils a `method` atom from each frequently-firing check, validates it with a full grader run, and promotes on score 1.0. See [[harness-to-oracle]], [[harness]].
 
 ## Environment Knobs
 
@@ -79,5 +89,6 @@ The `ORACLE_*` family tunes retrieval and the distill/promote lifecycle. All are
 | `ECOM_ORACLE_RANK_ENABLED` | 1 | `0` → skip LLM re-rank, use cosine top-k |
 | `ECOM_ORACLE_DISTILL` | 0 | `1` → distill a candidate atom on success |
 | `ECOM_ORACLE_VALIDATE_INLINE` | 1 | `1` → grader-validate + promote inline |
+| `ECOM_ORACLE_FORCE_ACTIVE` | (unset) | Comma-separated atom ids forced retrievable in `_active` for one efficacy run |
 | `ECOM_MODEL_EMBED` | nomic-embed-text | Embedding model id |
 | `ECOM_MODEL_RANK` | `ECOM_MODEL` | Stage-2 re-rank model |

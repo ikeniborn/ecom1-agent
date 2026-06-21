@@ -33,3 +33,7 @@ When `ECOM_HARNESS_VALIDATE_INLINE=1` (default `1`, effective only with `ECOM_HA
 ## harness_validate.py
 
 `agent/harness_validate.py` is the validation gate for candidate check-specs (mirroring `oracle_validate.py`). `validate_check_via_grader(check, failing_plan, good_plan) -> bool` resolves the handler via `harness.handler_for(check["kind"])`, runs it against both plans, and returns `True` only when the handler flags the bad plan and does not flag the good one. No live grader round-trip is needed for structural checks — unlike oracle atoms, checks are evaluated purely over the `PlanIR` structure. See [[oracle]] for the parallel oracle validation pattern.
+
+## Teach bridge to the oracle
+
+A repeatedly-firing check signals a recurring PLAN mistake worth teaching against positively. The offline `scripts/harness_to_oracle.py` bridge selects hot checks from lint telemetry and distils each into a validated `method` atom in the oracle bank, turning a negative lint signal into positive PLAN guidance. See [[harness-to-oracle]].
