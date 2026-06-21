@@ -377,6 +377,30 @@ def test_enrich_prim_error_idempotent():
     assert pipeline._enrich_prim_error(enriched) == enriched
 
 
+def test_enrich_prim_error_lint_compute_form():
+    # check_compute_on_raw_discovery_bind emits "... (compute 'X' arg $root)"
+    from agent import pipeline
+    out = pipeline._enrich_prim_error("plan: bad source (compute 'column' arg $rows)")
+    assert "CONTRACT:" in out
+    assert "column(rows, col)" in out          # column's contract appended
+
+
+def test_enrich_prim_error_lint_contract_message():
+    # primitive_contract spec messages lead with the quoted primitive
+    from agent import pipeline
+    out = pipeline._enrich_prim_error(
+        "plan: 'column' expects list[dict]; use 'get'+'to_number' for a single row"
+    )
+    assert "CONTRACT:" in out
+    assert "column(rows, col)" in out          # first known primitive wins, not 'get'/'to_number'
+
+
+def test_enrich_prim_error_quoted_nonprimitive_noop():
+    from agent import pipeline
+    msg = "verify: missing ref 'foobar'"
+    assert pipeline._enrich_prim_error(msg) == msg     # 'foobar' is not a primitive
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader

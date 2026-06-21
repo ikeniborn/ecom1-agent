@@ -97,13 +97,23 @@ def _is_retryable_vm_error(msg: str) -> bool:
 
 
 def _enrich_prim_error(err: str) -> str:
-    """Append the failed primitive's contract to a compute/arity error so the retry sees
-    the spec, not just the symptom. No-op when the message names no known primitive."""
+    """Append the failed primitive's contract so the retry sees the spec, not just the
+    symptom. Matches the runtime forms ("compute step 'X'", "primitive 'X'") and the lint
+    forms ("compute 'X'", "'X' expects ..."). No-op when the message names no known
+    primitive (contract() is empty for non-primitives, so a stray quoted word is safe)."""
     import re as _re
     from .primitives import contract
-    m = _re.search(r"(?:compute step|primitive) '([a-z_]+)'", err)
-    if m:
-        c = contract(m.group(1))
+    m = _re.search(r"(?:compute(?: step)?|primitive) '([a-z_]+)'", err)
+    prim = m.group(1) if m else None
+    if prim is None:
+        # lint primitive_contract messages lead with the quoted primitive, e.g.
+        # "'column' expects list[dict]; use 'get'..." — first quoted token that is a primitive.
+        for tok in _re.findall(r"'([a-z_]+)'", err):
+            if contract(tok):
+                prim = tok
+                break
+    if prim:
+        c = contract(prim)
         if c and c not in err:
             return f"{err}\nCONTRACT: {c}"
     return err
