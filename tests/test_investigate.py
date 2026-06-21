@@ -388,3 +388,52 @@ def test_investigate_steps_appear_in_trace(monkeypatch, tmp_path):
     assert vm_calls, "investigator VM call not captured in trace"
     assert any(r.get("rpc") == "Read" for r in vm_calls)
     assert any(r.get("step_type") == "INVESTIGATE" for r in vm_calls)   # tagged as the investigate phase
+
+
+def test_investigate_probes_seed_data_path_and_records(monkeypatch):
+    intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
+    vm = MockVMSpy({fixture_key("List", "/proc/payments"): {"entries": "p_1.json\np_2.json"}})
+    # router would end immediately, but the forced data-probe runs FIRST (higher priority).
+    monkeypatch.setattr(inv, "router", lambda i, b, atoms, escalate: {"done": True})
+    monkeypatch.setattr(inv, "digest",
+                        lambda goal, tool, args, observation, escalate: (
+                            Note(tool=tool, args=args, lesson="listed dir"), {}))
+    brief = inv.investigate(vm, intent, data_paths=["/proc/payments"], max_steps=6)
+    assert "/proc/payments" in brief.env.get("data_paths", {})       # recorded
+    assert any(c[0] == "List" for c in vm.calls)                     # dir probed via list
+
+
+def test_investigate_data_paths_inert_when_flag_off(monkeypatch):
+    # data_paths=None (flag off) -> no probe, router decides immediately, no data_paths env
+    intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
+    vm = MockVMSpy({})
+    monkeypatch.setattr(inv, "router", lambda i, b, atoms, escalate: {"done": True})
+    brief = inv.investigate(vm, intent, max_steps=6)
+    assert "data_paths" not in brief.env
+    assert not any(c[0] == "List" for c in vm.calls)
+
+
+def test_investigate_emits_stop_trace(tmp_path, monkeypatch):
+    import json
+    from agent import trace
+    logpath = tmp_path / "t.jsonl"
+    logger = trace.TraceLogger(path=logpath, task_id="tT")
+    trace.set_trace(logger)
+    try:
+        intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
+                            outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
+        vm = MockVMSpy({fixture_key("List", "/proc/payments"): {"entries": "p_1.json"}})
+        monkeypatch.setattr(inv, "router", lambda i, b, atoms, escalate: {"done": True})
+        monkeypatch.setattr(inv, "digest",
+                            lambda goal, tool, args, observation, escalate: (Note(tool=tool), {}))
+        inv.investigate(vm, intent, data_paths=["/proc/payments"], max_steps=6)
+    finally:
+        logger.close(); trace.set_trace(None)
+    recs = [json.loads(l) for l in logpath.read_text(encoding="utf-8").splitlines() if l.strip()]
+    stop = [r for r in recs if r.get("type") == "investigate_stop"]
+    assert stop, "no investigate_stop record emitted"
+    assert stop[-1]["data_paths_total"] == 1
+    assert stop[-1]["data_paths_probed"] == 1
+    assert stop[-1]["reason"] == "data_probed"
