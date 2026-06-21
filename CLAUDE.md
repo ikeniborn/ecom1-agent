@@ -57,6 +57,7 @@ Copy `.env.example` → `.env` (single source for config AND credentials; gitign
 | `ECOM_INVESTIGATE_MAX_STEPS` | Step budget for the investigator ReAct loop (default 6). |
 | `ECOM_INVESTIGATE_ORACLE_K` | Oracle atoms retrieved per investigator step, scoped to the step goal (default 2). |
 | `ECOM_MODEL_INVESTIGATE` | Per-phase model override for INVESTIGATE (defaults to its tier → `ECOM_MODEL_FAST`). Router/digest steps run on the FAST tier and escalate to REASON on a deterministic stall. |
+| `ECOM_INVESTIGATE_DATA_PATHS` | `1` → INVESTIGATE probes seed data-paths (instruction absolute-path literals ∪ learned `prephase_deep_read` paths) into `brief.env["data_paths"]` before stopping; `sufficient()` then requires every seed probed (or step budget). Default `0` → no seed, no probe, pre-feature behaviour. Emits an `investigate_stop` trace record either way for A/B measurement. |
 
 Credentials (`ECOM_ANTHROPIC_API_KEY`, `ECOM_OPENROUTER_API_KEY`, `ECOM_OLLAMA_API_KEY`, `ECOM_BITGN_API_KEY`) live in `.env` (single source; gitignored). There is no separate `.secrets` file. The agent reads `ECOM_`-prefixed keys ONLY — a stray system `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` can never leak into a call.
 

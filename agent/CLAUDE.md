@@ -18,7 +18,7 @@ Key env vars (authoritative table is the root `../CLAUDE.md`):
 - `ECOM_MODEL` — primary LLM (e.g. `anthropic/claude-sonnet-4-6`)
 - `ECOM_MODEL_REASON` / `ECOM_MODEL_FAST` — model tiers (see routing below)
 - `ECOM_INTERPRETER_MAX_STEPS` — interpreter cycle ceiling (default 6)
-- `ECOM_INVESTIGATE_ENABLED` / `ECOM_INVESTIGATE_MAX_STEPS` / `ECOM_INVESTIGATE_ORACLE_K` / `ECOM_MODEL_INVESTIGATE` — INVESTIGATE phase controls (see root `../CLAUDE.md`)
+- `ECOM_INVESTIGATE_ENABLED` / `ECOM_INVESTIGATE_MAX_STEPS` / `ECOM_INVESTIGATE_ORACLE_K` / `ECOM_MODEL_INVESTIGATE` / `ECOM_INVESTIGATE_DATA_PATHS` — INVESTIGATE phase controls (see root `../CLAUDE.md`)
 
 ## Agent Package Architecture
 
