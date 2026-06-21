@@ -311,6 +311,21 @@ class TraceLogger:
             "reason": reason or "",
         })
 
+    def log_lint_fire(self, cycle: int, check_id: str, kind: str,
+                      severity: str, blocking: bool, message: str) -> None:
+        """One fired lint check-spec (data/harness/checks.yaml): which check, its kind/
+        severity, whether it blocked the plan, and the violation message. Captures warn-
+        level fires that the aggregate LINT `gate` record does not surface."""
+        self._write({
+            "type": "lint_fire",
+            "cycle": cycle,
+            "check_id": check_id,
+            "kind": kind,
+            "severity": severity,
+            "blocking": bool(blocking),
+            "message": message,
+        })
+
     def log_answer(self, cycle: int, message: str, outcome: str, refs: list) -> None:
         """The final answer submitted to the grader — refs kept in full (small)."""
         self._write({
@@ -530,5 +545,16 @@ def log_gate_auto(step_type: str, passed: bool, reason: str) -> None:
         return
     try:
         t.log_gate(current_cycle(), step_type, passed, reason)
+    except Exception:
+        pass
+
+
+def log_lint_fire_auto(check_id: str, kind: str, severity: str,
+                       blocking: bool, message: str) -> None:
+    t = get_trace()
+    if t is None:
+        return
+    try:
+        t.log_lint_fire(current_cycle(), check_id, kind, severity, blocking, message)
     except Exception:
         pass
