@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка спецификации — Lint-Firing Telemetry</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --surface:#ffffff; --fg:#2b2b3a; --muted:#6b6b80;
+    --accent:#5c6bc0; --accent-2:#3949ab; --border:#d6d8e6; --line:#9aa0b4; --zebra:#eef0f8;
+    --ok:#43a047; --ok-2:#2e7d32; --warn:#fb8c00; --warn-2:#ef6c00; --danger:#e53935; --danger-2:#c62828;
+    --shadow:rgba(40,40,80,.18);
+  }
+  body:has(#theme-toggle:checked){
+    --bg:#181825; --surface:#262637; --fg:#cdd6f4; --muted:#a6adc8;
+    --accent:#89b4fa; --accent-2:#5e95f0; --border:#3a3b52; --line:#6c7086; --zebra:#21222f;
+    --ok:#a6e3a1; --ok-2:#74c46e; --warn:#f9e2af; --warn-2:#f5c95b; --danger:#f38ba8; --danger-2:#e8638a;
+    --shadow:rgba(0,0,0,.45);
+  }
+  body{
+    margin:0 auto; padding:1.5rem 2rem 4rem; max-width:1080px;
+    font:16px/1.55 system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb,var(--accent) 10%, transparent), transparent),
+      var(--bg);
+    color:var(--fg);
+    transition:background .3s, color .3s;
+  }
+  .theme-btn{
+    position:sticky; top:.5rem; float:right; z-index:5;
+    cursor:pointer; user-select:none;
+    padding:.25rem .6rem; border:1px solid var(--border); border-radius:6px;
+    background:var(--surface);
+  }
+  h1{font-size:1.7rem; margin:.2rem 0 .1rem; color:var(--accent-2);}
+  h2{font-size:1.25rem; margin:2.2rem 0 .6rem; border-bottom:2px solid var(--border); padding-bottom:.25rem;}
+  h3{font-size:1.05rem; margin:1.4rem 0 .5rem; color:var(--accent-2);}
+  code{background:color-mix(in srgb,var(--accent) 14%, var(--surface)); padding:.05em .35em; border-radius:4px; font-size:.88em;}
+  .sub{color:var(--muted); font-size:.92rem; margin:.1rem 0;}
+  table{border-collapse:collapse; width:100%; margin:.6rem 0 1rem; font-size:.92rem; background:var(--surface);
+        box-shadow:0 1px 3px var(--shadow); border-radius:8px; overflow:hidden;}
+  th,td{border:1px solid var(--border); padding:.45rem .6rem; text-align:left; vertical-align:top;}
+  th{background:color-mix(in srgb,var(--accent) 16%, var(--surface)); color:var(--fg);}
+  tbody tr:nth-child(even){background:var(--zebra);}
+  .badge{display:inline-block; padding:.08em .55em; border-radius:999px; font-size:.78rem; font-weight:600; white-space:nowrap;}
+  .b-ok{background:color-mix(in srgb,var(--ok) 22%, var(--surface)); color:var(--ok-2); border:1px solid var(--ok);}
+  .b-warn{background:color-mix(in srgb,var(--warn) 22%, var(--surface)); color:var(--warn-2); border:1px solid var(--warn);}
+  .b-danger{background:color-mix(in srgb,var(--danger) 22%, var(--surface)); color:var(--danger-2); border:1px solid var(--danger);}
+  .b-neutral{background:color-mix(in srgb,var(--line) 22%, var(--surface)); color:var(--muted); border:1px solid var(--line);}
+  .note{background:color-mix(in srgb,var(--accent) 10%, var(--surface)); border-left:4px solid var(--accent);
+        padding:.7rem 1rem; border-radius:6px; margin:1rem 0;}
+  .verdict{font-size:1.15rem; font-weight:700; padding:.6rem 1rem; border-radius:8px; display:inline-block;
+           background:color-mix(in srgb,var(--ok) 18%, var(--surface)); color:var(--ok-2); border:1px solid var(--ok);}
+  /* flow diagram */
+  .flow{display:flex; flex-wrap:wrap; gap:.5rem 1.6rem; align-items:stretch; margin:1rem 0;}
+  .frow{display:flex; flex-wrap:wrap; align-items:center; gap:.4rem 1rem; width:100%;}
+  .node{background:var(--surface); border:1.5px solid var(--accent); border-radius:9px;
+        padding:.5rem .7rem; box-shadow:0 2px 5px var(--shadow); min-width:120px;}
+  .node .nt{font-weight:700; font-size:.86rem;}
+  .node .nd{color:var(--muted); font-size:.76rem; margin-top:.15rem;}
+  .node.store{border-style:dashed; border-color:var(--line);}
+  .node.sink{border-color:var(--ok);}
+  .arrow{color:var(--accent); font-weight:700; font-size:1.2rem;}
+  .arrow small{display:block; font-size:.66rem; color:var(--muted); font-weight:400; text-align:center;}
+  figure{margin:1rem 0;}
+  figcaption{color:var(--muted); font-size:.85rem; margin-top:.3rem;}
+  .legend{font-size:.8rem; color:var(--muted); margin:.3rem 0 0;}
+  ul.tight{margin:.3rem 0 .3rem 1.1rem; padding:0;}
+  ul.tight li{margin:.15rem 0;}
+</style>
+</head>
+<body>
+<input type="checkbox" id="theme-toggle" hidden>
+<label for="theme-toggle" class="theme-btn" title="Переключить тему">🌙 / ☀️</label>
+
+<main class="report">
+  <h1>Проверка спецификации — Lint-Firing Telemetry</h1>
+  <p class="sub">Файл: <code>docs/superpowers/specs/2026-06-21-lint-firing-telemetry-design.md</code></p>
+  <p class="sub">Дата проверки: 2026-06-21 · spec_hash: <code>60862f0470b3e178</code> · Навык: <code>check-spec</code></p>
+  <p style="margin-top:.8rem"><span class="verdict">Итоговый вердикт: PASS — 0 findings</span></p>
+
+  <!-- ============ БЛОК 1: РЕЗЮМЕ СПЕЦИФИКАЦИИ ============ -->
+  <h2>1. Резюме спецификации</h2>
+  <p>Спецификация описывает <strong>первый срез</strong> будущего моста обратной связи
+  <code>harness → oracle</code>: инструментирование того, какие <code>data/harness/checks.yaml</code>
+  проверки срабатывают, чтобы направление моста выбиралось по реальным данным. <strong>Только телеметрия.</strong></p>
+
+  <table>
+    <thead><tr><th>Секция</th><th>Требование (по одному в строке)</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="3">Background / Problem</td>
+          <td><code>oracle</code> (мягкий, позитивный, ранжируется ретривалом, NL-атомы) и <code>harness</code> (жёсткий, негативный, детерминированный гейт, code-backed check-specs) — двусторонний цикл «генерация-затем-проверка», не избыточность.</td></tr>
+      <tr><td>Единственное направление обратной связи с «топливом» сегодня — «teach»: срабатывающая проверка → <code>method</code>-атом.</td></tr>
+      <tr><td>Блокер: нет per-check сигнала срабатывания (<code>lint()</code> только <code>print()</code>; <code>log_gate</code> — агрегат passed/blocked; warn-срабатывания невидимы).</td></tr>
+
+      <tr><td>Scope</td>
+          <td>Инструментировать срабатывание lint + offline-отчёт. ТОЛЬКО телеметрия — без дистилляции, без изменения oracle, без авто-промоции, без env-gate.</td></tr>
+
+      <tr><td>Non-Goals</td>
+          <td>Нет: дистилляции <code>method</code>-атомов; записи в <code>data/oracle/</code>; авто-промоции; новой env-переменной; упрочнения <code>anti</code>-атомов (их ноль); нового always-on event-файла (переиспользуем trace-канал, не <code>history.jsonl</code>).</td></tr>
+
+      <tr><td>Architecture · Unit 1 — Emit (<code>agent/trace.py</code>)</td>
+          <td>Новый <code>log_lint_fire_auto(check_id, kind, severity, blocking, message)</code>; best-effort, никогда не бросает; запись <code>{type:lint_fire, cycle, check_id, kind, severity:error|warn, blocking, message}</code>; <code>task_id/seq/ts</code> штампует <code>TraceLogger._write</code>; новый метод <code>TraceLogger.log_lint_fire</code> + thread-local обёртка.</td></tr>
+
+      <tr><td>Architecture · Unit 2 — Wire-in (<code>interpreter.py:lint()</code>)</td>
+          <td>Для КАЖДОЙ сработавшей проверки (blocking И warn) вызвать <code>log_lint_fire_auto</code> до действия; emit предшествует существующему raise/print — семантика неизменна. Известное ограничение: <code>lint()</code> бросает на первой blocking-проверке → за цикл фиксируется только первый блокер; задокументировано, не чинится.</td></tr>
+
+      <tr><td>Architecture · Unit 3 — Report (<code>scripts/lint_report.py</code>)</td>
+          <td>Offline-агрегатор, без LLM/grader; сканирует <code>{tid}.jsonl</code> + <code>{tid}.c{N}.jsonl</code>; колонки <code>check_id, kind, fires, blocked, warned, distinct-tasks, sample</code>; ранжирование по сумме срабатываний; trace-каталог аргументом.</td></tr>
+
+      <tr><td>Data Flow</td>
+          <td><code>lint(plan)</code> → per check → <code>log_lint_fire_auto</code> → <code>{tid}.jsonl</code> → <code>render_trace</code> → <code>{tid}.detail.log</code>; прогон бенчмарка → много <code>{tid}.jsonl</code> → <code>lint_report.py</code> → ранжированная таблица в stdout.</td></tr>
+
+      <tr><td>Rendering</td>
+          <td>Добавить ветку <code>lint_fire</code> в диспетчер <code>event()</code> функции <code>render_trace</code> → строка <code>· [lint_fire] c&lt;cycle&gt; &lt;check_id&gt; [BLOCK|warn] &lt;message-head&gt;</code>.</td></tr>
+
+      <tr><td>Error Handling</td>
+          <td><code>log_lint_fire_auto</code> глотает все исключения (как <code>log_vm_auto</code>/<code>log_gate_auto</code>); поведение <code>lint()</code> иначе неизменно; <code>lint_report.py</code> терпит битый JSONL (skip-and-continue) и пустой каталог («no lint_fire records»).</td></tr>
+
+      <tr><td>Testing</td>
+          <td>(a) Emit — триггер одного error + одного warn, два <code>lint_fire</code>-record с верными blocking-флагами + run всё ещё бросает на blocking; (b) No-trace safety — <code>log_lint_fire_auto</code> без логгера → no-op, no raise; (c) Render — <code>lint_fire</code>-record через <code>render_trace</code>, проверка формата строки; (d) Report — <code>lint_report.py</code> на каталог-фикстуру из 2 файлов, проверка агрегатов на <code>check_id</code>.</td></tr>
+
+      <tr><td>Open Questions</td>
+          <td>Ничего блокирующего; stdout-таблица по умолчанию, HTML-вариант — тривиальный follow-up.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Success Criteria (производные)</h3>
+  <table>
+    <thead><tr><th>#</th><th>Критерий приёмки</th></tr></thead>
+    <tbody>
+      <tr><td>SC-1</td><td>Каждая сработавшая lint-проверка (error И warn) пишет <code>lint_fire</code> trace-record.</td></tr>
+      <tr><td>SC-2</td><td>Warn-срабатывания (невидимые сегодня) становятся видимыми.</td></tr>
+      <tr><td>SC-3</td><td>Offline <code>lint_report.py</code> строит ранжированную таблицу per <code>check_id</code> из trace бенчмарка.</td></tr>
+      <tr><td>SC-4</td><td>Нулевое изменение семантики block/warn.</td></tr>
+      <tr><td>SC-5</td><td>Нулевые записи в <code>data/oracle</code>, нет новой env-переменной.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ============ БЛОК 2: СХЕМЫ РЕШЕНИЯ И ЗАВИСИМОСТЕЙ ============ -->
+  <h2>2. Схемы решения и зависимостей</h2>
+
+  <h3>2.1 Схема решения (data/control flow)</h3>
+  <figure>
+    <div class="flow">
+      <div class="frow">
+        <div class="node"><div class="nt">interpreter.lint(plan)</div><div class="nd">per сработавшая проверка (block + warn)</div></div>
+        <span class="arrow">→<small>emit</small></span>
+        <div class="node"><div class="nt">trace.log_lint_fire_auto</div><div class="nd">Emit · agent/trace.py · best-effort</div></div>
+        <span class="arrow">→<small>TraceLogger.log_lint_fire / _write</small></span>
+        <div class="node store"><div class="nt">{tid}.jsonl</div><div class="nd">lint_fire records</div></div>
+      </div>
+      <div class="frow">
+        <div class="node store"><div class="nt">{tid}.jsonl</div><div class="nd">trace-файл</div></div>
+        <span class="arrow">→<small>render_trace (ветка lint_fire)</small></span>
+        <div class="node sink"><div class="nt">{tid}.detail.log</div><div class="nd">human-readable строка</div></div>
+      </div>
+      <div class="frow">
+        <div class="node store"><div class="nt">много {tid}.jsonl</div><div class="nd">прогон бенчмарка</div></div>
+        <span class="arrow">→<small>scripts/lint_report.py &lt;trace_dir&gt;</small></span>
+        <div class="node sink"><div class="nt">ранжированная таблица</div><div class="nd">stdout · per check_id</div></div>
+      </div>
+    </div>
+    <figcaption>Три независимых юнита: Emit (запись) → файл trace → две независимые читалки (Rendering и Report). Запись выполняет <code>TraceLogger.log_lint_fire</code> / <code>_write</code> (штампует task_id/seq/ts).</figcaption>
+  </figure>
+
+  <h3>2.2 Граф зависимостей</h3>
+  <figure class="rpt-graph">
+    <svg viewBox="0 0 560 300" width="100%" style="max-width:620px" role="img" aria-label="граф зависимостей компонентов">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+        </marker>
+      </defs>
+      <!-- edges -->
+      <line x1="150" y1="60"  x2="150" y2="135" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="160" y1="160" x2="270" y2="225" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="430" y1="60"  x2="320" y2="225" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="450" y1="80"  x2="160" y2="150" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+      <line x1="450" y1="225" x2="320" y2="245" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+      <!-- edge labels -->
+      <text x="156" y="105" fill="var(--muted)" font-size="11">uses</text>
+      <text x="195" y="200" fill="var(--muted)" font-size="11">writes</text>
+      <text x="378" y="150" fill="var(--muted)" font-size="11">reads</text>
+      <text x="300" y="120" fill="var(--accent-2)" font-size="11">depends-on (record shape)</text>
+      <text x="370" y="248" fill="var(--muted)" font-size="11">reads</text>
+      <!-- nodes -->
+      <g font-size="12" text-anchor="middle">
+        <rect x="95"  y="30"  width="110" height="36" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+        <text x="150" y="52" fill="var(--fg)">Wire-in</text>
+        <rect x="95"  y="138" width="130" height="40" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+        <text x="160" y="155" fill="var(--fg)">Emit</text>
+        <text x="160" y="170" fill="var(--muted)" font-size="10">trace.py</text>
+        <rect x="380" y="30"  width="130" height="40" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+        <text x="445" y="47" fill="var(--fg)">Report</text>
+        <text x="445" y="62" fill="var(--muted)" font-size="10">lint_report.py</text>
+        <rect x="385" y="207" width="120" height="40" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+        <text x="445" y="224" fill="var(--fg)">Rendering</text>
+        <text x="445" y="239" fill="var(--muted)" font-size="10">render_trace</text>
+        <rect x="245" y="225" width="120" height="40" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="305" y="242" fill="var(--fg)">{tid}.jsonl</text>
+        <text x="305" y="257" fill="var(--muted)" font-size="10">trace file</text>
+      </g>
+    </svg>
+    <figcaption>Узлы — компоненты, рёбра — «использует/пишет/читает/зависит-от». Wire-in использует Emit; Emit пишет в <code>{tid}.jsonl</code>; Rendering и Report читают его; Report зависит от Emit по форме записи (пунктир-accent).</figcaption>
+  </figure>
+  <p class="legend">Сплошные рёбра — runtime data-flow; пунктирное accent-ребро — структурная зависимость по контракту записи.</p>
+
+  <h3>2.3 Карта покрытия (задача → требования)</h3>
+  <table>
+    <thead><tr><th>Задача</th><th>Emit</th><th>Wire-in</th><th>Report</th><th>Rendering</th><th>Error Handling</th><th>Testing</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Инструментировать, какие harness-lint-проверки срабатывают, чтобы направление моста <code>harness→oracle</code> выбиралось по реальным данным</td>
+        <td><span class="badge b-ok">✓</span></td>
+        <td><span class="badge b-ok">✓</span></td>
+        <td><span class="badge b-ok">✓</span></td>
+        <td><span class="badge b-ok">✓</span></td>
+        <td><span class="badge b-ok">✓</span></td>
+        <td><span class="badge b-ok">✓</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="legend">Единственная задача среза покрыта всеми шестью группами требований; «лишних» требований не обнаружено.</p>
+
+  <!-- ============ БЛОК 3: РЕЗУЛЬТАТЫ ПРОВЕРКИ ============ -->
+  <h2>3. Результаты проверки</h2>
+
+  <h3>Статус по фазам</h3>
+  <table>
+    <thead><tr><th>Фаза</th><th>Чек-лист</th><th>Статус</th></tr></thead>
+    <tbody>
+      <tr><td>1 · structure</td><td>Плейсхолдеры, битые внутренние ссылки, нумерация секций, дублирующиеся заголовки</td><td><span class="badge b-ok">passed</span></td></tr>
+      <tr><td>2 · coverage</td><td>Покрытие задачи требованиями, отсутствие «лишних» требований, противоречия</td><td><span class="badge b-ok">passed</span></td></tr>
+      <tr><td>3 · clarity</td><td>Неоднозначные формулировки, требования без DoD, несогласованные термины</td><td><span class="badge b-ok">passed</span></td></tr>
+      <tr><td>4 · consistency</td><td>Хеши секций, сводка изменившихся секций и связанных findings</td><td><span class="badge b-ok">passed</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Findings</h3>
+  <table>
+    <thead><tr><th>id</th><th>severity</th><th>section</th><th>text</th><th>verdict</th></tr></thead>
+    <tbody>
+      <tr><td colspan="5" style="text-align:center; color:var(--muted)">— findings нет —</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>Сводка.</strong>
+    CRITICAL open: <span class="badge b-ok">0</span>&nbsp;&nbsp;
+    WARNING open: <span class="badge b-ok">0</span>&nbsp;&nbsp;
+    Итоговый вердикт: <span class="badge b-ok">PASS</span>
+    <ul class="tight">
+      <li><strong>structure:</strong> нет TODO/TBD/???/FIXME; нет битых §/anchor-ссылок; заголовки <code>### 1/2/3</code> последовательны без пропусков и дублей.</li>
+      <li><strong>coverage:</strong> все требования трассируются к задаче телеметрии; Non-Goals явно ограждают scope; противоречий нет. <code>severity:error|warn</code> в record-shape согласуется с warn-only enforcement для <code>candidate</code>-проверок.</li>
+      <li><strong>clarity:</strong> единственное «trivial» — в необязательной заметке Open Questions, не критерий приёмки; у каждого требования есть конкретный DoD; термины (<code>lint_fire</code>, <code>log_lint_fire_auto</code>, <code>check_id/kind/severity/blocking</code>) согласованы.</li>
+      <li><strong>consistency:</strong> блок <code>review:</code> создан впервые (fresh init), базлайн по 9 секциям; диффить нечего.</li>
+    </ul>
+  </div>
+
+  <h3>Chain</h3>
+  <p>intent → spec: <code>intent = null</code> (intent-документ для этой темы в <code>docs/superpowers/intents/</code> не найден). Проверка продолжена без блокировки.</p>
+
+  <p class="sub" style="margin-top:2rem">Артефакт сгенерирован навыком <code>check-spec</code> → <code>html-report</code>. Источник истины — блок <code>review:</code> во frontmatter спецификации.</p>
+</main>
+</body>
+</html>

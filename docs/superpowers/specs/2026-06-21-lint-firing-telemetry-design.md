@@ -1,3 +1,17 @@
+---
+review:
+  spec_hash: 60862f0470b3e178
+  last_run: 2026-06-21
+  phases:
+    structure:    { status: passed }
+    coverage:     { status: passed }
+    clarity:      { status: passed }
+    consistency:  { status: passed }
+  findings: []
+chain:
+  intent: null
+---
+
 # Lint-Firing Telemetry — Design
 
 **Date:** 2026-06-21
