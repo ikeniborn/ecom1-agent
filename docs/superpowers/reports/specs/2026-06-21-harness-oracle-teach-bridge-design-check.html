@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка спецификации — Harness→Oracle «Teach» Bridge</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --surface:#ffffff; --fg:#2b2b3a; --muted:#6b6b80;
+    --accent:#5c6bc0; --accent-2:#3949ab; --border:#d6d8e6; --line:#9aa0b4; --zebra:#eef0f8;
+    --ok:#43a047; --ok-2:#2e7d32; --warn:#fb8c00; --warn-2:#ef6c00; --danger:#e53935; --danger-2:#c62828;
+    --shadow:rgba(40,40,80,.18);
+  }
+  body:has(#theme-toggle:checked){
+    --bg:#181825; --surface:#262637; --fg:#cdd6f4; --muted:#a6adc8;
+    --accent:#89b4fa; --accent-2:#5e95f0; --border:#3a3b52; --line:#6c7086; --zebra:#21222f;
+    --ok:#a6e3a1; --ok-2:#74c46e; --warn:#f9e2af; --warn-2:#f5c95b; --danger:#f38ba8; --danger-2:#e8638a;
+    --shadow:rgba(0,0,0,.45);
+  }
+  body{
+    margin:0 auto; padding:1.5rem 2rem 4rem; max-width:1080px;
+    font:16px/1.55 system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb,var(--accent) 10%, transparent), transparent),
+      var(--bg);
+    color:var(--fg);
+    transition:background .3s, color .3s;
+  }
+  .theme-btn{
+    position:sticky; top:.5rem; float:right; z-index:10;
+    cursor:pointer; user-select:none;
+    padding:.25rem .6rem; border:1px solid var(--border); border-radius:6px;
+    background:var(--surface);
+  }
+  h1{font-size:1.7rem; margin:.2rem 0 .4rem; color:var(--accent-2);}
+  h2{font-size:1.25rem; margin:2rem 0 .6rem; border-bottom:2px solid var(--border); padding-bottom:.25rem; color:var(--accent-2);}
+  h3{font-size:1.05rem; margin:1.4rem 0 .4rem; color:var(--accent);}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.86em; background:color-mix(in srgb,var(--accent) 12%, var(--surface)); padding:.06em .35em; border-radius:4px;}
+  .lead{color:var(--muted); margin:.2rem 0 1rem;}
+  table{border-collapse:collapse; width:100%; margin:.6rem 0 1rem; background:var(--surface); box-shadow:0 1px 4px var(--shadow); border-radius:8px; overflow:hidden;}
+  th,td{text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--border); vertical-align:top;}
+  th{background:color-mix(in srgb,var(--accent) 16%, var(--surface)); font-weight:600;}
+  tbody tr:nth-child(even){background:var(--zebra);}
+  td.id{font-family:ui-monospace,monospace; white-space:nowrap;}
+  .badge{display:inline-block; padding:.08em .55em; border-radius:999px; font-size:.78rem; font-weight:600; line-height:1.5;}
+  .b-ok{background:color-mix(in srgb,var(--ok) 22%, var(--surface)); color:var(--ok-2); border:1px solid var(--ok);}
+  .b-warn{background:color-mix(in srgb,var(--warn) 22%, var(--surface)); color:var(--warn-2); border:1px solid var(--warn);}
+  .b-danger{background:color-mix(in srgb,var(--danger) 22%, var(--surface)); color:var(--danger-2); border:1px solid var(--danger);}
+  .b-info{background:color-mix(in srgb,var(--accent) 18%, var(--surface)); color:var(--accent-2); border:1px solid var(--accent);}
+  .note{background:color-mix(in srgb,var(--accent) 10%, var(--surface)); border-left:4px solid var(--accent); padding:.6rem .9rem; border-radius:6px; margin:1rem 0;}
+  .note.ok{border-left-color:var(--ok);}
+  .verdict-final{font-size:1.15rem; font-weight:700; padding:.8rem 1rem; border-radius:8px; background:color-mix(in srgb,var(--ok) 18%, var(--surface)); border:1px solid var(--ok); color:var(--ok-2);}
+  .hashrow{font-family:ui-monospace,monospace; font-size:.85rem;}
+  .flow{display:flex; flex-wrap:wrap; gap:.5rem; align-items:stretch; margin:1rem 0;}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:.6rem .8rem; box-shadow:0 1px 4px var(--shadow); flex:1 1 200px; min-width:180px;}
+  .card .t{font-weight:600; color:var(--accent-2); display:block; margin-bottom:.25rem;}
+  .card .s{color:var(--muted); font-size:.85rem;}
+  .arrow{align-self:center; color:var(--line); font-size:1.4rem;}
+  figure{margin:1rem 0;}
+  figcaption{color:var(--muted); font-size:.85rem; margin-top:.3rem;}
+  .legend{font-size:.82rem; color:var(--muted);}
+  .legend b{color:var(--fg);}
+</style>
+</head>
+<body>
+<input type="checkbox" id="theme-toggle" hidden>
+<label for="theme-toggle" class="theme-btn" title="Тёмная / светлая тема">🌙 / ☀️</label>
+
+<main class="report">
+  <h1>Проверка спецификации — Harness→Oracle «Teach» Bridge</h1>
+  <p class="lead">Дата проверки: 2026-06-21 · Фазовая модель check-spec (structure / coverage / clarity / consistency)</p>
+
+  <div class="note ok">
+    <strong>Файл:</strong> <code>docs/superpowers/specs/2026-06-21-harness-oracle-teach-bridge-design.md</code><br>
+    <span class="hashrow"><strong>spec_hash (новый):</strong> 5ca33c546416695a · <strong>prev_hash:</strong> f5e77627bde336b7</span><br>
+    Тело документа было изменено (исправлена формулировка шага 2 Architecture), поэтому quick-exit по кешу не сработал — протокол выполнен полностью. После повторной валидации <code>spec_hash</code> пересчитан по каноническому алгоритму и совпадает с хешем тела.
+  </div>
+
+  <!-- ───────────────────── БЛОК 1: РЕЗЮМЕ СПЕЦИФИКАЦИИ ───────────────────── -->
+  <h2>1. Резюме спецификации</h2>
+  <p class="lead">Офлайн-инструмент: из часто срабатывающей lint-проверки <code>data/harness/checks.yaml</code> дистиллируется положительный <code>method</code>-атом oracle, валидируется полным сквозным прогоном задачи-источника и промотируется (candidate→active) только при оценке грейдера 1.0.</p>
+
+  <table>
+    <thead><tr><th>Секция</th><th>Требование</th></tr></thead>
+    <tbody>
+      <tr><td>Scope</td><td>Офлайн-инструмент per hot-check: distil → validate → promote; переиспользует существующую машинерию distil/validate/promote.</td></tr>
+      <tr><td>Decisions</td><td>Размещение — офлайн-скрипт (нулевая runtime-стоимость).</td></tr>
+      <tr><td>Decisions</td><td>Гейт валидации — efficacy через полный pipeline (INTENT → INVESTIGATE → PLAN-loop) с инжектированным атомом.</td></tr>
+      <tr><td>Architecture §1</td><td>Оркестратор <code>scripts/harness_to_oracle.py</code> (new): aggregate → load_checks → отбор hot-checks → per-check distil/validate/promote → сводка.</td></tr>
+      <tr><td>Architecture §2</td><td>Efficacy-валидатор <code>agent/oracle_validate.py</code> (extend): <code>grade_full_run</code> + <code>validate_atom_via_full_run</code>; ленивый импорт <code>run_agent</code> против цикла импорта.</td></tr>
+      <tr><td>Architecture §3</td><td>Сем инъекции <code>agent/oracle.py</code> (extend): <code>_active()</code> учитывает <code>ECOM_ORACLE_FORCE_ACTIVE</code>, делая один candidate-атом видимым для retrieve на время одного прогона.</td></tr>
+      <tr><td>Reused</td><td>aggregate, load_checks, distill(+dedup), promote, persisted intent/plan, parse_score — без изменений pipeline/INTENT/PLAN/промптов.</td></tr>
+      <tr><td>Env Vars</td><td><code>ECOM_BRIDGE_MIN_FIRES</code>=3, <code>ECOM_BRIDGE_MAX_ATOMS</code>=3, <code>ECOM_ORACLE_FORCE_ACTIVE</code> (unset).</td></tr>
+      <tr><td>Error Handling</td><td>per-check try/except; best-effort валидатор (любой сбой → False); очистка force-active в finally; промоут только candidate→active.</td></tr>
+      <tr><td>Testing</td><td>Юнит-тесты для <code>_active</code>, <code>validate_atom_via_full_run</code>, оркестратора (через monkeypatch).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Success Criteria (критерии приёмки, из тела спеки)</h3>
+  <table>
+    <thead><tr><th>#</th><th>Критерий</th></tr></thead>
+    <tbody>
+      <tr><td class="id">SC-1</td><td>Промоут атома происходит <em>только</em> при сквозной оценке грейдера 1.0 (efficacy-гейт).</td></tr>
+      <tr><td class="id">SC-2</td><td>Идемпотентность: повторный запуск скрипта не раздувает oracle — dedup по косинусу (<code>ECOM_ORACLE_DEDUP_COSINE</code>), без always-on ledger.</td></tr>
+      <tr><td class="id">SC-3</td><td>Нулевая runtime-стоимость: вся логика офлайн, грейдер-round-trips вне основного прогона.</td></tr>
+      <tr><td class="id">SC-4</td><td>Без мутации <code>data/oracle/atoms.yaml</code> до промоута; <code>ECOM_ORACLE_FORCE_ACTIVE</code> чистится в finally (не утекает в последующие прогоны).</td></tr>
+      <tr><td class="id">SC-5</td><td>Изоляция: при unset env поведение идентично текущему (back-compatible).</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ───────────────────── БЛОК 2: СХЕМЫ РЕШЕНИЯ И ЗАВИСИМОСТЕЙ ───────────────────── -->
+  <h2>2. Схемы решения и зависимостей</h2>
+
+  <h3>2.1. Схема решения (data/control flow)</h3>
+  <div class="flow">
+    <div class="card"><span class="t">logs/**/*.jsonl</span><span class="s">трейсы lint_fire</span></div>
+    <div class="arrow">→</div>
+    <div class="card"><span class="t">lint_report.aggregate</span><span class="s">stats по check_id (reuse)</span></div>
+    <div class="arrow">→</div>
+    <div class="card"><span class="t">harness.load_checks() → list[dict]</span><span class="s">оркестратор индексирует по check_id → {kind, message, source_task}</span></div>
+  </div>
+  <div class="flow">
+    <div class="card"><span class="t">Отбор hot-checks</span><span class="s">fires ≥ MIN_FIRES, ранж по fires, cap MAX_ATOMS</span></div>
+    <div class="arrow">→</div>
+    <div class="card"><span class="t">oracle.distill(seed=message)</span><span class="s">candidate-атом (+dedup на вставке)</span></div>
+    <div class="arrow">→</div>
+    <div class="card"><span class="t">validate_atom_via_full_run</span><span class="s">grade_full_run + FORCE_ACTIVE</span></div>
+    <div class="arrow">→</div>
+    <div class="card"><span class="t">oracle.promote</span><span class="s">только при score ≥ 1.0</span></div>
+  </div>
+  <p class="legend"><b>Control:</b> per-check try/except изолирует сбои; <b>data:</b> candidate-атом записывается в atoms.yaml, но виден retrieve только через <code>ECOM_ORACLE_FORCE_ACTIVE</code> до промоута.</p>
+
+  <h3>2.2. Граф зависимостей компонентов</h3>
+  <figure>
+    <svg viewBox="0 0 560 270" width="100%" role="img" aria-label="граф зависимостей компонентов решения">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+        </marker>
+      </defs>
+      <!-- edges (uses / depends-on) -->
+      <line x1="120" y1="55"  x2="120" y2="110" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="195" y1="135" x2="250" y2="135" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="150" y1="156" x2="250" y2="210" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="350" y1="135" x2="450" y2="135" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="360" y1="230" x2="450" y2="158" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="450" y1="156" x2="345" y2="216" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+      <!-- nodes -->
+      <g>
+        <rect x="55" y="25" width="130" height="30" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+        <text x="120" y="44" text-anchor="middle" font-size="11" fill="var(--fg)">lint_report.aggregate</text>
+      </g>
+      <g>
+        <rect x="45" y="110" width="150" height="46" rx="6" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="2"/>
+        <text x="120" y="130" text-anchor="middle" font-size="11" fill="var(--fg)">§1 Orchestrator</text>
+        <text x="120" y="146" text-anchor="middle" font-size="9" fill="var(--muted)">harness_to_oracle.py</text>
+      </g>
+      <g>
+        <rect x="250" y="112" width="100" height="44" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+        <text x="300" y="132" text-anchor="middle" font-size="11" fill="var(--fg)">oracle.distill</text>
+        <text x="300" y="147" text-anchor="middle" font-size="9" fill="var(--muted)">+dedup, promote</text>
+      </g>
+      <g>
+        <rect x="250" y="210" width="110" height="46" rx="6" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="2"/>
+        <text x="305" y="230" text-anchor="middle" font-size="11" fill="var(--fg)">§2 oracle_validate</text>
+        <text x="305" y="245" text-anchor="middle" font-size="9" fill="var(--muted)">grade_full_run</text>
+      </g>
+      <g>
+        <rect x="450" y="112" width="100" height="46" rx="6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+        <text x="500" y="132" text-anchor="middle" font-size="11" fill="var(--fg)">§3 oracle</text>
+        <text x="500" y="147" text-anchor="middle" font-size="9" fill="var(--muted)">_active() seam</text>
+      </g>
+    </svg>
+    <figcaption>Узлы — компоненты решения; рёбра — «использует / зависит от» (пунктир — env-сем <code>ECOM_ORACLE_FORCE_ACTIVE</code>). §1 оркеструет всё; §2 (валидатор) зависит от §3 (seam) и от distill/promote; §1 переиспользует aggregate.</figcaption>
+  </figure>
+
+  <h3>2.3. Карта покрытия (задача → требования спеки)</h3>
+  <table>
+    <thead><tr><th>Задача (scope-цель)</th><th>Покрывающие требования спеки</th></tr></thead>
+    <tbody>
+      <tr><td>Дистилляция атома из hot-check</td><td>Architecture §1 (шаги 1–4 distil), seed-строка из <code>message</code></td></tr>
+      <tr><td>Валидация атома сквозным прогоном</td><td>Architecture §2 (<code>grade_full_run</code> / <code>validate_atom_via_full_run</code>), Decisions (efficacy-гейт)</td></tr>
+      <tr><td>Промоут только при 1.0</td><td>Architecture §1 шаг 4 (promote), Error Handling, SC-1</td></tr>
+      <tr><td>Видимость candidate-атома для retrieve</td><td>Architecture §3 (<code>_active()</code> + <code>ECOM_ORACLE_FORCE_ACTIVE</code>)</td></tr>
+      <tr><td>Идемпотентность / анти-rebloat</td><td>Non-Goals (no ledger), §1 шаг 4 (dedup на вставке), SC-2</td></tr>
+      <tr><td>Изоляция и безопасность env</td><td>Error Handling (finally-очистка), §3 (unset → идентичное поведение), SC-4/SC-5</td></tr>
+      <tr><td>Проверяемость</td><td>Testing (3 группы юнит-тестов)</td></tr>
+    </tbody>
+  </table>
+  <p class="legend">Все цели покрыты ≥1 требованием; «лишних» требований без привязки к задаче не обнаружено.</p>
+
+  <!-- ───────────────────── БЛОК 3: РЕЗУЛЬТАТЫ ПРОВЕРКИ ───────────────────── -->
+  <h2>3. Результаты проверки</h2>
+
+  <table>
+    <thead><tr><th>Фаза</th><th>Статус</th><th>Новые findings</th></tr></thead>
+    <tbody>
+      <tr><td>1. structure</td><td><span class="badge b-ok">passed</span></td><td>нет (плейсхолдеры/битые ссылки/нумерация/дубли заголовков — чисто)</td></tr>
+      <tr><td>2. coverage</td><td><span class="badge b-ok">passed</span></td><td>нет (все цели покрыты, противоречий нет)</td></tr>
+      <tr><td>3. clarity</td><td><span class="badge b-ok">passed</span></td><td>нет («hot» имеет явный критерий fires ≥ MIN_FIRES; термины согласованы)</td></tr>
+      <tr><td>4. consistency</td><td><span class="badge b-ok">passed</span></td><td>нет (секция §1 Orchestrator изменилась — F-001 переоценён и закрыт)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Findings</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Severity</th><th>Секция</th><th>Описание</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="id">F-001</td>
+        <td><span class="badge b-info">INFO</span></td>
+        <td>Architecture / 1. Orchestrator</td>
+        <td>Шаг 2 ранее читался как «load_checks() → map check_id → {…}», но функция возвращает <code>list[dict]</code>. Формулировка исправлена: теперь «<code>harness.load_checks()</code> → <code>list[dict]</code>; оркестратор сам индексирует по <code>check_id</code>». Поведение всегда было корректным.</td>
+        <td><span class="badge b-ok">fixed</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>Сводка:</strong> CRITICAL open: <strong>0</strong> · WARNING open: <strong>0</strong> · INFO open: <strong>0</strong> (F-001 → fixed). Новых findings нет.
+  </div>
+
+  <p class="verdict-final">Финальный вердикт: OK — спецификация прошла все 4 фазы; единственный finding F-001 закрыт (fixed).</p>
+
+  <h3>Chain</h3>
+  <p class="lead"><code>intent → spec</code>: <code>chain.intent = null</code> (intent-документ не указан и не найден). Спека: <code>2026-06-21-harness-oracle-teach-bridge-design.md</code>.</p>
+
+</main>
+</body>
+</html>
