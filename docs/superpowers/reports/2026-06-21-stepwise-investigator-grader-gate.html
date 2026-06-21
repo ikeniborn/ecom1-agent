@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>Stepwise Investigator — Grader Gate (Task 15)</title>
+<title>Пошаговый исследователь — Grader Gate (Задача 15)</title>
 <style>
   body{font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;max-width:920px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}
   h1{font-size:1.5rem;border-bottom:2px solid #ddd;padding-bottom:.3rem}
@@ -18,47 +18,48 @@
 </style>
 </head>
 <body>
-<h1>Stepwise Investigator — Real Grader Gate (Task 15)</h1>
-<p><strong>Date:</strong> 2026-06-21 · <strong>Branch:</strong> heuristics · <strong>Model:</strong> <code>deepseek-v4-flash:cloud</code> · <strong>Live BitGN grader</strong></p>
-<p>Baseline (<code>ECOM_INVESTIGATE_ENABLED=0</code>, eager pre-phase gather + legacy whole-instruction oracle dump) vs. treatment (<code>=1</code>, slim seed + read-only INVESTIGATE ReAct → brief). One StartRun→SubmitRun per cell.</p>
+<h1>Пошаговый исследователь (INVESTIGATE) — живой Grader Gate (Задача 15)</h1>
+<p><strong>Дата:</strong> 2026-06-21 · <strong>Ветка:</strong> heuristics · <strong>Модель:</strong> <code>deepseek-v4-flash:cloud</code> · <strong>Живой грейдер BitGN</strong></p>
+<p>Базовый прогон (<code>ECOM_INVESTIGATE_ENABLED=0</code>: жадный pre-phase gather + устаревший дамп оракула по всей инструкции) против лечения (<code>=1</code>: «тонкий» seed + read-only фаза INVESTIGATE (ReAct → brief)). Одна пара StartRun→SubmitRun на ячейку.</p>
 
-<h2>Results</h2>
+<h2>Результаты</h2>
 <table>
-<thead><tr><th>Run</th><th>Score</th><th>PLAN prompt chars</th><th>Cycles</th><th>Tokens in/out*</th><th>Task time</th><th>Wall clock</th></tr></thead>
+<thead><tr><th>Прогон</th><th>Score</th><th>Символов в PLAN-промпте</th><th>Циклов</th><th>Токены in/out*</th><th>Время задачи</th><th>Wall clock</th></tr></thead>
 <tbody>
-<tr><td>t38 OFF (baseline)</td><td class="bad">0.00</td><td>~29,100</td><td>3</td><td>34,032 / 18,469</td><td>148.5s</td><td>3:02</td></tr>
-<tr><td>t38 ON (treatment)</td><td class="bad">0.00</td><td><strong>11,597</strong></td><td>1</td><td>9,711 / 16,966</td><td>112.0s</td><td>2:16</td></tr>
-<tr><td>t01 OFF (baseline)</td><td class="bad">0.00</td><td>~28,400</td><td>5</td><td>50,955 / 27,597</td><td>598.0s</td><td>10:13</td></tr>
-<tr><td>t01 ON (treatment)</td><td class="bad">0.00</td><td><strong>12,623</strong></td><td>6</td><td>51,513 / 36,606</td><td>305.5s</td><td>5:22</td></tr>
+<tr><td>t38 OFF (базовый)</td><td class="bad">0.00</td><td>~29 100</td><td>3</td><td>34 032 / 18 469</td><td>148.5 с</td><td>3:02</td></tr>
+<tr><td>t38 ON (лечение)</td><td class="bad">0.00</td><td><strong>11 597</strong></td><td>1</td><td>9 711 / 16 966</td><td>112.0 с</td><td>2:16</td></tr>
+<tr><td>t01 OFF (базовый)</td><td class="bad">0.00</td><td>~28 400</td><td>5</td><td>50 955 / 27 597</td><td>598.0 с</td><td>10:13</td></tr>
+<tr><td>t01 ON (лечение)</td><td class="bad">0.00</td><td><strong>12 623</strong></td><td>6</td><td>51 513 / 36 606</td><td>305.5 с</td><td>5:22</td></tr>
 </tbody>
 </table>
-<p style="font-size:13px;color:#555">* Reported tokens count INTENT/PLAN/iLEARN only; the investigator's FAST-tier router/digest calls are NOT accumulated into these figures (pipeline <code>_accum</code> threads token_out only for INTENT/PLAN/iLEARN), so treatment's true token spend is higher than the in/out shown.</p>
+<p style="font-size:13px;color:#555">* Учтённые токены считают только INTENT/PLAN/iLEARN; FAST-вызовы router/digest исследователя НЕ аккумулируются в эти цифры (<code>_accum</code> в pipeline передаёт token_out лишь для INTENT/PLAN/iLEARN), поэтому реальный расход токенов в режиме ON выше показанного in/out.</p>
 
-<h2>Success-criteria assessment (from the spec)</h2>
+<h2>Оценка критериев успеха (из спецификации)</h2>
 <ul>
-<li><span class="ok">PASS</span> — PLAN prompt chars drop sharply ON vs OFF: t38 ~29.1k→11.6k (−60%), t01 ~28.4k→12.6k (−55%). The slim-seed + focused-brief hypothesis is confirmed mechanically.</li>
-<li><span class="ok">PASS</span> — No 492 s-class CC timeout on PLAN (and none possible here: the active model is deepseek-flash, not the Claude Code tier).</li>
-<li><span class="ok">PASS</span> — Fewer/cheaper cycles &amp; wall-clock: t38 3→1 cycles, 3:02→2:16; t01 wall 10:13→5:22 (~half).</li>
-<li><span class="bad">FAIL</span> — <strong>t38 score did NOT improve from 0 to &gt; 0.</strong> Both baseline and treatment return <code>OUTCOME_DENIED_SECURITY</code> (expected <code>OUTCOME_OK</code>).</li>
-<li><span class="ok">no regression</span> — t01 ON did not drop a passing score, but t01 was <em>already failing</em> at baseline (0.00) with this model, so the spot-check is only weakly informative.</li>
+<li><span class="ok">ПРОЙДЕНО</span> — символы PLAN-промпта резко падают ON против OFF: t38 ~29.1k→11.6k (−60%), t01 ~28.4k→12.6k (−55%). Гипотеза «тонкий seed + сфокусированный brief» подтверждена механически.</li>
+<li><span class="ok">ПРОЙДЕНО</span> — нет CC-таймаута класса 492 с на PLAN (и он невозможен здесь: активная модель — deepseek-flash, а не уровень Claude Code).</li>
+<li><span class="ok">ПРОЙДЕНО</span> — меньше/дешевле циклы и wall-clock: t38 3→1 цикл, 3:02→2:16; t01 wall 10:13→5:22 (≈вдвое).</li>
+<li><span class="bad">НЕ ПРОЙДЕНО</span> — <strong>score t38 НЕ улучшился с 0 до &gt; 0.</strong> И базовый, и лечение возвращают <code>OUTCOME_DENIED_SECURITY</code> (ожидался <code>OUTCOME_OK</code>).</li>
+<li><span class="ok">без регресса</span> — t01 ON не уронил проходной score, но t01 <em>уже падал</em> на базовом прогоне (0.00) с этой моделью, поэтому spot-check слабо информативен.</li>
 </ul>
 
-<h2>Diagnosis (from the treatment trace)</h2>
-<p>The decisive criterion failed. Root cause is <strong>not</strong> context overload, so the investigator (a context-efficiency mechanism) cannot fix it:</p>
+<h2>Диагностика (по трейсу лечения)</h2>
+<p>Решающий критерий не пройден. Корневая причина — <strong>не</strong> перегрузка контекстом, поэтому исследователь (механизм экономии контекста) её не чинит:</p>
 <ol>
-<li><strong>The baseline fails with full context too.</strong> t38 OFF carries the entire eager facts dump (all doc bodies + identity + samples, ~29k chars) and still returns DENIED_SECURITY. The failure is a decision/grounding error, not floundering-from-overload. Shrinking the prompt (the investigator's job) is therefore not expected to flip it — and didn't.</li>
-<li><strong>Weak model.</strong> The benchmark ran on <code>deepseek-v4-flash:cloud</code>, which fails <em>both</em> t38 and t01 at baseline. The plan's t38 fix presumed a Claude-Code-tier timeout/floundering symptom; under this model the bottleneck is reasoning capability, not prompt size. t38 is also a known-hard task (prior note: fraud "impossible-leg" caps ~73%).</li>
-<li><strong>Investigator flaw surfaced (minor, not the t38 root cause).</strong> In the t38 ON brief, the router correctly read <code>/docs/security.md</code> then tried <code>/bin/id</code> to confirm identity — but <code>is_readonly</code> rejects all <code>exec</code> except <code>/bin/sql</code>, so <code>/bin/id</code> was rejected twice and the router gave up (<code>done</code>). The brief bound only <code>policy_doc:/docs/security.md</code> and never the identity. This is wasted steps + brief noise, <em>not</em> the t38 score cause: the slim seed still gathers identity into <code>facts.identity</code> (kept in both modes), which reaches PLAN regardless — and PLAN still denied. Still, <code>/bin/id</code> is a legitimate read-only identity probe the investigator should be allowed to run on demand.</li>
+<li><strong>Базовый прогон падает и с полным контекстом.</strong> t38 OFF несёт весь жадный дамп фактов (все тела документов + identity + сэмплы, ~29k символов) и всё равно возвращает DENIED_SECURITY. Это ошибка решения/обоснования, а не «барахтанье от перегруза». Сжатие промпта (работа исследователя) не должно её перевернуть — и не перевернуло.</li>
+<li><strong>Слабая модель.</strong> Бенчмарк работал на <code>deepseek-v4-flash:cloud</code>, которая валит <em>обе</em> задачи (t38 и t01) на базовом прогоне. План закладывал симптом таймаута/барахтанья уровня Claude Code; на этой модели узкое место — способность к рассуждению, а не размер промпта. t38 — также известно трудная задача (прежняя пометка: fraud «impossible-leg», потолок ~73%).</li>
+<li><strong>Всплыл изъян исследователя (минорный, не корень t38).</strong> В brief t38 ON router верно прочитал <code>/docs/security.md</code>, затем попытался запустить <code>/bin/id</code> для подтверждения identity — но <code>is_readonly</code> отвергает любой <code>exec</code> кроме <code>/bin/sql</code>, поэтому <code>/bin/id</code> был отвергнут дважды и router сдался (<code>done</code>). Brief забиндил только <code>policy_doc:/docs/security.md</code> и так и не получил identity. Это потерянные шаги + шум в brief, а <em>не</em> причина score t38: тонкий seed всё равно собирает identity в <code>facts.identity</code> (сохраняется в обоих режимах), которая доходит до PLAN независимо — и PLAN всё равно отказал. Тем не менее <code>/bin/id</code> — легитимная read-only проба identity, которую исследователю стоит разрешать по требованию.</li>
 </ol>
 
-<h2>Verdict</h2>
-<p>The INVESTIGATE feature (Tasks 1–14) is <strong>implemented and works as designed</strong>: it builds a compact brief, runs strictly read-only, cuts the PLAN prompt ~55–60%, reduces cycles/wall-clock, traces under the INVESTIGATE phase, and degrades gracefully — all behind <code>ECOM_INVESTIGATE_ENABLED</code> with the <code>=0</code> baseline preserved exactly (108 deterministic-core tests + 30 investigator unit tests green). The mechanical efficiency goals are met. The hoped-for <strong>t38 score flip (0→&gt;0) was not achieved</strong> on this model run, because the t38 failure is decision/capability-bound, not context-bound.</p>
+<h2>Вердикт</h2>
+<p>Фича INVESTIGATE (Задачи 1–14) <strong>реализована и работает по проекту</strong>: строит компактный brief, работает строго read-only, режет PLAN-промпт на ~55–60%, снижает число циклов/wall-clock, трассируется под фазой INVESTIGATE и деградирует мягко — всё за флагом <code>ECOM_INVESTIGATE_ENABLED</code> с точным сохранением базового поведения при <code>=0</code> (108 тестов детерминированного ядра + 30 юнит-тестов исследователя зелёные). Механические цели по эффективности достигнуты. Ожидаемый <strong>переворот score t38 (0→&gt;0) на этом прогоне не достигнут</strong>, потому что провал t38 обусловлен решением/способностью модели, а не контекстом.</p>
 
-<h2>Recommendations (not done here — for a follow-up decision)</h2>
+<h2>Рекомендации (здесь не выполнены — для отдельного решения)</h2>
 <ul>
-<li>Allow <code>/bin/id</code> (and only that) in <code>investigate.is_readonly</code> exec whitelist — it is a read-only identity probe; today the investigator wastes steps on it. Small, well-scoped; will <em>not</em> by itself flip t38 (identity already flows via the slim seed).</li>
-<li>Re-run the gate on a stronger model (Claude tier) before judging the t38 hypothesis — the plan's floundering/timeout premise targets the CC tier, not deepseek-flash.</li>
-<li>t38's DENIED_SECURITY decision is a LEARN/oracle + model-capability problem, not a pre-phase problem; pursue it via the LEARN rule (never <code>data/prompts/</code>), separately from this feature.</li>
+<li>Разрешить <code>/bin/id</code> (и только его) в whitelist exec у <code>investigate.is_readonly</code> — это read-only проба identity; сейчас исследователь тратит на неё шаги впустую. Маленькое, узкое изменение; само по себе t38 <em>не</em> перевернёт (identity и так идёт через тонкий seed).</li>
+<li>Перепрогнать gate на более сильной модели (уровень Claude) прежде чем судить гипотезу t38 — премиса плана про барахтанье/таймаут целится в уровень CC, а не deepseek-flash.</li>
+<li>Решение DENIED_SECURITY у t38 — проблема LEARN/oracle + способности модели, а не pre-phase; чинить через правило LEARN (никогда <code>data/prompts/</code>), отдельно от этой фичи.</li>
+<li>Финальный кросс-ревью отметил два минора (исправить по случаю): (а) на эскалации <code>_call_json</code> резолвит модель через <code>_resolve_model_for_phase("reason", …)</code>, игнорируя явный <code>ECOM_MODEL_INVESTIGATE</code> — задокументировать или резолвить как <code>ECOM_MODEL_INVESTIGATE → ECOM_MODEL_REASON</code>; (б) параметр <code>seed</code> принимается, но не используется (зарезервирован под v1) — убрать до момента подключения или пометить на месте вызова.</li>
 </ul>
 </body>
 </html>
