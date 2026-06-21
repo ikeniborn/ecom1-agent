@@ -644,6 +644,14 @@ def call_llm_raw(
                 system=system,
                 user_msg=user_msg,
                 raw_response=result or "",
+                # M2 (deferred): the caller parses the IntentSpec/PlanIR only
+                # AFTER call_llm_raw returns, so the parsed object isn't available
+                # here. A clean post-hoc patch is blocked by the trace write path:
+                # _write() streams each record to the .jsonl immediately (append-
+                # only, line-buffered), so patching _records in place would desync
+                # the canonical .jsonl from the re-rendered .detail.log. Threading
+                # it properly needs a re-streamed write path — out of scope per the
+                # t38-pipeline-fixes plan's explicit M2 stop-condition.
                 parsed_output=None,
                 tokens_in=_tok.get("input", 0),
                 tokens_out=_tok.get("output", 0),
