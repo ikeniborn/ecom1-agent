@@ -355,6 +355,28 @@ def test_same_error_streak_breaks_before_imax(monkeypatch):
     vm.answer.assert_called_once()
 
 
+def test_enrich_prim_error_appends_contract():
+    from agent import pipeline
+    out = pipeline._enrich_prim_error(
+        "interpret: compute step 'concat' failed: 'ExecResponse' object is not iterable"
+    )
+    assert "CONTRACT:" in out
+    assert "concat" in out
+
+
+def test_enrich_prim_error_noop_without_prim():
+    from agent import pipeline
+    msg = "verify: missing ref"
+    assert pipeline._enrich_prim_error(msg) == msg
+
+
+def test_enrich_prim_error_idempotent():
+    from agent import pipeline
+    msg = "interpret: compute step 'concat' failed: bad"
+    enriched = pipeline._enrich_prim_error(msg)
+    assert pipeline._enrich_prim_error(enriched) == enriched
+
+
 def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     from agent import learned_store
     from agent.pipeline import learn_from_grader

@@ -6,6 +6,7 @@ bounded escape hatch: (text, params) -> list[dict], dispatched by name.
 """
 from __future__ import annotations
 
+import inspect
 import re
 from typing import Any, Callable
 
@@ -63,6 +64,30 @@ PRIMITIVES: dict[str, Callable[..., Any]] = {
     "any_true": lambda seq: any(seq or []),
     "filter_rows": _filter_rows,
 }
+
+
+_PRIM_NOTES = {  # extra contract prose beyond the bare signature
+    "concat": "both args must be list[dict] rows (parse Exec output via rowsets first)",
+    "column": "arg must be list[dict] rows; use 'get' for a single row",
+    "sum_col": "arg must be list[dict] rows; use 'get'+'to_number' for a scalar",
+    "filter_rows": "first arg must be list[dict] rows",
+    "count": "arg must be a rowset/list, not a single record",
+}
+
+
+def contract(prim: str) -> str:
+    """One-line deterministic contract for a primitive: signature arity + a row/scalar
+    note. Empty string for an unknown primitive."""
+    fn = PRIMITIVES.get(prim)
+    if fn is None:
+        return ""
+    try:
+        params = list(inspect.signature(fn).parameters)
+    except (TypeError, ValueError):
+        params = []
+    sig = f"{prim}({', '.join(params)})"
+    note = _PRIM_NOTES.get(prim)
+    return f"{sig}: {note}" if note else sig
 
 
 def run_primitive(name: str, args: list) -> Any:

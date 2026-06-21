@@ -76,3 +76,15 @@ def test_list_ops_allow_none_as_empty():
     # None (empty rowset) stays valid -> [] / 0.0, preserving current semantics.
     assert run_primitive("column", [None, "c"]) == []
     assert run_primitive("sum_col", [None, "c"]) == 0.0
+
+
+def test_contract_concat_has_signature_and_note():
+    from agent import primitives
+    c = primitives.contract("concat")
+    assert "concat(a, b)" in c
+    assert "list[dict]" in c
+
+
+def test_contract_unknown_prim_empty():
+    from agent import primitives
+    assert primitives.contract("nope") == ""

@@ -96,6 +96,19 @@ def _is_retryable_vm_error(msg: str) -> bool:
     return any(p in msg for p in _RETRYABLE_VM_ERROR_PATTERNS)
 
 
+def _enrich_prim_error(err: str) -> str:
+    """Append the failed primitive's contract to a compute/arity error so the retry sees
+    the spec, not just the symptom. No-op when the message names no known primitive."""
+    import re as _re
+    from .primitives import contract
+    m = _re.search(r"(?:compute step|primitive) '([a-z_]+)'", err)
+    if m:
+        c = contract(m.group(1))
+        if c and c not in err:
+            return f"{err}\nCONTRACT: {c}"
+    return err
+
+
 # ---------------------------------------------------------------------------
 # Learn + consolidate (merged LLM call)
 # ---------------------------------------------------------------------------
@@ -437,7 +450,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             continue
         except (PlanError, InterpretError) as e:
             empty_streak = 0
-            last_error = f"plan: {e}"; _accum(tk)
+            last_error = _enrich_prim_error(f"plan: {e}"); _accum(tk)
             log_gate_auto("LINT", False, last_error)
             _ilearn(task_id, learn_ctx, intent,
                     plan.model_dump_json() if plan is not None else "", last_error)
@@ -458,7 +471,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         try:
             result = interpret(plan, intent, vm, facts)
         except InterpretError as e:
-            last_error = f"interpret: {e}"
+            last_error = _enrich_prim_error(f"interpret: {e}")
             log_gate_auto("INTERPRET", False, last_error)
             _ilearn(task_id, learn_ctx, intent, plan.model_dump_json(), last_error,
                     observed=None)
