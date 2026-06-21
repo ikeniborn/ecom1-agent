@@ -483,6 +483,10 @@ def render_trace(source, *, color: bool = False, max_chars: int = 0, phase: str 
             out.append(f"{pre} sql+answer tests generated")
         elif t == "schema_refresh":
             out.append(f"{pre} c{cyc} +tables {rec.get('added_tables')}")
+        elif t == "lint_fire":
+            mark = "BLOCK" if rec.get("blocking") else "warn"
+            out.append(f"{pre} c{cyc} {rec.get('check_id')} [{mark}] "
+                       f"{(rec.get('message') or '')[:80]}")
         else:
             payload = {k: v for k, v in rec.items() if k not in ("ts", "task_id", "type")}
             out.append(f"{pre} {json.dumps(payload, ensure_ascii=False)[:120]}")

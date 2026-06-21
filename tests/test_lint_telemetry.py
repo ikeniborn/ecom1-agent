@@ -86,3 +86,13 @@ def test_lint_emits_fire_for_warn_and_blocking(tmp_path, monkeypatch):
     assert [f["check_id"] for f in fires] == ["warn1", "err1"]
     assert fires[0]["blocking"] is False
     assert fires[1]["blocking"] is True
+
+
+def test_render_trace_shows_lint_fire():
+    rec = {"type": "lint_fire", "cycle": 2, "check_id": "chk_x", "kind": "primitive_contract",
+           "severity": "error", "blocking": True, "message": "boom contract"}
+    text = render_trace([rec], color=False)
+    assert "lint_fire" in text
+    assert "chk_x" in text
+    assert "BLOCK" in text
+    assert "boom contract" in text
