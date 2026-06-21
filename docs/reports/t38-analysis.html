@@ -246,6 +246,15 @@ Per-phase стоимость по логу <b>измерить невозмож�
 рисковал не пройти grader (over-/under-select относительно authority-confirmed набора). Поэтому фикс PLAN — необходимое, но недостаточное условие для score&nbsp;1.0 на t38.</p>
 
 <h2>6. Проблемы и рекомендуемые фиксы</h2>
+
+<div class="note warn">
+<b>Поправка после чтения исходника.</b> Часть пунктов ниже скорректирована: cross-provider fallback
+(<code>llm.py:595</code>, FIX-417), ограничение CC-ретраев (<code>ECOM_CC_MAX_RETRIES</code>), нативный
+<code>--fallback-model</code> и fail-fast (FIX-361/390) <b>уже реализованы</b>. Настоящий код-баг — <b>один</b>:
+<code>cfg={}</code> на всех call-site → <code>models.json cc_options</code> мёртв. M1/M2 — <b>не баги</b>.
+Авторитетный источник — спек <code>docs/superpowers/specs/2026-06-21-t38-pipeline-fixes-design.md</code>.
+</div>
+
 <table class="rpt-table">
   <thead><tr><th>#</th><th>Severity</th><th>Проблема</th><th>Доказательство</th><th>Рекомендуемый фикс</th></tr></thead>
   <tbody>
@@ -256,16 +265,16 @@ Per-phase стоимость по логу <b>измерить невозмож�
       <td>Трактовать пустой ответ как retryable-сбой тира; не повторять тот же тир вслепую дважды.</td>
     </tr>
     <tr>
-      <td>C2</td><td><span class="badge crit">critical</span></td>
-      <td>Fallback не сработал на пустой PLAN</td>
-      <td>обе попытки <code>claude-code/sonnet</code>; <code>ECOM_MODEL_FALLBACK</code> не активировался</td>
-      <td>Пустой/нулевой ответ → эскалация на следующий тир/модель из <code>models.json</code>, затем <code>ECOM_MODEL_FALLBACK</code>.</td>
+      <td>C2</td><td><span class="badge med">config</span></td>
+      <td>Fallback не сработал — но он <b>уже реализован</b> (FIX-417), просто <code>ECOM_MODEL_FALLBACK</code> не задан</td>
+      <td><code>llm.py:595-601</code>: <code>result is None</code> → retry через <code>_FALLBACK_MODEL</code> (любой провайдер)</td>
+      <td><b>Конфиг:</b> задать <code>ECOM_MODEL_FALLBACK=anthropic/claude-sonnet-4-6</code> в <code>.env</code>. Код менять не нужно.</td>
     </tr>
     <tr>
-      <td>H1</td><td><span class="badge high">high</span></td>
-      <td>HTTP read-timeout не соблюдён на CC-tier</td>
-      <td>732&nbsp;с/вызов против <code>ECOM_LLM_HTTP_READ_TIMEOUT_S=180</code></td>
-      <td>Wall-clock kill для CC CLI subprocess; обрывать и эскалировать на таймауте, а не ждать ~732&nbsp;с.</td>
+      <td>A1</td><td><span class="badge crit">critical</span></td>
+      <td>Реальный код-баг: <code>cfg={}</code> на всех call-site → <code>models.json cc_options</code> мёртв</td>
+      <td><code>reason.py:133,169</code>, <code>investigate.py:186</code> и др. шлют <code>{}</code>; <code>cc_timeout_s/cc_model/cc_fallback_model</code> недостижимы</td>
+      <td>Резолвить per-model cfg из <code>models.json</code> внутри <code>llm.py</code> (один шов <code>call_llm_raw</code>). Разблокирует per-model timeout + CC-fallback. 732&nbsp;с (3×180 таймаута) станут управляемыми.</td>
     </tr>
     <tr>
       <td>H2</td><td><span class="badge high">high</span></td>
@@ -280,16 +289,16 @@ Per-phase стоимость по логу <b>измерить невозмож�
       <td>Резолвить confirmed-сигнал из governing doc до авторства фильтра; не использовать частотный/технический прокси.</td>
     </tr>
     <tr>
-      <td>M1</td><td><span class="badge med">medium</span></td>
-      <td>Учёт токенов сломан на CC-tier</td>
-      <td><code>tokens_in=3424</code> константа во всех 27 событиях</td>
-      <td>Парсить usage из CC stream-json; иначе помечать как <code>unmeasured</code>, не подставлять числа INTENT.</td>
+      <td>M1</td><td><span class="badge det">не баг</span></td>
+      <td>Учёт токенов <b>корректен</b>: <code>3424</code> = свежие (некэшированные) input при prompt-caching</td>
+      <td>кэш в <code>cache_read</code> (<code>cc_client.py:75-125</code>, FIX-N)</td>
+      <td><b>Опц.:</b> добавить <code>cache_read/creation</code> в сводку <code>main.py</code> (агрегат из trace) — честная стоимость. Низкая ценность.</td>
     </tr>
     <tr>
-      <td>M2</td><td><span class="badge med">medium</span></td>
-      <td>Дыра логирования <code>parsed_output=null</code> при успехе</td>
-      <td>INTENT <code>seq 6</code>: raw JSON валиден, <code>parsed_output=null</code></td>
-      <td>Сериализовать IntentSpec/PlanIR в <code>parsed_output</code> для разборчивости JSONL.</td>
+      <td>M2</td><td><span class="badge det">не баг</span></td>
+      <td><code>parsed_output=null</code> — <b>by design</b>: <code>call_llm_raw</code> = raw-funnel</td>
+      <td><code>llm.py:621</code> зашивает <code>None</code>; парсинг ниже по стеку</td>
+      <td><b>Опц.:</b> протащить распарсенный объект для INTENT/PLAN. Переплумбинг trace, низкая ценность.</td>
     </tr>
     <tr>
       <td>M3</td><td><span class="badge med">medium</span></td>
@@ -300,17 +309,18 @@ Per-phase стоимость по логу <b>измерить невозмож�
   </tbody>
 </table>
 
-<h3>Приоритет фиксов</h3>
+<h3>Приоритет фиксов (после поправки)</h3>
 <ol class="fixlist">
-  <li><b>C1 + C2 (разблокировать PLAN).</b> Пустой ответ → retry на другом тире → <code>ECOM_MODEL_FALLBACK</code>. Снимает 76% потерянного времени и сам провал прогона.</li>
-  <li><b>H1 (таймаут CC-subprocess).</b> Wall-clock kill на 180&nbsp;с превращает 732-секундное зависание в быструю эскалацию.</li>
-  <li><b>H2 + H3 (корректность answer).</b> Дочитывать governing doc до sufficiency и резолвить confirmed-сигнал — необходимо для реального score 1.0, иначе PLAN построит план на прокси.</li>
-  <li><b>M1–M3 (наблюдаемость и стоимость).</b> Чинят измеримость и срезают лишние round-trip’ы INVESTIGATE.</li>
+  <li><b>A1 + C2 (разблокировать PLAN).</b> A1 — резолвить per-model cfg из <code>models.json</code> (код); C2 — задать <code>ECOM_MODEL_FALLBACK</code> (конфиг, fallback уже в коде). Снимает 76% потерянного времени и сам провал прогона.</li>
+  <li><b>H2 + H3 (корректность answer).</b> Детерминированно грунтовать governing-doc и резолвить confirmed-сигнал — необходимо для реального score 1.0, иначе PLAN строит план на прокси.</li>
+  <li><b>M3 (стоимость INVESTIGATE).</b> Слить digest(N)+router(N+1) в один вызов — срезает round-trip’ы. Средний риск.</li>
+  <li><b>M1–M2 (опционально).</b> Не баги; косметика наблюдаемости, делать только если дёшево.</li>
 </ol>
 
 <div class="note">
-<b>Итог в одну строку.</b> t38 провален не из-за логики агента, а из-за <b>пустого ответа PLAN на CC-tier без fallback и без соблюдения таймаута</b>.
-Под этим механическим сбоем скрыт семантический риск: записи выбраны по 3DS-прокси при непрочитанном governing-doc. Чинить нужно оба слоя.
+<b>Итог в одну строку.</b> t38 провален механически — PLAN на CC-tier таймаутил (3×180&nbsp;с) и упал в empty <b>без заданного fallback</b>.
+Настоящий код-баг один: <code>cfg={}</code> делает <code>models.json cc_options</code> мёртвым (A1). Fallback уже в коде — нужен лишь конфиг (C2).
+Под механикой — семантический риск: 3DS-прокси при непрочитанном governing-doc (H2/H3). Чинить оба слоя.
 </div>
 
 <footer>
