@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Result Check — Richer Downstream Context</title>
+<style>
+  :root[data-theme="dark"]{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --ink:#e6edf3; --muted:#9aa7b4;
+    --line:#2b333d; --accent:#5aa9ff; --ok:#3fb950; --warn:#d29922; --crit:#f85149;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#f0f3f6; --ink:#1f2328; --muted:#57606a;
+    --line:#d0d7de; --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --crit:#cf222e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .wrap{max-width:1060px;margin:0 auto;padding:28px 22px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+         border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:18px;margin:32px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:20px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);font-size:13px}
+  .toggle{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+          border-radius:8px;padding:8px 14px;font-size:13px}
+  .toggle:hover{border-color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:10px 0 18px;background:var(--panel);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13.5px}
+  th{background:var(--panel2);font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12.5px;
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .badge{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:600;border:1px solid}
+  .b-ok{color:var(--ok);border-color:var(--ok)}
+  .b-warn{color:var(--warn);border-color:var(--warn)}
+  .b-info{color:var(--accent);border-color:var(--accent)}
+  .b-done{color:var(--ok);border-color:var(--ok)}
+  .note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+        border-radius:8px;padding:12px 14px;margin:12px 0;font-size:14px}
+  .kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:13px;color:var(--muted);margin-bottom:8px}
+  .kv b{color:var(--ink);font-weight:600}
+  .counts{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
+  .chip{border:1px solid var(--line);border-radius:8px;padding:8px 14px;background:var(--panel);font-size:13px}
+  .chip b{font-size:18px}
+  .ok{color:var(--ok)} .zero{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Result Check — Richer Downstream Context</h1>
+    <div class="sub">Сверка реализации с планом · IDD-цепочка · 2026-06-21</div>
+  </div>
+  <button class="toggle" id="tg">◐ Тема</button>
+</header>
+
+<!-- ===== БЛОК 1: РЕЗЮМЕ СВЕРКИ ===== -->
+<h2>1. Резюме сверки</h2>
+<div class="kv">
+  <span>Plan:</span><b>docs/superpowers/plans/2026-06-21-richer-downstream-context.md · plan_hash 7bd8c37763f5c1d6</b>
+  <span>Spec:</span><b>docs/superpowers/specs/2026-06-21-richer-downstream-context-design.md</b>
+  <span>Intent:</span><b>не найден (chain.intent: null) — не блокирует</b>
+  <span>Diff base:</span><b>git diff 6aaaa79 → HEAD (28cd3e0) · 9 feature-коммитов · 13 файлов</b>
+  <span>Вердикт:</span><b><span class="badge b-ok">OK</span></b>
+</div>
+<div class="note">База сверки — <code>6aaaa79</code> (родитель первого feature-коммита), а не <code>HEAD</code>: изменения уже закоммичены, и промежуточный bulk-коммит <code>6aaaa79 "гз"</code> внёс несвязанный мусор (удаления <code>data/</code>, чужой план harness-oracle-teach-bridge) — он исключён из сверки.</div>
+
+<!-- ===== БЛОК 2: РЕЗУЛЬТАТЫ ПРОВЕРКИ ===== -->
+<h2>2. Результаты проверки</h2>
+
+<h3>Покрытие шагов плана</h3>
+<div class="counts">
+  <div class="chip">DONE <b class="ok">7</b></div>
+  <div class="chip">PARTIAL <b class="zero">0</b></div>
+  <div class="chip">MISSING <b class="zero">0</b></div>
+</div>
+<table>
+  <thead><tr><th>Задача</th><th>Статус</th><th>Свидетельство в diff</th></tr></thead>
+  <tbody>
+    <tr><td>T1 — Part B: CONTRACT на lint-ошибках</td><td><span class="badge b-done">DONE</span></td><td><code>agent/pipeline.py</code> (_enrich_prim_error) + <code>tests/test_pipeline_interpreted.py</code> (5 enrich-тестов)</td></tr>
+    <tr><td>T2 — trace <code>investigate_stop</code></td><td><span class="badge b-done">DONE</span></td><td><code>agent/trace.py</code> +22 (метод + auto-helper)</td></tr>
+    <tr><td>T3 — <code>_forced_data_probe</code> + <code>sufficient()</code></td><td><span class="badge b-done">DONE</span></td><td><code>agent/investigate.py</code> + <code>tests/test_investigate.py</code> (5 тестов)</td></tr>
+    <tr><td>T4 — wiring investigate-loop</td><td><span class="badge b-done">DONE</span></td><td><code>agent/investigate.py</code> (action-chain/stop_reason/emit) + <code>tests/test_investigate.py</code> (3 теста) + fix double-stall→budget</td></tr>
+    <tr><td>T5 — pipeline <code>_data_path_seed</code> + call-site</td><td><span class="badge b-done">DONE</span></td><td><code>agent/pipeline.py</code> + <code>tests/test_pipeline_interpreted.py</code> (2 теста) + стуб <code>tests/test_pipeline_investigate.py</code></td></tr>
+    <tr><td>T6 — docs + iwiki</td><td><span class="badge b-done">DONE</span></td><td><code>CLAUDE.md</code>, <code>agent/CLAUDE.md</code>, <code>.env.example</code>, <code>docs/wiki/{investigate,pipeline}.md</code> + <code>.iwiki/index.jsonl</code></td></tr>
+    <tr><td>T7 — полная верификация</td><td><span class="badge b-done">DONE</span></td><td>Не code-артефакт: прогон <code>uv run pytest</code> (439 passed; 14 падений доказанно pre-existing) + комбинированный integration-тест</td></tr>
+  </tbody>
+</table>
+
+<h3>Findings</h3>
+<table>
+  <thead><tr><th>severity</th><th>шаг</th><th>Plan / Diff / Fix</th></tr></thead>
+  <tbody>
+    <tr><td><span class="badge b-warn">WARNING (excess, оправдано)</span></td><td>T5</td>
+        <td><b>Plan:</b> назвал только <code>pipeline.py</code> + <code>test_pipeline_interpreted.py</code>. <b>Diff:</b> также <code>tests/test_pipeline_investigate.py</code> (+1 строка: <code>data_paths=None</code> в стуб <code>fake_investigate</code>). <b>Fix:</b> не требуется — прямое следствие нового kwarg в call-site T5; ревью подтвердило минимальность.</td></tr>
+    <tr><td><span class="badge b-info">INFO</span></td><td>T6</td>
+        <td><b>Plan:</b> regenerate iwiki pages. <b>Diff:</b> кроме страниц обновлён <code>docs/wiki/.iwiki/index.jsonl</code> (264 стр.) — ожидаемый артефакт ingest, закоммичен отдельно (<code>c1ba2b8</code>) после того как первый T6-коммит его упустил.</td></tr>
+  </tbody>
+</table>
+
+<h3>Intent / Spec Coverage</h3>
+<table>
+  <thead><tr><th>Источник</th><th>Покрытие</th><th>Примечание</th></tr></thead>
+  <tbody>
+    <tr><td>Intent Desired Outcomes</td><td>—</td><td>intent-doc отсутствует (chain.intent: null) — сверка только plan↔spec↔diff</td></tr>
+    <tr><td>Spec Success Criteria (Testing)</td><td><b class="ok">8/8</b></td><td>Part B: 4 формы + idempotency; Part A: probe-эвристика, probe-once, sufficient-clause, regression-off, integration env, combined refs+data_paths — все в diff-тестах</td></tr>
+    <tr><td>Spec требования A1–A6, B1</td><td><b class="ok">7/7</b></td><td>все отражены в <code>agent/*.py</code> diff</td></tr>
+  </tbody>
+</table>
+
+<h3>Excess Changes</h3>
+<div class="note">Несвязанных изменений в feature-diff (<code>6aaaa79..HEAD</code>) нет. Единственный «excess» — оправданный 1-строчный стуб (см. findings). Мусор bulk-коммита <code>6aaaa79</code> вне зоны сверки.</div>
+
+<div class="note">
+  <b>Summary:</b> CRITICAL: 0 &nbsp;·&nbsp; WARNING: 1 (оправдано) &nbsp;·&nbsp; INFO: 1 &nbsp;·&nbsp;
+  <span class="badge b-ok">Вердикт: OK</span><br>
+  <span class="sub">Chain: intent (null) → spec (7136e5521c553673) → plan (7bd8c37763f5c1d6) → result OK</span>
+</div>
+
+</div>
+<script>
+  (function(){
+    var r=document.documentElement, b=document.getElementById('tg');
+    b.addEventListener('click',function(){
+      r.setAttribute('data-theme', r.getAttribute('data-theme')==='dark'?'light':'dark');
+    });
+  })();
+</script>
+</body>
+</html>
