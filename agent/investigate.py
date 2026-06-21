@@ -156,20 +156,22 @@ def is_stalled(result: str, signature: str, seen_signatures: set[str]) -> bool:
     return False
 
 
-def sufficient(intent, env: dict) -> bool:
-    """True when every investigator-groundable required_ref for the desired outcome
-    is grounded in env. Refs whose grounding is PLAN's responsibility (e.g.
-    record_path resolved from a $source) are skipped — the investigator cannot
-    ground them and must not block on them."""
+def sufficient(intent, env: dict, data_paths=None, probed=None) -> bool:
+    """True when every investigator-groundable required_ref for the desired outcome is
+    grounded in env AND every seed data-path has been probed. Refs whose grounding is
+    PLAN's responsibility (e.g. record_path resolved from a $source) are skipped — the
+    investigator cannot ground them and must not block on them. data_paths/probed default
+    to None ⇒ the data clause is inert (pre-feature behaviour)."""
     outcome = intent.desired_outcome
     refs = (intent.required_refs or {}).get(outcome, [])
-    if not refs:
-        return True
     for ref in refs:
         g = ref.grounded(env)
         if g is None:            # PLAN produces this ref (e.g. record_path) — not the investigator's job
             continue
         if not g:
+            return False
+    if data_paths:
+        if any(p not in (probed or set()) for p in data_paths):
             return False
     return True
 
@@ -194,6 +196,19 @@ def _forced_doc_read(env: dict, refs: list) -> "dict | None":
     for r in refs:
         if r.read_target() and r.grounded(env) is False:
             return {"tool": "read", "args": {"path": r.read_target()}}
+    return None
+
+
+def _forced_data_probe(data_paths, probed: set) -> "dict | None":
+    """Return a read-only action for the first un-probed seed data-path, or None.
+    Probe-tool heuristic: a '.' in the basename ⇒ a file ⇒ `read`; otherwise a directory
+    ⇒ `list`. The caller marks the path probed (probe-once) when it dispatches."""
+    for p in data_paths or []:
+        if p in probed:
+            continue
+        base = p.rsplit("/", 1)[-1]
+        tool = "read" if "." in base else "list"
+        return {"tool": tool, "args": {"path": p}, "_seed": p}
     return None
 
 

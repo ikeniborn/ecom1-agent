@@ -198,6 +198,44 @@ def test_sufficient_true_when_only_record_path_refs():
     assert sufficient(intent, env={}) is True
 
 
+from agent.investigate import _forced_data_probe
+
+
+def test_forced_data_probe_picks_first_unprobed_dir_then_file():
+    dp = _forced_data_probe(["/proc/payments", "/docs/p.md"], probed=set())
+    assert dp["_seed"] == "/proc/payments"
+    assert dp["tool"] == "list"                 # no '.' in basename -> directory -> list
+    assert dp["args"] == {"path": "/proc/payments"}
+    dp2 = _forced_data_probe(["/docs/p.md"], probed=set())
+    assert dp2["tool"] == "read"                # '.' in basename -> file -> read
+
+
+def test_forced_data_probe_none_when_all_probed_or_empty():
+    assert _forced_data_probe(["/a/b"], probed={"/a/b"}) is None
+    assert _forced_data_probe([], probed=set()) is None
+    assert _forced_data_probe(None, probed=set()) is None
+
+
+def test_sufficient_false_when_data_path_unprobed():
+    intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
+    assert sufficient(intent, env={}, data_paths=["/proc/payments"], probed=set()) is False
+
+
+def test_sufficient_true_when_all_data_paths_probed():
+    intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
+    assert sufficient(intent, env={}, data_paths=["/proc/payments"],
+                      probed={"/proc/payments"}) is True
+
+
+def test_sufficient_data_clause_inert_when_no_data_paths():
+    # regression guard: omitting data_paths/probed reproduces the old behaviour
+    env = {"policy_doc:/docs/security.md": True, "row.record_path": "/p.json"}
+    assert sufficient(_intent_with_refs(), env=env) is True
+    assert sufficient(_intent_with_refs(), env={}) is False
+
+
 import agent.investigate as inv
 
 
