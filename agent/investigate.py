@@ -377,7 +377,7 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
                         note, env_updates = digest(goal, tool, args, observation, escalate=True)
                         brief.notes.append(note); brief.env.update(env_updates)
                         _ground_doc_refs(brief.env, tool, args, req_refs)
-                        stop_reason = "sufficient"
+                        stop_reason = "budget"   # stalled even after escalation — gave up, not satisfied
                         break
                 seen.add(sig)
                 if _MERGE_STEPS:
