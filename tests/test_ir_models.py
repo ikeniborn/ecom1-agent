@@ -170,3 +170,20 @@ def test_intent_with_ok_is_fine():
                         outcome_space=["OUTCOME_OK", "OUTCOME_NONE_CLARIFICATION"],
                         answer_shape=AnswerShape())
     assert "OUTCOME_OK" in intent.outcome_space
+
+
+# --- Task L3: RefSpec grounding API ---
+
+def test_refspec_env_key_and_grounded_policy_doc():
+    r = RefSpec(kind="policy_doc", path="/d.md")
+    assert r.env_key() == "policy_doc:/d.md"
+    assert r.grounded({"policy_doc:/d.md": True}) is True
+    assert r.grounded({}) is False
+    assert r.read_target() == "/d.md"
+
+
+def test_refspec_record_path_not_investigator_groundable():
+    r = RefSpec(kind="record_path", source="$row.x")
+    assert r.env_key() is None
+    assert r.grounded({}) is None
+    assert r.read_target() is None

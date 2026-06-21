@@ -165,10 +165,37 @@ def test_sufficient_true_when_all_refs_grounded():
     assert sufficient(_intent_with_refs(), env=env)
 
 
+def test_sufficient_true_when_only_policy_doc_grounded_record_path_ungrounded():
+    # L3: record_path is PLAN-produced — sufficient() must not block on it.
+    intent = IntentSpec(
+        objective="cite fraud payments",
+        desired_outcome="OUTCOME_OK",
+        outcome_space=["OUTCOME_OK"],
+        answer_shape={},
+        required_refs={"OUTCOME_OK": [
+            RefSpec(kind="policy_doc", path="/docs/security.md"),
+            RefSpec(kind="record_path", source="$row.record_path"),
+        ]},
+    )
+    env = {"policy_doc:/docs/security.md": True}   # record_path NOT in env
+    assert sufficient(intent, env) is True
+
+
 def test_sufficient_true_when_no_required_refs():
     intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
                         outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
     assert sufficient(intent, env={})
+
+
+def test_sufficient_true_when_only_record_path_refs():
+    """required_refs with ONLY a PLAN-produced record_path ref must not block the
+    investigator (record_path is groundable only by a PLAN rowset, never by reads)."""
+    intent = IntentSpec(
+        objective="x", desired_outcome="OUTCOME_OK", outcome_space=["OUTCOME_OK"],
+        answer_shape={},
+        required_refs={"OUTCOME_OK": [RefSpec(kind="record_path", source="$row.record_path")]},
+    )
+    assert sufficient(intent, env={}) is True
 
 
 import agent.investigate as inv
@@ -249,8 +276,21 @@ def test_investigate_stops_on_sufficiency(monkeypatch):
 
 
 def test_investigate_respects_budget(monkeypatch):
-    intent = _intent_with_refs()             # two refs, never grounded -> never sufficient
-    # distinct non-empty results per step: no empty-stall, no repeated-signature stall
+    # Single ungrounded policy_doc ref — sufficient() stays False until budget exhausted.
+    # (record_path refs are PLAN-produced and are skipped by sufficient(); this test uses
+    # only a policy_doc so the budget mechanism is not masked by ref-kind skipping.)
+    intent = IntentSpec(
+        objective="cite fraud payments",
+        desired_outcome="OUTCOME_OK",
+        outcome_space=["OUTCOME_OK"],
+        answer_shape={},
+        required_refs={"OUTCOME_OK": [
+            RefSpec(kind="policy_doc", path="/docs/security.md"),
+        ]},
+    )
+    # distinct non-empty results per step: no empty-stall, no repeated-signature stall;
+    # reads go to /docs/0.md, /docs/1.md, /docs/2.md — NOT /docs/security.md, so
+    # _ground_doc_refs never grounds the policy_doc and sufficient() stays False.
     fx = {fixture_key("Read", f"/docs/{i}.md"): {"content": f"data{i}"} for i in range(3)}
     vm = MockVMSpy(fx)
     monkeypatch.setattr(inv, "router",

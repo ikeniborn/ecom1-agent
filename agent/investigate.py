@@ -157,43 +157,43 @@ def is_stalled(result: str, signature: str, seen_signatures: set[str]) -> bool:
 
 
 def sufficient(intent, env: dict) -> bool:
-    """True when every required_ref for the desired (happy) outcome is groundable
-    from env. Conservative: a policy_doc is grounded when env has key
-    'policy_doc:<path>'; a record_path is grounded when env has the bound source
-    key (RefSpec.source '$row.record_path' -> env key 'row.record_path')."""
+    """True when every investigator-groundable required_ref for the desired outcome
+    is grounded in env. Refs whose grounding is PLAN's responsibility (e.g.
+    record_path resolved from a $source) are skipped — the investigator cannot
+    ground them and must not block on them."""
     outcome = intent.desired_outcome
     refs = (intent.required_refs or {}).get(outcome, [])
     if not refs:
         return True
     for ref in refs:
-        if ref.kind == "policy_doc":
-            if not env.get(f"policy_doc:{ref.path}"):
-                return False
-        elif ref.kind == "record_path":
-            key = (ref.source or "").lstrip("$")
-            if not env.get(key):
-                return False
+        g = ref.grounded(env)
+        if g is None:            # PLAN produces this ref (e.g. record_path) — not the investigator's job
+            continue
+        if not g:
+            return False
     return True
 
 
 def _ground_doc_refs(env: dict, tool: str, args: dict, refs: list) -> None:
-    """Deterministically ground a required policy_doc ref when its exact path was
-    just read — independent of the digest LLM emitting the env key. Mutates env."""
+    """Deterministically ground a required ref when the path it reads from was just
+    read — independent of the digest LLM emitting the env key. Grounding state lives
+    on RefSpec (env_key/read_target). Mutates env."""
     if (tool or "").lower() != "read":
         return
     path = args.get("path", "")
     for r in refs:
-        if getattr(r, "kind", "") == "policy_doc" and r.path == path:
-            env[f"policy_doc:{path}"] = True
+        # read_target() and env_key() are both non-None exactly for groundable kinds
+        if r.read_target() == path and r.env_key():
+            env[r.env_key()] = True
 
 
 def _forced_doc_read(env: dict, refs: list) -> "dict | None":
-    """If a required policy_doc ref is still ungrounded, return a forced read
-    action for its path (prioritized over free routing); else None."""
+    """If any investigator-groundable ref (one with a read_target) is still ungrounded,
+    return a forced read action for its target path (prioritized over free routing);
+    else None."""
     for r in refs:
-        if getattr(r, "kind", "") == "policy_doc" and r.path:
-            if not env.get(f"policy_doc:{r.path}"):
-                return {"tool": "read", "args": {"path": r.path}}
+        if r.read_target() and r.grounded(env) is False:
+            return {"tool": "read", "args": {"path": r.read_target()}}
     return None
 
 
@@ -222,7 +222,7 @@ def _atoms_block(atoms: list) -> str:
 
 def _refs_targets(intent) -> str:
     refs = (intent.required_refs or {}).get(intent.desired_outcome, [])
-    return "; ".join(r.path if r.kind == "policy_doc" else f"{r.kind}:{r.source}" for r in refs)
+    return "; ".join(r.read_target() or f"{r.kind}:{r.source}" for r in refs)
 
 
 def router(intent, brief: "Brief", atoms: list, escalate: bool) -> dict:

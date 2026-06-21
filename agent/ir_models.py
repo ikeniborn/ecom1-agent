@@ -77,6 +77,23 @@ class RefSpec(BaseModel):
             raise ValueError(f"unknown RefSpec kind {self.kind!r}")
         return self
 
+    def env_key(self) -> "str | None":
+        """The env key under which a read-only investigator records this ref as grounded,
+        or None when the ref is PLAN-produced (resolved from a $source at plan time)."""
+        if self.kind == "policy_doc":
+            return f"policy_doc:{self.path}"
+        return None                      # record_path (& future $source kinds) -> PLAN's job
+
+    def grounded(self, env: dict) -> "bool | None":
+        """True/False if this ref is investigator-groundable (its env_key state); None when
+        it is not the investigator's responsibility (PLAN produces it)."""
+        k = self.env_key()
+        return None if k is None else bool(env.get(k))
+
+    def read_target(self) -> "str | None":
+        """The path a read-only investigator should read to ground this ref, else None."""
+        return self.path if self.kind == "policy_doc" else None
+
 
 class IntentSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
