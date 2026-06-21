@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка плана — Harness→Oracle Teach Bridge</title>
+<style>
+:root{
+  --bg:#f6f7fb; --surface:#ffffff; --fg:#2b2b3a; --muted:#6b6b80;
+  --accent:#5c6bc0; --accent-2:#3949ab; --border:#d6d8e6; --line:#9aa0b4; --zebra:#eef0f8;
+  --ok:#43a047; --ok-2:#2e7d32; --warn:#fb8c00; --warn-2:#ef6c00; --danger:#e53935; --danger-2:#c62828;
+  --shadow:rgba(40,40,80,.18);
+}
+body:has(#theme-toggle:checked){
+  --bg:#181825; --surface:#262637; --fg:#cdd6f4; --muted:#a6adc8;
+  --accent:#89b4fa; --accent-2:#5e95f0; --border:#3a3b52; --line:#6c7086; --zebra:#21222f;
+  --ok:#a6e3a1; --ok-2:#74c46e; --warn:#f9e2af; --warn-2:#f5c95b; --danger:#f38ba8; --danger-2:#e8638a;
+  --shadow:rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+body{
+  margin:0 auto; padding:1.5rem 2rem 4rem; max-width:1080px;
+  font:16px/1.55 system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb,var(--accent) 10%, transparent), transparent),
+    var(--bg);
+  color:var(--fg);
+  transition:background .3s, color .3s;
+}
+.theme-btn{
+  position:sticky; top:.5rem; float:right; z-index:10;
+  cursor:pointer; user-select:none;
+  padding:.25rem .6rem; border:1px solid var(--border); border-radius:6px;
+  background:var(--surface);
+}
+h1{font-size:1.7rem; margin:.2rem 0 .3rem}
+h2{font-size:1.25rem; margin:2rem 0 .6rem; border-bottom:2px solid var(--border); padding-bottom:.25rem}
+h3{font-size:1.05rem; margin:1.3rem 0 .4rem; color:var(--accent-2)}
+.sub{color:var(--muted); margin:.2rem 0 1rem}
+code{background:color-mix(in srgb,var(--accent) 14%, var(--surface)); padding:.05rem .35rem; border-radius:4px; font-size:.88em}
+table{border-collapse:collapse; width:100%; margin:.5rem 0 1rem; font-size:.92rem; background:var(--surface); box-shadow:0 1px 4px var(--shadow); border-radius:8px; overflow:hidden}
+th,td{border:1px solid var(--border); padding:.45rem .6rem; text-align:left; vertical-align:top}
+th{background:color-mix(in srgb,var(--accent) 18%, var(--surface)); font-weight:600}
+tbody tr:nth-child(even){background:var(--zebra)}
+.badge{display:inline-block; padding:.08rem .5rem; border-radius:999px; font-size:.78rem; font-weight:600; white-space:nowrap}
+.b-ok{background:color-mix(in srgb,var(--ok) 22%,var(--surface)); color:var(--ok-2); border:1px solid var(--ok)}
+.b-warn{background:color-mix(in srgb,var(--warn) 22%,var(--surface)); color:var(--warn-2); border:1px solid var(--warn)}
+.b-danger{background:color-mix(in srgb,var(--danger) 22%,var(--surface)); color:var(--danger-2); border:1px solid var(--danger)}
+.b-info{background:color-mix(in srgb,var(--accent) 18%,var(--surface)); color:var(--accent-2); border:1px solid var(--accent)}
+.note{background:color-mix(in srgb,var(--accent) 10%,var(--surface)); border-left:4px solid var(--accent); padding:.6rem .9rem; border-radius:0 8px 8px 0; margin:1rem 0}
+.lead{font-size:1.02rem}
+.center{text-align:center}
+.matrix td.hit{background:color-mix(in srgb,var(--accent) 30%,var(--surface)); text-align:center; font-weight:700; color:var(--accent-2)}
+.matrix td.empty{text-align:center; color:var(--muted)}
+.verdict{font-size:1.15rem; font-weight:700; padding:.8rem 1.1rem; border-radius:10px; margin:1rem 0; background:color-mix(in srgb,var(--ok) 16%,var(--surface)); border:1px solid var(--ok); color:var(--ok-2)}
+figure{margin:1rem 0; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1rem; box-shadow:0 1px 4px var(--shadow)}
+figcaption{color:var(--muted); font-size:.85rem; margin-top:.5rem; text-align:center}
+svg{display:block; margin:0 auto; max-width:100%; height:auto}
+.chain{font-family:ui-monospace,monospace; font-size:.9rem; background:var(--surface); padding:.6rem .9rem; border-radius:8px; border:1px solid var(--border)}
+.legend{font-size:.82rem; color:var(--muted); display:flex; gap:1.2rem; flex-wrap:wrap; justify-content:center; margin-top:.4rem}
+.legend span{display:inline-flex; align-items:center; gap:.35rem}
+.swatch{width:22px; height:0; border-top:3px solid var(--line); display:inline-block}
+</style>
+</head>
+<body>
+<input type="checkbox" id="theme-toggle" hidden>
+<label for="theme-toggle" class="theme-btn" title="Переключить тему">🌙 / ☀️</label>
+
+<h1>Проверка плана — Harness→Oracle «Teach» Bridge</h1>
+<p class="sub">Дата проверки: 2026-06-21 · Навык <code>check-plan</code> · Фазовая модель + state во frontmatter</p>
+
+<div class="verdict">Итоговый вердикт: OK — 0 critical, 0 warning. Все 5 фаз пройдены.</div>
+
+<h2>Файлы и хеши</h2>
+<table>
+<thead><tr><th>Артефакт</th><th>Путь</th><th>Хеш тела (canonical)</th><th>Статус</th></tr></thead>
+<tbody>
+<tr><td>План</td><td><code>docs/superpowers/plans/2026-06-21-harness-oracle-teach-bridge.md</code></td><td><code>964a5710f79a4fde</code></td><td><span class="badge b-ok">записан в review:</span></td></tr>
+<tr><td>Спека</td><td><code>docs/superpowers/specs/2026-06-21-harness-oracle-teach-bridge-design.md</code></td><td><code>5ca33c546416695a</code></td><td><span class="badge b-ok">совпадает с review.spec_hash спеки</span></td></tr>
+</tbody>
+</table>
+<div class="note">Во frontmatter плана при инициализации <code>review:</code> блока persisted <code>plan_hash</code> пересчитан на финальном файле (с уже вставленным frontmatter) каноническим алгоритмом <code>awk 'fm&gt;=2' | sha256sum | cut -c1-16</code> и совпадает: <code>964a5710f79a4fde</code>.</div>
+
+<h2>Резюме плана: шаги и критерии готовности (DoD)</h2>
+<table>
+<thead><tr><th>Задача</th><th>Шаг</th><th>Артефакт</th><th>Критерий готовности (DoD)</th></tr></thead>
+<tbody>
+<tr><td rowspan="6"><b>Task 1</b><br>Retrieval seam <code>_active()</code></td><td>1. Тесты (red)</td><td><code>tests/test_oracle_force_active.py</code></td><td>Файл создан, 2 теста</td></tr>
+<tr><td>2. Запуск → fail</td><td>—</td><td>FAIL: <code>cand1</code> не включён в <code>_active()</code></td></tr>
+<tr><td>3. Правка <code>_active()</code></td><td><code>agent/oracle.py:51-52</code></td><td>2 строки: чтение <code>ECOM_ORACLE_FORCE_ACTIVE</code></td></tr>
+<tr><td>4. Запуск → pass</td><td>—</td><td>PASS (2 passed)</td></tr>
+<tr><td>5. Регрессия oracle</td><td>—</td><td><code>test_oracle_seed.py</code> без НОВЫХ падений</td></tr>
+<tr><td>6. Commit</td><td>git</td><td>Коммит сделан</td></tr>
+
+<tr><td rowspan="5"><b>Task 2</b><br>Efficacy validator</td><td>1. Тесты (red)</td><td><code>tests/test_oracle_full_run_validate.py</code></td><td>Файл создан, 5 тестов</td></tr>
+<tr><td>2. Запуск → fail</td><td>—</td><td><code>AttributeError: grade_full_run</code></td></tr>
+<tr><td>3. Дописать validator</td><td><code>agent/oracle_validate.py</code> (конец, после стр. 76)</td><td><code>grade_full_run</code> + <code>validate_atom_via_full_run</code></td></tr>
+<tr><td>4. Запуск → pass</td><td>—</td><td>PASS (5 passed)</td></tr>
+<tr><td>5. Commit</td><td>git</td><td>Коммит сделан</td></tr>
+
+<tr><td rowspan="6"><b>Task 3</b><br>Orchestrator script</td><td>1. Тесты (red)</td><td><code>tests/test_harness_to_oracle.py</code></td><td>Файл создан, 5 тестов</td></tr>
+<tr><td>2. Запуск → fail</td><td>—</td><td><code>ModuleNotFoundError: scripts.harness_to_oracle</code></td></tr>
+<tr><td>3. Создать скрипт</td><td><code>scripts/harness_to_oracle.py</code></td><td><code>select_hot_checks/_source_artifacts/bridge_one/main</code></td></tr>
+<tr><td>4. Запуск → pass</td><td>—</td><td>PASS (5 passed)</td></tr>
+<tr><td>5. Smoke-run</td><td>—</td><td>Печатает <code>no hot checks (&gt;= 3 fires) in …</code>, без краша</td></tr>
+<tr><td>6. Commit</td><td>git</td><td>Коммит сделан</td></tr>
+
+<tr><td rowspan="3"><b>Task 4</b><br>Регрессия по всему набору</td><td>1. Полный прогон</td><td>—</td><td>12 новых тестов зелёные; падает только известный pre-existing набор</td></tr>
+<tr><td>2. Сверка падений</td><td>—</td><td>Нет НОВЫХ падений вне known set</td></tr>
+<tr><td>3. Commit (опц.)</td><td>git</td><td>Только если потребовался incidental fixup</td></tr>
+</tbody>
+</table>
+
+<h2>Схема зависимостей шагов</h2>
+<figure>
+<svg viewBox="0 0 900 200" role="img" aria-label="Граф зависимостей задач">
+  <defs>
+    <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="var(--shadow)"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+    </marker>
+  </defs>
+  <!-- edges (M -> N, M < N) -->
+  <line x1="190" y1="100" x2="250" y2="100" stroke="var(--line)" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="450" y1="100" x2="510" y2="100" stroke="var(--line)" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="710" y1="100" x2="770" y2="100" stroke="var(--line)" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <!-- nodes -->
+  <g filter="url(#ds)">
+    <rect x="30" y="70" width="160" height="60" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <rect x="290" y="70" width="160" height="60" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <rect x="550" y="70" width="160" height="60" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+    <rect x="810" y="70" width="80" height="60" rx="10" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+  </g>
+  <text x="110" y="95" text-anchor="middle" font-size="13" font-weight="700" fill="var(--fg)">Task 1</text>
+  <text x="110" y="114" text-anchor="middle" font-size="10.5" fill="var(--muted)">_active() seam</text>
+  <text x="370" y="95" text-anchor="middle" font-size="13" font-weight="700" fill="var(--fg)">Task 2</text>
+  <text x="370" y="114" text-anchor="middle" font-size="10.5" fill="var(--muted)">grade_full_run</text>
+  <text x="630" y="95" text-anchor="middle" font-size="13" font-weight="700" fill="var(--fg)">Task 3</text>
+  <text x="630" y="114" text-anchor="middle" font-size="10.5" fill="var(--muted)">orchestrator</text>
+  <text x="850" y="98" text-anchor="middle" font-size="13" font-weight="700" fill="var(--fg)">Task 4</text>
+  <text x="850" y="116" text-anchor="middle" font-size="10.5" fill="var(--muted)">regress</text>
+</svg>
+<figcaption>Рёбра M→N означают «результат шага M используется в шаге N» (M&lt;N). Циклов и нарушений порядка не обнаружено.</figcaption>
+</figure>
+<ul>
+<li><b>Task 1 → Task 2:</b> <code>grade_full_run</code> выставляет <code>ECOM_ORACLE_FORCE_ACTIVE</code>, который читает seam из Task 1.</li>
+<li><b>Task 2 → Task 3:</b> <code>bridge_one</code> импортирует <code>validate_atom_via_full_run</code> из Task 2.</li>
+<li><b>Task 3 → Task 4:</b> регрессия прогоняет все 3 новых тестовых файла.</li>
+</ul>
+
+<h2>Пересечения: артефакты × задачи</h2>
+<table class="matrix">
+<thead><tr><th>Артефакт</th><th>Task 1</th><th>Task 2</th><th>Task 3</th><th>Task 4</th></tr></thead>
+<tbody>
+<tr><td><code>agent/oracle.py</code></td><td class="hit">✔</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+<tr><td><code>agent/oracle_validate.py</code></td><td class="empty">·</td><td class="hit">✔</td><td class="empty">·</td><td class="empty">·</td></tr>
+<tr><td><code>scripts/harness_to_oracle.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="hit">✔</td><td class="empty">·</td></tr>
+<tr><td><code>tests/ (3 файла)</code></td><td class="hit">✔</td><td class="hit">✔</td><td class="hit">✔</td><td class="hit">прогон</td></tr>
+</tbody>
+</table>
+<p class="sub">Ни один исходный модуль не правится двумя задачами одновременно — конфликтов перекрытия нет. Тесты пересекаются только в Task 4 (прогон, не правка).</p>
+
+<h2>Покрытие требований спеки</h2>
+<table>
+<thead><tr><th>Требование спеки</th><th>Задача плана</th><th>Покрыто</th></tr></thead>
+<tbody>
+<tr><td>§1 Orchestrator: aggregate → load_checks → hot select → distil/validate/promote → summary; argparse trace_dir=logs</td><td>Task 3</td><td><span class="badge b-ok">да</span></td></tr>
+<tr><td>§2 Efficacy validator: <code>grade_full_run</code> + <code>validate_atom_via_full_run</code>, lazy <code>run_agent</code>, без <code>vm.answer</code>, env в <code>finally</code></td><td>Task 2</td><td><span class="badge b-ok">да</span></td></tr>
+<tr><td>§3 Retrieval seam: <code>_active()</code> + <code>ECOM_ORACLE_FORCE_ACTIVE</code></td><td>Task 1</td><td><span class="badge b-ok">да</span></td></tr>
+<tr><td>Env: <code>ECOM_BRIDGE_MIN_FIRES</code> / <code>ECOM_BRIDGE_MAX_ATOMS</code> / <code>ECOM_ORACLE_FORCE_ACTIVE</code></td><td>Task 3 (main) + Task 2</td><td><span class="badge b-ok">да</span></td></tr>
+<tr><td>Error handling: per-check try/except, best-effort False, env clear, promote-only-on-pass</td><td>Task 2 + Task 3</td><td><span class="badge b-ok">да</span></td></tr>
+<tr><td>Testing: force-active / score-gate + env discipline / selection + routing</td><td>Tasks 1–3 + Task 4</td><td><span class="badge b-ok">да</span></td></tr>
+<tr><td>Idempotency via dedup (уточнение: status «active» skip вместо None)</td><td>Task 3 (заголовок-нота + bridge_one)</td><td><span class="badge b-ok">да</span></td></tr>
+<tr><td>Non-Goals (no in-pipeline hook, no anti→check, no ledger, no HTML)</td><td>—</td><td><span class="badge b-ok">соблюдены</span></td></tr>
+</tbody>
+</table>
+<p class="sub">Лишних шагов нет: каждая задача отражена в Self-Review плана и привязана к требованию спеки.</p>
+
+<h2>Результаты проверки по фазам</h2>
+<table>
+<thead><tr><th>Фаза</th><th>Статус</th><th>Комментарий</th></tr></thead>
+<tbody>
+<tr><td>1. structure</td><td><span class="badge b-ok">passed</span></td><td>Нет плейсхолдеров (единственное совпадение TODO — фраза «No TBD/TODO» в Self-Review). Задачи 1–4 и шаги внутри без пропусков/дублей.</td></tr>
+<tr><td>2. coverage</td><td><span class="badge b-ok">passed</span></td><td>Все требования спеки покрыты ≥1 задачей; лишних задач нет.</td></tr>
+<tr><td>3. dependencies</td><td><span class="badge b-ok">passed</span></td><td>Порядок Task 1→2→3→4 корректен (M&lt;N); циклов нет; артефакты доступны на момент использования.</td></tr>
+<tr><td>4. verifiability</td><td><span class="badge b-ok">passed</span></td><td>У каждого шага есть команда запуска и ожидаемый результат (FAIL/PASS-счётчики, точный stdout smoke-run, known-failure set).</td></tr>
+<tr><td>5. consistency</td><td><span class="badge b-ok">passed</span></td><td>spec_hash совпадает с собственным review-хешем спеки; plan_hash пересчитан на финальном файле и совпадает.</td></tr>
+</tbody>
+</table>
+
+<h3>Findings</h3>
+<table>
+<thead><tr><th>id</th><th>severity</th><th>section</th><th>описание</th><th>verdict</th></tr></thead>
+<tbody>
+<tr><td colspan="5" class="center sub">Findings отсутствуют — план не требует доработки.</td></tr>
+</tbody>
+</table>
+
+<h3>Сводка</h3>
+<ul>
+<li>CRITICAL open: <b>0</b></li>
+<li>WARNING open: <b>0</b></li>
+<li>Вердикт: <b>OK</b></li>
+</ul>
+
+<div class="note">
+<b>Независимая сверка кода (не доверяя тексту плана):</b>
+<ul>
+<li><code>agent/oracle.py:51-52</code> — <code>_active()</code> возвращает только active; <code>import os</code> есть (стр. 6); конструктор <code>KnowledgeOracle(atoms=…)</code> принимает список. ✔</li>
+<li><code>agent/oracle_atoms.py</code> — порядок/имена полей <code>Atom</code> совпадают с keyword-конструкторами тестов. ✔</li>
+<li><code>agent/oracle_validate.py</code> — импорты <code>harness_pb2 as H</code>, клиенты, <code>_URL/_BID/_KEY</code>, <code>parse_score</code> на месте; файл заканчивается на стр. 76; <code>grade_full_run</code> использует те же RPC, что <code>grade_candidate</code>. ✔</li>
+<li><code>distill(...)</code> → <code>add_candidate</code>, который при cosine-dedup возвращает <b>существующий</b> атом (не None). Уточнение плана «idempotency через status == active» — корректно. (Плюс: <code>distill</code> возвращает None, если LLM не дал content — план это явно обрабатывает.) ✔</li>
+<li><code>run_agent(model_configs, harness_url, task_text, task_id="")</code> существует; pipeline отвечает VM один раз. ✔</li>
+<li><code>scripts/__init__.py</code> есть; <code>scripts/lint_report.py:aggregate</code> возвращает <code>{check_id: {fires, …}}</code>. ✔</li>
+<li>Import-cycle: <code>oracle_validate</code> импортируется <code>pipeline</code>, а <code>orchestrator</code> импортирует <code>pipeline</code> — ленивый импорт <code>run_agent</code> внутри <code>grade_full_run</code> необходим и корректен. ✔</li>
+</ul>
+</div>
+
+<h2>Цепочка</h2>
+<p class="chain">intent: null → spec: 2026-06-21-harness-oracle-teach-bridge-design.md → plan: 2026-06-21-harness-oracle-teach-bridge.md</p>
+
+<p class="sub center">Артефакт сгенерирован навыком <code>check-plan</code> → <code>html-report</code>. Self-contained, офлайн, тема переключается кнопкой 🌙/☀️.</p>
+
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка спецификации — Richer Downstream Context</title>
+<style>
+  :root[data-theme="dark"]{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --ink:#e6edf3; --muted:#9aa7b4;
+    --line:#2b333d; --accent:#5aa9ff; --ok:#3fb950; --warn:#d29922; --crit:#f85149;
+    --node:#1f2a36; --node-b:#33425a; --edge:#5a6b80;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#f0f3f6; --ink:#1f2328; --muted:#57606a;
+    --line:#d0d7de; --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --crit:#cf222e;
+    --node:#eef3f8; --node-b:#b6c2d1; --edge:#8a97a8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 22px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+         border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:18px;margin:34px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:22px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);font-size:13px}
+  .toggle{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+          border-radius:8px;padding:8px 14px;font-size:13px}
+  .toggle:hover{border-color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:10px 0 18px;background:var(--panel);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--panel2);font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12.5px;
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .badge{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:600;border:1px solid}
+  .b-ok{color:var(--ok);border-color:var(--ok)}
+  .b-warn{color:var(--warn);border-color:var(--warn)}
+  .b-crit{color:var(--crit);border-color:var(--crit)}
+  .b-info{color:var(--accent);border-color:var(--accent)}
+  .note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+        border-radius:8px;padding:12px 14px;margin:12px 0;font-size:14px}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+        padding:2px 8px;margin:2px 3px 2px 0;font-size:12.5px;font-family:ui-monospace,monospace}
+  /* block/flow diagram */
+  .flow{display:flex;flex-direction:column;gap:14px;margin:14px 0}
+  .lane{display:flex;gap:14px;flex-wrap:wrap;align-items:stretch}
+  .card{flex:1 1 210px;background:var(--node);border:1px solid var(--node-b);border-radius:10px;padding:12px 14px}
+  .card .t{font-weight:600;font-size:13.5px;margin-bottom:5px}
+  .card .d{color:var(--muted);font-size:12.5px}
+  .arrow{align-self:center;color:var(--edge);font-size:20px;line-height:1}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:12.5px;margin:6px 0 0}
+  figure{margin:0}
+  figcaption{color:var(--muted);font-size:12.5px;margin-top:6px}
+  .grid2{display:grid;grid-template-columns:1fr;gap:6px}
+  .verdict{font-size:16px;font-weight:700}
+  .kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:13px;color:var(--muted)}
+  .kv b{color:var(--ink);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Проверка спецификации — Richer Downstream Context</h1>
+    <div class="sub">2 части: INVESTIGATE data-paths (flag OFF) · CONTRACT на lint-сообщениях · 2026-06-21</div>
+  </div>
+  <button class="toggle" id="tg">◐ Тема</button>
+</header>
+
+<div class="kv">
+  <span>Файл спеки:</span><b>docs/superpowers/specs/2026-06-21-richer-downstream-context-design.md</b>
+  <span>spec_hash:</span><b>7136e5521c553673</b>
+  <span>Цепочка:</span><b>intent → spec (intent: null)</b>
+  <span>Финальный вердикт:</span><b><span class="badge b-ok">OK</span> — 0 CRITICAL open · 0 WARNING open</b>
+</div>
+
+<!-- ============ БЛОК 1: РЕЗЮМЕ СПЕЦИФИКАЦИИ ============ -->
+<h2>1. Резюме спецификации</h2>
+
+<h3>Требования по секциям</h3>
+<table>
+  <thead><tr><th>#</th><th>Секция</th><th>Требование</th></tr></thead>
+  <tbody>
+    <tr><td>A1</td><td>Configuration</td><td>Env-flag <code>ECOM_INVESTIGATE_DATA_PATHS</code> (default <code>0</code>). При <code>0</code> поведение INVESTIGATE идентично текущему — regression guard и A/B-baseline.</td></tr>
+    <tr><td>A2</td><td>Seed construction</td><td>Детерминированный seed в <code>run_pipeline</code>: path-литералы инструкции (<code>_extract_path_literals</code>) ∪ learned <code>prephase_deep_read</code> (только <code>/</code>-пути). Function-level import — без import-цикла. Никакого блуждания.</td></tr>
+    <tr><td>A3</td><td>investigate() signature</td><td>Новый параметр <code>data_paths: list[str] | None = None</code>. Falsy → всё новое поведение инертно (зеркало flag-off).</td></tr>
+    <tr><td>A4</td><td>Forced data-probe</td><td><code>_forced_data_probe(env, data_paths, probed)</code>. Приоритет шага: doc_read &gt; data_probe &gt; router. Probe-tool: <code>.</code> в basename → <code>read</code>, иначе → <code>list</code>. Probe-once. Запись в <code>brief.env["data_paths"][path]</code>.</td></tr>
+    <tr><td>A5</td><td>Stop condition</td><td><code>sufficient()</code> += <code>data_paths</code>/<code>probed</code>. Stop = doc-refs заземлены AND все seeds пробиты, OR step budget. Ceiling (<code>ECOM_INVESTIGATE_MAX_STEPS</code>=6) не поднимается.</td></tr>
+    <tr><td>A6</td><td>Trace signal</td><td>Событие <code>investigate_stop {reason, data_paths_total, data_paths_probed}</code>, reason ∈ <code>sufficient|budget|data_probed</code>. Делает гипотезу измеримой (baseline vs flag-on).</td></tr>
+    <tr><td>B1</td><td>Part B</td><td>Расширить <code>_enrich_prim_error</code>: <code>compute(?: step)?</code> ловит <code>compute 'X'</code>; fallback-скан quoted-токенов берёт первый с непустым <code>contract()</code> — ловит <code>'X' expects...</code>. Безопасно: <code>contract()</code>="" для не-примитива.</td></tr>
+  </tbody>
+</table>
+
+<h3>Success Criteria (DoD из секции Testing)</h3>
+<table>
+  <thead><tr><th>Часть</th><th>Критерий приёмки</th></tr></thead>
+  <tbody>
+    <tr><td>B</td><td><code>compute 'column' arg $rows</code> → CONTRACT для <code>column</code> один раз.</td></tr>
+    <tr><td>B</td><td><code>'column' expects list[dict]; use 'get'+'to_number'</code> → CONTRACT для <code>column</code> (не <code>get</code>/<code>to_number</code>).</td></tr>
+    <tr><td>B</td><td>Существующие форматы <code>compute step 'sum_col'</code>, <code>primitive 'count'</code> → поведение сохранено.</td></tr>
+    <tr><td>B</td><td>Не-примитив <code>'foo'</code> → без CONTRACT; уже содержащий CONTRACT → не дублируется.</td></tr>
+    <tr><td>A</td><td><code>_forced_data_probe</code>: первый непробитый seed; <code>None</code> когда все пробиты; эвристика read/list.</td></tr>
+    <tr><td>A</td><td>Probe-once: seed с ошибкой/пустотой помечен пробитым, не переиздаётся.</td></tr>
+    <tr><td>A</td><td><code>sufficient()</code> с непробитым data_path → <code>False</code>; все пробиты → fallback на doc-ref результат.</td></tr>
+    <tr><td>A</td><td><b>Regression guard:</b> flag=0 / <code>data_paths=None</code> → Brief идентичен дореформенному коду.</td></tr>
+    <tr><td>A</td><td>Integration: flag on + существующий путь → <code>brief.env["data_paths"][path]</code> заполнен, виден в <code>render_brief</code>.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ БЛОК 2: СХЕМЫ РЕШЕНИЯ И ЗАВИСИМОСТЕЙ ============ -->
+<h2>2. Схемы решения и зависимостей</h2>
+
+<h3>Схема решения (data/control flow)</h3>
+<figure>
+<div class="flow">
+  <div class="lane">
+    <div class="card"><div class="t">run_pipeline</div><div class="d">flag ON → строит <code>data_seed</code> = path-литералы ∪ deep_read(/)</div></div>
+    <div class="arrow">→</div>
+    <div class="card"><div class="t">investigate(data_paths=…)</div><div class="d">read-only ReAct loop, ceiling=6</div></div>
+  </div>
+  <div class="lane">
+    <div class="card"><div class="t">Приоритет шага</div><div class="d">_forced_doc_read &gt; _forced_data_probe &gt; router</div></div>
+    <div class="arrow">→</div>
+    <div class="card"><div class="t">_forced_data_probe</div><div class="d">первый непробитый seed → read/list (эвристика basename). Probe-once.</div></div>
+    <div class="arrow">→</div>
+    <div class="card"><div class="t">run_tool</div><div class="d">read / list (read-only)</div></div>
+  </div>
+  <div class="lane">
+    <div class="card"><div class="t">digest → brief.env["data_paths"]</div><div class="d">запись пробы; probed-set растёт</div></div>
+    <div class="arrow">→</div>
+    <div class="card"><div class="t">sufficient()</div><div class="d">doc-refs AND все seeds probed → stop; иначе budget</div></div>
+    <div class="arrow">→</div>
+    <div class="card"><div class="t">render_brief → PLAN</div><div class="d">+ trace <code>investigate_stop</code></div></div>
+  </div>
+  <div class="lane">
+    <div class="card"><div class="t">PLAN/lint/interpret ошибка</div><div class="d">сообщение об ошибке</div></div>
+    <div class="arrow">→</div>
+    <div class="card"><div class="t">_enrich_prim_error (Part B)</div><div class="d">regex + fallback-скан → <code>contract()</code></div></div>
+    <div class="arrow">→</div>
+    <div class="card"><div class="t">+ CONTRACT в retry</div><div class="d">iLEARN видит спецификацию примитива</div></div>
+  </div>
+</div>
+<figcaption>Part A (верхние 3 ряда) и Part B (нижний ряд) независимы; связаны темой «больше контекста downstream».</figcaption>
+</figure>
+
+<h3>Граф зависимостей (узлы — компоненты, рёбра — использует/зависит)</h3>
+<figure>
+<svg viewBox="0 0 940 420" width="100%" role="img" aria-label="Граф зависимостей">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--edge)"/>
+    </marker>
+    <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .n rect{fill:var(--node);stroke:var(--node-b);stroke-width:1.2;rx:9;filter:url(#ds)}
+      .n text{fill:var(--ink);font:12px ui-monospace,monospace}
+      .e{stroke:var(--edge);stroke-width:1.6;fill:none;marker-end:url(#arr)}
+      .el{fill:var(--muted);font:10.5px sans-serif}
+      .gA rect{stroke:var(--accent)}
+      .gB rect{stroke:var(--ok)}
+    </style>
+  </defs>
+
+  <!-- edges -->
+  <path class="e" d="M150,70 L150,118"/>
+  <path class="e" d="M150,160 L150,208"/>
+  <path class="e" d="M232,135 L360,90"/>
+  <path class="e" d="M232,142 L360,140"/>
+  <path class="e" d="M232,235 L360,232"/>
+  <path class="e" d="M470,255 L470,300"/>
+  <path class="e" d="M560,232 L660,150"/>
+  <path class="e" d="M560,322 L660,322"/>
+  <path class="e" d="M760,180 L760,300"/>
+  <!-- Part B -->
+  <path class="e" d="M250,372 L360,372"/>
+  <path class="e" d="M560,372 L660,372"/>
+
+  <!-- nodes Part A -->
+  <g class="n gA"><rect x="60" y="34" width="180" height="36" rx="9"/><text x="74" y="57">ECOM_…DATA_PATHS</text></g>
+  <g class="n gA"><rect x="60" y="124" width="180" height="36" rx="9"/><text x="74" y="147">data_seed (run_pipeline)</text></g>
+  <g class="n gA"><rect x="60" y="214" width="180" height="36" rx="9"/><text x="74" y="237">investigate(data_paths)</text></g>
+  <g class="n gA"><rect x="360" y="70" width="200" height="36" rx="9"/><text x="374" y="93">_extract_path_literals</text></g>
+  <g class="n gA"><rect x="360" y="122" width="200" height="36" rx="9"/><text x="374" y="145">load_prephase_deep_read</text></g>
+  <g class="n gA"><rect x="360" y="214" width="200" height="36" rx="9"/><text x="374" y="237">_forced_data_probe</text></g>
+  <g class="n gA"><rect x="360" y="300" width="220" height="36" rx="9"/><text x="374" y="323">run_tool (read/list)</text></g>
+  <g class="n gA"><rect x="660" y="114" width="220" height="36" rx="9"/><text x="674" y="137">sufficient()</text></g>
+  <g class="n gA"><rect x="660" y="300" width="220" height="36" rx="9"/><text x="674" y="323">brief.env["data_paths"]</text></g>
+
+  <!-- nodes Part B -->
+  <g class="n gB"><rect x="60" y="354" width="190" height="36" rx="9"/><text x="74" y="377">lint/interpret error</text></g>
+  <g class="n gB"><rect x="360" y="354" width="200" height="36" rx="9"/><text x="374" y="377">_enrich_prim_error</text></g>
+  <g class="n gB"><rect x="660" y="354" width="220" height="36" rx="9"/><text x="674" y="377">primitives.contract()</text></g>
+
+  <text class="el" x="250" y="86">uses</text>
+  <text class="el" x="250" y="135">uses</text>
+  <text class="el" x="590" y="180">gates</text>
+  <text class="el" x="585" y="316">writes</text>
+  <text class="el" x="590" y="366">uses</text>
+</svg>
+<figcaption>Синие узлы — Part A; зелёные — Part B. Подграфы не пересекаются (независимость частей).</figcaption>
+</figure>
+
+<h3>Карта покрытия (задача → требования спеки)</h3>
+<table>
+  <thead><tr><th>Задача из контекста</th><th>Покрывающие требования</th></tr></thead>
+  <tbody>
+    <tr><td><b>Part A</b> — INVESTIGATE поднимает data-paths (flag OFF)</td>
+        <td><span class="pill">A1</span><span class="pill">A2</span><span class="pill">A3</span><span class="pill">A4</span><span class="pill">A5</span><span class="pill">A6</span></td></tr>
+    <tr><td><b>Part B</b> — CONTRACT на lint-сообщениях</td>
+        <td><span class="pill">B1</span></td></tr>
+  </tbody>
+</table>
+<div class="note">Лишних (непривязанных) требований нет. Секции Testing / Files touched / Non-goals — поддерживающие, не вводят новых задач.</div>
+
+<!-- ============ БЛОК 3: РЕЗУЛЬТАТЫ ПРОВЕРКИ ============ -->
+<h2>3. Результаты проверки</h2>
+
+<table>
+  <thead><tr><th>Фаза</th><th>Статус</th><th>Закрытый чек-лист</th></tr></thead>
+  <tbody>
+    <tr><td>structure</td><td><span class="badge b-ok">passed</span></td><td>Нет TODO/TBD/???/FIXME; нет битых якорей/ссылок; секции без нумерации (пропусков нет); дублей заголовков нет.</td></tr>
+    <tr><td>coverage</td><td><span class="badge b-ok">passed</span></td><td>Part A и Part B покрыты ≥1 требованием; лишних требований нет; противоречий нет (ceiling-not-raised согласован: Stop + Non-goals).</td></tr>
+    <tr><td>clarity</td><td><span class="badge b-ok">passed</span></td><td>Probe-эвристика задана критерием (<code>.</code> в basename); DoD в Testing; термины согласованы (data_paths/seed/probe).</td></tr>
+    <tr><td>consistency</td><td><span class="badge b-ok">passed</span></td><td>Первый прогон; все секции новые; прежних findings нет.</td></tr>
+  </tbody>
+</table>
+
+<h3>Findings</h3>
+<table>
+  <thead><tr><th>id</th><th>severity</th><th>section</th><th>text</th><th>verdict</th></tr></thead>
+  <tbody>
+    <tr><td colspan="5" style="color:var(--muted)">— findings нет —</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <div class="grid2">
+    <div><b>CRITICAL open:</b> 0 &nbsp; · &nbsp; <b>WARNING open:</b> 0</div>
+    <div class="verdict"><span class="badge b-ok">Вердикт: OK</span></div>
+    <div>Цепочка: <code>intent → spec</code> · intent: <code>null</code> (intent-doc для темы не найден — не блокирует).</div>
+  </div>
+</div>
+
+<p class="sub">Артефакт автогенерируемый. spec_hash <code>7136e5521c553673</code> совпадает с телом спеки на момент проверки.</p>
+
+</div>
+<script>
+  (function(){
+    var r=document.documentElement, b=document.getElementById('tg');
+    b.addEventListener('click',function(){
+      r.setAttribute('data-theme', r.getAttribute('data-theme')==='dark'?'light':'dark');
+    });
+  })();
+</script>
+</body>
+</html>

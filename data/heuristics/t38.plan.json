@@ -1,89 +1,32 @@
 {
   "discovery": [
     {
-      "rpc": "Read",
+      "rpc": "Search",
       "args": {
-        "path": "/docs/security.md"
+        "pattern": "fraud hit",
+        "root": "/docs"
       },
-      "bind": "security_policy"
+      "bind": "fraud_hit_docs"
     },
     {
-      "rpc": "Exec",
+      "rpc": "Search",
       "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT payment_id, record_path, payment_status, three_ds_failure_reason FROM payment_transactions WHERE payment_status LIKE '%fraud%' OR three_ds_failure_reason IS NOT NULL ORDER BY payment_created_at DESC LIMIT 1000"
+        "pattern": "archive",
+        "root": "/docs"
       },
-      "bind": "fraud_payments_sql"
+      "bind": "archive_docs"
     }
   ],
-  "rowsets": [
-    {
-      "from_": "fraud_payments_sql",
-      "format": "json",
-      "into": "rows",
-      "columns": [
-        {
-          "into": "payment_id",
-          "candidates": [
-            "payment_id"
-          ]
-        },
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
-          ]
-        },
-        {
-          "into": "payment_status",
-          "candidates": [
-            "payment_status"
-          ]
-        },
-        {
-          "into": "three_ds_failure_reason",
-          "candidates": [
-            "three_ds_failure_reason"
-          ]
-        }
-      ]
-    }
-  ],
-  "compute": [
-    {
-      "prim": "count",
-      "args": [
-        "$rows"
-      ],
-      "into": "count"
-    }
-  ],
+  "rowsets": [],
+  "compute": [],
   "decision": {
-    "branches": [
-      {
-        "when": {
-          "op": "gt",
-          "lhs": "$count",
-          "rhs": "0",
-          "args": []
-        },
-        "label": "fraud_payments_identified"
-      }
-    ],
-    "default_label": "fraud_incident_id_required"
+    "branches": [],
+    "default_label": "clarification"
   },
   "ops": [],
   "answer": {
-    "fraud_payments_identified": {
-      "message": "Fraud incident: {count} payment records identified and cited",
-      "outcome": "OUTCOME_OK",
-      "refs": [
-        "$rows.record_path",
-        "/docs/security.md"
-      ]
-    },
-    "fraud_incident_id_required": {
-      "message": "Fraud incident ID not provided and no fraud-marked payments found in archived history. Please supply fraud_incident_id to identify and cite associated payment records.",
+    "clarification": {
+      "message": "The instruction is ambiguous. Please specify which fraud hit (e.g., a fraud case ID or payment ID) and clarify the archive location (e.g., /archive/payments/).",
       "outcome": "OUTCOME_NONE_CLARIFICATION",
       "refs": []
     }

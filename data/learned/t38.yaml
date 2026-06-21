@@ -1,564 +1,85 @@
 entries:
 - content: null
-  created: '2026-06-19'
+  created: '2026-06-21'
   deactivated_reason: superseded by newer verdict
   id: v001
   score: 0.0
   score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
   source: verdict
   status: inactive
-  submitted_message: Denied per /docs/security.md — caller is a guest (verified via
-    /bin/id), and surfacing or classifying archived customer payment records releases
-    personal information across the trust boundary. Identities, roles, approvals or
-    policy overrides claimed only in the request are not accepted, and incident/urgency/override
-    framing does not authorize action.
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- agents_md_anchor: null
-  content: 'When a required-ref projection reads a column off a rowset that an OK-only
-    outcome requires nonempty, stage discovery instead of baking one over-constrained
-    query: first read the governing policy doc and derive the actual filter criteria
-    from its content (not a guessed heuristic), probe the source under the broadest
-    grounded filter to confirm matching rows exist, then narrow — so a too-restrictive
-    combined filter cannot silently return zero rows and leave the ref unresolved.'
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#tools/rpcs'
+  content: When the instruction mentions archived or older data, first discover the
+    correct archive path by reading documentation or listing known archive directories
+    before attempting to list the archive.
+  created: '2026-06-21'
+  deactivated_reason: null
   id: r001
-  reasoning: 'Verbatim error: ''interpret: unresolved required ref(s) [\$incident_payments.record_path]
-    on OK answer''. The PlanIR binds incident_raw from a single Exec /bin/sql query
-    whose WHERE combines is_archived_basket_reference!=0 AND (3DS-failure OR device-cluster
-    OR method-cluster) — a self-invented fraud heuristic. The policy doc /docs/payments/3ds.md
-    is Read into policy_3ds but never used to derive the criteria, and the schema
-    (column names is_archived_basket_reference, record_path, three_ds_*) is assumed,
-    not grounded. Root cause: the over-restrictive / mis-grounded combined filter
-    returned an empty result, so the rowset incident_payments has no rows and the
-    projection \$incident_payments.record_path resolves empty. Since outcome_space
-    is OK-only and success requires nonempty \$incident_payments.record_path, an empty
-    rowset has no fallback label and fails interpret. Rule linkage: future PLAN must
-    shape discovery broad-to-narrow off policy-grounded criteria + a nonempty probe
-    before projecting a required ref, rather than betting the whole answer on one
-    guessed query.'
-  status: inactive
+  reasoning: 'Error: real_vm: list failed: not found for path /archive/payments. Root
+    cause: PlanIR hardcoded the archive path without verifying its existence. The
+    instruction refers to ''older archived payment history'' but the plan did not
+    discover the actual archive location. Rule ensures the plan performs discovery
+    (Read docs or List parent directories) to find the correct path before listing,
+    preventing grounding failures.'
+  status: active
   surface: ir
 - agents_md_anchor: null
-  content: Always wire every required_ref declared for the emitted outcome into that
-    answer branch's refs array; for a ref sourced from a rowset column (e.g. $rowset.record_path),
-    project that column from the resolved rowset so each cited row contributes its
-    path — an empty refs array leaves source-based required refs unresolved even when
-    the rowset itself is populated.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  content: When the instruction mentions an archive or archived data, do not assume
+    a fixed path; instead, first search for documentation about the archive structure
+    using Search with pattern 'archive' or 'data retention', then read the found document
+    to discover the correct path before listing the archive.
+  created: '2026-06-21'
+  deactivated_reason: null
   id: r002
-  reasoning: 'Verbatim error: ''interpret: unresolved required ref(s) [''$incident_payments.record_path'']
-    on OK answer''. IntentSpec required_refs[OK] declares record_path sourced from
-    $incident_payments.record_path. Failing PlanIR fragment: answer.ok = {...,"refs":[]}
-    — refs array is empty. The discovery+rowset correctly bind a record_path column
-    on $incident_payments, but the answer branch never projects the declared required
-    refs, so the dynamic source-based ref ($incident_payments.record_path) stays unresolved;
-    the static policy_doc literal path resolves on its own, which is why only the
-    source-based ref is flagged. Distinct from the existing in-session rule (which
-    guards against over-constrained filters returning zero rows) — here rows may exist
-    yet the answer omits ref projection entirely. New rule forces the answer branch
-    to emit each required_ref, projecting rowset-sourced columns per row.'
-  status: inactive
+  reasoning: 'Verbatim error: ''real_vm: list failed: not found''. Root cause: the
+    PlanIR attempted to list a hardcoded path ''/archive'' which does not exist; the
+    plan did not first discover the correct archive path from documentation. Failing
+    PlanIR fragment: the List RPC with args {''path'': ''/archive''}. Existing rule
+    [in-session] was insufficient because it did not specify how to discover the path;
+    the plan guessed a path instead of searching.'
+  status: active
   surface: ir
 - agents_md_anchor: null
-  content: When a PlanIR builds a filtering query whose result feeds a rowset column
-    that an OK-only outcome requires nonempty, first emit a schema-discovery step
-    that reads the source table's actual column names and enum/status values (definition
-    or a sample row) and confirm every referenced column and literal exists before
-    constructing the filter — never guess identifiers like fingerprint/status/archive-flag
-    columns or status enum strings, because a query over a non-existent column or
-    wrong enum value returns zero rows and leaves the rowset-sourced required ref
-    unresolved even when the ref is correctly wired and projected.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  content: Always define a rowsets entry for any discovery bind (from a Search RPC)
+    that will be used with a 'column' or 'list' primitive in the compute section,
+    before referencing that bind in compute.
+  created: '2026-06-21'
+  deactivated_reason: null
   id: r003
-  reasoning: 'Verbatim error: ''interpret: unresolved required ref(s) [$incident_payments.record_path]
-    on OK answer''. The ref IS wired into answer.ok.refs and record_path IS projected
-    in the incident_payments rowset columns, so the prior in-session wiring/projection
-    rules were satisfied — the failure is upstream: the discovery Exec bakes a single
-    combined SQL filter referencing guessed columns (three_ds_status, three_ds_failure_reason,
-    three_ds_attempts, three_ds_max_attempts, device_fingerprint, payment_method_fingerprint,
-    is_archived_basket_reference) and guessed status literals (''failed'',''failure'',''fail'',''denied'',''rejected'').
-    If any of those column names or enum values do not match the real payment_transactions
-    schema, the query errors or returns zero rows → empty record_path → unresolved
-    required ref. This is distinct from existing rule r-stage-discovery (probe broadest
-    grounded filter): schema grounding of column/enum identifiers is the precondition
-    that must precede any probe, since even the broadest filter over a non-existent
-    column yields nothing. Additive, supersedes nothing.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a PlanIR both cites a policy_doc required ref and filters a source
-    to populate a rowset column that an OK-only outcome requires nonempty, extract
-    the concrete membership criteria (status enums, signal thresholds, which fingerprints/flags
-    define the incident) from that policy doc's content via an explicit extraction
-    or decision step and feed those extracted values into the query filter — a policy
-    read bound only to satisfy the citation ref while the WHERE clause applies independently-guessed
-    heuristic constants grounds the rowset on invented criteria, returns zero matching
-    rows, and leaves the rowset-sourced record_path ref unresolved even though the
-    read happened.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: 'Verbatim error: "interpret: unresolved required ref(s) [''$incident_payments.record_path'']
-    on OK answer". The ref IS wired (answer.ok.refs contains "$incident_payments.record_path")
-    and the column IS projected (compute: column $incident_payments record_path ->
-    incident_record_paths), so the prior wiring/projection rules were satisfied —
-    yet the ref still resolved empty. Root cause: discovery reads /docs/payments/3ds.md
-    into bind "policy_doc" but that content is never consumed; the SQL filter (device_fingerprint/payment_method_fingerprint
-    GROUP BY HAVING COUNT(*)>1, three_ds_failure_reason IS NOT NULL, three_ds_attempts>=three_ds_max_attempts,
-    is_archived_basket_reference<>0) is an independently-invented heuristic, not derived
-    from the cited policy. Failing fragment: the policy_doc Read bound to "policy_doc"
-    is decorative (feeds only the citation ref) while the WHERE clause hardcodes guessed
-    cluster/3DS constants — over-constrained, returns zero rows, so $incident_payments.record_path
-    is empty and the OK-only outcome (which requires nonempty record_path) cannot
-    resolve. Linkage: existing rule A says ''derive criteria from its content (not
-    a guessed heuristic)''; this rule sharpens the mechanism — the policy bind must
-    be CONSUMED via an extraction/decision step that binds concrete criteria into
-    the filter, not left as a citation-only read alongside a guessed WHERE clause.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: 'When an OK-only outcome''s required ref demands nonempty on a rowset column,
-    treat that nonempty condition — not a permissive count>=0 self-check — as the
-    binding success gate: a `ge $count 0` decision branch is true even for an empty
-    rowset, so the planner emits OK while interpret-time ref resolution fails; ground
-    discovery (schema-verified columns, policy-derived criteria, broadest-grounded
-    probe) to guarantee at least one matching row, and guard the OK label on the rowset
-    being nonempty rather than on a count that passes at zero rows — especially when
-    the outcome space has no fallback outcome to absorb an empty result.'
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'Verbatim error: `interpret: unresolved required ref(s) [''$incident_payments.record_path'']
-    on OK answer`. The required ref IS wired in the answer refs array and record_path
-    IS projected in the rowset columns, so the wiring/projection rules were satisfied.
-    Root cause: the baked combined-OR WHERE over guessed columns (is_archived_basket_reference,
-    device_fingerprint, payment_method_fingerprint, three_ds_status/failure_reason/attempts/max_attempts)
-    returned zero rows, so $incident_payments resolved empty and the nonempty required-ref
-    on record_path could not resolve. Distinct new angle vs prior rules: the decision
-    is `{"branches":[{"when":{"op":"ge","lhs":"$incident_count","rhs":0}, "label":"ok"}],"default_label":"ok"}`
-    — a ge-0 guard that is TRUE for zero rows, so the planner committed OUTCOME_OK
-    despite an empty rowset; with outcome_space=[OUTCOME_OK] there is no fallback,
-    so discovery MUST yield rows. Prior rules 1/3/4 address query grounding (schema
-    discovery, policy-criteria extraction, probe-broad-then-narrow); this rule adds
-    the complementary decision-guard insight that a permissive count self-check must
-    not stand in for the nonempty-ref precondition. No supersession — those rules
-    remain valid.'
-  status: inactive
+  reasoning: 'Error: ''plan: list primitive consumes a raw discovery bind; parse it
+    with a rowsets entry first (compute ''column'' arg $archive_search_results); list
+    primitive consumes a raw discovery bind; parse it with a rowsets entry first (compute
+    ''column'' arg $fraud_search_results)''. Root cause: The PlanIR has a compute
+    section with ''column'' primitives directly referencing discovery bindings ($archive_search_results,
+    $fraud_search_results) without first parsing them into a rowsets entry. The system
+    requires that discovery results be structured via a rowsets entry before column
+    extraction. Failing PlanIR fragment: ''compute'': [{''prim'':''column'',''args'':[''$archive_search_results'',''path''],...},
+    ...] with ''rowsets'':[]. The existing in-session rule about discovering archive
+    paths is correct but insufficient; it does not enforce the necessary plan structure.
+    This new rule fills that gap.'
+  status: active
   surface: ir
 - content: null
-  created: '2026-06-20'
-  deactivated_reason: superseded by newer verdict
+  created: '2026-06-21'
   id: v002
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
   source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: '#instruction > action-scope'
-  content: Always emit each required_ref of the chosen OK outcome as an explicit structured
-    entry in that outcome's answer.refs array, projecting its rowset-column source
-    (e.g. {kind, source:$rowset.record_path}) — interpolating those values into the
-    message string alone, or leaving answer.refs as [], leaves the required ref unresolved
-    at interpret time even when the rowset is nonempty and the value already appears
-    in the message text, because interpret-time resolution validates the refs array,
-    not message placeholders.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: 'Verbatim error: "interpret: unresolved required ref(s) [''$fraud_payments.record_path'']
-    on OK answer". required_refs.OUTCOME_OK declares one ref {kind:record_path, source:$fraud_payments.record_path},
-    but the failing PlanIR''s answer block is "ok":{...,"refs":[]} — refs is empty.
-    The plan computed the column via {"prim":"column","args":["$fraud_payments","record_path"],"into":"payment_record_paths"}
-    and only interpolated it as {payment_record_paths} inside the message skeleton;
-    it never emitted the structured $fraud_payments.record_path ref into answer.ok.refs.
-    Interpret-time ref resolution checks the refs array, not message-string placeholders,
-    so the required ref stays unresolved regardless of whether fraud_payments has
-    rows. Root cause is the answer.refs projection, not rowset grounding. This is
-    distinct from r003/r004/r005, which all guarantee a nonempty rowset (schema-verified
-    columns, policy-derived criteria, nonempty OK gate) but say nothing about wiring
-    the required ref into the answer block; the new rule closes that gap.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-20'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-20'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: No fraudulent payment records found. Please clarify the criteria.
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When an OK-only required ref projects a rowset column for citation (e.g.
-    $rows.record_path), probe the source table's schema first and confirm that BOTH
-    the membership-filter columns AND the citation/path column exist under the exact
-    names used in SELECT/WHERE before authoring the query; selecting guessed column
-    names — whether for the policy signals or for the citation column itself — makes
-    the query error or return blank/zero rows, so the rowset is empty and the projected
-    ref stays unresolved even when the table holds matching records. Map the citation
-    ref to a schema-verified column and build filter predicates from verified columns,
-    not invented names.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: 'Verbatim error: ''interpret: unresolved required ref(s) [\''$rows.record_path\'']
-    on OK answer''. The PlanIR correctly guards OK on nonempty $rows (r005) and emits
-    the record_path ref as a structured answer.refs entry {kind:record_path, source:$rows.record_path}
-    (r006), so the failure is upstream: the rowset itself came back empty. Failing
-    fragment — the SQL SELECTs payment_id, record_path, three_ds_status, three_ds_failure_reason,
-    three_ds_attempts, three_ds_max_attempts, is_archived_basket_reference and applies
-    a WHERE with hand-invented enums (''failed'',''failure'',''rejected'',''declined'',''denied'',''error'',''aborted'',''not_authenticated'',''unauthenticated'',''abandoned'',''challenge_failed'',
-    payment_status IN (''fraud'',''chargeback'',''reversed'',''voided''), attempts>=max_attempts)
-    while /docs/payments/3ds.md is read only as bind policy_doc and never feeds the
-    filter — the membership-criteria half of this is exactly r004 (policy read to
-    satisfy citation ref, WHERE applies guessed constants). The NEW, complementary
-    root cause this rule targets: every column name (three_ds_*, record_path, is_archived_basket_reference)
-    is also guessed against an unverified schema; if the real table names the citation
-    column or the filter columns differently, the query errors or projects blanks
-    and $rows.record_path is unresolved independent of whether criteria match. r004
-    covers criteria grounding; r005 covers the nonempty success gate; r006 covers
-    ref projection — none require schema-verifying the citation/filter columns. This
-    rule closes that gap. prephase_deep_read surfaces both the policy content and
-    the actual schema at plan time so the next cycle authors verified column names
-    and policy-derived enums rather than guessing.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a compute step collapses a rowset column into a single string for
-    message interpolation, do not feed a fixed-arity binary primitive like `concat`
-    a single list/column argument — verify each compute primitive's declared arity
-    against the args supplied, and to fold a multi-value column into one string use
-    a list-aggregating join primitive (or a reduce that hands `concat` its two required
-    operands per step) rather than calling the 2-arg primitive with one arg.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r008
-  reasoning: 'Verbatim error: `plan: primitive ''concat'' takes 2 arg(s), plan supplies
-    1`. Root cause: the PlanIR compute chain extracts the record_path column then
-    tries to flatten it to a single string for the {record_paths} message placeholder
-    via `{"prim":"concat","args":["$record_paths_col"],"into":"record_paths"}` — but
-    `concat` is a binary primitive requiring exactly 2 operands; supplying one list
-    argument fails plan-time arity validation before execution. Failing fragment:
-    the lone-arg `concat` over `$record_paths_col`. The planner conflated ''join a
-    list into a string'' (an aggregation/reduce) with ''concatenate two operands''
-    (binary concat). Distinct from existing rules: r004/r005/in-session address policy-derived
-    criteria and schema-verified columns to keep the rowset nonempty; r006 addresses
-    projecting refs into answer.refs rather than message placeholders — none cover
-    compute-primitive arity. This rule adds arity-checking before emitting compute
-    steps. Note r006 already implies the {record_paths} message interpolation is not
-    what resolves the ref, but the immediate fix is correct primitive arity for any
-    column-to-string fold.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-20'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When the PlanIR filters a rowset by a policy-defined rule (fraud signals,
-    status enums, attempt thresholds), derive every predicate value and threshold
-    from the policy document / facts.policies content that a discovery step binds
-    — do not bake guessed status strings or comparison thresholds into the SQL WHERE.
-    A discovery step that reads the policy into a bind but then filters on invented
-    signal values returns zero matching rows, leaving the rowset empty so any OK-required
-    citation ref projected from it (e.g. $rows.record_path) stays unresolved at interpret
-    time even though the ref is correctly emitted in answer.refs and the citation
-    column was selected.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r009
-  reasoning: 'Verbatim error: ''interpret: unresolved required ref(s) [$rows.record_path]
-    on OK answer''. The ''found'' answer DOES emit the ref structurally ({kind:record_path,
-    source:$rows.record_path}), so r006 is satisfied, and record_path is selected
-    in the SELECT, so r007''s column-name check passes too. Root cause is upstream:
-    the failing PlanIR discovery reads /docs/payments/3ds.md into bind ''policy_doc''
-    but never uses it — the fraud WHERE predicate bakes guessed signal values (LOWER(three_ds_status)
-    IN (''failed'',''failure'',''declined'',''error'',''rejected'',''abandoned''),
-    three_ds_attempts >= three_ds_max_attempts). TOOL_PLAN.params explicitly says
-    ''read the rule from facts.policies, do not bake values''. When the real policy
-    defines fraud by different status enums / reason codes / thresholds, this invented
-    predicate matches no archived rows, fraud_raw is empty, rowset ''rows'' is empty,
-    and $rows.record_path projects nothing — hence the unresolved required ref. New
-    rule targets predicate-VALUE grounding (derive from policy content), distinct
-    from r006 (emit ref in array) and r007 (verify column NAMES exist); none are superseded.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a rowset's membership filter must apply a rule defined in a policy
-    document the instruction names by path, request that document via prephase_deep_read
-    and ground the SQL WHERE predicates (signal column names, status enums, attempt
-    thresholds) on its surfaced contents before authoring the query — do not place
-    a Read of the policy in the PlanIR discovery list and expect its bind to shape
-    the filter, because the discovery Read resolves only at execution time, after
-    the static SQL text is already fixed, so it cannot feed the WHERE; an unguided
-    filter then falls back to invented enum/threshold values, matches zero scoped
-    rows, and leaves any OK-required citation ref projected from that empty rowset
-    (e.g. $rows.record_path) unresolved at interpret time even when the ref is correctly
-    emitted in answer.refs and the citation column was selected. Alternatively select
-    the full scoped rowset unfiltered and apply the policy-derived predicate in a
-    compute/decision step.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r010
-  reasoning: 'Verbatim error: ''interpret: unresolved required ref(s) [\''$rows.record_path\'']
-    on OK answer''. Root cause: the PlanIR discovery reads /docs/payments/3ds.md into
-    bind policy_doc_text, but the WHERE filter never consumes that bind — it is statically
-    authored with guessed three_ds_status enums (''failed'',''failure'',''declined'',''error'',''rejected'',''abandoned'',''expired'',''timeout'',''not_authenticated'',''unauthenticated'')
-    and a guessed three_ds_attempts >= three_ds_max_attempts threshold. Static SQL
-    text is frozen at plan time, so a runtime discovery Read cannot ground it; the
-    invented signals match zero archived rows, $rows is empty, and the citation ref
-    source:$rows.record_path stays unresolved even though answer.refs emits it (r006
-    satisfied) and the column was selected (r007 schema concern not the blocker).
-    The [in-session] rule already names this empty-rowset-from-guessed-values failure
-    but its advice (''derive predicate values from the bind a discovery step reads'')
-    is structurally unachievable for static SQL and the cycle failed again following
-    it — so this rule supplies the workable mechanism: surface the policy doc via
-    prephase_deep_read so the plan author sees real signals before authoring, or move
-    the policy predicate into compute/decision over an unfiltered scoped rowset. Not
-    skipped: existing rules diagnose but do not give an actionable grounding path.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When an OK answer's required citation ref projects a column from a rowset
-    whose membership depends on a policy-defined predicate (status enums, attempt
-    thresholds, anomaly signals named only in a doc), request that policy document
-    via prephase_deep_read so its predicate values are eagerly surfaced (Tier-2) before
-    the PlanIR is authored, then ground the filter on those surfaced values — either
-    encoded in the SQL WHERE or applied as a post-fetch compute/decision filter over
-    the schema-verified membership-scoped rowset — and never bake guessed enum/threshold
-    literals into static SQL, because a discovery-list Read of the policy resolves
-    only at execution time after the static SQL text is fixed, so an unguided filter
-    falls back to invented values, matches zero scoped rows, and leaves the projected
-    ref unresolved at interpret time even when the ref is correctly emitted in answer.refs
-    and the citation column was selected.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r011
-  reasoning: 'Verbatim error: ''interpret: unresolved required ref(s) [\''$rows.record_path\'']
-    on OK answer''. The ref is correctly emitted (answer.refs has {kind:record_path,
-    source:$rows.record_path}, satisfying r006) and record_path is in the SELECT list
-    (satisfying r007''s projection), so the ref stays unresolved because the rowset
-    is EMPTY. Root cause: the fraud filter is baked into static SQL WHERE with guessed
-    signal values — `LOWER(COALESCE(three_ds_status,'''')) IN (''failed'',''fail'',''declined'',''error'',''rejected'',''abandoned'')`
-    and `three_ds_attempts >= three_ds_max_attempts` — none grounded on /docs/payments/3ds.md.
-    The discovery Read binds policy_doc_text only at execution time, after the static
-    SQL is fixed, so it cannot shape the WHERE; the invented enums/threshold match
-    zero archived rows, $rows collapses to empty, and the projected citation ref cannot
-    resolve. The two in-session rules already diagnose this shape but were never enacted
-    because prephase_deep_read stayed []; the corrective lever is to actually request
-    the eager policy deep-read so predicates are grounded before authoring, and to
-    apply the policy predicate over the membership-scoped (is_archived_basket_reference=1)
-    rowset rather than via an unguided static WHERE.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-20'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-20'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: 'Clarification needed: please specify the criteria that define
-    the known fraud hit (e.g., a specific device fingerprint, payment status, or incident
-    identifier).'
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When the PlanIR runs SQL through the /bin/sql Exec RPC, deliver the query
-    over the RPC's real stdin-pipe channel so the tool reads it on standard input
-    — do not drop the query into an inline `stdin` arg key the runner does not forward
-    to the process, because an unfed sql binary prints its usage banner instead of
-    executing, returns no rowset, leaves the bound rows_raw empty, and any OK-required
-    citation ref projected from it (e.g. $rows.record_path) stays unresolved at interpret
-    time even though the ref is correctly emitted in answer.refs and the citation
-    column was selected.
-  created: '2026-06-20'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r012
-  reasoning: 'Verbatim error: ''interpret: sql returned usage banner — SQL not delivered
-    via stdin''. Root cause is mechanical, not grounding: the discovery step Exec
-    on /bin/sql placed the query in a sibling `stdin` arg key — {"rpc":"Exec","args":{"path":"/bin/sql","args":["-csv","-header"],"stdin":"WITH
-    archived AS (...) ..."},"bind":"rows_raw"} — but the runner never piped that string
-    to the process standard input, so /bin/sql received no query and emitted its usage
-    banner. With no rows returned, rows_raw is empty, the rowsets->rows projection
-    yields zero rows, and the OK-required citation ref $rows.record_path (required_refs.OUTCOME_OK
-    record_path) is unresolved despite being correctly emitted. This is orthogonal
-    to r009/r010/r011 (policy-derived predicate grounding of WHERE values) — those
-    concern WHICH rows match; this concerns the SQL never executing at all. New rule
-    covers the Exec stdin-delivery contract.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-20'
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
   status: active
-  submitted_message: No archived payment records matching the confirmed fraud hit
-    could be identified.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_message: The instruction is ambiguous. Please specify which fraud hit
+    (e.g., a fraud case ID or payment ID) and clarify the archive location (e.g.,
+    /archive/payments/).
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
-- agents_md_anchor: null
-  content: Do not emit an empty PlanIR (no discovery, no rowsets, no compute, empty
-    decision.branches) that falls through to a params_missing/clarification default
-    just because the IntentSpec flags the entity-identifying params as 'not provided
-    in the instruction'; when the objective names operationally-grounded entities
-    a data source can resolve (a confirmed-status record, an archived-history scope,
-    a membership-criteria rule), first author discovery steps that ground each such
-    entity — locate its source listing, its membership-criteria source, and its scope/status
-    selector — then build the membership-scoped rowset over those grounded values
-    and project the OK-required citation refs (e.g. $rows.record_path, $rows.payment_id)
-    from it, reserving the clarification outcome only for when discovery itself returns
-    no candidate source. An empty PlanIR fetches no rowset, populates no $rows, leaves
-    every required citation ref unresolved, and grades as OUTCOME_NONE_UNSUPPORTED
-    — failing an OUTCOME_OK expectation even though the entities were discoverable
-    and the refs were declarable.
-  created: '2026-06-20'
-  deactivated_reason: null
-  id: r013
-  reasoning: 'Verbatim error: ''grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED''.
-    The gold outcome is OUTCOME_OK (cite payment records belonging to the confirmed
-    fraud hit), but the PlanIR gave up before attempting retrieval. Failing PlanIR
-    fragment: discovery=[], rowsets=[], compute=[], decision.branches=[] with default_label=''params_missing''
-    mapping to answer.params_missing -> OUTCOME_NONE_CLARIFICATION (''Cannot identify
-    ... without required parameters: fraud_hit_identifier, fraud_membership_criteria,
-    archived_scope''). Root cause: PLAN treated the IntentSpec''s ''not provided in
-    instruction'' annotations on fraud_hit_identifier / fraud_membership_criteria
-    / archived_scope as a hard blocker and emitted a no-op plan, instead of authoring
-    discovery steps to ground those operationally-resolvable entities (a Risk Ops-confirmed
-    fraud-hit source, a membership-criteria/policy source, an archive scope/status
-    selector) and projecting the required citation refs from the resulting membership-scoped
-    rowset. Because no rowset was ever built, $rows stayed empty and the empty plan
-    graded as OUTCOME_NONE_UNSUPPORTED rather than the expected OUTCOME_OK. Linkage:
-    r010/r011 cover grounding a policy-defined WHERE predicate without baking guessed
-    values, and r012 covers SQL stdin delivery; none address the upstream failure
-    of refusing to author any discovery/rowset and defaulting to clarification — so
-    this rule is distinct and not superseded by them.'
-  status: active
-  surface: ir
-- agents_md_anchor: null
-  content: Always populate each answer.<label>.refs entry that required_refs declares
-    for that outcome, projecting the declared source column (e.g. $rows.record_path)
-    from the membership-scoped rowset into the ref, because an empty answer.refs list
-    leaves every OUTCOME-required citation ref unresolved at interpret time even when
-    the rowset is fetched and the citation column is selected — the projection that
-    binds the ref only fires when the ref is actually emitted inside the answer block,
-    so a refs:[] OK answer can never satisfy a required_refs citation.
-  created: '2026-06-20'
-  deactivated_reason: null
-  id: r014
-  reasoning: 'Verbatim error: "interpret: unresolved required ref(s) [''$rows.record_path'']
-    on OK answer". required_refs.OUTCOME_OK declares one citation {kind: record_path,
-    source: $rows.record_path}, but the failing PlanIR''s answer.ok block emits no
-    refs: "ok":{"message":"...","outcome":"OUTCOME_OK","refs":[]}. Root cause: the
-    OK answer''s refs array is empty, so the required record_path citation is never
-    projected from the rowset; the interpreter therefore reports $rows.record_path
-    as an unresolved required ref regardless of whether $rows is populated. This is
-    the missing-emission failure mode, distinct from r011 (predicate grounding so
-    scoped rows match), r012 (stdin pipe channel so SQL executes), and r013 (non-empty
-    PlanIR so a rowset exists) — all three presuppose the ref WAS emitted in answer.refs
-    and address why the bound rowset is empty; none covers an answer block that omits
-    the citation entirely. The rowset already selects record_path correctly, so the
-    fix is purely to emit it in answer.ok.refs.'
-  status: active
-  surface: ir
-- agents_md_anchor: null
-  content: When the IntentSpec says to discover a membership criterion as a 'method,
-    never a re-seeded literal', do not read that as license to invent a statistical
-    or structural proxy (GROUP BY ... HAVING COUNT(*) > 1, frequency-rank ORDER BY
-    n DESC LIMIT 1, most-common-value) for a designation that an external authority
-    confirms or flags (a Risk-Ops-confirmed hit, an approved record, a flagged signal);
-    the 'method' must resolve the actual authority-confirmed value, so surface its
-    defining authority source via prephase_deep_read (Tier-2) before authoring SQL
-    and ground the filter on the confirmed signal column/value — encoded in the WHERE
-    or applied as a post-fetch compute/decision filter over the schema-verified scoped
-    rowset — because a frequency proxy is itself an unguided guess that matches the
-    wrong rows or zero rows when the confirmed hit is not the most-frequent one, leaving
-    the bound rows empty and the OK-required citation ref unresolved at interpret
-    time even though that ref was correctly emitted in answer.refs and the citation
-    column was selected.
-  created: '2026-06-20'
-  deactivated_reason: null
-  id: r015
-  reasoning: 'Verbatim error: "interpret: unresolved required ref(s) [''$rows.record_path'']
-    on OK answer". The ref IS emitted (answer.ok.refs=[{kind:record_path,source:$rows.record_path}])
-    and record_path IS selected, so the ref-emission rules (in-session, r013) were
-    satisfied; the ref stays unresolved because $rows came back empty. Root cause:
-    the static SQL identifies the ''confirmed fraud hit'' with an invented statistical
-    proxy — device_counts/method_counts use HAVING COUNT(*) > 1, then top_signal does
-    ORDER BY n DESC, sig_type, sig_value LIMIT 1 — picking whichever fingerprint merely
-    repeats most. But the objective''s fraud_hit_indicator is the Risk-Ops-CONFIRMED
-    signal defined in the incident doc /docs/merchant-continuity-and-critical-incidents.md
-    (read into the fraud_doc bind during discovery yet never referenced by the query).
-    The frequency proxy is itself a guess: if no archived fingerprint repeats (>1)
-    or the confirmed hit is not the most-frequent value, the archived/top_signal join
-    yields zero rows, $rows is empty, and $rows.record_path cannot resolve. Failing
-    fragment: the device_counts/method_counts HAVING COUNT(*) > 1 + top_signal ORDER
-    BY n DESC LIMIT 1 block, plus the unused fraud_doc discovery Read. Linkage: extends
-    r011 (ground a policy-defined predicate on doc-surfaced values via prephase_deep_read,
-    never bake unguided guesses into static SQL) by naming a distinct sub-pattern
-    it did not cover — substituting a frequency/structural proxy, rather than a guessed
-    enum/threshold literal, for an authority-confirmed designation; and adds the incident
-    doc to prephase_deep_read so the confirmed signal is surfaced Tier-2 before SQL
-    authoring instead of being read too late in the discovery list.'
-  status: active
-  surface: ir
 last_run:
-  cycles_used: 2
-  date: '2026-06-20'
+  cycles_used: 4
+  date: '2026-06-21'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 prephase_deep_read:
-- payment_transactions
-- /docs/payments/3ds.md
-- facts.policies
-- /docs/merchant-continuity-and-critical-incidents.md
+- /archive
 task_id: t38

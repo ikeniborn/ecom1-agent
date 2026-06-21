@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка плана — Richer Downstream Context</title>
+<style>
+  :root[data-theme="dark"]{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --ink:#e6edf3; --muted:#9aa7b4;
+    --line:#2b333d; --accent:#5aa9ff; --ok:#3fb950; --warn:#d29922; --crit:#f85149;
+    --node:#1f2a36; --node-b:#33425a; --edge:#5a6b80;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#f0f3f6; --ink:#1f2328; --muted:#57606a;
+    --line:#d0d7de; --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --crit:#cf222e;
+    --node:#eef3f8; --node-b:#b6c2d1; --edge:#8a97a8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 22px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+         border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:22px;margin:0 0 4px}
+  h2{font-size:18px;margin:34px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:22px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);font-size:13px}
+  .toggle{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+          border-radius:8px;padding:8px 14px;font-size:13px}
+  .toggle:hover{border-color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:10px 0 18px;background:var(--panel);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13.5px}
+  th{background:var(--panel2);font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  tr:last-child td{border-bottom:none}
+  code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12.5px;
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .badge{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:600;border:1px solid}
+  .b-ok{color:var(--ok);border-color:var(--ok)}
+  .b-info{color:var(--accent);border-color:var(--accent)}
+  .note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+        border-radius:8px;padding:12px 14px;margin:12px 0;font-size:14px}
+  .dot{display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--accent);vertical-align:middle}
+  figure{margin:0}
+  figcaption{color:var(--muted);font-size:12.5px;margin-top:6px}
+  .kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:13px;color:var(--muted);margin-bottom:8px}
+  .kv b{color:var(--ink);font-weight:600}
+  .ok-cell{color:var(--ok);font-weight:600}
+  .x{color:var(--accent);font-weight:700;text-align:center}
+  .mini{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Проверка плана — Richer Downstream Context</h1>
+    <div class="sub">7 задач · Part A (INVESTIGATE data-paths, flag OFF) + Part B (CONTRACT на lint) · 2026-06-21</div>
+  </div>
+  <button class="toggle" id="tg">◐ Тема</button>
+</header>
+
+<div class="kv">
+  <span>План:</span><b>docs/superpowers/plans/2026-06-21-richer-downstream-context.md · plan_hash 7bd8c37763f5c1d6</b>
+  <span>Спека:</span><b>docs/superpowers/specs/2026-06-21-richer-downstream-context-design.md · spec_hash 7136e5521c553673</b>
+  <span>Цепочка:</span><b>intent (null) → spec → plan</b>
+  <span>Вердикт:</span><b><span class="badge b-ok">OK</span> — 0 CRITICAL open · 0 WARNING open</b>
+</div>
+
+<!-- ============ БЛОК 1: РЕЗЮМЕ ПЛАНА ============ -->
+<h2>1. Резюме плана (задачи · шаги · DoD)</h2>
+<table>
+  <thead><tr><th>Задача</th><th>Шаги</th><th>Критерий готовности (DoD)</th></tr></thead>
+  <tbody>
+    <tr><td><b>T1.</b> Part B — CONTRACT на lint-reject</td>
+        <td>S1 тест(fail) · S2 run-fail · S3 правка <code>_enrich_prim_error</code> · S4 run-green · S5 commit</td>
+        <td><code>uv run pytest -k enrich_prim_error</code> → 6/6 PASS (3 старых + 3 новых).</td></tr>
+    <tr><td><b>T2.</b> Part A — trace <code>investigate_stop</code></td>
+        <td>S1 method · S2 auto-helper · S3 import-check · S4 commit</td>
+        <td><code>uv run python -c "from agent.trace import log_investigate_stop_auto"</code> → <code>ok</code>.</td></tr>
+    <tr><td><b>T3.</b> Part A — <code>_forced_data_probe</code> + <code>sufficient()</code></td>
+        <td>S1 тест(fail) · S2 run-fail · S3 probe-fn · S4 sufficient · S5 run-green · S6 commit</td>
+        <td><code>pytest -k "forced_data_probe or data_path or data_clause or sufficient"</code> → PASS.</td></tr>
+    <tr><td><b>T4.</b> Part A — wiring в investigate-loop</td>
+        <td>S1 тесты(fail) · S2 run-fail · S3 import · S4 signature · S5 init · S6 action-chain · S7–9 stop-reason/record/emit · S10 run-green · S11 commit</td>
+        <td><code>pytest test_investigate*.py</code> → новые probe/inert/stop-trace + все старые PASS.</td></tr>
+    <tr><td><b>T5.</b> Part A — pipeline seed + call-site</td>
+        <td>S1 тест(fail) · S2 run-fail · S3 <code>_data_path_seed</code> · S4 run-green · S5 wire call · S6 suite-green · S7 commit</td>
+        <td><code>pytest -k data_path_seed</code> → 2/2 PASS; pipeline suites зелёные (flag off ⇒ <code>[]</code>).</td></tr>
+    <tr><td><b>T6.</b> Docs — env var + iwiki (MANDATORY)</td>
+        <td>S1 root CLAUDE.md · S2 agent/CLAUDE.md · S3 iwiki-ingest · S4 iwiki-lint · S5 commit</td>
+        <td>iwiki-lint: нет битых <code>[[refs]]</code>, нет новых orphan/stale.</td></tr>
+    <tr><td><b>T7.</b> Полная верификация</td>
+        <td>S1 full suite · S2 smoke (flag on, optional) · S3 final commit</td>
+        <td><code>uv run pytest tests/ -q</code> → all PASS (кроме известного pre-existing red t09).</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ БЛОК 2: ЗАВИСИМОСТИ И ПЕРЕСЕЧЕНИЯ ============ -->
+<h2>2. Зависимости и пересечения</h2>
+
+<h3>Граф зависимостей задач (M → N: результат M используется в N, M&lt;N)</h3>
+<figure>
+<svg viewBox="0 0 900 300" width="100%" role="img" aria-label="Граф зависимостей задач">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--edge)"/>
+    </marker>
+    <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .n rect{fill:var(--node);stroke:var(--node-b);stroke-width:1.2;filter:url(#ds)}
+      .n text{fill:var(--ink);font:12px ui-monospace,monospace}
+      .n .s{fill:var(--muted);font:10px sans-serif}
+      .e{stroke:var(--edge);stroke-width:1.7;fill:none;marker-end:url(#arr)}
+    </style>
+  </defs>
+
+  <!-- edges: T2->T4, T3->T4, T4->T5, T1->T6, T4->T6, T5->T6, *->T7 -->
+  <path class="e" d="M170,96 C250,96 250,150 318,150"/>   <!-- T2->T4 -->
+  <path class="e" d="M170,204 C250,204 250,158 318,158"/>  <!-- T3->T4 -->
+  <path class="e" d="M452,150 L518,150"/>                   <!-- T4->T5 -->
+  <path class="e" d="M170,40 C400,30 520,40 632,210"/>      <!-- T1->T6 -->
+  <path class="e" d="M452,156 C520,170 560,210 632,216"/>   <!-- T4->T6 -->
+  <path class="e" d="M610,150 C650,160 650,196 660,206"/>   <!-- T5->T6 -->
+  <path class="e" d="M748,228 C800,210 800,150 770,96"/>    <!-- T6->T7 (chain end) -->
+
+  <!-- nodes -->
+  <g class="n"><rect x="40" y="18" width="130" height="40" rx="9"/><text x="54" y="38">T1 Part B</text><text class="s" x="54" y="52">pipeline regex</text></g>
+  <g class="n"><rect x="40" y="76" width="130" height="40" rx="9"/><text x="54" y="96">T2 trace</text><text class="s" x="54" y="110">investigate_stop</text></g>
+  <g class="n"><rect x="40" y="184" width="130" height="40" rx="9"/><text x="54" y="204">T3 probe+suff</text><text class="s" x="54" y="218">investigate.py</text></g>
+  <g class="n"><rect x="318" y="130" width="134" height="40" rx="9"/><text x="332" y="150">T4 wiring</text><text class="s" x="332" y="164">investigate loop</text></g>
+  <g class="n"><rect x="518" y="130" width="120" height="40" rx="9"/><text x="532" y="150">T5 seed</text><text class="s" x="532" y="164">pipeline wire</text></g>
+  <g class="n"><rect x="632" y="196" width="120" height="40" rx="9"/><text x="646" y="216">T6 docs</text><text class="s" x="646" y="230">CLAUDE+iwiki</text></g>
+  <g class="n"><rect x="732" y="58" width="120" height="40" rx="9"/><text x="746" y="78">T7 verify</text><text class="s" x="746" y="92">full suite</text></g>
+</svg>
+<figcaption>DAG без циклов. Все рёбра направлены вперёд (M&lt;N) — нарушений порядка фаза dependencies не нашла. T1/T2/T3 независимы и параллелизуемы; T7 финальный.</figcaption>
+</figure>
+
+<h3>Пересечения по артефактам (какие задачи трогают один файл)</h3>
+<table>
+  <thead><tr><th>Артефакт</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>T6</th><th>T7</th></tr></thead>
+  <tbody>
+    <tr><td><code>agent/pipeline.py</code></td><td class="x">✦</td><td></td><td></td><td></td><td class="x">✦</td><td></td><td></td></tr>
+    <tr><td><code>agent/investigate.py</code></td><td></td><td></td><td class="x">✦</td><td class="x">✦</td><td></td><td></td><td></td></tr>
+    <tr><td><code>agent/trace.py</code></td><td></td><td class="x">✦</td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td><code>tests/test_pipeline_interpreted.py</code></td><td class="x">✦</td><td></td><td></td><td></td><td class="x">✦</td><td></td><td></td></tr>
+    <tr><td><code>tests/test_investigate.py</code></td><td></td><td></td><td class="x">✦</td><td class="x">✦</td><td></td><td></td><td></td></tr>
+    <tr><td><code>CLAUDE.md / agent/CLAUDE.md / docs/wiki</code></td><td></td><td></td><td></td><td></td><td></td><td class="x">✦</td><td></td></tr>
+  </tbody>
+</table>
+<div class="note">Overlap-пары трогают <b>разные участки</b> одного файла: T1↔T5 в <code>pipeline.py</code> (<code>_enrich_prim_error</code> vs <code>_data_path_seed</code>/call-site); T3↔T4 в <code>investigate.py</code> (<code>_forced_data_probe</code>/<code>sufficient</code> vs loop-wiring). Конфликта правок нет; порядок (T3→T4, T1→T5) соблюдён.</div>
+
+<h3>Карта покрытия (требование спеки → задачи)</h3>
+<table>
+  <thead><tr><th>Требование</th><th>Покрывающие шаги</th></tr></thead>
+  <tbody>
+    <tr><td>A1 Configuration (flag, default 0, inert)</td><td>T5·S3 (gate), T4·S5/S6 (inert), T6 (docs)</td></tr>
+    <tr><td>A2 Seed construction</td><td>T5·S3</td></tr>
+    <tr><td>A3 investigate() signature</td><td>T4·S4</td></tr>
+    <tr><td>A4 Forced data-probe</td><td>T3·S3, T4·S6/S8</td></tr>
+    <tr><td>A5 Stop condition</td><td>T3·S4, T4·S9c</td></tr>
+    <tr><td>A6 Trace signal</td><td>T2, T4·S7/S9</td></tr>
+    <tr><td>B1 CONTRACT на lint</td><td>T1·S3</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ БЛОК 3: РЕЗУЛЬТАТЫ ПРОВЕРКИ ============ -->
+<h2>3. Результаты проверки</h2>
+<table>
+  <thead><tr><th>Фаза</th><th>Статус</th><th>Итог по закрытому чек-листу</th></tr></thead>
+  <tbody>
+    <tr><td>structure</td><td><span class="badge b-ok">passed</span></td><td>Нет реальных плейсхолдеров; нумерация шагов per-task 1..N без пропусков/дублей; дублей заголовков нет. (Токены TODO/TBD встречаются только в описательной строке Self-Review — не плейсхолдер, не flagged.)</td></tr>
+    <tr><td>coverage</td><td><span class="badge b-ok">passed</span></td><td>Все A1–A6, B1 покрыты ≥1 шагом; лишних шагов нет (Testing/Docs/Verify — поддерживающие).</td></tr>
+    <tr><td>dependencies</td><td><span class="badge b-ok">passed</span></td><td>DAG без циклов; T4 после T2,T3; T5 после T4; артефакты создаются до использования. TDD-тесты ссылаются на API до impl осознанно (Step «verify it fails»).</td></tr>
+    <tr><td>verifiability</td><td><span class="badge b-ok">passed</span></td><td>Каждый шаг — точный код или команда + ожидаемый вывод. Smoke (T7·S2) помечен optional/no-assert.</td></tr>
+    <tr><td>consistency</td><td><span class="badge b-ok">passed</span></td><td>Первый прогон; plan_hash/spec_hash зафиксированы; spec_hash совпадает с frontmatter спеки (спека не менялась).</td></tr>
+  </tbody>
+</table>
+
+<h3>Findings</h3>
+<table>
+  <thead><tr><th>id</th><th>severity</th><th>section</th><th>text</th><th>verdict</th></tr></thead>
+  <tbody>
+    <tr><td colspan="5" style="color:var(--muted)">— findings нет —</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <b>CRITICAL open:</b> 0 &nbsp;·&nbsp; <b>WARNING open:</b> 0 &nbsp;·&nbsp;
+  <span class="verdict badge b-ok">Вердикт: OK</span><br>
+  <span class="mini">Chain: intent (null) → spec (7136e5521c553673) → plan (7bd8c37763f5c1d6)</span>
+</div>
+
+</div>
+<script>
+  (function(){
+    var r=document.documentElement, b=document.getElementById('tg');
+    b.addEventListener('click',function(){
+      r.setAttribute('data-theme', r.getAttribute('data-theme')==='dark'?'light':'dark');
+    });
+  })();
+</script>
+</body>
+</html>
