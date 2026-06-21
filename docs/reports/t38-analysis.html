@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>t38 — анализ прогона агента (claude-code/sonnet)</title>
+<style>
+:root{
+  --bg:#f6f7fb; --surface:#ffffff; --fg:#2b2b3a; --muted:#6b6b80;
+  --accent:#5c6bc0; --accent-2:#3949ab; --border:#d6d8e6; --line:#9aa0b4; --zebra:#eef0f8;
+  --ok:#43a047; --ok-2:#2e7d32; --warn:#fb8c00; --warn-2:#ef6c00; --danger:#e53935; --danger-2:#c62828;
+  --shadow:rgba(40,40,80,.18);
+}
+body:has(#theme-toggle:checked){
+  --bg:#181825; --surface:#262637; --fg:#cdd6f4; --muted:#a6adc8;
+  --accent:#89b4fa; --accent-2:#5e95f0; --border:#3a3b52; --line:#6c7086; --zebra:#21222f;
+  --ok:#a6e3a1; --ok-2:#74c46e; --warn:#f9e2af; --warn-2:#f5c95b; --danger:#f38ba8; --danger-2:#e8638a;
+  --shadow:rgba(0,0,0,.45);
+}
+body{
+  margin:0 auto; padding:1.5rem 2rem 4rem; max-width:1080px;
+  font:16px/1.55 system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb,var(--accent) 10%, transparent), transparent),
+    var(--bg);
+  color:var(--fg);
+  transition:background .3s, color .3s;
+}
+.theme-btn{
+  position:sticky; top:.5rem; float:right;
+  cursor:pointer; user-select:none;
+  padding:.25rem .6rem; border:1px solid var(--border); border-radius:6px;
+  background:var(--surface); z-index:9;
+}
+h1{ font-size:1.7rem; margin:.2rem 0 .3rem; }
+h2{ font-size:1.25rem; margin:2.2rem 0 .6rem; padding-bottom:.3rem; border-bottom:2px solid var(--accent); }
+h3{ font-size:1.02rem; margin:1.3rem 0 .4rem; color:var(--accent); }
+code{ font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; background:color-mix(in srgb,var(--accent) 10%,var(--surface));
+  padding:.05rem .35rem; border-radius:4px; font-size:.86em; }
+.lead{ font-size:1.08rem; }
+.sub{ color:var(--muted); font-size:.92rem; }
+
+/* metric cards */
+.cards{ display:flex; flex-wrap:wrap; gap:.8rem; margin:1.1rem 0; }
+.card{ flex:1 1 150px; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:.7rem .9rem; box-shadow:0 2px 12px var(--shadow); }
+.card .k{ font-size:.78rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.card .v{ font-size:1.5rem; font-weight:700; margin-top:.2rem; }
+.card.bad .v{ color:var(--danger-2); }
+.card.warn .v{ color:var(--warn-2); }
+.card.ok .v{ color:var(--ok-2); }
+
+/* table */
+.rpt-table{ border-collapse:separate; border-spacing:0; width:100%; background:var(--surface);
+  margin:1rem 0; font-size:.9rem; border:1px solid var(--border); border-radius:10px;
+  overflow:hidden; box-shadow:0 2px 12px var(--shadow); }
+.rpt-table th, .rpt-table td{ border-bottom:1px solid var(--border); padding:.5rem .75rem; text-align:left; vertical-align:top; }
+.rpt-table tbody tr:last-child td{ border-bottom:none; }
+.rpt-table thead th{ background:var(--accent); color:var(--bg); position:sticky; top:0; }
+.rpt-table tbody tr:nth-child(even){ background:var(--zebra); }
+.rpt-table tbody tr:hover{ background:color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.rpt-table td code{ white-space:nowrap; }
+.num{ text-align:right; font-variant-numeric:tabular-nums; }
+
+/* bar chart */
+.bars{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1rem 1.1rem;
+  margin:1rem 0; box-shadow:0 2px 12px var(--shadow); }
+.barrow{ display:flex; align-items:center; gap:.7rem; margin:.45rem 0; }
+.barrow .lbl{ flex:0 0 9.5rem; font-size:.85rem; }
+.barrow .track{ flex:1 1 auto; background:var(--zebra); border-radius:5px; height:1.45rem; position:relative; overflow:hidden; }
+.barrow .fill{ height:100%; border-radius:5px; display:flex; align-items:center; }
+.barrow .val{ flex:0 0 6.5rem; text-align:right; font-size:.82rem; font-variant-numeric:tabular-nums; color:var(--muted); }
+.fill.f-danger{ background:linear-gradient(90deg,var(--danger),var(--danger-2)); }
+.fill.f-warn{ background:linear-gradient(90deg,var(--warn),var(--warn-2)); }
+.fill.f-accent{ background:linear-gradient(90deg,var(--accent),var(--accent-2)); }
+.fill.f-line{ background:var(--line); }
+
+/* pipeline flow */
+.rpt-flow{ display:flex; align-items:stretch; gap:0; margin:1.1rem 0; flex-wrap:wrap; }
+.rpt-flow .node{ background:var(--surface); color:var(--fg); border:1px solid var(--border); border-radius:8px;
+  padding:.5rem .8rem; font-size:.85rem; box-shadow:0 1px 6px var(--shadow); min-width:5rem; text-align:center; }
+.rpt-flow .node b{ display:block; }
+.rpt-flow .node .t{ font-size:.74rem; color:var(--muted); }
+.rpt-flow .node.ok{ border-left:4px solid var(--ok); }
+.rpt-flow .node.warn{ border-left:4px solid var(--warn); }
+.rpt-flow .node.fail{ border-left:4px solid var(--danger); background:color-mix(in srgb,var(--danger) 10%,var(--surface)); }
+.rpt-flow .arrow{ flex:0 0 2rem; align-self:center; height:2px; background:var(--line); position:relative; }
+.rpt-flow .arrow::after{ content:""; position:absolute; right:0; top:-4px; border:5px solid transparent; border-left-color:var(--line); }
+
+/* badges */
+.badge{ display:inline-block; font-size:.7rem; padding:.05rem .5rem; border-radius:999px; border:1px solid var(--border); white-space:nowrap; }
+.badge.crit{ color:#fff; background:var(--danger-2); border-color:var(--danger-2); }
+.badge.high{ color:var(--bg); background:var(--warn); border-color:var(--warn-2); }
+.badge.med{ color:var(--warn-2); border-color:var(--warn); }
+.badge.llm{ color:var(--warn-2); border-color:var(--warn); }
+.badge.det{ color:var(--ok-2); border-color:var(--ok); }
+
+/* callouts */
+.note{ border-left:4px solid var(--accent); padding:.55rem 1rem; margin:1rem 0;
+  background:color-mix(in srgb, var(--accent) 8%, var(--surface)); border-radius:0 8px 8px 0; box-shadow:0 1px 8px var(--shadow); }
+.note.danger{ border-left-color:var(--danger); background:color-mix(in srgb,var(--danger) 9%,var(--surface)); }
+.note.warn{ border-left-color:var(--warn); background:color-mix(in srgb,var(--warn) 10%,var(--surface)); }
+pre.log{ background:#11111b; color:#cdd6f4; border:1px solid var(--border); border-radius:8px; padding:.8rem 1rem;
+  overflow-x:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.8rem; line-height:1.5; box-shadow:0 2px 10px var(--shadow); }
+body:has(#theme-toggle:checked) pre.log{ background:#0e0e16; }
+ul.tight li{ margin:.3rem 0; }
+details{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:.7rem 1rem; margin:.7rem 0; box-shadow:0 1px 8px var(--shadow); }
+details summary{ cursor:pointer; font-weight:600; color:var(--accent); }
+.fixlist li{ margin:.55rem 0; }
+footer{ margin-top:3rem; padding-top:1rem; border-top:1px solid var(--border); color:var(--muted); font-size:.82rem; }
+</style>
+</head>
+<body>
+<input type="checkbox" id="theme-toggle" hidden>
+<label for="theme-toggle" class="theme-btn" title="Тёмная / светлая тема">🌙 / ☀️</label>
+
+<main class="report">
+
+<h1>t38 — анализ прогона агента</h1>
+<p class="lead">Эффективность инструментов и пайплайна на задаче <code>t38</code> (fraud-hit payment records).</p>
+<p class="sub">Источник: <code>logs/20260621_091749_claude-code-sonnet/t38.jsonl</code> · <code>t38.detail.log</code> · модель <code>claude-code/sonnet</code> (CC CLI tier) · прогон 2026-06-21 09:17 · 37 событий лога</p>
+
+<div class="note danger">
+<b>Главный вывод.</b> Задача провалена <u>механически</u>, а не по логике: фаза <b>PLAN дважды вернула пустой ответ</b>
+(<code>PLAN LLM returned empty response</code>), по ~732&nbsp;с каждый. План так и не построен → нет interpret/verify → <code>vm.answer</code> не вызван →
+терминальный <code>OUTCOME_NONE_CLARIFICATION</code>. <b>76% времени прогона ушло в два пустых вызова PLAN.</b>
+Вторая, скрытая проблема: INVESTIGATE исчерпал бюджет, <b>не дочитав governing policy-doc</b> (<code>policy_doc_read=false</code>),
+и выбрал 40 записей по 3DS-прокси — ровно анти-паттерн, против которого направлено выученное правило <code>r015</code>.
+</div>
+
+<h2>1. TL;DR — метрики прогона</h2>
+<div class="cards">
+  <div class="card bad"><div class="k">Score</div><div class="v">0.00</div></div>
+  <div class="card bad"><div class="k">Outcome</div><div class="v" style="font-size:1rem">NONE_<wbr>CLARIFICATION</div></div>
+  <div class="card warn"><div class="k">Wall-clock</div><div class="v">1934&nbsp;с</div></div>
+  <div class="card warn"><div class="k">Циклы</div><div class="v">2</div></div>
+  <div class="card bad"><div class="k">Время в PLAN</div><div class="v">76.2%</div></div>
+  <div class="card"><div class="k">LLM-вызовов</div><div class="v">27</div></div>
+</div>
+<p class="sub">Ожидался <code>OUTCOME_OK</code>, получен <code>OUTCOME_NONE_CLARIFICATION</code> → <code>score=0.0</code>.
+Учтённые токены (<code>in=3424 / out=9802</code>) ненадёжны — см. проблему&nbsp;M1.</p>
+
+<details>
+<summary>Текст задачи t38</summary>
+<p style="margin:.4rem 0 0"><i>«Risk Ops confirmed a known fraud hit in the older archived payment history. Identify the payment records that
+belong to that hit. Do not change files; cite every payment record you mark as fraud.»</i></p>
+<p class="sub">Read-only идентификация + цитирование. Идентичность прогона: <code>emp_011</code> (store_manager и др. роли, без явной payment/fraud-роли).</p>
+</details>
+
+<h2>2. Таймлайн прогона — где утекло время</h2>
+
+<h3>Пайплайн: где сломалось</h3>
+<figure class="rpt-flow">
+  <div class="node ok"><b>PREPHASE</b><span class="t">3.5&nbsp;с · slim seed</span></div>
+  <div class="arrow"></div>
+  <div class="node ok"><b>INTENT</b><span class="t">126&nbsp;с · валидный JSON</span></div>
+  <div class="arrow"></div>
+  <div class="node warn"><b>INVESTIGATE</b><span class="t">285&nbsp;с · 40 записей,<br>doc не дочитан</span></div>
+  <div class="arrow"></div>
+  <div class="node fail"><b>PLAN ×2</b><span class="t">1464&nbsp;с · ПУСТО<br>0 токенов</span></div>
+  <div class="arrow"></div>
+  <div class="node fail"><b>CLARIFICATION</b><span class="t">score 0.0</span></div>
+</figure>
+<p class="sub">interpret / verify / <code>answer</code> не достигнуты — пайплайн оборвался на пустом PLAN.</p>
+
+<h3>Распределение wall-clock по фазам</h3>
+<div class="bars">
+  <div class="barrow"><span class="lbl">PLAN (2 пустых)</span><div class="track"><div class="fill f-danger" style="width:76.2%"></div></div><span class="val">1464.2&nbsp;с · 76.2%</span></div>
+  <div class="barrow"><span class="lbl">INVESTIGATE</span><div class="track"><div class="fill f-warn" style="width:14.8%"></div></div><span class="val">284.8&nbsp;с · 14.8%</span></div>
+  <div class="barrow"><span class="lbl">INTENT</span><div class="track"><div class="fill f-accent" style="width:6.6%"></div></div><span class="val">126.0&nbsp;с · 6.6%</span></div>
+  <div class="barrow"><span class="lbl">RERANK (oracle)</span><div class="track"><div class="fill f-accent" style="width:2.3%"></div></div><span class="val">44.1&nbsp;с · 2.3%</span></div>
+  <div class="barrow"><span class="lbl">PREPHASE_GATHER</span><div class="track"><div class="fill f-line" style="width:0.2%"></div></div><span class="val">3.5&nbsp;с · 0.2%</span></div>
+</div>
+
+<table class="rpt-table">
+  <thead><tr><th>Фаза</th><th class="num">Вызовов</th><th class="num">Время, с</th><th class="num">% wall-clock</th><th>Итог</th></tr></thead>
+  <tbody>
+    <tr><td><b>PLAN</b></td><td class="num">2</td><td class="num">1464.2</td><td class="num">76.2%</td><td><span class="badge crit">пустой ответ ×2</span></td></tr>
+    <tr><td>INVESTIGATE</td><td class="num">20</td><td class="num">284.8</td><td class="num">14.8%</td><td><span class="badge high">не дочитал doc</span></td></tr>
+    <tr><td>INTENT</td><td class="num">1</td><td class="num">126.0</td><td class="num">6.6%</td><td><span class="badge det">ok</span></td></tr>
+    <tr><td>RERANK</td><td class="num">4</td><td class="num">44.1</td><td class="num">2.3%</td><td><span class="badge det">ok</span></td></tr>
+    <tr><td>PREPHASE_GATHER</td><td class="num">3</td><td class="num">3.5</td><td class="num">0.2%</td><td><span class="badge det">ok</span></td></tr>
+  </tbody>
+</table>
+<p class="sub">27 LLM-вызовов + 7 VM-вызовов за прогон. INVESTIGATE = 20 вызовов (router+digest на шаг) — самый «болтливый» этап.</p>
+
+<h2>3. Корневая причина — механика</h2>
+<p>Обе попытки PLAN (цикл 1 и 2) завершились идентично: <b>пустой ответ, 0 токенов, ~732&nbsp;с, <code>success=False</code></b>.
+Так как PlanIR не построен, интерпретатор не запускался ни разу. Цикл-loop исчерпал 2 итерации → терминальный CLARIFICATION.</p>
+
+<pre class="log">cycle 1 · PLAN · 732092ms · tokens 0/0 · FAIL
+cycle 2 · PLAN · 732098ms · tokens 0/0 · FAIL
+...
+PREVIOUS_ERROR:
+plan: PLAN LLM returned empty response
+└ ASSISTANT
+    (empty)
+════════════════════════════════════════════
+RESULT  OUTCOME_NONE_CLARIFICATION  score=0.0  cycles=2  1934167ms</pre>
+
+<div class="note danger">
+<b>Три механических дефекта складываются в провал:</b>
+<ul class="tight" style="margin:.4rem 0 0">
+  <li><b>Пустой ответ CC-tier</b> на самой большой фазе (system-prompt PLAN + intent + brief + 4 learned-правила + oracle). Вероятно — переполнение контекста/таймаут CC-subprocess при генерации крупного PlanIR JSON.</li>
+  <li><b>Нет fallback.</b> <code>ECOM_MODEL_FALLBACK</code> не сработал — обе попытки тот же <code>claude-code/sonnet</code>. Пустой ответ не трактуется как исчерпание тира.</li>
+  <li><b>Таймаут не соблюдён.</b> 732&nbsp;с на вызов против <code>ECOM_LLM_HTTP_READ_TIMEOUT_S=180</code> — CC CLI subprocess не подчиняется HTTP-таймауту.</li>
+</ul>
+</div>
+
+<h2>4. Эффективность инструментов и пайплайна</h2>
+
+<h3>INVESTIGATE — дорогой и не сошёлся</h3>
+<p>20 LLM-вызовов (router + digest + эскалации) при бюджете <code>ECOM_INVESTIGATE_MAX_STEPS=6</code>. Записи найдены, но <b>sufficiency не достигнут</b>:
+governing policy-doc остался непрочитан на момент исчерпания бюджета.</p>
+<table class="rpt-table">
+  <thead><tr><th>Ключ env из Brief</th><th>Значение</th><th>Комментарий</th></tr></thead>
+  <tbody>
+    <tr><td><code>identity.user</code></td><td><code>emp_011</code></td><td>идентичность подтверждена через <code>/bin/id</code></td></tr>
+    <tr><td><code>fraud_table_exists</code></td><td><code>false</code></td><td>выделенной fraud-таблицы нет</td></tr>
+    <tr><td><code>fraud_records_identified</code></td><td><code>40</code></td><td>20 @3ds-status2/customer_abandoned + 20 @3ds-status3/challenge_timeout</td></tr>
+    <tr><td><code>policy_doc_read</code></td><td><span class="badge high">false</span></td><td><b>governing doc не дочитан</b> — sufficiency не выполнен</td></tr>
+  </tbody>
+</table>
+<p class="sub">Стоимость этапа: router+digest ≈ 2–3 LLM-вызова на шаг + 4 отдельных RERANK (oracle-retrieve). При этом ключевое чтение doc не выполнено — бюджет потрачен на перечисление/группировку записей.</p>
+
+<h3>Сломанный учёт токенов на CC-tier</h3>
+<p>В каждом из 27 LLM-событий <code>tokens_in=3424</code> — константа. Это не реальные per-call значения; итог <code>in=3424/out=9802</code> совпадает лишь с числами INTENT.
+Per-phase стоимость по логу <b>измерить невозможно</b> — CC-subprocess не отдаёт usage надёжно.</p>
+
+<h3>Дыра логирования <code>parsed_output</code></h3>
+<p>INTENT: <code>success=True</code>, <code>tokens_out=9802</code>, <code>raw_response</code> — <b>валидный полный JSON</b> (2030 байт), но <code>parsed_output=null</code> в логе.
+Фаза отработала (INVESTIGATE дальше использовал <code>required_refs</code>), значит <code>null</code> — дефект сериализации лога, а не сбой фазы. Усложняет автоматический разбор JSONL.</p>
+
+<h2>5. Семантика решения — куда шёл investigator</h2>
+<p>Логика разведки до обрыва была разумной: identity-gate (<code>/bin/id</code> → <code>emp_011</code>), нашёл <code>payment_transactions</code>, установил отсутствие dedicated fraud-таблицы, выделил 40 «застрявших 3DS» записей.</p>
+
+<div class="note warn">
+<b>Но выбор 40 записей — по 3DS-прокси, не по Risk-Ops-confirmed сигналу.</b> Записи отобраны по
+<code>customer_abandoned</code> / <code>challenge_timeout</code> (технические 3DS-исходы), тогда как задача требует записи
+<i>подтверждённого</i> Risk-Ops fraud-hit. Это ровно анти-паттерн, против которого направлено активное правило <code>r015</code>
+(«не подменяй authority-confirmed сигнал статистическим/структурным прокси») — и причина, по которой <code>policy_doc_read=false</code>
+критичен: governing doc определяет настоящий confirmed-сигнал.
+</div>
+
+<p>Следствие: <b>механический фейл PLAN замаскировал вероятный семантический фейл</b>. Даже при рабочем PLAN ответ, построенный на 3DS-прокси,
+рисковал не пройти grader (over-/under-select относительно authority-confirmed набора). Поэтому фикс PLAN — необходимое, но недостаточное условие для score&nbsp;1.0 на t38.</p>
+
+<h2>6. Проблемы и рекомендуемые фиксы</h2>
+<table class="rpt-table">
+  <thead><tr><th>#</th><th>Severity</th><th>Проблема</th><th>Доказательство</th><th>Рекомендуемый фикс</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>C1</td><td><span class="badge crit">critical</span></td>
+      <td>PLAN вернул пустой ответ ×2 → score 0</td>
+      <td><code>seq 34/35</code>, 732&nbsp;с, <code>tokens 0/0</code>, <code>"PLAN LLM returned empty response"</code></td>
+      <td>Трактовать пустой ответ как retryable-сбой тира; не повторять тот же тир вслепую дважды.</td>
+    </tr>
+    <tr>
+      <td>C2</td><td><span class="badge crit">critical</span></td>
+      <td>Fallback не сработал на пустой PLAN</td>
+      <td>обе попытки <code>claude-code/sonnet</code>; <code>ECOM_MODEL_FALLBACK</code> не активировался</td>
+      <td>Пустой/нулевой ответ → эскалация на следующий тир/модель из <code>models.json</code>, затем <code>ECOM_MODEL_FALLBACK</code>.</td>
+    </tr>
+    <tr>
+      <td>H1</td><td><span class="badge high">high</span></td>
+      <td>HTTP read-timeout не соблюдён на CC-tier</td>
+      <td>732&nbsp;с/вызов против <code>ECOM_LLM_HTTP_READ_TIMEOUT_S=180</code></td>
+      <td>Wall-clock kill для CC CLI subprocess; обрывать и эскалировать на таймауте, а не ждать ~732&nbsp;с.</td>
+    </tr>
+    <tr>
+      <td>H2</td><td><span class="badge high">high</span></td>
+      <td>INVESTIGATE исчерпал бюджет, не дочитав governing doc</td>
+      <td><code>policy_doc_read=false</code> при 20 LLM-вызовах / 6 шагов</td>
+      <td>Приоритизировать deep-read governing-doc в роутере; не закрывать sufficiency, пока <code>required_refs</code> не groundable из doc.</td>
+    </tr>
+    <tr>
+      <td>H3</td><td><span class="badge high">high</span></td>
+      <td>Выбор записей по 3DS-прокси вместо authority-confirmed (риск r015)</td>
+      <td>40 записей по <code>customer_abandoned</code>/<code>challenge_timeout</code>; <code>r015</code> активно</td>
+      <td>Резолвить confirmed-сигнал из governing doc до авторства фильтра; не использовать частотный/технический прокси.</td>
+    </tr>
+    <tr>
+      <td>M1</td><td><span class="badge med">medium</span></td>
+      <td>Учёт токенов сломан на CC-tier</td>
+      <td><code>tokens_in=3424</code> константа во всех 27 событиях</td>
+      <td>Парсить usage из CC stream-json; иначе помечать как <code>unmeasured</code>, не подставлять числа INTENT.</td>
+    </tr>
+    <tr>
+      <td>M2</td><td><span class="badge med">medium</span></td>
+      <td>Дыра логирования <code>parsed_output=null</code> при успехе</td>
+      <td>INTENT <code>seq 6</code>: raw JSON валиден, <code>parsed_output=null</code></td>
+      <td>Сериализовать IntentSpec/PlanIR в <code>parsed_output</code> для разборчивости JSONL.</td>
+    </tr>
+    <tr>
+      <td>M3</td><td><span class="badge med">medium</span></td>
+      <td>INVESTIGATE «болтлив» (20 вызовов + 4 RERANK)</td>
+      <td>24 round-trip = 329&nbsp;с при не достигнутой sufficiency</td>
+      <td>Слить router+digest в один вызов на шаг; переиспользовать oracle-retrieve между шагами.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Приоритет фиксов</h3>
+<ol class="fixlist">
+  <li><b>C1 + C2 (разблокировать PLAN).</b> Пустой ответ → retry на другом тире → <code>ECOM_MODEL_FALLBACK</code>. Снимает 76% потерянного времени и сам провал прогона.</li>
+  <li><b>H1 (таймаут CC-subprocess).</b> Wall-clock kill на 180&nbsp;с превращает 732-секундное зависание в быструю эскалацию.</li>
+  <li><b>H2 + H3 (корректность answer).</b> Дочитывать governing doc до sufficiency и резолвить confirmed-сигнал — необходимо для реального score 1.0, иначе PLAN построит план на прокси.</li>
+  <li><b>M1–M3 (наблюдаемость и стоимость).</b> Чинят измеримость и срезают лишние round-trip’ы INVESTIGATE.</li>
+</ol>
+
+<div class="note">
+<b>Итог в одну строку.</b> t38 провален не из-за логики агента, а из-за <b>пустого ответа PLAN на CC-tier без fallback и без соблюдения таймаута</b>.
+Под этим механическим сбоем скрыт семантический риск: записи выбраны по 3DS-прокси при непрочитанном governing-doc. Чинить нужно оба слоя.
+</div>
+
+<footer>
+Отчёт сгенерирован из <code>logs/20260621_091749_claude-code-sonnet/t38.jsonl</code> и <code>t38.detail.log</code>.
+Все цифры взяты из лога без экстраполяции. Тема переключается кнопкой 🌙/☀️ вверху справа.
+</footer>
+
+</main>
+</body>
+</html>
