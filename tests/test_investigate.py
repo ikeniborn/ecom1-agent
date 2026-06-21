@@ -437,3 +437,36 @@ def test_investigate_emits_stop_trace(tmp_path, monkeypatch):
     assert stop[-1]["data_paths_total"] == 1
     assert stop[-1]["data_paths_probed"] == 1
     assert stop[-1]["reason"] == "data_probed"
+
+
+def test_investigate_requires_both_doc_ref_and_data_path(monkeypatch):
+    # Combined constraint: doc-ref grounding (priority 1) AND data-path probe (priority 2)
+    # must BOTH clear before sufficient() stops the loop.
+    intent = IntentSpec(
+        objective="cite policy + inspect payments",
+        desired_outcome="OUTCOME_OK",
+        outcome_space=["OUTCOME_OK"],
+        answer_shape={},
+        required_refs={"OUTCOME_OK": [RefSpec(kind="policy_doc", path="/docs/security.md")]},
+    )
+    vm = MockVMSpy({
+        fixture_key("Read", "/docs/security.md"): {"content": "cite record_path"},
+        fixture_key("List", "/proc/payments"): {"entries": "p_1.json"},
+    })
+    # router must never drive progress here — the forced doc-read then data-probe do.
+    monkeypatch.setattr(inv, "router",
+                        lambda i, b, atoms, escalate: {"done": True})
+    # digest grounds the policy_doc only when the security.md read happened; the data-path
+    # is grounded structurally by being probed (probed set), not by digest env_updates.
+    def fake_digest(goal, tool, args, observation, escalate):
+        env = {"policy_doc:/docs/security.md": True} if args.get("path") == "/docs/security.md" else {}
+        return Note(tool=tool, args=args, lesson="x"), env
+    monkeypatch.setattr(inv, "digest", fake_digest)
+
+    brief = inv.investigate(vm, intent, data_paths=["/proc/payments"], max_steps=6)
+
+    # both constraints satisfied -> both RPCs happened, data-path recorded
+    assert any(c[0] == "Read" and c[1].get("path") == "/docs/security.md" for c in vm.calls)
+    assert any(c[0] == "List" and c[1].get("path") == "/proc/payments" for c in vm.calls)
+    assert "/proc/payments" in brief.env.get("data_paths", {})
+    assert brief.env.get("policy_doc:/docs/security.md") is True
