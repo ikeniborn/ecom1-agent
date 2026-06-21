@@ -32,6 +32,8 @@ It collects denied labels from `plan.answer`, finds the last denied branch index
 
 Violation disposition: an `active` + `error`-severity violation raises `InterpretError` (blocks the cycle, routes to iLEARN); a `candidate` or `warn`-severity violation logs only. An unknown `kind` or a handler exception is a logged no-op — it never crashes the pipeline. See [[harness]] for the full handler catalogue and [[data-files#Harness Check Catalogue]] for the spec format.
 
+Each fired check — blocking **and** warn — also emits a `lint_fire` telemetry record into the active trace via `log_lint_fire_auto` (`agent/interpreter.py:277`), placed after the block/warn decision and before the raise/print, so it is purely additive and cannot alter lint semantics. This surfaces warn-level fires that the aggregate `gate` record omits. Because `lint()` raises on the first blocking check, a second blocker in the same cycle is not recorded — acceptable for telemetry, since the first blocker is the actionable one. See [[tooling#Trace schema v2]] for the record shape and [[tooling#Lint Report]] for the offline aggregator that ranks fires across a run.
+
 ## interpret() — executing the plan against the VM
 
 `interpret(plan, intent, vm, facts)` (`agent/interpreter.py:259`) is the deterministic executor. It seeds `env` from `intent.params` (plus `_facts`), then runs the seven phases in order. It NEVER calls `vm.answer` — it returns a `CapturedAnswer` inside an `InterpretResult` for [[pipeline]] to submit after verify. See [[vm]] for the RPC surface.
