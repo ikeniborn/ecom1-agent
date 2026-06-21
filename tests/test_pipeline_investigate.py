@@ -62,7 +62,7 @@ def test_run_pipeline_builds_brief_then_plan(monkeypatch):
     monkeypatch.setattr("agent.reason.run_intent",
                         lambda facts, instruction, token_out=None, learn_ctx=None: intent)
 
-    def fake_investigate(vm, intent, seed=None, oracle=None, max_steps=None):
+    def fake_investigate(vm, intent, seed=None, oracle=None, max_steps=None, data_paths=None):
         b = Brief(); b.env["row.record_path"] = "/payments/p_1.json"
         b.notes.append(Note(tool="read", lesson="cite p_1"))
         return b
