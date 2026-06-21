@@ -283,6 +283,29 @@ HARD_CONNECTION_KWS = (
 # Set MODEL_FALLBACK to any supported model string (same format as MODEL_DEFAULT).
 _FALLBACK_MODEL = os.environ.get("ECOM_MODEL_FALLBACK", "")
 
+# Per-model config from models.json (repo root). Loaded once at import.
+# Every LLM call site passes cfg={}; call_llm_raw() backfills from here so
+# models.json cc_options (cc_timeout_s / cc_model / cc_fallback_model) actually
+# reach cc_complete. Underscore-prefixed keys are docs, not models.
+_MODELS_JSON_PATH = Path(__file__).resolve().parent.parent / "models.json"
+try:
+    _raw_model_cfgs = json.loads(_MODELS_JSON_PATH.read_text())
+    _MODEL_CFGS: dict[str, dict] = {
+        k: v for k, v in _raw_model_cfgs.items()
+        if not k.startswith("_") and isinstance(v, dict)
+    }
+    del _raw_model_cfgs
+except (OSError, ValueError):
+    _MODEL_CFGS = {}
+
+
+def resolve_model_cfg(model: str) -> dict:
+    """Per-model config block from models.json ({} when absent / docs key).
+    Returns a shallow copy so callers can mutate the result without corrupting
+    the shared module-level cache."""
+    return dict(_MODEL_CFGS.get(model, {}))
+
+
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 _LOG_LEVEL = os.environ.get("ECOM_LOG_LEVEL", "INFO").upper()  # DEBUG → log think blocks
 
@@ -585,6 +608,9 @@ def call_llm_raw(
     if think is None:
         think = _think_for_phase(phase)
 
+    if not cfg:
+        cfg = resolve_model_cfg(model)
+
     _tok = token_out if token_out is not None else {}
     _t0 = time.monotonic()
     result = _call_raw_single_model(
@@ -595,7 +621,7 @@ def call_llm_raw(
     if result is None and _FALLBACK_MODEL and _FALLBACK_MODEL != model:
         print(f"[llm] Primary exhausted — retrying with MODEL_FALLBACK={_FALLBACK_MODEL}")
         result = _call_raw_single_model(
-            system, user_msg, _FALLBACK_MODEL, {},
+            system, user_msg, _FALLBACK_MODEL, resolve_model_cfg(_FALLBACK_MODEL),
             max_tokens=max_tokens, think=think, max_retries=1,
             plain_text=plain_text, token_out=_tok, logprobs=logprobs,
         )
