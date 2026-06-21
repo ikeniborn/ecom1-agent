@@ -1,6 +1,6 @@
 # Pipeline
 
-The deterministic Plan-IR pipeline in `agent/pipeline.py`. One pipeline per task: INTENT freezes the goal, then a bounded loop emits a `PlanIR`, lints it, interprets it against the VM, verifies the result, and answers exactly once — or terminates in CLARIFICATION. No LLM grades the answer; `verify()` is the only gate. See [[architecture]] for the surrounding harness.
+The deterministic Plan-IR pipeline in `agent/pipeline.py`. One pipeline per task: INTENT freezes the goal, an optional read-only INVESTIGATE phase builds an evidence brief, then a bounded loop emits a `PlanIR`, lints it, interprets it against the VM, verifies the result, and answers exactly once — or terminates in CLARIFICATION. No LLM grades the answer; `verify()` is the only gate. See [[architecture]] for the surrounding harness and [[investigate]] for the investigator.
 
 ## run_pipeline
 
@@ -16,9 +16,13 @@ The deterministic Plan-IR pipeline in `agent/pipeline.py`. One pipeline per task
 
 INTENT is retried up to `_DESIGN_MAX_ATTEMPTS` (env `ECOM_DESIGN_MAX_ATTEMPTS`, default 3) times on transient empty/parse failure — `IntentError` is caught and the attempt re-run (`pipeline.py:244`). If `intent` is still `None` after all attempts, the run records `save_last_run(..., "OUTCOME_NONE_CLARIFICATION", 0)`, emits one terminal CLARIFICATION, and returns with `cycles_used: 0`.
 
+## INVESTIGATE phase
+
+When `ECOM_INVESTIGATE_ENABLED != 0` (default), `run_pipeline` calls `investigate(vm, intent, seed=facts, oracle=_oracle)` ONCE after INTENT and before the loop, and `render_brief(brief)` is threaded into every PLAN cycle via `run_plan(..., brief_block=...)`. The whole-instruction oracle dump is skipped in this mode (the investigator retrieves scoped atoms per step instead); the orchestrator also gathers a SLIM seed (identity + schema names + doc paths — no bodies/samples/listings/records). When `=0`, the eager gather + legacy `oracle.retrieve(instruction)` dump are restored exactly and the investigator is skipped. The `investigate()` call is wrapped in a try/except: on any failure PLAN falls back to the slim seed facts (`brief=None`). On a passing verify, `_brief_lessons_text(brief)` enriches the distill note (no new path). See [[investigate]].
+
 ## PLAN — run_plan
 
-`run_plan(intent, facts, learn_ctx, prev_error, oracle_atoms, observed)` (`reason.py:77`) is the reason-tier LLM call inside the loop. Its user message assembles the oracle block, the `IntentSpec` JSON, the facts block, active LEARNED_RULES, prior OBSERVED_RPC_OUTPUTS, and any PREVIOUS_ERROR. It returns a `PlanIR` (discovery, rowsets, compute, decision, ops, answer, custom_extract). An empty LLM body raises `PlanEmptyError` (a `PlanError` subclass, `reason.py`) — distinguished from a substantive parse/validation `PlanError` so the loop can handle a transient empty cheaply (see [[pipeline#Empty-PLAN handling]]). See [[oracle]].
+`run_plan(intent, facts, learn_ctx, prev_error, oracle_atoms, observed, brief_block)` (`reason.py:77`) is the reason-tier LLM call inside the loop. Its user message assembles the oracle block, the `IntentSpec` JSON, the facts block, the optional `brief_block` (the rendered INVESTIGATE brief, appended right after the facts block), active LEARNED_RULES, prior OBSERVED_RPC_OUTPUTS, and any PREVIOUS_ERROR. It returns a `PlanIR` (discovery, rowsets, compute, decision, ops, answer, custom_extract). An empty LLM body raises `PlanEmptyError` (a `PlanError` subclass, `reason.py`) — distinguished from a substantive parse/validation `PlanError` so the loop can handle a transient empty cheaply (see [[pipeline#Empty-PLAN handling]]). See [[oracle]] and [[investigate]].
 
 ## Tiered pre-phase facts
 
