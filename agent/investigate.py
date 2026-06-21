@@ -176,6 +176,17 @@ def sufficient(intent, env: dict) -> bool:
     return True
 
 
+def _ground_doc_refs(env: dict, tool: str, args: dict, refs: list) -> None:
+    """Deterministically ground a required policy_doc ref when its exact path was
+    just read — independent of the digest LLM emitting the env key. Mutates env."""
+    if (tool or "").lower() != "read":
+        return
+    path = args.get("path", "")
+    for r in refs:
+        if getattr(r, "kind", "") == "policy_doc" and r.path == path:
+            env[f"policy_doc:{path}"] = True
+
+
 def _call_json(system: str, user: str, phase: str, escalate: bool) -> dict:
     """One LLM round-trip returning a parsed JSON object. FAST tier by default;
     escalate=True forces the REASON tier (think=on) for a stalled step."""
@@ -250,6 +261,7 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
     compatibility (Task 10 passes the slim pre-phase facts) but is reserved/unused in v1
     — the slim facts still reach PLAN via run_plan's `facts` argument."""
     brief = Brief()
+    req_refs = (intent.required_refs or {}).get(intent.desired_outcome, [])
     seen: set[str] = set()
     steps = max_steps if max_steps is not None else _MAX_STEPS
     _prev_step = current_step_type()
@@ -286,11 +298,13 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
                     if is_stalled(observation, sig, seen):     # still stalled after escalation → stop
                         note, env_updates = digest(goal, tool, args, observation, escalate=True)
                         brief.notes.append(note); brief.env.update(env_updates)
+                        _ground_doc_refs(brief.env, tool, args, req_refs)
                         break
                 seen.add(sig)
                 note, env_updates = digest(goal, tool, args, observation, escalate=escalate)
                 brief.notes.append(note)
                 brief.env.update(env_updates)
+                _ground_doc_refs(brief.env, tool, args, req_refs)
                 if sufficient(intent, brief.env):
                     break
             except Exception as e:                             # graceful: never raise out of a step
