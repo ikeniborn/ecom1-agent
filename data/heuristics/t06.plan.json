@@ -1,0 +1,147 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT pv.product_sku, pv.record_path, (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'size' AND pvp.property_value_text = 'M') > 0 AS has_size_M, (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'size' AND pvp.property_value_text = 'S') > 0 AS has_size_S FROM product_variants pv WHERE pv.brand = 'Portwest' AND (pv.series = 'PW3 DX 3TU-ST2' OR pv.model = 'Work Gloves' OR pv.product_name LIKE '%PW3 DX 3TU-ST2 Work Gloves%') LIMIT 1;"
+      },
+      "bind": "query_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "$query_result",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "has_size_M",
+          "candidates": [
+            "has_size_M"
+          ]
+        },
+        {
+          "into": "has_size_S",
+          "candidates": [
+            "has_size_S"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "product_sku"
+      ],
+      "into": "sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "record_path"
+      ],
+      "into": "record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "has_size_M"
+      ],
+      "into": "has_M"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "has_size_S"
+      ],
+      "into": "has_S"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "eq",
+              "lhs": "$has_M",
+              "rhs": 1,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$has_S",
+              "rhs": 1,
+              "args": []
+            }
+          ]
+        },
+        "label": "sizes_present"
+      },
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$sku",
+          "rhs": null,
+          "args": []
+        },
+        "label": "size_absent"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "size_absent": {
+      "message": "<NO> for SKU {sku}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$record_path"
+        }
+      ]
+    },
+    "sizes_present": {
+      "message": "Product exists and both sizes M and S are present.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "not_found": {
+      "message": "No matching product found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

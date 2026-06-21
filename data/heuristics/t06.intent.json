@@ -1,0 +1,41 @@
+{
+  "objective": "Verify whether the product catalogue contains a Portwest PW3 DX 3TU-ST2 Work Gloves item with both size M and size S properties, and if the base product exists but the size claim is absent, answer <NO> with the checked SKU.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "product_search": "SQL query on product_variants: brand = 'Portwest' AND (series = 'PW3 DX 3TU-ST2' OR model = 'Work Gloves' OR product_name LIKE '%PW3 DX 3TU-ST2 Work Gloves%')",
+    "size_check": "For the found SKU, check product_variant_properties for property_key = 'size' with property_value_text IN ('M', 'S') and verify both are present"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$answer.sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "startswith",
+        "lhs": "$answer",
+        "rhs": "<NO>",
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "<NO> for SKU {sku}"
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product.record_path"
+      }
+    ]
+  }
+}

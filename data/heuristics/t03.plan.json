@@ -1,0 +1,99 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH matching AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  WHERE pv.brand = 'Osram'\n    AND pk.product_kind_name = 'LED Bulb'\n    AND pf.product_family_name = 'Osram Eco Classic 3PW-R88 LED Bulb'\n    AND EXISTS (SELECT 1 FROM product_variant_properties vp1 WHERE vp1.product_sku = pv.product_sku AND vp1.property_key = 'Wattage' AND vp1.property_value_text = '15 W')\n    AND EXISTS (SELECT 1 FROM product_variant_properties vp2 WHERE vp2.product_sku = pv.product_sku AND vp2.property_key = 'Luminous Flux' AND vp2.property_value_text = '806 lm')\n)\nSELECT COUNT(*) AS cnt, (SELECT record_path FROM matching LIMIT 1) AS sample_path FROM matching;"
+      },
+      "bind": "matching_data"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "matching_data",
+      "format": "auto_delim",
+      "into": "matching_rows",
+      "columns": [
+        {
+          "into": "cnt",
+          "candidates": [
+            "cnt"
+          ]
+        },
+        {
+          "into": "sample_path",
+          "candidates": [
+            "sample_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$matching_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "cnt"
+      ],
+      "into": "cnt_str"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$cnt_str"
+      ],
+      "into": "matching_count"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "sample_path"
+      ],
+      "into": "matching_product_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "gt",
+          "lhs": "$matching_count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "The product was found in the catalogue.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$matching_product_record_path"
+        }
+      ]
+    },
+    "not_found": {
+      "message": "The product was not found in the catalogue.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

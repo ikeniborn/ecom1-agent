@@ -1,15 +1,34 @@
 {
-  "objective": "count rows",
+  "objective": "Determine whether a product matching 'metabo 125 grinder body, regular or flat' exists in the catalogue.",
   "desired_outcome": "OUTCOME_OK",
-  "params": {},
+  "params": {
+    "product_query": "lookup from product_variants where brand = 'metabo' and product_name contains '125' and 'grinder' and 'body', then check product_variant_properties for a property indicating 'regular' or 'flat' body type"
+  },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_NONE_CLARIFICATION"
+    "OUTCOME_NONE_UNSUPPORTED"
   ],
   "constraints": [],
-  "success_criteria": {},
-  "answer_shape": {
-    "msg_skeleton": ""
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$rows.0.product_sku",
+        "rhs": null,
+        "args": []
+      }
+    ]
   },
-  "required_refs": {}
+  "answer_shape": {
+    "msg_skeleton": "The product {product_name} (SKU: {sku}) is {status} in the catalogue."
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$rows.0.record_path"
+      }
+    ]
+  }
 }

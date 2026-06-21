@@ -1,0 +1,89 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT pv.product_sku, pv.product_name, pv.record_path\nFROM product_variants pv\nJOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id\nJOIN product_families pf ON pv.product_family_id = pf.product_family_id\nJOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'voltage' AND pvp1.property_value_text = '12 V'\nJOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'battery platform' AND pvp2.property_value_text = '12v-system'\nJOIN product_variant_properties pvp3 ON pv.product_sku = pvp3.product_sku AND pvp3.property_key = 'kit contents' AND pvp3.property_value_text = 'two battery kit'\nWHERE pk.product_kind_name = 'Cordless Drill Driver'\n  AND pf.product_family_name = 'Festool Brushless SYS 1XD-LGR Cordless Drill Driver'\n  AND pv.brand = 'Festool';"
+      },
+      "bind": "sql_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_result",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "product_name",
+          "candidates": [
+            "product_name"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$rows"
+      ],
+      "into": "count"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "row"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "gt",
+          "lhs": "$count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "Product {product_name} (SKU: {product_sku}) found in catalog.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$row.record_path"
+        }
+      ]
+    },
+    "not_found": {
+      "message": "No matching product found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}
