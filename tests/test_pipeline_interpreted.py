@@ -377,6 +377,22 @@ def test_enrich_prim_error_idempotent():
     assert pipeline._enrich_prim_error(enriched) == enriched
 
 
+def test_enrich_prim_error_idempotent_lint_compute_form():
+    from agent import pipeline
+    msg = "plan: bad source (compute 'column' arg $rows)"
+    enriched = pipeline._enrich_prim_error(msg)
+    assert "CONTRACT:" in enriched
+    assert pipeline._enrich_prim_error(enriched) == enriched
+
+
+def test_enrich_prim_error_idempotent_lint_contract_message():
+    from agent import pipeline
+    msg = "plan: 'column' expects list[dict]; use 'get'+'to_number' for a single row"
+    enriched = pipeline._enrich_prim_error(msg)
+    assert "CONTRACT:" in enriched
+    assert pipeline._enrich_prim_error(enriched) == enriched
+
+
 def test_enrich_prim_error_lint_compute_form():
     # check_compute_on_raw_discovery_bind emits "... (compute 'X' arg $root)"
     from agent import pipeline
