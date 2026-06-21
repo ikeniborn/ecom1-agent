@@ -73,3 +73,45 @@ def validate_atom_via_grader(atom, task_id, intent, plan, min_score: float = 1.0
         return score is not None and score >= min_score
     except Exception:
         return False
+
+
+def grade_full_run(task_id, force_active_id):
+    """Run `task_id` end-to-end on a fresh StartRun with `force_active_id` force-active in the
+    oracle (so a candidate atom is retrievable into PLAN), then return (score, detail).
+
+    The full agent answers the VM itself, so — unlike `grade_candidate` — we do NOT call
+    vm.answer here. `run_agent` is imported lazily to avoid an import cycle (this module is
+    imported by `agent.pipeline`, which `run_agent` pulls in).
+    """
+    from agent.orchestrator import run_agent
+    c = HarnessServiceClientSync(_URL)
+    run = c.start_run(H.StartRunRequest(name=f"bridge-validate-{task_id}",
+                                        benchmark_id=_BID, api_key=_KEY))
+    for tid in run.trial_ids:
+        try:
+            t = c.start_trial(H.StartTrialRequest(trial_id=tid))
+        except Exception:
+            continue
+        if t.task_id == task_id:
+            os.environ["ECOM_ORACLE_FORCE_ACTIVE"] = force_active_id
+            try:
+                run_agent({}, t.harness_url, t.instruction, task_id=task_id)
+            finally:
+                os.environ.pop("ECOM_ORACLE_FORCE_ACTIVE", None)
+        try:
+            c.end_trial(H.EndTrialRequest(trial_id=t.trial_id))
+        except Exception:
+            pass
+    res = c.submit_run(H.SubmitRunRequest(run_id=run.run_id, force=True))
+    return parse_score(res, task_id)
+
+
+def validate_atom_via_full_run(atom, task_id, min_score: float = 1.0) -> bool:
+    """True iff a full end-to-end re-run of `task_id` with `atom` force-active scores >=
+    min_score. Best-effort: any failure (no live grader, run error) returns False so the
+    atom stays a candidate. Never raises."""
+    try:
+        score, _detail = grade_full_run(task_id, atom.id)
+        return score is not None and score >= min_score
+    except Exception:
+        return False
