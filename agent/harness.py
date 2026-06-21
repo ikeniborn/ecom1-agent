@@ -129,6 +129,30 @@ def check_sql_stdin(plan, spec) -> list[str]:
 _MATCH_ATTRS = ("brand", "series", "model", "product_name")
 
 
+# list-consuming prims that iterate their row args (crash on a non-list)
+_LIST_CONSUMING_PRIMS = {"concat", "column", "sum_col", "count", "dedupe",
+                         "filter_rows", "all_true", "any_true", "first"}
+
+
+def check_compute_on_raw_discovery_bind(plan, spec) -> list[str]:
+    """A list-consuming primitive must not consume a RAW discovery RPC bind (Read/List/Tree/Exec,
+    …) — that object is not iterable rows. Parse it with a `rowsets` entry first. Complements
+    check_primitive_contract (which only sees compute->compute producers, never discovery binds)."""
+    msg = spec.get("message") or "list primitive consumes a raw discovery bind; parse it via rowsets first"
+    raw_binds = {st.bind for st in plan.discovery if st.bind}
+    parsed = {rs.into for rs in plan.rowsets}
+    unparsed = raw_binds - parsed
+    out: list[str] = []
+    for cs in plan.compute:
+        if cs.prim not in _LIST_CONSUMING_PRIMS:
+            continue
+        for a in cs.args:
+            root = _ref_root(a)
+            if root in unparsed:
+                out.append(f"{msg} (compute '{cs.prim}' arg ${root})")
+    return out
+
+
 def check_sql_exact_match(plan, spec) -> list[str]:
     """General control: catalogue matching over RE-SEEDED data must be NORMALIZED
     (LOWER/TRIM + LIKE), not raw equality on a text attribute — `brand = 'X'` is brittle
@@ -158,6 +182,7 @@ _HANDLERS = {
     "primitive_arity": check_primitive_arity,
     "sql_stdin": check_sql_stdin,
     "sql_exact_match": check_sql_exact_match,
+    "compute_on_raw_discovery_bind": check_compute_on_raw_discovery_bind,
 }
 
 

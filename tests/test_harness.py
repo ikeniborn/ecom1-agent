@@ -137,3 +137,58 @@ def test_sql_exact_match_flags_raw_equality_not_normalized():
     good = _plan(discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "args": [],
         "stdin": "SELECT record_path FROM product_variants WHERE LOWER(TRIM(brand)) LIKE '%bosch%'"}, "bind": "r"}])
     assert harness.check_sql_exact_match(good, spec) == []
+
+
+# --- check_compute_on_raw_discovery_bind tests ------------------------------------
+
+_RAW_DISCOVERY_SPEC = {"id": "chk_compute_on_raw_discovery_bind", "kind": "compute_on_raw_discovery_bind"}
+
+
+def test_compute_on_raw_discovery_bind_flags_list_prim_on_unparsed_bind():
+    """concat consuming a raw discovery bind (no rowset for it) must be flagged."""
+    bad = _plan(
+        discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "stdin": "SELECT ..."}, "bind": "raw1"}],
+        rowsets=[],
+        compute=[{"prim": "concat", "args": ["$raw1", "$raw1"], "into": "rows"}],
+    )
+    assert harness.check_compute_on_raw_discovery_bind(bad, _RAW_DISCOVERY_SPEC)
+
+
+def test_compute_on_raw_discovery_bind_passes_when_rowset_parses_bind():
+    """concat consuming a rowset-parsed binding must NOT be flagged."""
+    good = _plan(
+        discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "stdin": "SELECT ..."}, "bind": "raw1"}],
+        rowsets=[{"from": "raw1", "into": "rows1", "columns": []}],
+        compute=[{"prim": "concat", "args": ["$rows1", "$rows1"], "into": "rows"}],
+    )
+    assert harness.check_compute_on_raw_discovery_bind(good, _RAW_DISCOVERY_SPEC) == []
+
+
+def test_compute_on_raw_discovery_bind_passes_for_non_list_prim():
+    """get is not a list-consuming primitive — raw bind is fine for scalar access."""
+    good = _plan(
+        discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "stdin": "SELECT ..."}, "bind": "raw1"}],
+        rowsets=[],
+        compute=[{"prim": "get", "args": ["$raw1", "k"], "into": "x"}],
+    )
+    assert harness.check_compute_on_raw_discovery_bind(good, _RAW_DISCOVERY_SPEC) == []
+
+
+def test_lint_blocks_on_active_compute_on_raw_discovery_bind(monkeypatch):
+    """lint() raises InterpretError when the check is active+error and the plan is bad."""
+    monkeypatch.setattr(harness, "load_checks",
+                        lambda *a, **k: [{"id": "c", "kind": "compute_on_raw_discovery_bind",
+                                          "severity": "error", "status": "active"}])
+    bad = _plan(
+        discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "stdin": "SELECT ..."}, "bind": "raw1"}],
+        rowsets=[],
+        compute=[{"prim": "concat", "args": ["$raw1", "$raw1"], "into": "rows"}],
+    )
+    good = _plan(
+        discovery=[{"rpc": "Exec", "args": {"path": "/bin/sql", "stdin": "SELECT ..."}, "bind": "raw1"}],
+        rowsets=[{"from": "raw1", "into": "rows1", "columns": []}],
+        compute=[{"prim": "concat", "args": ["$rows1", "$rows1"], "into": "rows"}],
+    )
+    with pytest.raises(InterpretError):
+        lint(bad)
+    lint(good)  # good plan must not raise
