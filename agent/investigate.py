@@ -251,8 +251,30 @@ def digest(goal: str, tool: str, args: dict, observation: str, escalate: bool):
     return note, env_updates
 
 
+def digest_and_route(goal: str, tool: str, args: dict, observation: str,
+                     escalate: bool):
+    """Condense the observation AND choose the next action in one LLM call.
+    Returns (Note, env_updates, next_action|None). next_action mirrors router()
+    output: {"tool","args"} or None when the investigator is done."""
+    guide = load_prompt("investigate") or "# PHASE: INVESTIGATE"
+    user = (f"GOAL:\n{goal}\n\nTOOL: {tool} {args}\n\n"
+            f"RAW_RESULT (condense this):\n{observation[:4000]}\n\n"
+            "Return JSON: observation_digest, lesson, refs_found, env_updates, "
+            "and next_action ({\"tool\":...,\"args\":...} or null when done).")
+    obj = _call_json(guide, user, phase="INVESTIGATE", escalate=escalate)
+    note = Note(goal=goal, tool=tool, args=args,
+                observation_digest=str(obj.get("observation_digest", ""))[:200],
+                lesson=str(obj.get("lesson", "")),
+                refs_found=list(obj.get("refs_found", []) or []))
+    env_updates = obj.get("env_updates", {}) if isinstance(obj.get("env_updates"), dict) else {}
+    na = obj.get("next_action")
+    next_action = na if isinstance(na, dict) and na.get("tool") else None
+    return note, env_updates, next_action
+
+
 _MAX_STEPS = int(os.environ.get("ECOM_INVESTIGATE_MAX_STEPS", "6"))
 _ORACLE_K = int(os.environ.get("ECOM_INVESTIGATE_ORACLE_K", "2"))
+_MERGE_STEPS = os.environ.get("ECOM_INVESTIGATE_MERGE_STEPS", "0") == "1"
 
 
 def _retrieve_atoms(oracle, goal: str) -> list:
@@ -273,6 +295,7 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
     brief = Brief()
     req_refs = (intent.required_refs or {}).get(intent.desired_outcome, [])
     seen: set[str] = set()
+    pending_action = None
     steps = max_steps if max_steps is not None else _MAX_STEPS
     _prev_step = current_step_type()
     set_step_type("INVESTIGATE")
@@ -285,6 +308,9 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
                 if forced is not None and tool_signature(
                         forced["tool"], forced["args"]) not in seen:
                     act = forced  # prioritize grounding the governing doc
+                elif _MERGE_STEPS and pending_action is not None:
+                    act = pending_action
+                    pending_action = None
                 else:
                     act = router(intent, brief, atoms, escalate=False)
                 if act.get("done"):
@@ -316,7 +342,11 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
                         _ground_doc_refs(brief.env, tool, args, req_refs)
                         break
                 seen.add(sig)
-                note, env_updates = digest(goal, tool, args, observation, escalate=escalate)
+                if _MERGE_STEPS:
+                    note, env_updates, pending_action = digest_and_route(
+                        goal, tool, args, observation, escalate=escalate)
+                else:
+                    note, env_updates = digest(goal, tool, args, observation, escalate=escalate)
                 brief.notes.append(note)
                 brief.env.update(env_updates)
                 _ground_doc_refs(brief.env, tool, args, req_refs)
