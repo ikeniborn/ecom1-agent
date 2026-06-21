@@ -326,6 +326,18 @@ class TraceLogger:
             "message": message,
         })
 
+    def log_investigate_stop(self, reason: str, data_paths_total: int,
+                             data_paths_probed: int) -> None:
+        """Why the investigator stopped (sufficient | budget | data_probed) and how many
+        seed data-paths it probed. Lets an A/B run compare flag-off vs flag-on
+        (ECOM_INVESTIGATE_DATA_PATHS)."""
+        self._write({
+            "type": "investigate_stop",
+            "reason": reason or "",
+            "data_paths_total": int(data_paths_total),
+            "data_paths_probed": int(data_paths_probed),
+        })
+
     def log_answer(self, cycle: int, message: str, outcome: str, refs: list) -> None:
         """The final answer submitted to the grader — refs kept in full (small)."""
         self._write({
@@ -560,5 +572,15 @@ def log_lint_fire_auto(check_id: str, kind: str, severity: str,
         return
     try:
         t.log_lint_fire(current_cycle(), check_id, kind, severity, blocking, message)
+    except Exception:
+        pass
+
+
+def log_investigate_stop_auto(reason: str, total: int, probed: int) -> None:
+    t = get_trace()
+    if t is None:
+        return
+    try:
+        t.log_investigate_stop(reason, total, probed)
     except Exception:
         pass
