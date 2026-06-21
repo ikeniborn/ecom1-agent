@@ -57,13 +57,14 @@
 <thead><tr><th>Прогон</th><th>Score</th><th>PLAN chars</th><th>Циклов</th><th>Время задачи</th><th>Wall</th><th>Outcome</th></tr></thead>
 <tbody>
 <tr><td>t38 sonnet OFF</td><td class="bad">0.00</td><td>~29 200</td><td>1</td><td>290.5 с</td><td>5:28</td><td>DENIED_SECURITY</td></tr>
-<tr><td>t38 sonnet ON</td><td class="bad">0.00</td><td><strong>~14 000</strong></td><td>4</td><td>2881.7 с</td><td><strong>48:48</strong></td><td>NONE_CLARIFICATION</td></tr>
+<tr><td>t38 sonnet ON (fast=sonnet)</td><td class="bad">0.00</td><td><strong>~14 000</strong></td><td>4</td><td>2881.7 с</td><td><strong>48:48</strong></td><td>NONE_CLARIFICATION</td></tr>
+<tr><td>t38 sonnet ON (fast=haiku)</td><td class="bad">0.00</td><td>~16 000</td><td>2</td><td>1934.2 с</td><td>32:54</td><td>NONE_CLARIFICATION</td></tr>
 </tbody>
 </table>
 <ul>
-<li><span class="ok">подтверждено</span> — PLAN-промпт −52% и на sonnet (29.2k→14k).</li>
-<li><span class="bad">не пройдено</span> — <strong>t38 = 0.00 и на сильной модели в обоих режимах.</strong> Это окончательно снимает гипотезу «context-bound»: даже способная модель валит t38 с полным И с тонким контекстом. ON лишь сменил режим провала (DENIED_SECURITY → NONE_CLARIFICATION: PLAN-ы повторно не проходили lint → нет валидного плана).</li>
-<li><span class="bad">регресс латентности на CC</span> — ON занял <strong>48:48</strong> против 5:28 OFF. Причина: <code>ECOM_MODEL_FAST</code> не задан, поэтому fast-тир исследователя резолвится в тот же <code>claude-code/sonnet</code>, и каждый из ~14 router/digest-шагов — отдельный медленный CC-субпроцесс. На облачном/ollama-тире (где fast-тир = та же дешёвая модель) эффект обратный (ON быстрее); на CC без дешёвого fast-тира исследователь умножает дорогие вызовы.</li>
+<li><span class="ok">подтверждено</span> — PLAN-промпт −45..52% и на sonnet.</li>
+<li><span class="bad">не пройдено</span> — <strong>t38 = 0.00 и на сильной модели во всех режимах.</strong> Это окончательно снимает гипотезу «context-bound»: способная модель валит t38 с полным И с тонким контекстом. ON сменил режим провала (DENIED_SECURITY → NONE_CLARIFICATION: PLAN-ы повторно не проходили lint → нет валидного плана).</li>
+<li><span class="note"><strong>Источник латентности — измерено, гипотеза «дорогой investigator» ОПРОВЕРГНУТА.</strong> Шаги router/digest исследователя ДЕШЁВЫ на любом тире (~19–21 с/шаг, think=off, 1024 ток; investigate-фаза целиком ~270 с) — <code>ECOM_MODEL_FAST=claude-code/haiku</code> их латентность НЕ меняет (19 с на sonnet vs 21 с на haiku). Доминирующая стоимость на CC — <strong>reason-тир PLAN: ~10–12 мин на ОДИН вызов</strong> на claude-code/sonnet. Разброс wall-clock (48:48 при 4 циклах vs 32:54 при 2) объясняется числом PLAN-циклов (run-to-run вариация на провальном плане), а не fast-тиром. Реальный CC-эффект INVESTIGATE: на нерешаемой задаче он уводит прогон из быстрого неверного ответа (1 цикл/DENIED, ~5 мин) в медленный не-ответ (2–4 цикла/CLARIFICATION, 33–49 мин), потому что каждый лишний PLAN-цикл на CC стоит ~10 мин.</span></li>
 </ul>
 
 <h2>Вердикт</h2>
@@ -73,11 +74,12 @@
 <ul>
 <li><span class="ok">ВЫПОЛНЕНО (рек 1)</span> — <code>/bin/id</code> разрешён read-only в <code>investigate.is_readonly</code> (+ <code>run_tool</code> диспатчит реальный бинарь, не хардкодит <code>/bin/sql</code>; mock-флаг <code>mutated</code> поправлен). На sonnet-прогоне исследователь теперь действительно добывает identity. Сам по себе t38 не перевернул.</li>
 <li><span class="ok">ВЫПОЛНЕНО (рек 2)</span> — перепрогон на <code>claude-code/sonnet</code> сделан. Итог: t38 = 0.00 и на сильной модели → гипотеза «context-bound» снята окончательно.</li>
-<li><span class="bad">НОВОЕ — обязательно для CC</span> — на CC-тире задавать <code>ECOM_MODEL_FAST=claude-code/haiku</code>, чтобы router/digest-шаги исследователя шли на дешёвой haiku, а REASON-фазы (INTENT/PLAN) — на sonnet. Без этого fast-тир падает на sonnet и ~14 шагов исследователя дают латентный взрыв (48 мин против 5.5). На облачном/ollama-тире это не нужно (fast = та же дешёвая модель).</li>
+<li><span class="ok">НОВОЕ (рек 2-бис) — проверено</span> — <code>ECOM_MODEL_FAST=claude-code/haiku</code> на CC: это COST-оптимизация (дешёвые токены для коротких investigate-шагов), а НЕ latency-фикс — investigate-шаги и так ~20 с на любом тире. Латентность CC определяется reason-тир PLAN (~10–12 мин/вызов на sonnet), который fast-тир не трогает. Добавлено в <code>.env.example</code> как закомментированная рекомендация с честной оговоркой.</li>
+<li><span class="bad">Главный CC-вывод</span> — на CC-тире держать INVESTIGATE по умолчанию-ON разумно только если PLAN на reason-тире приемлемо быстр. На <code>claude-code/sonnet</code> один PLAN ~10–12 мин, и INVESTIGATE на трудной задаче добавляет PLAN-циклы → 30–50 мин/задача. Для CC рассмотреть более быстрый reason-тир (haiku) ИЛИ оставлять INVESTIGATE для cloud/ollama-тиров, где PLAN дёшев.</li>
 <li>Решение DENIED_SECURITY/CLARIFICATION у t38 — проблема LEARN/oracle + способности модели, а не pre-phase; чинить через правило LEARN (никогда <code>data/prompts/</code>), отдельно от этой фичи.</li>
 <li>Минор из кросс-ревью (по случаю): (а) на эскалации <code>_call_json</code> игнорирует явный <code>ECOM_MODEL_INVESTIGATE</code> (резолв через reason-тир) — задокументировать или резолвить как <code>ECOM_MODEL_INVESTIGATE → ECOM_MODEL_REASON</code>; (б) параметр <code>seed</code> принимается, но не используется (v1-резерв).</li>
 </ul>
 
-<p class="note"><strong>Флаг по умолчанию.</strong> <code>ECOM_INVESTIGATE_ENABLED</code> уже включён по умолчанию (<code>"1"</code>) в обоих гейтах (<code>orchestrator</code> + <code>pipeline</code>); <code>=0</code> — только opt-out на точный baseline. На облачном/ollama-тире фича — чистый плюс (−55..60% промпт, меньше циклов, ≈½ wall-clock). На CC-тире держать дефолт-ON ТОЛЬКО вместе с <code>ECOM_MODEL_FAST=claude-code/haiku</code> (иначе латентный регресс).</p>
+<p class="note"><strong>Флаг по умолчанию.</strong> <code>ECOM_INVESTIGATE_ENABLED</code> уже включён по умолчанию (<code>"1"</code>) в обоих гейтах (<code>orchestrator</code> + <code>pipeline</code>); <code>=0</code> — только opt-out на точный baseline. На облачном/ollama-тире фича — чистый плюс (−55..60% промпт, меньше циклов, ≈½ wall-clock; PLAN там дёшев). На CC-тире плюс по промпту сохраняется, но wall-clock определяется медленным reason-тир PLAN (~10–12 мин/вызов на sonnet), а INVESTIGATE может добавить PLAN-циклы на трудной задаче — это вопрос выбора reason-модели, а НЕ fast-тира.</p>
 </body>
 </html>
