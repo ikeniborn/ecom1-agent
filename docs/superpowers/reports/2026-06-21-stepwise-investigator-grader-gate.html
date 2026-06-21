@@ -51,15 +51,33 @@
 <li><strong>Всплыл изъян исследователя (минорный, не корень t38).</strong> В brief t38 ON router верно прочитал <code>/docs/security.md</code>, затем попытался запустить <code>/bin/id</code> для подтверждения identity — но <code>is_readonly</code> отвергает любой <code>exec</code> кроме <code>/bin/sql</code>, поэтому <code>/bin/id</code> был отвергнут дважды и router сдался (<code>done</code>). Brief забиндил только <code>policy_doc:/docs/security.md</code> и так и не получил identity. Это потерянные шаги + шум в brief, а <em>не</em> причина score t38: тонкий seed всё равно собирает identity в <code>facts.identity</code> (сохраняется в обоих режимах), которая доходит до PLAN независимо — и PLAN всё равно отказал. Тем не менее <code>/bin/id</code> — легитимная read-only проба identity, которую исследователю стоит разрешать по требованию.</li>
 </ol>
 
+<h2>Перепрогон на сильной модели — Claude-тир (рекомендация 2, выполнена)</h2>
+<p>Повтор t38 OFF/ON на <code>claude-code/sonnet</code> (через CC CLI/OAuth), с уже применённым фиксом рек.1 (<code>/bin/id</code> разрешён исследователю). Здесь исследователь добыл identity (8 read-only vm-вызовов, 14 router/digest-шагов), а не упёрся в отказ.</p>
+<table>
+<thead><tr><th>Прогон</th><th>Score</th><th>PLAN chars</th><th>Циклов</th><th>Время задачи</th><th>Wall</th><th>Outcome</th></tr></thead>
+<tbody>
+<tr><td>t38 sonnet OFF</td><td class="bad">0.00</td><td>~29 200</td><td>1</td><td>290.5 с</td><td>5:28</td><td>DENIED_SECURITY</td></tr>
+<tr><td>t38 sonnet ON</td><td class="bad">0.00</td><td><strong>~14 000</strong></td><td>4</td><td>2881.7 с</td><td><strong>48:48</strong></td><td>NONE_CLARIFICATION</td></tr>
+</tbody>
+</table>
+<ul>
+<li><span class="ok">подтверждено</span> — PLAN-промпт −52% и на sonnet (29.2k→14k).</li>
+<li><span class="bad">не пройдено</span> — <strong>t38 = 0.00 и на сильной модели в обоих режимах.</strong> Это окончательно снимает гипотезу «context-bound»: даже способная модель валит t38 с полным И с тонким контекстом. ON лишь сменил режим провала (DENIED_SECURITY → NONE_CLARIFICATION: PLAN-ы повторно не проходили lint → нет валидного плана).</li>
+<li><span class="bad">регресс латентности на CC</span> — ON занял <strong>48:48</strong> против 5:28 OFF. Причина: <code>ECOM_MODEL_FAST</code> не задан, поэтому fast-тир исследователя резолвится в тот же <code>claude-code/sonnet</code>, и каждый из ~14 router/digest-шагов — отдельный медленный CC-субпроцесс. На облачном/ollama-тире (где fast-тир = та же дешёвая модель) эффект обратный (ON быстрее); на CC без дешёвого fast-тира исследователь умножает дорогие вызовы.</li>
+</ul>
+
 <h2>Вердикт</h2>
 <p>Фича INVESTIGATE (Задачи 1–14) <strong>реализована и работает по проекту</strong>: строит компактный brief, работает строго read-only, режет PLAN-промпт на ~55–60%, снижает число циклов/wall-clock, трассируется под фазой INVESTIGATE и деградирует мягко — всё за флагом <code>ECOM_INVESTIGATE_ENABLED</code> с точным сохранением базового поведения при <code>=0</code> (108 тестов детерминированного ядра + 30 юнит-тестов исследователя зелёные). Механические цели по эффективности достигнуты. Ожидаемый <strong>переворот score t38 (0→&gt;0) на этом прогоне не достигнут</strong>, потому что провал t38 обусловлен решением/способностью модели, а не контекстом.</p>
 
-<h2>Рекомендации (здесь не выполнены — для отдельного решения)</h2>
+<h2>Рекомендации</h2>
 <ul>
-<li>Разрешить <code>/bin/id</code> (и только его) в whitelist exec у <code>investigate.is_readonly</code> — это read-only проба identity; сейчас исследователь тратит на неё шаги впустую. Маленькое, узкое изменение; само по себе t38 <em>не</em> перевернёт (identity и так идёт через тонкий seed).</li>
-<li>Перепрогнать gate на более сильной модели (уровень Claude) прежде чем судить гипотезу t38 — премиса плана про барахтанье/таймаут целится в уровень CC, а не deepseek-flash.</li>
-<li>Решение DENIED_SECURITY у t38 — проблема LEARN/oracle + способности модели, а не pre-phase; чинить через правило LEARN (никогда <code>data/prompts/</code>), отдельно от этой фичи.</li>
-<li>Финальный кросс-ревью отметил два минора (исправить по случаю): (а) на эскалации <code>_call_json</code> резолвит модель через <code>_resolve_model_for_phase("reason", …)</code>, игнорируя явный <code>ECOM_MODEL_INVESTIGATE</code> — задокументировать или резолвить как <code>ECOM_MODEL_INVESTIGATE → ECOM_MODEL_REASON</code>; (б) параметр <code>seed</code> принимается, но не используется (зарезервирован под v1) — убрать до момента подключения или пометить на месте вызова.</li>
+<li><span class="ok">ВЫПОЛНЕНО (рек 1)</span> — <code>/bin/id</code> разрешён read-only в <code>investigate.is_readonly</code> (+ <code>run_tool</code> диспатчит реальный бинарь, не хардкодит <code>/bin/sql</code>; mock-флаг <code>mutated</code> поправлен). На sonnet-прогоне исследователь теперь действительно добывает identity. Сам по себе t38 не перевернул.</li>
+<li><span class="ok">ВЫПОЛНЕНО (рек 2)</span> — перепрогон на <code>claude-code/sonnet</code> сделан. Итог: t38 = 0.00 и на сильной модели → гипотеза «context-bound» снята окончательно.</li>
+<li><span class="bad">НОВОЕ — обязательно для CC</span> — на CC-тире задавать <code>ECOM_MODEL_FAST=claude-code/haiku</code>, чтобы router/digest-шаги исследователя шли на дешёвой haiku, а REASON-фазы (INTENT/PLAN) — на sonnet. Без этого fast-тир падает на sonnet и ~14 шагов исследователя дают латентный взрыв (48 мин против 5.5). На облачном/ollama-тире это не нужно (fast = та же дешёвая модель).</li>
+<li>Решение DENIED_SECURITY/CLARIFICATION у t38 — проблема LEARN/oracle + способности модели, а не pre-phase; чинить через правило LEARN (никогда <code>data/prompts/</code>), отдельно от этой фичи.</li>
+<li>Минор из кросс-ревью (по случаю): (а) на эскалации <code>_call_json</code> игнорирует явный <code>ECOM_MODEL_INVESTIGATE</code> (резолв через reason-тир) — задокументировать или резолвить как <code>ECOM_MODEL_INVESTIGATE → ECOM_MODEL_REASON</code>; (б) параметр <code>seed</code> принимается, но не используется (v1-резерв).</li>
 </ul>
+
+<p class="note"><strong>Флаг по умолчанию.</strong> <code>ECOM_INVESTIGATE_ENABLED</code> уже включён по умолчанию (<code>"1"</code>) в обоих гейтах (<code>orchestrator</code> + <code>pipeline</code>); <code>=0</code> — только opt-out на точный baseline. На облачном/ollama-тире фича — чистый плюс (−55..60% промпт, меньше циклов, ≈½ wall-clock). На CC-тире держать дефолт-ON ТОЛЬКО вместе с <code>ECOM_MODEL_FAST=claude-code/haiku</code> (иначе латентный регресс).</p>
 </body>
 </html>
