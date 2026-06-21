@@ -197,6 +197,11 @@ def _finalize_task_trace(
 
 
 def _print_table_header() -> None:
+    # M1 (deferred): cache_read/cache_creation are recorded per llm_call in the
+    # trace JSONL (trace.py) but are not aggregated into token_stats/metrics, so
+    # the summary has no cache columns. Surfacing them needs non-trivial trace
+    # aggregation (sum per-task trace events → thread through run_agent). Left
+    # unimplemented per the t38-pipeline-fixes plan's explicit M1 stop-condition.
     lines = [
         f"\n{'=' * 80}",
         f"{'ИТОГОВАЯ СТАТИСТИКА':^80}",
