@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Проверка плана — t38 Pipeline Robustness &amp; Correctness Fixes</title>
+<style>
+  :root{
+    --bg:#0f1116; --panel:#171a21; --panel2:#1e222b; --txt:#e6e8ec; --muted:#9aa3af;
+    --ok:#3fb950; --warn:#d29922; --crit:#f85149; --line:#2b2f3a; --accent:#58a6ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.55}
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:1.7rem;margin:0 0 6px}
+  h2{font-size:1.25rem;margin:38px 0 12px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--accent)}
+  .sub{color:var(--muted);font-size:.92rem;margin-bottom:18px}
+  .verdict{display:inline-block;padding:8px 18px;border-radius:8px;font-weight:700;font-size:1.05rem}
+  .verdict.ok{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid var(--ok)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:14px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card .k{color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+  .card .v{font-size:1.15rem;font-weight:600;margin-top:4px}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.92rem}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;background:var(--panel2)}
+  tr:hover td{background:rgba(88,166,255,.04)}
+  code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:.86em}
+  .pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.78rem;font-weight:600}
+  .pill.passed{background:rgba(63,185,80,.15);color:var(--ok)}
+  .pill.opt{background:rgba(210,153,34,.12);color:var(--warn)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:.85rem;margin:8px 0 0}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+  svg{width:100%;height:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .matrix td.hit{background:rgba(88,166,255,.18);text-align:center;font-weight:700;color:var(--accent)}
+  .matrix td.self{background:var(--panel2);text-align:center;color:var(--muted)}
+  .matrix td.empty{text-align:center;color:#3a3f4b}
+  .chain{font-family:ui-monospace,monospace;background:var(--panel);border:1px solid var(--line);
+         border-radius:8px;padding:12px 14px;color:var(--muted)}
+  .chain b{color:var(--txt)}
+  .foot{margin-top:40px;color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:14px}
+  .ok-txt{color:var(--ok)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Проверка плана — t38 Pipeline Robustness &amp; Correctness Fixes</h1>
+  <div class="sub">Дата проверки: 2026-06-21 &nbsp;·&nbsp; навык <code>check-plan</code> &nbsp;·&nbsp; фазовая модель (5 фаз)</div>
+
+  <p><span class="verdict ok">ВЕРДИКТ: OK</span> &nbsp; 0 CRITICAL · 0 WARNING · все 5 фаз <span class="ok-txt">passed</span></p>
+
+  <div class="grid">
+    <div class="card"><div class="k">План</div><div class="v mono">d5fdb537…</div><div class="sub" style="margin:2px 0 0">2026-06-21-t38-pipeline-fixes.md</div></div>
+    <div class="card"><div class="k">Спека</div><div class="v mono">868e0bd2…</div><div class="sub" style="margin:2px 0 0">…t38-pipeline-fixes-design.md</div></div>
+    <div class="card"><div class="k">Задач</div><div class="v">8 <span class="sub">(3 опциональных)</span></div></div>
+    <div class="card"><div class="k">Findings</div><div class="v ok-txt">0</div></div>
+  </div>
+
+  <div class="chain">Цепочка: <b>intent: null</b> → spec: <b>…t38-pipeline-fixes-design.md</b> → plan: <b>…t38-pipeline-fixes.md</b></div>
+
+  <!-- ============ БЛОК 1: РЕЗЮМЕ ПЛАНА ============ -->
+  <h2>1. Резюме плана — задачи и критерии готовности (DoD)</h2>
+  <table>
+    <thead><tr><th>#</th><th>Задача (spec-item)</th><th>Файлы</th><th>Критерий готовности (DoD)</th><th>Статус</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><b>A1</b> — резолв per-model <code>cfg</code> из <code>models.json</code> на стыке вызова</td>
+        <td><code>agent/llm.py</code>, <code>tests/test_llm_cfg_resolution.py</code></td>
+        <td><code>pytest test_llm_cfg_resolution.py</code> → PASS (6 тестов); регрессия <code>test_llm_routing/module/trace_llm_funnel</code> → PASS</td>
+        <td><span class="pill passed">обязат.</span></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><b>A2</b> — включить уже разведённый fallback (config)</td>
+        <td><code>.env.example</code>, <code>models.json</code>, <code>tests/test_llm_cfg_resolution.py</code></td>
+        <td>тест fallback-dispatch → PASS; <code>json.load('models.json')</code> без ошибок</td>
+        <td><span class="pill passed">обязат.</span></td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><b>H2a</b> — детерминированное grounding управляющего документа</td>
+        <td><code>agent/investigate.py</code>, <code>tests/test_investigate_doc_grounding.py</code></td>
+        <td><code>pytest test_investigate_doc_grounding.py + test_investigate.py</code> → PASS</td>
+        <td><span class="pill passed">обязат.</span></td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><b>H2b</b> — приоритетное чтение незаземлённого управляющего документа</td>
+        <td><code>agent/investigate.py</code>, <code>tests/test_investigate_doc_grounding.py</code></td>
+        <td><code>pytest …doc_grounding + test_investigate + test_pipeline_investigate</code> → PASS</td>
+        <td><span class="pill passed">обязат.</span></td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><b>M3</b> — слияние digest + next-action в один вызов (за флагом)</td>
+        <td><code>agent/investigate.py</code>, <code>tests/test_investigate_merge.py</code></td>
+        <td><code>pytest test_investigate_merge.py + …</code> → PASS; при флаге OFF поведение не меняется</td>
+        <td><span class="pill opt">опц. (флаг)</span></td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><b>M1</b> — кэш-токены в сводке прогона</td>
+        <td><code>main.py</code></td>
+        <td>если дёшево — 2 колонки кэша в сводке; иначе комментарий-заглушка и stop</td>
+        <td><span class="pill opt">опц.</span></td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td><b>M2</b> — <code>parsed_output</code> в трейс INTENT/PLAN</td>
+        <td><code>agent/trace.py</code>, <code>agent/reason.py</code></td>
+        <td>если есть seam — патч последней записи + тест; иначе документировать и stop</td>
+        <td><span class="pill opt">опц.</span></td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>Полный прогон + интеграционный gate (A1/A2/H2/H3)</td>
+        <td>— (только верификация)</td>
+        <td><code>pytest tests/ -v</code> → PASS (кроме известного red t09); <code>pgrep</code>-gate; <code>make task TASKS='t38'</code> → OUTCOME_OK, score 1.0; <code>policy_doc:&lt;doc&gt;:True</code> в env</td>
+        <td><span class="pill passed">обязат.</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ============ БЛОК 2: ЗАВИСИМОСТИ И ПЕРЕСЕЧЕНИЯ ============ -->
+  <h2>2. Схемы зависимостей и пересечений</h2>
+
+  <h3>2.1 Граф зависимостей шагов (M → N: результат M используется в N)</h3>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--accent)"></span>ребро зависимости (направление M→N, M&lt;N)</span>
+    <span><span class="dot" style="background:var(--ok)"></span>обязательная задача</span>
+    <span><span class="dot" style="background:var(--warn)"></span>опциональная задача</span>
+    <span class="ok-txt">циклов и нарушений порядка не найдено</span>
+  </div>
+  <svg viewBox="0 0 980 230" role="img" aria-label="Граф зависимостей задач плана">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+      </marker>
+    </defs>
+    <!-- edges -->
+    <!-- T1 -> T2 (resolve_model_cfg used by fallback config/test) -->
+    <line x1="120" y1="95" x2="232" y2="95" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+    <!-- T3 -> T4 (_ground_doc_refs + req_refs needed before _forced_doc_read) -->
+    <line x1="466" y1="95" x2="578" y2="95" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+    <!-- T4 -> T5 (forced/router wiring + req_refs reused by merged step) -->
+    <line x1="690" y1="95" x2="802" y2="95" stroke="#58a6ff" stroke-width="2" marker-end="url(#arr)"/>
+    <!-- T3 -> T5 (curved: _ground_doc_refs reused in merged loop) -->
+    <path d="M 410,118 C 520,185 720,185 846,120" fill="none" stroke="#58a6ff" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arr)"/>
+    <!-- feeders into T8 (verification gate) -->
+    <path d="M 76,70 C 76,20 866,20 870,72" fill="none" stroke="#3fb950" stroke-width="1.4" stroke-dasharray="4,4" marker-end="url(#arr)"/>
+    <text x="470" y="16" fill="#3fb950" font-size="11" text-anchor="middle">все обязательные задачи (T1–T4) верифицируются в T8</text>
+
+    <!-- nodes -->
+    <g font-size="13" font-family="ui-monospace,monospace" text-anchor="middle">
+      <g><circle cx="76"  cy="95" r="34" fill="#171a21" stroke="#3fb950" stroke-width="2"/><text x="76"  y="92" fill="#e6e8ec">T1</text><text x="76"  y="108" fill="#9aa3af" font-size="10">A1</text></g>
+      <g><circle cx="266" cy="95" r="34" fill="#171a21" stroke="#3fb950" stroke-width="2"/><text x="266" y="92" fill="#e6e8ec">T2</text><text x="266" y="108" fill="#9aa3af" font-size="10">A2</text></g>
+      <g><circle cx="432" cy="95" r="34" fill="#171a21" stroke="#3fb950" stroke-width="2"/><text x="432" y="92" fill="#e6e8ec">T3</text><text x="432" y="108" fill="#9aa3af" font-size="10">H2a</text></g>
+      <g><circle cx="612" cy="95" r="34" fill="#171a21" stroke="#3fb950" stroke-width="2"/><text x="612" y="92" fill="#e6e8ec">T4</text><text x="612" y="108" fill="#9aa3af" font-size="10">H2b</text></g>
+      <g><circle cx="846" cy="95" r="34" fill="#171a21" stroke="#d29922" stroke-width="2"/><text x="846" y="92" fill="#e6e8ec">T5</text><text x="846" y="108" fill="#9aa3af" font-size="10">M3</text></g>
+      <g><circle cx="900" cy="95" r="0" fill="none"/></g>
+      <!-- gate node -->
+      <g><circle cx="900" cy="200" r="0"/></g>
+    </g>
+    <g font-size="12" text-anchor="middle">
+      <rect x="430" y="178" width="120" height="34" rx="8" fill="#171a21" stroke="#3fb950" stroke-width="2"/>
+      <text x="490" y="200" fill="#e6e8ec">T8 — gate</text>
+    </g>
+  </svg>
+  <p class="sub">Опциональные T6 (M1) и T7 (M2) изолированы — не зависят от других задач и не блокируют их (на графе не показаны как часть критической цепи). Цепь обязательных задач строго возрастающая (T1→T2, T3→T4→T5), нарушений порядка «M&lt;N» нет.</p>
+
+  <h3>2.2 Пересечения — артефакты (файлы), затрагиваемые несколькими задачами</h3>
+  <table class="matrix">
+    <thead><tr><th>Файл \ Задача</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>T6</th><th>T7</th><th>T8</th></tr></thead>
+    <tbody>
+      <tr><td><code>agent/llm.py</code></td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+      <tr><td><code>.env.example</code></td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td></tr>
+      <tr><td><code>models.json</code></td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+      <tr><td><code>agent/investigate.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="hit">●</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+      <tr><td><code>main.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td></tr>
+      <tr><td><code>agent/trace.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="empty">·</td></tr>
+      <tr><td><code>tests/test_llm_cfg_resolution.py</code></td><td class="hit">●</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+      <tr><td><code>tests/test_investigate_doc_grounding.py</code></td><td class="empty">·</td><td class="empty">·</td><td class="hit">●</td><td class="hit">●</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td><td class="empty">·</td></tr>
+    </tbody>
+  </table>
+  <p class="sub"><b>Ключевое пересечение:</b> <code>agent/investigate.py</code> правят T3, T4, T5 — но строго последовательно (T3 добавляет <code>_ground_doc_refs</code>+<code>req_refs</code>; T4 добавляет <code>_forced_doc_read</code> и заменяет вызов роутера; T5 заменяет тот же блок выбора действия финальной трёхветочной формой). Каждая поздняя задача показывает полную форму замены — конфликта нет. <code>tests/test_llm_cfg_resolution.py</code> создаётся в T1 и дополняется в T2; <code>…doc_grounding.py</code> создаётся в T3 и дополняется в T4 — порядок соблюдён.</p>
+
+  <h3>2.3 Пересечения — покрытие требований спеки</h3>
+  <table>
+    <thead><tr><th>Требование спеки</th><th>Задача(и) плана</th><th>Тип покрытия</th></tr></thead>
+    <tbody>
+      <tr><td>§4 A1 — cfg threading (код)</td><td>T1</td><td>1→1</td></tr>
+      <tr><td>§4 A2 — config</td><td>T2</td><td>1→1</td></tr>
+      <tr><td>§4 A3 — fail-fast (emergent, «no separate change»)</td><td>T1 + T2 (эмерджентно), верификация в T8</td><td>покрыто без отдельной задачи (по спеке)</td></tr>
+      <tr><td>§5 H2 — детерм. grounding + приоритет чтения</td><td>T3 + T4</td><td>1 требование → 2 задачи</td></tr>
+      <tr><td>§5 H3 — authority-confirmed signal (без кода, через grader)</td><td>T8</td><td>верификация</td></tr>
+      <tr><td>§5 M3 — merge digest+route (за флагом)</td><td>T5</td><td>1→1</td></tr>
+      <tr><td>§6 M1 — кэш-токены (опц.)</td><td>T6</td><td>1→1</td></tr>
+      <tr><td>§6 M2 — parsed_output трейс (опц.)</td><td>T7</td><td>1→1</td></tr>
+      <tr><td>§7 — стратегия верификации (unit + интеграция + pgrep)</td><td>T8</td><td>1→1</td></tr>
+    </tbody>
+  </table>
+  <p class="sub">Каждое требование спеки покрыто ≥1 задачей; лишних задач (не привязанных к спеке) нет. Единственное «1→много» — H2, намеренно разбитое на grounding (T3) и приоритезацию чтения (T4).</p>
+
+  <!-- ============ БЛОК 3: РЕЗУЛЬТАТЫ ПРОВЕРКИ ============ -->
+  <h2>3. Результаты проверки по фазам</h2>
+  <table>
+    <thead><tr><th>Фаза</th><th>Что проверялось</th><th>Статус</th><th>Findings</th></tr></thead>
+    <tbody>
+      <tr><td><b>1. structure</b></td><td>плейсхолдеры (TODO/TBD/???/FIXME); нумерация задач/шагов; дубли заголовков</td><td><span class="pill passed">passed</span></td><td>0 — плейсхолдеров нет; задачи 1–8 без пропусков; шаги в каждой задаче сквозные; дублей нет</td></tr>
+      <tr><td><b>2. coverage</b></td><td>каждое требование спеки покрыто шагом; нет «лишних» шагов</td><td><span class="pill passed">passed</span></td><td>0 — §4–§7 полностью отображены на T1–T8; orphan-задач нет</td></tr>
+      <tr><td><b>3. dependencies</b></td><td>порядок (M&lt;N при использовании результата); циклы; доступность артефактов</td><td><span class="pill passed">passed</span></td><td>0 — T3→T4→T5 строго по возрастанию; все тест-файлы и <code>mock_vm_spy</code> существуют; новые файлы создаются до использования</td></tr>
+      <tr><td><b>4. verifiability</b></td><td>измеримый DoD у каждого шага; нет шагов без выхода/команды</td><td><span class="pill passed">passed</span></td><td>0 — у каждого шага явная команда <code>pytest</code>/<code>make task</code> и ожидаемый результат; опц. T6/T7 имеют явные stop-условия</td></tr>
+      <tr><td><b>5. consistency</b></td><td>сверка хешей секций плана/спеки; сводка изменений</td><td><span class="pill passed">passed</span></td><td>0 — первая фиксация <code>review:</code>; spec_hash совпал с собственным <code>review.spec_hash</code> спеки (спека не менялась); ссылки на строки кода в плане сверены с живым исходником — точны</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Таблица findings</h3>
+  <table>
+    <thead><tr><th>id</th><th>severity</th><th>section</th><th>text</th><th>verdict</th></tr></thead>
+    <tbody>
+      <tr><td colspan="5" style="text-align:center;color:var(--ok)">Findings отсутствуют — план соответствует спеке по всем 5 фазам.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Сводка</h3>
+  <div class="grid">
+    <div class="card"><div class="k">CRITICAL open</div><div class="v ok-txt">0</div></div>
+    <div class="card"><div class="k">WARNING open</div><div class="v ok-txt">0</div></div>
+    <div class="card"><div class="k">Фазы passed</div><div class="v">5 / 5</div></div>
+    <div class="card"><div class="k">Финальный вердикт</div><div class="v ok-txt">OK</div></div>
+  </div>
+
+  <div class="foot">
+    Цепочка проверки: <span class="mono">intent: null → docs/superpowers/specs/2026-06-21-t38-pipeline-fixes-design.md → docs/superpowers/plans/2026-06-21-t38-pipeline-fixes.md</span><br>
+    plan_hash <span class="mono">d5fdb53756ec4f6e</span> · spec_hash <span class="mono">868e0bd29e43056b</span> · last_run 2026-06-21 · навык <code>check-plan</code>
+  </div>
+
+</div>
+</body>
+</html>
