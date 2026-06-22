@@ -60,7 +60,16 @@ deterministic Plan-IR interpreter.
      plan against the VM. `InterpretError` → `_ilearn` → retry (break if a mutation landed).
      A real-VM `Exception` → `_ilearn`, then retry only when the plan is read-only AND the
      error is retryable (`_is_retryable_vm_error`), else break.
-   - **verify** (`verify.py:verify(result, intent)`) — no LLM, deterministic. Checks
+   - **ground-refs** (`grounding.py:ground_refs(...)`) — no LLM, best-effort (never raises).
+     Re-derives the authoritative reference set from the VM + task text + computed answer and
+     **overwrites** `result.captured.refs` before verify. Record refs: entity-token →
+     evidence-scan/`find`/generic-SQL-fallback → `stat`-validate (+ conservative cross-customer
+     ownership guard). Doc refs: investigator `docs_read` (`brief.env["docs_read"]`), narrowed
+     by a recall-preserving relies-on filter and case-corrected. Model refs are hints; code
+     produces the enforced set.
+   - **verify** (`verify.py:verify(result, intent)`) — no LLM, deterministic. I1 is
+     presence-based on **every** outcome (each resolved `required_refs[outcome]` value ⊆
+     `answer.refs`, plus a `$`-ref guard). Checks
      `success_criteria` and required refs.
      - Pass → `vm.answer(...)` once, `_persist_artifacts(intent, plan)`,
        return success metrics.

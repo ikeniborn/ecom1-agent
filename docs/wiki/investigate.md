@@ -8,7 +8,7 @@ A front-loaded pre-phase dump (all doc bodies, sample rows, listings) bloats the
 
 ## Brief and Note models
 
-`Note` (goal, tool, args, observation_digest, lesson, refs_found) is one read-only step's condensed record; `Brief` holds an ordered `notes` list plus an `env` dict of bound facts (e.g. `incident_id`, `policy_doc:<path>`, `<row>.record_path`). Both are Pydantic models with `extra="forbid"` (matching [[data-files]]'s `ir_models` convention). `env` is the sufficiency gate's ground truth.
+`Note` (goal, tool, args, observation_digest, lesson, refs_found) is one read-only step's condensed record; `Brief` holds an ordered `notes` list plus an `env` dict of bound facts (e.g. `incident_id`, `policy_doc:<path>`, `<row>.record_path`). Both are Pydantic models with `extra="forbid"` (matching [[data-files]]'s `ir_models` convention). `env` is the sufficiency gate's ground truth. `env["docs_read"]` accumulates the `/docs/*.md` paths the investigator actually read (via `_note_doc_read` at the two `_ground_doc_refs` call sites); [[pipeline]] threads it into [[grounding]] so the deterministic ref-grounding stage can auto-cite the docs the answer relied on.
 
 ## render_brief
 
