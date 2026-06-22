@@ -38,3 +38,74 @@ def test_allowlisted_prefix_sql_columns_are_extracted_known_limitation():
     # downstream stat-validation drops any token that does not resolve to a real /proc path.
     toks = extract_entity_tokens("SELECT order_id FROM orders WHERE return_reason IS NULL", "")
     assert "order_id" in toks and "return_reason" in toks
+from agent.grounding import resolve_record_path, _proc_paths_in
+from agent.mock_vm_spy import MockVMSpy, fixture_key
+from agent.interpreter import InterpretResult, CapturedAnswer
+
+
+def _result(env=None, sql_results=None, message=""):
+    return InterpretResult(
+        captured=CapturedAnswer(message=message, outcome="OUTCOME_OK", refs=[]),
+        env=env or {}, observations=[], sql_results=sql_results or [],
+        mutation_landed=False, label="ok")
+
+
+def test_resolve_via_find_then_stat():
+    path = "/proc/catalog/STO-2R84BSHQ.json"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Find", "/proc"): {"paths": [path]},
+        fixture_key("Stat", path): {"path": path},
+    })
+    assert resolve_record_path(vm, "STO-2R84BSHQ", evidence_paths=[]) == path
+
+
+def test_resolve_drops_token_with_no_stat_match():
+    # find returns nothing, no evidence -> token does not resolve to a real path.
+    vm = MockVMSpy(fixtures={})
+    assert resolve_record_path(vm, "STO-NOPE", evidence_paths=[]) is None
+
+
+def test_resolve_evidence_fastpath_when_stat_ok():
+    path = "/proc/catalog/SKU-FK.json"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", path): {"path": path}})
+    # path already present in evidence (SQL returned it) -> no find needed.
+    assert resolve_record_path(vm, "SKU-FK", evidence_paths=[path]) == path
+
+
+def test_resolve_evidence_path_dropped_when_stat_fails():
+    path = "/proc/catalog/SKU-STALE.json"
+    vm = MockVMSpy(fixtures={})   # no Stat fixture -> stub has no "path" -> not ok
+    assert resolve_record_path(vm, "SKU-STALE", evidence_paths=[path]) is None
+
+
+def test_proc_paths_scans_sql_results_and_env_and_message():
+    res = _result(
+        env={"rows": [{"record_path": "/proc/catalog/SKU-A.json"}]},
+        sql_results=["product_sku,record_path\nSKU-B,/proc/catalog/SKU-B.json"],
+        message="see /proc/catalog/SKU-C.json")
+    found = _proc_paths_in(res, res.captured)
+    assert set(found) == {
+        "/proc/catalog/SKU-A.json",
+        "/proc/catalog/SKU-B.json",
+        "/proc/catalog/SKU-C.json",
+    }
+
+
+def test_resolve_via_sql_fallback_when_find_empty():
+    # evidence + find both empty -> generic SQL fallback selects record_path from a
+    # schema table by LIKE-token, then stat-validates.
+    path = "/proc/catalog/STO-2R84BSHQ.json"
+    sql = "SELECT record_path FROM catalog WHERE record_path LIKE '%STO-2R84BSHQ%' LIMIT 5"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Exec", "/bin/sql", [sql]): {"stdout": f"record_path\n{path}"},
+        fixture_key("Stat", path): {"path": path},
+    })
+    assert resolve_record_path(vm, "STO-2R84BSHQ", evidence_paths=[],
+                               schema_tables=["catalog"]) == path
+
+
+def test_resolve_sql_fallback_skips_unsafe_token():
+    # a token with a space is not SQL-safe -> fallback is skipped (no injection), None.
+    vm = MockVMSpy(fixtures={})
+    assert resolve_record_path(vm, "bad token", evidence_paths=[],
+                               schema_tables=["catalog"]) is None
