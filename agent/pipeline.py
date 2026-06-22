@@ -329,47 +329,6 @@ def _make_answer_once(vm):
 
 
 # ---------------------------------------------------------------------------
-# F8b: gated distill -> validate -> promote hook
-# ---------------------------------------------------------------------------
-
-def _load_good_plan(task_id):
-    """Last persisted successful PlanIR for this task (known-good), or None. Persisted
-    only on a success path (_persist_artifacts), so it exists once the task has passed
-    at least once — the false-positive reference for inline check validation."""
-    pp = Path("data/heuristics") / f"{task_id}.plan.json"
-    if not pp.exists():
-        return None
-    try:
-        from .ir_models import PlanIR
-        return PlanIR.model_validate_json(pp.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-
-
-def _maybe_harness_distill(plan, error, task_id) -> None:
-    """F8b (gated HARNESS_DISTILL=1, default 0): after an F1-class compute contract
-    failure, propose a `candidate` check-spec. When HARNESS_VALIDATE_INLINE=1 (default),
-    validate it — the candidate MUST flag this failing plan AND must NOT flag the last
-    known-good plan — and promote (candidate -> active) on success; otherwise it stays a
-    warn-only candidate for an offline promote. Never raises (cannot dead-end a run)."""
-    if os.environ.get("ECOM_HARNESS_DISTILL", "0") != "1":
-        return
-    if "compute step" not in error and "custom_extract" not in error:
-        return
-    try:
-        from . import harness
-        candidate = harness.distill(plan, error, source_task=task_id)
-        if not candidate or os.environ.get("ECOM_HARNESS_VALIDATE_INLINE", "1") != "1":
-            return
-        from .harness_validate import validate_check_via_grader
-        if validate_check_via_grader(candidate, plan, _load_good_plan(task_id)):
-            harness.promote(candidate["id"])
-            print(f"{CLI_GREEN}[pipeline] check {candidate['id']} promoted (validated){CLI_CLR}")
-    except Exception as e:
-        print(f"{CLI_YELLOW}[pipeline] harness distill skipped: {e}{CLI_CLR}")
-
-
-# ---------------------------------------------------------------------------
 # Main entry — Plan-IR interpreter pipeline
 # ---------------------------------------------------------------------------
 
@@ -504,7 +463,6 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             log_gate_auto("INTERPRET", False, last_error)
             _ilearn(task_id, learn_ctx, intent, plan.model_dump_json(), last_error,
                     observed=None)
-            _maybe_harness_distill(plan, last_error, task_id)
             if getattr(e, "mutation_landed", False):
                 break
             if _stuck_on_same_error(last_error):

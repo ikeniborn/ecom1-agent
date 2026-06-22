@@ -46,7 +46,7 @@ _VM_ARG_KEYS = ("path", "root", "pattern", "args", "stdin")
 _PHASE_TO_STEP_TYPE = {
     "INTENT": "INTENT", "PLAN": "PLAN", "ILEARN": "ILEARN", "LEARN": "ILEARN",
     "DOC_SELECT": "DOC_SELECT", "RERANK": "ORACLE_RETRIEVE",
-    "DISTILL": "DISTILL", "HARNESS_DISTILL": "DISTILL",
+    "DISTILL": "DISTILL",
 }
 
 
