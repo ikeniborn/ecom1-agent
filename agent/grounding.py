@@ -169,3 +169,54 @@ def ownership_safe(vm, record_path: str, identity: dict) -> bool:
         return False
     owner = str((record or {}).get("customer_id", "")).strip()
     return owner == "" or owner == cust
+
+
+def _canonical_doc_path(vm, path: str) -> "str | None":
+    """The real-cased path for a /docs doc the investigator read, or None if it no
+    longer resolves. Exact path that stats -> keep; else case-correct via find-by-basename."""
+    if _stat_ok(vm, path):
+        return path
+    base = path.rsplit("/", 1)[-1]
+    for cand in _find_paths(vm, "/docs", base):
+        if cand.lower() == path.lower():
+            return cand
+    return None
+
+
+def _doc_relied_on_signal(path: str, intent, answer) -> bool:
+    """A positive 'the answer relies on this doc' signal: its basename stem appears in the
+    answer message, OR it is a declared policy_doc in intent.required_refs (any outcome)."""
+    stem = path.rsplit("/", 1)[-1]
+    if stem.endswith(".md"):
+        stem = stem[:-3]
+    msg = (getattr(answer, "message", "") or "").lower()
+    if stem and stem.lower() in msg:
+        return True
+    refs = getattr(intent, "required_refs", None) or {}
+    for specs in refs.values():
+        for r in specs:
+            if getattr(r, "kind", "") == "policy_doc" and getattr(r, "path", None) == path:
+                return True
+    return False
+
+
+def canonical_doc_refs(docs_read: list[str], vm, intent=None, answer=None) -> list[str]:
+    """Doc refs derived from the /docs paths the investigator actually read. When an
+    intent/answer is supplied, narrow to the docs the answer relies on (basename stem in
+    the message, or a declared policy_doc) — but ONLY if at least one read doc carries such
+    a signal; with no signal at all, keep every read doc (recall-preserving, since the
+    investigator only reads docs it routed to as relevant for the objective). Each kept doc
+    is stat-validated and case-corrected; unresolvable docs dropped. Deduped, ordered.
+    intent/answer omitted -> no relies-on filter (keep all read docs)."""
+    cands = [p for p in (docs_read or [])
+             if isinstance(p, str) and p.startswith("/docs/") and p.endswith(".md")]
+    if intent is not None or answer is not None:
+        relied = [p for p in cands if _doc_relied_on_signal(p, intent, answer)]
+        if relied:                       # narrow only when a signal exists; else keep all
+            cands = relied
+    out: list[str] = []
+    for p in cands:
+        c = _canonical_doc_path(vm, p)
+        if c and c not in out:
+            out.append(c)
+    return out

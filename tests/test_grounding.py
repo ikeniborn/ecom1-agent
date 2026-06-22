@@ -147,3 +147,76 @@ def test_unreadable_record_dropped_for_customer():
     # customer caller, record cannot be read -> err toward dropping (conservative).
     vm = MockVMSpy(fixtures={})   # Read stub -> empty content -> unparseable
     assert ownership_safe(vm, "/proc/baskets/basket_x.json", {"customer_id": "cust_016"}) is False
+
+from agent.grounding import canonical_doc_refs
+from agent.mock_vm_spy import MockVMSpy, fixture_key
+
+
+def test_keeps_existing_doc_path_as_is():
+    path = "/docs/payments/3ds.md"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", path): {"path": path}})
+    assert canonical_doc_refs([path], vm) == [path]
+
+
+def test_case_corrects_via_find_basename():
+    real = "/docs/Checkout.md"
+    asked = "/docs/checkout.md"
+    vm = MockVMSpy(fixtures={
+        # asked path does not stat; find by basename returns the real-cased path.
+        fixture_key("Find", "/docs"): {"paths": [real]},
+    })
+    assert canonical_doc_refs([asked], vm) == [real]
+
+
+def test_drops_unresolvable_doc():
+    vm = MockVMSpy(fixtures={})   # neither stat nor find resolves
+    assert canonical_doc_refs(["/docs/ghost.md"], vm) == []
+
+
+def test_dedupes_doc_refs():
+    path = "/docs/security.md"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", path): {"path": path}})
+    assert canonical_doc_refs([path, path], vm) == [path]
+
+
+class _Ans:
+    def __init__(self, message):
+        self.message = message
+
+
+def test_relies_on_filter_keeps_only_signalled_doc():
+    a, b = "/docs/checkout.md", "/docs/returns.md"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", a): {"path": a},
+        fixture_key("Stat", b): {"path": b},
+    })
+    # 'checkout' stem appears in the message -> only that doc is relied on.
+    out = canonical_doc_refs([a, b], vm, intent=None, answer=_Ans("the checkout policy blocks this"))
+    assert out == [a]
+
+
+def test_relies_on_keeps_all_when_no_signal():
+    a, b = "/docs/checkout.md", "/docs/returns.md"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", a): {"path": a},
+        fixture_key("Stat", b): {"path": b},
+    })
+    # no doc stem in the message and no declared policy_doc -> recall-preserving: keep all.
+    out = canonical_doc_refs([a, b], vm, intent=None, answer=_Ans("request cannot proceed"))
+    assert out == [a, b]
+
+
+def test_relies_on_policy_doc_signal_from_intent():
+    from agent.ir_models import IntentSpec
+    a, b = "/docs/checkout.md", "/docs/returns.md"
+    intent = IntentSpec(objective="o", desired_outcome="OUTCOME_NONE_UNSUPPORTED",
+                        outcome_space=["OUTCOME_OK", "OUTCOME_NONE_UNSUPPORTED"],
+                        constraints=[], success_criteria={}, answer_shape={},
+                        required_refs={"OUTCOME_NONE_UNSUPPORTED": [
+                            {"kind": "policy_doc", "path": a}]})
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", a): {"path": a},
+        fixture_key("Stat", b): {"path": b},
+    })
+    out = canonical_doc_refs([a, b], vm, intent=intent, answer=_Ans("denied"))
+    assert out == [a]
