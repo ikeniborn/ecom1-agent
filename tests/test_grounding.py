@@ -27,7 +27,14 @@ def test_dedupes_and_preserves_order():
     assert toks.count("SKU-FK") == 1
 
 
-def test_ignores_lowercase_schema_words():
+def test_does_not_extract_non_allowlisted_prefix_words():
     # 'record_path' / 'product_sku' are schema words, not entity ids — must NOT match.
     toks = extract_entity_tokens("select record_path, product_sku from product_variants", "")
     assert toks == []
+
+
+def test_allowlisted_prefix_sql_columns_are_extracted_known_limitation():
+    # Allowlisted-prefix SQL columns DO match (e.g. 'order_id'); this is acceptable because
+    # downstream stat-validation drops any token that does not resolve to a real /proc path.
+    toks = extract_entity_tokens("SELECT order_id FROM orders WHERE return_reason IS NULL", "")
+    assert "order_id" in toks and "return_reason" in toks
