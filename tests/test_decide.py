@@ -256,3 +256,37 @@ def test_preflight_none_when_no_deny():
         constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
                       "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}])
     assert security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "customer"})) is None
+
+
+def test_preflight_gated_deny_fires_from_marked_constraint():
+    # A constraint that is BOTH requires_protected_action=True AND protected_action=True
+    # self-satisfies the blast-radius gate: has_protected_action(intent, None) returns True
+    # (the marked constraint itself counts), so security_deny fires with protected=True,
+    # and security_preflight returns a terminal deny pre-loop without any mutation.
+    intent = _intent(
+        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+        constraints=[{"anchor": "#blast", "rule": "guest blast-radius check",
+                      "security": True,
+                      "requires_protected_action": True,
+                      "protected_action": True,
+                      "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}])
+    out = security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"}))
+    assert out is not None
+    outcome, msg, refs = out
+    assert outcome == "OUTCOME_DENIED_SECURITY"
+    assert "/docs/security.md" in refs
+
+
+def test_preflight_gated_deny_skipped_without_protected_marker():
+    # Same constraint but WITHOUT protected_action=True: has_protected_action(intent, None)
+    # returns False, so security_deny skips the requires_protected_action constraint ->
+    # preflight returns None (the deny cannot fire pre-loop; it needs a mutation landing first).
+    intent = _intent(
+        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+        constraints=[{"anchor": "#blast", "rule": "guest blast-radius check",
+                      "security": True,
+                      "requires_protected_action": True,
+                      "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}])
+    # Confirm the gate is False (no protected_action marker, no result mutation)
+    assert has_protected_action(intent, None) is False
+    assert security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"})) is None
