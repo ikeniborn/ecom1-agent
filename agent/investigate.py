@@ -199,20 +199,6 @@ def _forced_doc_read(env: dict, refs: list) -> "dict | None":
     return None
 
 
-def _forced_data_probe(data_paths, probed: set) -> "dict | None":
-    """Return a read-only action for the first un-probed seed data-path, or None.
-    Probe-tool heuristic: a '.' in the basename ⇒ a file ⇒ `read`; otherwise a directory
-    ⇒ `list`. The caller marks the path probed (probe-once) when it dispatches, and must drop the
-    `_seed` key before passing the action to run_tool/tool_signature."""
-    for p in data_paths or []:
-        if p in probed:
-            continue
-        base = p.rsplit("/", 1)[-1]
-        tool = "read" if "." in base else "list"
-        return {"tool": tool, "args": {"path": p}, "_seed": p}
-    return None
-
-
 def _call_json(system: str, user: str, phase: str, escalate: bool) -> dict:
     """One LLM round-trip returning a parsed JSON object. FAST tier by default;
     escalate=True forces the REASON tier (think=on) for a stalled step."""
@@ -302,8 +288,7 @@ def _retrieve_atoms(oracle, goal: str) -> list:
         return []
 
 
-def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None,
-                data_paths: list[str] | None = None) -> "Brief":
+def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None) -> "Brief":
     """Bounded read-only ReAct loop → Brief. Never raises: a rejected mutation or any
     per-step error is recorded as a lesson and the loop continues; the caller falls back
     to seed facts only if the whole brief is unusable. `seed` is accepted for caller
@@ -312,8 +297,6 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
     brief = Brief()
     req_refs = (intent.required_refs or {}).get(intent.desired_outcome, [])
     seen: set[str] = set()
-    probed: set[str] = set()
-    data_seed = list(data_paths or [])
     stop_reason = "budget"
     pending_action = None
     steps = max_steps if max_steps is not None else _MAX_STEPS
@@ -325,22 +308,10 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
             try:
                 atoms = _retrieve_atoms(oracle, goal)
                 act = None
-                probe_seed = None
                 forced = _forced_doc_read(brief.env, req_refs)
                 if forced is not None and tool_signature(
                         forced["tool"], forced["args"]) not in seen:
                     act = forced  # priority 1: ground the governing doc
-                if act is None:
-                    while True:   # priority 2: probe seed data-paths (probe-once)
-                        dp = _forced_data_probe(data_seed, probed)
-                        if dp is None:
-                            break
-                        probed.add(dp["_seed"])           # mark probed regardless of outcome
-                        if tool_signature(dp["tool"], dp["args"]) not in seen:
-                            act = {"tool": dp["tool"], "args": dp["args"]}  # NB: drop _seed before dispatch
-                            probe_seed = dp["_seed"]
-                            break
-                        # already fetched under another step → try the next seed
                 if act is None and _MERGE_STEPS and pending_action is not None:
                     act = pending_action
                     pending_action = None
@@ -356,8 +327,6 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
                     brief.notes.append(Note(goal=goal, tool=tool, args=args,
                                             lesson=f"rejected (mutation): {e}"))
                     continue
-                if probe_seed is not None:                # surface the probed data-path for PLAN
-                    brief.env.setdefault("data_paths", {})[probe_seed] = (observation or "")[:200]
                 sig = tool_signature(tool, args)
                 escalate = is_stalled(observation, sig, seen)
                 if escalate:                                   # one re-run on the reason tier
@@ -388,13 +357,13 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
                 brief.notes.append(note)
                 brief.env.update(env_updates)
                 _ground_doc_refs(brief.env, tool, args, req_refs)
-                if sufficient(intent, brief.env, data_seed, probed):
-                    stop_reason = "data_probed" if data_seed else "sufficient"
+                if sufficient(intent, brief.env):
+                    stop_reason = "sufficient"
                     break
             except Exception as e:                             # graceful: never raise out of a step
                 brief.notes.append(Note(goal=goal, lesson=f"step error: {e}"))
                 continue
-        log_investigate_stop_auto(stop_reason, len(data_seed), len(probed))
+        log_investigate_stop_auto(stop_reason, 0, 0)
     finally:
         set_step_type(_prev_step)
     return brief

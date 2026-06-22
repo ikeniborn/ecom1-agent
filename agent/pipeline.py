@@ -117,24 +117,6 @@ def _enrich_prim_error(err: str) -> str:
     return err
 
 
-def _data_path_seed(instruction: str, task_id: str) -> list[str]:
-    """Deterministic data-path seed for INVESTIGATE: absolute-path literals in the
-    instruction UNION learned prephase_deep_read absolute paths. Empty (no-op) unless
-    ECOM_INVESTIGATE_DATA_PATHS=1. Bounded by ECOM_PREPHASE_PATH_LITERALS — no wandering.
-    Imports are function-level: orchestrator imports pipeline, so a module-level import
-    here would be a cycle; by call time orchestrator is fully loaded."""
-    import os as _os
-    if _os.environ.get("ECOM_INVESTIGATE_DATA_PATHS", "0") != "1":
-        return []
-    from .orchestrator import _extract_path_literals
-    from .learned_store import load_prephase_deep_read
-    seed = list(_extract_path_literals(instruction))
-    for d in load_prephase_deep_read(task_id):
-        if d.startswith("/") and d not in seed:
-            seed.append(d)
-    return seed
-
-
 # ---------------------------------------------------------------------------
 # Learn + consolidate (merged LLM call)
 # ---------------------------------------------------------------------------
@@ -343,8 +325,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     brief_block = None
     if _investigate_on:
         try:
-            brief = investigate(vm, intent, seed=facts, oracle=_oracle,
-                                data_paths=_data_path_seed(instruction, task_id))
+            brief = investigate(vm, intent, seed=facts, oracle=_oracle)
             brief_block = render_brief(brief) or None
         except Exception as e:                    # graceful: fall back to the slim seed facts
             print(f"{CLI_YELLOW}[pipeline] investigate failed, using seed facts: {e}{CLI_CLR}")

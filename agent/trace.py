@@ -328,9 +328,9 @@ class TraceLogger:
 
     def log_investigate_stop(self, reason: str, data_paths_total: int,
                              data_paths_probed: int) -> None:
-        """Why the investigator stopped (sufficient | budget | data_probed) and how many
-        seed data-paths it probed. Lets an A/B run compare flag-off vs flag-on
-        (ECOM_INVESTIGATE_DATA_PATHS)."""
+        """Why the investigator stopped (sufficient | budget). Retained as A/B telemetry
+        for the INVESTIGATE phase. The data-path counts are always 0 since the data-paths
+        seed/probe branch was removed."""
         self._write({
             "type": "investigate_stop",
             "reason": reason or "",

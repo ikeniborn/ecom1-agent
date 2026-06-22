@@ -198,37 +198,6 @@ def test_sufficient_true_when_only_record_path_refs():
     assert sufficient(intent, env={}) is True
 
 
-from agent.investigate import _forced_data_probe
-
-
-def test_forced_data_probe_picks_first_unprobed_dir_then_file():
-    dp = _forced_data_probe(["/proc/payments", "/docs/p.md"], probed=set())
-    assert dp["_seed"] == "/proc/payments"
-    assert dp["tool"] == "list"                 # no '.' in basename -> directory -> list
-    assert dp["args"] == {"path": "/proc/payments"}
-    dp2 = _forced_data_probe(["/docs/p.md"], probed=set())
-    assert dp2["tool"] == "read"                # '.' in basename -> file -> read
-
-
-def test_forced_data_probe_none_when_all_probed_or_empty():
-    assert _forced_data_probe(["/a/b"], probed={"/a/b"}) is None
-    assert _forced_data_probe([], probed=set()) is None
-    assert _forced_data_probe(None, probed=set()) is None
-
-
-def test_sufficient_false_when_data_path_unprobed():
-    intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
-                        outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
-    assert sufficient(intent, env={}, data_paths=["/proc/payments"], probed=set()) is False
-
-
-def test_sufficient_true_when_all_data_paths_probed():
-    intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
-                        outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
-    assert sufficient(intent, env={}, data_paths=["/proc/payments"],
-                      probed={"/proc/payments"}) is True
-
-
 def test_sufficient_data_clause_inert_when_no_data_paths():
     # regression guard: omitting data_paths/probed reproduces the old behaviour
     env = {"policy_doc:/docs/security.md": True, "row.record_path": "/p.json"}
@@ -390,20 +359,6 @@ def test_investigate_steps_appear_in_trace(monkeypatch, tmp_path):
     assert any(r.get("step_type") == "INVESTIGATE" for r in vm_calls)   # tagged as the investigate phase
 
 
-def test_investigate_probes_seed_data_path_and_records(monkeypatch):
-    intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
-                        outcome_space=["OUTCOME_OK"], answer_shape={}, required_refs={})
-    vm = MockVMSpy({fixture_key("List", "/proc/payments"): {"entries": "p_1.json\np_2.json"}})
-    # router would end immediately, but the forced data-probe runs FIRST (higher priority).
-    monkeypatch.setattr(inv, "router", lambda i, b, atoms, escalate: {"done": True})
-    monkeypatch.setattr(inv, "digest",
-                        lambda goal, tool, args, observation, escalate: (
-                            Note(tool=tool, args=args, lesson="listed dir"), {}))
-    brief = inv.investigate(vm, intent, data_paths=["/proc/payments"], max_steps=6)
-    assert "/proc/payments" in brief.env.get("data_paths", {})       # recorded
-    assert any(c[0] == "List" for c in vm.calls)                     # dir probed via list
-
-
 def test_investigate_data_paths_inert_when_flag_off(monkeypatch):
     # data_paths=None (flag off) -> no probe, router decides immediately, no data_paths env
     intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
@@ -428,45 +383,12 @@ def test_investigate_emits_stop_trace(tmp_path, monkeypatch):
         monkeypatch.setattr(inv, "router", lambda i, b, atoms, escalate: {"done": True})
         monkeypatch.setattr(inv, "digest",
                             lambda goal, tool, args, observation, escalate: (Note(tool=tool), {}))
-        inv.investigate(vm, intent, data_paths=["/proc/payments"], max_steps=6)
+        inv.investigate(vm, intent, max_steps=6)
     finally:
         logger.close(); trace.set_trace(None)
     recs = [json.loads(l) for l in logpath.read_text(encoding="utf-8").splitlines() if l.strip()]
     stop = [r for r in recs if r.get("type") == "investigate_stop"]
     assert stop, "no investigate_stop record emitted"
-    assert stop[-1]["data_paths_total"] == 1
-    assert stop[-1]["data_paths_probed"] == 1
-    assert stop[-1]["reason"] == "data_probed"
-
-
-def test_investigate_requires_both_doc_ref_and_data_path(monkeypatch):
-    # Combined constraint: doc-ref grounding (priority 1) AND data-path probe (priority 2)
-    # must BOTH clear before sufficient() stops the loop.
-    intent = IntentSpec(
-        objective="cite policy + inspect payments",
-        desired_outcome="OUTCOME_OK",
-        outcome_space=["OUTCOME_OK"],
-        answer_shape={},
-        required_refs={"OUTCOME_OK": [RefSpec(kind="policy_doc", path="/docs/security.md")]},
-    )
-    vm = MockVMSpy({
-        fixture_key("Read", "/docs/security.md"): {"content": "cite record_path"},
-        fixture_key("List", "/proc/payments"): {"entries": "p_1.json"},
-    })
-    # router must never drive progress here — the forced doc-read then data-probe do.
-    monkeypatch.setattr(inv, "router",
-                        lambda i, b, atoms, escalate: {"done": True})
-    # digest grounds the policy_doc only when the security.md read happened; the data-path
-    # is grounded structurally by being probed (probed set), not by digest env_updates.
-    def fake_digest(goal, tool, args, observation, escalate):
-        env = {"policy_doc:/docs/security.md": True} if args.get("path") == "/docs/security.md" else {}
-        return Note(tool=tool, args=args, lesson="x"), env
-    monkeypatch.setattr(inv, "digest", fake_digest)
-
-    brief = inv.investigate(vm, intent, data_paths=["/proc/payments"], max_steps=6)
-
-    # both constraints satisfied -> both RPCs happened, data-path recorded
-    assert any(c[0] == "Read" and c[1].get("path") == "/docs/security.md" for c in vm.calls)
-    assert any(c[0] == "List" and c[1].get("path") == "/proc/payments" for c in vm.calls)
-    assert "/proc/payments" in brief.env.get("data_paths", {})
-    assert brief.env.get("policy_doc:/docs/security.md") is True
+    assert stop[-1]["data_paths_total"] == 0
+    assert stop[-1]["data_paths_probed"] == 0
+    assert stop[-1]["reason"] == "sufficient"
