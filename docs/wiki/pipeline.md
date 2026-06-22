@@ -4,7 +4,7 @@ The deterministic Plan-IR pipeline in `agent/pipeline.py`. One pipeline per task
 
 ## run_pipeline
 
-`run_pipeline(vm, instruction, task_id, agents_md_text, facts)` (`pipeline.py:214`) is the per-task entry. It loads active LEARN rules via `load_entries(task_id)`, retrieves oracle atoms, runs frozen INTENT, then loops PLAN→lint→interpret→verify. It calls `vm.answer` exactly once and returns a metrics dict (`cycles_used`, `outcome`, `status`, token counts). See [[vm]] and [[learning]].
+`run_pipeline(vm, instruction, task_id, agents_md_text, facts)` (`pipeline.py:276`) is the per-task entry. It loads active LEARN rules via `load_entries(task_id)`, retrieves oracle atoms, runs frozen INTENT, then loops PLAN→lint→interpret→verify. It calls `vm.answer` exactly once and returns a metrics dict (`cycles_used`, `outcome`, `status`, token counts). See [[vm]] and [[learning]].
 
 ## INTENT — run_intent
 
@@ -14,15 +14,11 @@ The deterministic Plan-IR pipeline in `agent/pipeline.py`. One pipeline per task
 
 ## INTENT retry and hard failure
 
-INTENT is retried up to `_DESIGN_MAX_ATTEMPTS` (env `ECOM_DESIGN_MAX_ATTEMPTS`, default 3) times on transient empty/parse failure — `IntentError` is caught and the attempt re-run (`pipeline.py:244`). If `intent` is still `None` after all attempts, the run records `save_last_run(..., "OUTCOME_NONE_CLARIFICATION", 0)`, emits one terminal CLARIFICATION, and returns with `cycles_used: 0`.
+INTENT is retried up to `_DESIGN_MAX_ATTEMPTS` (env `ECOM_DESIGN_MAX_ATTEMPTS`, default 3) times on transient empty/parse failure — `IntentError` is caught and the attempt re-run (`pipeline.py:314`). If `intent` is still `None` after all attempts, the run records `save_last_run(..., "OUTCOME_NONE_CLARIFICATION", 0)`, emits one terminal CLARIFICATION, and returns with `cycles_used: 0`.
 
 ## INVESTIGATE phase
 
-When `ECOM_INVESTIGATE_ENABLED != 0` (default), `run_pipeline` calls `investigate(vm, intent, seed=facts, oracle=_oracle, data_paths=_data_path_seed(instruction, task_id))` ONCE after INTENT and before the loop, and `render_brief(brief)` is threaded into every PLAN cycle via `run_plan(..., brief_block=...)`. The whole-instruction oracle dump is skipped in this mode (the investigator retrieves scoped atoms per step instead); the orchestrator also gathers a SLIM seed (identity + schema names + doc paths — no bodies/samples/listings/records). When `=0`, the eager gather + legacy `oracle.retrieve(instruction)` dump are restored exactly and the investigator is skipped. The `investigate()` call is wrapped in a try/except: on any failure PLAN falls back to the slim seed facts (`brief=None`). On a passing verify, `_brief_lessons_text(brief)` enriches the distill note (no new path). See [[investigate]].
-
-## _data_path_seed and ECOM_INVESTIGATE_DATA_PATHS
-
-`_data_path_seed(instruction, task_id)` (`pipeline.py:122`) computes a deterministic data-path seed passed to the investigator as `data_paths=`. It is gated by `ECOM_INVESTIGATE_DATA_PATHS=1` (default `0`); when off it returns `[]` immediately (no-op). When enabled, it unions two sources — absolute-path literals extracted from the instruction text via `orchestrator._extract_path_literals` (bounded by `ECOM_PREPHASE_PATH_LITERALS`, default 3) and learned `prephase_deep_read` paths from `learned_store.load_prephase_deep_read(task_id)` — deduplicating by insertion order. These paths give the investigator concrete file/dir roots to probe first, avoiding the generic discovery pass when the instruction already names specific paths. The imports are function-level (not module-level) to break the `orchestrator → pipeline → orchestrator` import cycle: by the time `_data_path_seed` is first called during a run, `orchestrator` is fully loaded.
+When `ECOM_INVESTIGATE_ENABLED != 0` (default), `run_pipeline` calls `investigate(vm, intent, seed=facts, oracle=_oracle)` ONCE after INTENT and before the loop (`pipeline.py:328`), and `render_brief(brief)` is threaded into every PLAN cycle via `run_plan(..., brief_block=...)`. The whole-instruction oracle dump is skipped in this mode (the investigator retrieves scoped atoms per step instead); the orchestrator also gathers a SLIM seed (identity + schema names + doc paths — no bodies/samples/listings/records). When `=0`, the eager gather + legacy `oracle.retrieve(instruction)` dump are restored exactly and the investigator is skipped. The `investigate()` call is wrapped in a try/except: on any failure PLAN falls back to the slim seed facts (`brief=None`). See [[investigate]].
 
 ## PLAN — run_plan
 
@@ -38,7 +34,7 @@ When `ECOM_INVESTIGATE_ENABLED != 0` (default), `run_pipeline` calls `investigat
 
 ## The cycle loop and INTERPRETER_MAX_STEPS
 
-The loop runs `cycle = 1..INTERPRETER_MAX_STEPS` (`_IMAX_STEPS`, env `ECOM_INTERPRETER_MAX_STEPS`, default 6; `pipeline.py:260`). Each cycle: PLAN → `repair_sql_stdin` → `lint` (registry dispatcher) → plan-signature check → `interpret` → `verify`. `set_cycle(cycle)` stamps the trace. Exhausting the loop without a passing verify falls through to terminal CLARIFICATION.
+The loop runs `cycle = 1..INTERPRETER_MAX_STEPS` (`_IMAX_STEPS`, env `ECOM_INTERPRETER_MAX_STEPS`, default 6; `pipeline.py:355`). Each cycle: PLAN → `repair_sql_stdin` → `lint` (registry dispatcher) → plan-signature check → `interpret` → `verify`. `set_cycle(cycle)` stamps the trace. Exhausting the loop without a passing verify falls through to terminal CLARIFICATION.
 
 ## Pre-lint repair and lint
 
@@ -56,51 +52,43 @@ An empty PLAN body (`PlanEmptyError`, raised by `run_plan` when the LLM returns 
 
 ## Interpret
 
-`interpret(plan, intent, vm, facts)` (`pipeline.py:284`) executes the plan against the VM, no LLM. An `InterpretError` triggers `_ilearn` then retry, but breaks if the error carries `mutation_landed`. A raw VM `Exception` triggers `_ilearn`, then retries only when the plan is read-only AND the message is retryable per `_is_retryable_vm_error` (missing path/record or network transient); a mutating plan, or a non-retryable error, breaks. See [[interpreter]].
+`interpret(plan, intent, vm, facts)` (called at `pipeline.py:400`) executes the plan against the VM, no LLM. An `InterpretError` triggers `_ilearn` then retry, but breaks if the error carries `mutation_landed`. A raw VM `Exception` triggers `_ilearn`, then retries only when the plan is read-only AND the message is retryable per `_is_retryable_vm_error` (missing path/record or network transient); a mutating plan, or a non-retryable error, breaks. See [[interpreter]].
 
 ## Verify and answer-once
 
-`verify(result, intent)` (`pipeline.py:308`) is the sole deterministic quality gate (no LLM), checking `success_criteria` and required refs. `success_criteria` is keyed by outcome (`dict[str, list[PredExpr]]`); verify applies only `success_criteria.get(ans.outcome, [])`, so a valid negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`) with no criteria for it passes — still gated by `outcome_space`. On pass: `_ground_security_refs` ensures a DENIED_SECURITY answer cites `/docs/security.md`, `answer_once(...)` submits via vm.answer (message capped at 800 chars), artifacts persist, distill runs, and the run returns. On fail: `_ilearn` fires with observed RPC outputs, or breaks if a mutation already landed. See [[interpreter#verify() — the deterministic quality gate]].
+`verify(result, intent)` (called at `pipeline.py:433`) is the sole deterministic quality gate (no LLM), checking `success_criteria` and required refs. `success_criteria` is keyed by outcome (`dict[str, list[PredExpr]]`); verify applies only `success_criteria.get(ans.outcome, [])`, so a valid negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`) with no criteria for it passes — still gated by `outcome_space`. On pass: `_ground_security_refs` ensures a DENIED_SECURITY answer cites `/docs/security.md`, `answer_once(...)` submits via vm.answer (message capped at 800 chars), `_persist_artifacts` writes the intent/plan JSON, and the run returns. There is no in-pipeline oracle-distill on the success path (removed in Phase 0). On fail: `_ilearn` fires with observed RPC outputs, or breaks if a mutation already landed. See [[interpreter#verify() — the deterministic quality gate]].
 
-**answer-once idempotency guard (F4):** `_make_answer_once(vm)` (`pipeline.py:250`) returns a closure that tracks whether `vm.answer` has already been called. The first call submits; subsequent calls are suppressed no-ops (logging a yellow warning). Both the success path and all terminal exits share the same `answer_once` closure, so a success followed by a loop-exhaust terminal can never double-submit. This eliminates the "answer already provided" dead-end that previously required a separate `_terminal_clarification` helper.
+**answer-once idempotency guard (F4):** `_make_answer_once(vm)` (`pipeline.py:255`) returns a closure that tracks whether `vm.answer` has already been called. The first call submits; subsequent calls are suppressed no-ops (logging a yellow warning). Both the success path and all terminal exits share the same `answer_once` closure, so a success followed by a loop-exhaust terminal can never double-submit. This eliminates the "answer already provided" dead-end that previously required a separate `_terminal_clarification` helper.
 
 ## Gate records
 
 `log_gate_auto(step_type, passed, reason)` (`agent/trace.py:527`) is called by `run_pipeline` after each of the three deterministic gates in the cycle loop. A `gate` record (type, cycle, step_type, passed bool, reason string) is appended to the task JSONL. Emission points:
 
-- After `lint(plan)` succeeds: `log_gate_auto("LINT", True, "")`. After a `PlanError`/`InterpretError` from lint: `log_gate_auto("LINT", False, last_error)` (`pipeline.py:417`).
-- After `interpret(...)` succeeds: `log_gate_auto("INTERPRET", True, "")`. After `InterpretError` or a real-VM exception: `log_gate_auto("INTERPRET", False, last_error)` (`pipeline.py:438`).
-- After `verify(...)`: `log_gate_auto("VERIFY", ok, "" if ok else verr)` (`pipeline.py:470`).
+- After `lint(plan)` succeeds: `log_gate_auto("LINT", True, "")`. After a `PlanError`/`InterpretError` from lint: `log_gate_auto("LINT", False, last_error)` (`pipeline.py:382`).
+- After `interpret(...)` succeeds: `log_gate_auto("INTERPRET", True, "")`. After `InterpretError` or a real-VM exception: `log_gate_auto("INTERPRET", False, last_error)` (`pipeline.py:403`).
+- After `verify(...)`: `log_gate_auto("VERIFY", ok, "" if ok else verr)` (`pipeline.py:434`).
 
 Gate records are consumed by [[tooling#Agent report]] (step-type timeline, cycle SVG) and are best-effort: `log_gate_auto` never raises into a run. See [[tooling#Trace schema v2]] for the record schema.
 
 ## _ilearn retry seam
 
-`_ilearn(task_id, learn_ctx, intent, plan_text, error, observed)` (`pipeline.py:155`) is the between-cycle LEARN seam for the interpreted path. It calls `_learn_consolidate_text` with the IR-framed `ilearn.md` prompt and `surface="ir"`, passing the rendered `IntentSpec` as context and `PlanIR` as artifact. It writes a diff to `data/learned/{tid}.yaml`, mutates `learn_ctx` in place, and persists any `prephase_deep_read` hints. See [[learning]].
-
-## Distill → validate → promote
-
-On a passing verify, `_maybe_distill_and_validate(intent, plan, task_id, note)` (`pipeline.py:187`) runs only when `ORACLE_ENABLED!=0` and `ECOM_ORACLE_DISTILL=1`. It calls `oracle.distill(...)` to generalise the working `PlanIR` into a candidate atom. When `ECOM_ORACLE_VALIDATE_INLINE=1`, `validate_atom_via_grader` re-runs against the live grader and `oracle.promote(...)` fires on improvement. It never raises. See [[oracle]].
+`_ilearn(task_id, learn_ctx, intent, plan_text, error, observed)` (`pipeline.py:195`) is the between-cycle LEARN seam for the interpreted path. It calls `_learn_consolidate_text` with the IR-framed `ilearn.md` prompt and `surface="ir"`, passing the rendered `IntentSpec` as context and `PlanIR` as artifact. It writes a diff to `data/learned/{tid}.yaml`, mutates `learn_ctx` in place, and persists any `prephase_deep_read` hints. See [[learning]].
 
 ## Persisted artifacts
 
-`_persist_artifacts(task_id, intent, plan)` (`pipeline.py:167`) writes `data/heuristics/{tid}.intent.json` and `{tid}.plan.json` on the success path. These rendered `IntentSpec` / `PlanIR` JSON files are the seam consumed by `learn_from_grader` in training mode. See [[data-files]].
+`_persist_artifacts(task_id, intent, plan)` (`pipeline.py:207`) writes `data/heuristics/{tid}.intent.json` and `{tid}.plan.json` on the success path. These rendered `IntentSpec` / `PlanIR` JSON files are the seam consumed by `learn_from_grader` in training mode. See [[data-files]].
 
 ## End-of-run self-fill
 
-`distill_from_grader(task_id, score, score_detail)` (`pipeline.py`) self-fills the oracle bank from the score SubmitRun already returned — not a live grader round-trip (distinct from `ECOM_ORACLE_VALIDATE_INLINE`). A pass (`score >= 1.0`) distills a `method` atom, a fail an `anti_pattern` atom, both written `status="active"`. It is gated only by `ECOM_ORACLE_ENABLED`, reads the persisted `IntentSpec`+`PlanIR`, no-ops when artifacts are absent, and never raises. `main.py` calls it once per task (pass and fail) in the score loop, before the fail-only `learn_from_grader`. Because it is gated only by `ECOM_ORACLE_ENABLED` (default on), it adds one distill LLM call per task. See [[oracle#End-of-run self-fill (distill_from_grader)]].
+`distill_from_grader(task_id, score, score_detail)` (`pipeline.py:218`) self-fills the oracle bank from the score SubmitRun already returned — not a live grader round-trip. A pass (`score >= 1.0`) distills a `method` atom, a fail an `anti_pattern` atom, both written `status="active"`. It is gated only by `ECOM_ORACLE_ENABLED`, reads the persisted `IntentSpec`+`PlanIR`, no-ops when artifacts are absent, and never raises. `main.py` calls it once per task (pass and fail) in the score loop, before the fail-only `learn_from_grader`. Because it is gated only by `ECOM_ORACLE_ENABLED` (default on), it adds one distill LLM call per task. See [[oracle#End-of-run self-fill (distill_from_grader)]].
 
 ## learn_from_grader training path
 
-`learn_from_grader(task_id, score_detail)` (`pipeline.py:339`) is the post-trial seam: the pipeline never sees grader feedback during a run (the score arrives only on SubmitRun). It loads the persisted `{tid}.intent.json` + `{tid}.plan.json`, frames the grader feedback as the error, and reuses the same IR-framed `_learn_consolidate_text` LEARN call. Returns False if persisted state is missing. See [[learning]].
+`learn_from_grader(task_id, score_detail)` (`pipeline.py:466`) is the post-trial seam: the pipeline never sees grader feedback during a run (the score arrives only on SubmitRun). It loads the persisted `{tid}.intent.json` + `{tid}.plan.json`, frames the grader feedback as the error, and reuses the same IR-framed `_learn_consolidate_text` LEARN call. Returns False if persisted state is missing. See [[learning]].
 
 ## LLM call budget
 
 Each cycle costs one PLAN call, plus one `_ilearn` LEARN call when the cycle fails. Best happy path is 2 calls (INTENT + 1 PLAN); a hard INTENT stop is 1 call; the worst case is `1 + 2·INTERPRETER_MAX_STEPS`. Interpret and verify make no LLM calls. See [[llm]].
-
-## answer-once and harness distill
-
-After a verify failure, `_maybe_harness_distill(plan, error, task_id)` (`pipeline.py:285`) fires when `ECOM_HARNESS_DISTILL=1` (default `0`) and the error string indicates an F1-class compute contract failure (`"compute step"` or `"custom_extract"` in the message). It calls `harness.distill(...)` to propose a candidate check-spec, then optionally validates and promotes it inline. It never raises. See [[harness#F8b: distill → validate → promote]].
 
 ## Terminal OUTCOME_NONE_CLARIFICATION
 

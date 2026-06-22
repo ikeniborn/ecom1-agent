@@ -8,7 +8,7 @@ The lint registry ([[harness]]) accumulates anti-pattern checks that block bad p
 
 ## Hot-check selection
 
-`select_hot_checks(stats, checks, min_fires, max_atoms)` (`harness_to_oracle.py:29`) keeps checks that fired at least `min_fires` times, ranks them by fire count descending, and caps the result at `max_atoms`. `stats` is the `lint_report.aggregate` map (`check_id -> {fires, ...}`); `checks` is `harness.load_checks()`. A `check_id` present in `stats` but absent from the catalogue is ignored. See [[harness#Load / Save / handler_for]].
+`select_hot_checks(stats, checks, min_fires, max_atoms)` (`harness_to_oracle.py:29`) keeps checks that fired at least `min_fires` times, ranks them by fire count descending, and caps the result at `max_atoms`. `stats` is the `lint_report.aggregate` map (`check_id -> {fires, ...}`); `checks` is `harness.load_checks()`. A `check_id` present in `stats` but absent from the catalogue is ignored. See [[harness#Load / handler_for]].
 
 ## Per-check bridge
 
