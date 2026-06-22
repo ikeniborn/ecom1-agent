@@ -220,3 +220,97 @@ def test_relies_on_policy_doc_signal_from_intent():
     })
     out = canonical_doc_refs([a, b], vm, intent=intent, answer=_Ans("denied"))
     assert out == [a]
+
+from agent.grounding import align_count, ground_refs
+from agent.ir_models import IntentSpec
+from agent.mock_vm_spy import MockVMSpy, fixture_key
+from agent.interpreter import InterpretResult, CapturedAnswer
+
+
+def test_align_count_truncates_catalog_refs_to_leading_number():
+    refs = ["/proc/catalog/A.json", "/proc/catalog/B.json", "/proc/catalog/C.json"]
+    assert align_count(refs, "2 products are in stock") == refs[:2]
+
+
+def test_align_count_noop_without_leading_number():
+    refs = ["/proc/catalog/A.json", "/proc/catalog/B.json"]
+    assert align_count(refs, "these products are in stock") == refs
+
+
+def test_align_count_noop_when_not_all_catalog():
+    refs = ["/proc/baskets/b.json", "/proc/catalog/A.json"]
+    assert align_count(refs, "1 found") == refs
+
+
+def _intent():
+    return IntentSpec(objective="o", desired_outcome="OUTCOME_OK",
+                      outcome_space=["OUTCOME_OK"], constraints=[],
+                      success_criteria={}, answer_shape={}, required_refs={})
+
+
+def _result(message, env=None, sql_results=None, refs=None):
+    return InterpretResult(
+        captured=CapturedAnswer(message=message, outcome="OUTCOME_OK", refs=refs or []),
+        env=env or {}, observations=[], sql_results=sql_results or [],
+        mutation_landed=False, label="ok")
+
+
+def test_ground_refs_adds_record_ref_from_evidence():
+    path = "/proc/catalog/STO-2R84BSHQ.json"
+    res = _result(message="STO-2R84BSHQ exists",
+                  sql_results=[f"sku,record_path\nSTO-2R84BSHQ,{path}"])
+    vm = MockVMSpy(fixtures={fixture_key("Stat", path): {"path": path}})
+    out = ground_refs(_intent(), res.captured, res, vm,
+                      task_text="does STO-2R84BSHQ exist?", docs_read=[])
+    assert path in out
+
+
+def test_ground_refs_adds_doc_ref_from_docs_read():
+    doc = "/docs/payments/3ds.md"
+    res = _result(message="3DS required")
+    vm = MockVMSpy(fixtures={fixture_key("Stat", doc): {"path": doc}})
+    out = ground_refs(_intent(), res.captured, res, vm,
+                      task_text="payment", docs_read=[doc])
+    assert doc in out
+
+
+def test_ground_refs_preserves_existing_enforced_refs_first():
+    res = _result(message="ok", refs=["/docs/counting.md"])
+    vm = MockVMSpy(fixtures={})
+    out = ground_refs(_intent(), res.captured, res, vm, task_text="x", docs_read=[])
+    assert out[0] == "/docs/counting.md"
+
+
+def test_ground_refs_never_raises_returns_base_on_error():
+    # Force a throw INSIDE ground_refs's try but OUTSIDE the inner per-RPC guards:
+    # answer.message is consumed by _proc_paths_in / extract_entity_tokens (which are
+    # NOT individually guarded), so a raising message exercises the OUTER try/except and
+    # ground_refs returns the interpreter refs unchanged.
+    res = _result(message="ok")
+
+    class _BoomAnswer:
+        refs = ["/docs/a.md"]
+
+        @property
+        def message(self):
+            raise RuntimeError("message exploded")
+
+    vm = MockVMSpy(fixtures={})
+    out = ground_refs(_intent(), _BoomAnswer(), res, vm,
+                      task_text="STO-ABCDEFGH", docs_read=[])
+    assert out == ["/docs/a.md"]
+
+
+def test_ground_refs_survives_vm_explosion_via_inner_guards():
+    # Complementary path: a VM that raises on every call is swallowed by the inner
+    # _find_paths/_stat_ok/ownership_safe guards (record + doc refs resolve to nothing),
+    # so base is preserved without reaching the outer except.
+    res = _result(message="ok", refs=["/docs/a.md"])
+
+    class Boom:
+        def __getattr__(self, _):
+            raise RuntimeError("vm exploded")
+
+    out = ground_refs(_intent(), res.captured, res, Boom(),
+                      task_text="STO-ABCDEFGH", docs_read=["/docs/x.md"])
+    assert out == ["/docs/a.md"]
