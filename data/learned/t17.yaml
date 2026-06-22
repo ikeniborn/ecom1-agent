@@ -1,333 +1,17 @@
 entries:
 - agents_md_anchor: null
-  content: Always ensure that every variable referenced in an answer ref exists as
-    a record with the exact field name used in the ref source path. If the data originates
-    from a rowset, extract the needed column and wrap it in a record with that field
-    name before the answer is built.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r001
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$graz_stores.record_path'',
-    ''$product.record_path''] on OK answer. Root cause: The PlanIR defined $graz_stores
-    as a rowset (list of records) and $product as a record with field ''product_record_path'',
-    but the answer refs required $graz_stores.record_path and $product.record_path.
-    The interpreter could not resolve these paths because $graz_stores.record_path
-    is ambiguous on a rowset and $product.record_path does not exist. Failing PlanIR
-    fragment: rowsets mapping graz_stores_raw into a rowset with column ''record_path'',
-    and product_rows mapping product_record_path; compute step creating $product from
-    first of product_rows without renaming the field; answer refs using $graz_stores.record_path
-    and $product.record_path. Rule linkage: The new rule instructs to always shape
-    variables so that answer ref source paths resolve to a record with the exact field
-    name, converting rowsets to records with the required field when necessary.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: 'Always ensure the PlanIR contains only the allowed fields: discovery,
-    rowsets, compute, and answer; do not include discovery_ext, rowsets_ext, or compute_ext.'
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: PLAN validation failed with 'Extra inputs are not permitted' for discovery_ext,
-    rowsets_ext, compute_ext. The generated PlanIR included these extraneous fields,
-    which are not part of the PlanIR schema. The root cause is that the plan generation
-    step incorrectly added these fields. The corrective rule ensures future PlanIR
-    outputs omit them.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: Product not found
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: 'Always use a multi-step discovery for products with complex criteria:
-    first find candidate SKUs by brand and series, then refine by model and properties
-    in compute, to avoid OUTCOME_NONE_UNSUPPORTED.'
-  created: '2026-06-22'
-  deactivated_reason: Superseded by more specific rule requiring two separate discovery
-    steps and compute intersection.
-  id: r003
-  reasoning: The plan's product discovery query returned no rows, causing $product_sku
-    to be empty, which triggered the unsupported branch. The exact string matching
-    for model and property_value_text may have failed due to case or synonym differences.
-    A multi-step discovery with a broader initial search and compute-time filtering
-    would be more robust. Additionally, a pre-phase deep read of product_variant_properties
-    will surface the actual property values.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always structure the 'decision' field in PlanIR as a valid DecisionTree
-    dictionary with a 'branches' list, each branch containing 'condition' and 'plan'
-    keys; never set it to null or an empty object.
-  created: '2026-06-22'
-  deactivated_reason: r004 is too vague; it did not explicitly forbid 'when' and 'label',
-    leading to this failure. The new rule provides precise key names.
-  id: r004
-  reasoning: The PlanIR validation error 'decision Input should be a valid dictionary
-    or instance of DecisionTree' indicates the 'decision' field was present but not
-    a proper DecisionTree object (likely null or missing required keys). The rule
-    ensures future PlanIR outputs include a correctly formed decision tree when a
-    decision is needed.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: No matching product found.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: 'Always separate product discovery into two distinct discovery steps: first
-    query product_variants for candidate SKUs based on brand and name/series, then
-    query product_variant_properties to filter those SKUs by property_key and property_value_text,
-    and use compute to find the intersection; never combine both filters in a single
-    SQL query.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'The PlanIR''s single discovery query combined product_variants and product_variant_properties
-    filters, returning empty and causing OUTCOME_NONE_UNSUPPORTED. The objective requires
-    a multi-step discovery: first find candidate SKUs by brand and name/series, then
-    refine by properties. The failure indicates that the combined query did not match
-    any rows, likely due to data nuances. A two-step approach with separate queries
-    and compute intersection would be more robust and align with the intended discovery
-    logic.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: '#decision-tree-branches'
-  content: Always structure decision branches with 'condition' and 'plan' keys, where
-    'plan' is the name of the answer block to execute; never use 'when' and 'label'.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: 'The PlanIR used ''when'' and ''label'' keys in the decision branch instead
-    of the required ''condition'' and ''plan'' keys. This caused the interpreter to
-    fail to evaluate the decision tree, resulting in an OUTCOME_NONE_CLARIFICATION
-    instead of the expected OUTCOME_OK. The error message: ''grader: expected outcome
-    OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION''. The failing PlanIR fragment: ''branches'':
-    [{''when'': {...}, ''label'': ''ok''}]. Existing rule r004 mentions ''condition''
-    and ''plan'' but was not specific enough to prevent this mistake.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always represent filter_rows predicates as a list [op, lhs, rhs] where
-    op is a string like 'eq', 'in_set', etc., and lhs/rhs are references; never use
-    a dict.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: 'Error: ''interpret: compute step ''filter_rows'' failed: ''dict'' object
-    has no attribute ''op'' CONTRACT: filter_rows(rows, pred): first arg must be list[dict]
-    rows''. The failing PlanIR fragment is: {"prim":"filter_rows","args":["$inventory_all",{"op":"eq","lhs":"$row.product_sku","rhs":"$target_sku"}],"into":"target_inventory_rows"}.
-    The predicate is a dict with keys ''op'', ''lhs'', ''rhs'', but the interpreter
-    expects an object with an attribute ''op'', not a dict. The correct PlanIR representation
-    for a predicate is a list, e.g., ["eq", "$row.product_sku", "$target_sku"]. This
-    rule ensures predicates are lists, not dicts, to match the interpreter''s expected
-    format.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always access the content of a Read RPC result via the 'content' field
-    (e.g., $bind.content) when using it in decision conditions; never use the raw
-    bind directly as a string.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r008
-  reasoning: 'Error: ''Protocol message ReadResponse has no "guest" field.'' The PlanIR
-    read /docs/security.md and bound it to $security_policy_raw. In the decision,
-    it used ''contains_any'' with lhs=$security_policy_raw and rhs=["guest","guests"].
-    The ReadResponse is an object with fields like ''content'', not a plain string.
-    The VM tried to access a ''guest'' field on the ReadResponse object, causing the
-    error. The fix is to reference $security_policy_raw.content to get the text content.
-    This rule ensures future PlanIRs correctly extract the text from Read RPC results.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always guard access to the first row of a rowset with a decision branch
-    that checks the rowset length is greater than zero before using primitives like
-    'get', to avoid null reference errors.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r009
-  reasoning: The real_vm error 'bad argument type for built-in operation' occurred
-    because the compute step 'get' attempted to access $product_rows.0.record_path
-    when $product_rows was empty (product not found). The get primitive received null
-    instead of a dict, causing a type error. The PlanIR lacked a guard for empty rowset.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always use $bind.stdout as the source for rowsets when the discovery step
-    is an Exec RPC, because Exec returns a structured object with stdout, stderr,
-    exit_code; using the raw bind may cause ambiguity and trigger a clarification
-    outcome.
+  content: Always use $bind.stdout as the source for rowsets when the discovery step is an Exec RPC, because
+    Exec returns a structured object with stdout, stderr, exit_code; using the raw bind may cause ambiguity
+    and trigger a clarification outcome.
   created: '2026-06-22'
   deactivated_reason: null
   id: r010
-  reasoning: The interpreter returned OUTCOME_NONE_CLARIFICATION instead of OUTCOME_OK
-    or OUTCOME_NONE_UNSUPPORTED. This indicates the PlanIR was ambiguous and the interpreter
-    could not proceed. The likely cause is that the rowsets' from_ fields reference
-    the raw Exec RPC bind names (e.g., $product_skus_raw) without specifying the stdout
-    field. Exec RPC returns an object with stdout, stderr, exit_code; the rowset parser
-    expects a string, so it encountered an object and asked for clarification. The
-    failing fragment is the rowsets' from_ attributes. This is analogous to existing
-    rule r008 for Read RPC, but for Exec.
+  reasoning: The interpreter returned OUTCOME_NONE_CLARIFICATION instead of OUTCOME_OK or OUTCOME_NONE_UNSUPPORTED.
+    This indicates the PlanIR was ambiguous and the interpreter could not proceed. The likely cause is
+    that the rowsets' from_ fields reference the raw Exec RPC bind names (e.g., $product_skus_raw) without
+    specifying the stdout field. Exec RPC returns an object with stdout, stderr, exit_code; the rowset
+    parser expects a string, so it encountered an object and asked for clarification. The failing fragment
+    is the rowsets' from_ attributes. This is analogous to existing rule r008 for Read RPC, but for Exec.
   status: active
   surface: ir
 - content: null
@@ -342,36 +26,31 @@ entries:
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'When discovering a product by family name and properties, always use a
-    stepwise approach: first discover the product family, then its variants, then
-    filter by properties using a join on product_variant_properties, and verify the
-    property keys and values match the expected ones before proceeding.'
+  content: 'When discovering a product by family name and properties, always use a stepwise approach:
+    first discover the product family, then its variants, then filter by properties using a join on product_variant_properties,
+    and verify the property keys and values match the expected ones before proceeding.'
   created: '2026-06-22'
   deactivated_reason: null
   id: r011
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED. Root
-    cause: the SQL query used EXISTS subqueries to filter product variants by properties,
-    but it returned no rows, so product_variant.record_path was empty, triggering
-    the no_product branch. The plan''s product lookup was not robust enough to find
-    the product. A stepwise approach with explicit joins and verification would improve
-    grounding.'
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED. Root cause: the SQL query
+    used EXISTS subqueries to filter product variants by properties, but it returned no rows, so product_variant.record_path
+    was empty, triggering the no_product branch. The plan''s product lookup was not robust enough to find
+    the product. A stepwise approach with explicit joins and verification would improve grounding.'
   status: active
   surface: ir
 - agents_md_anchor: '#plan-primitives'
-  content: Never pass more than two arguments to the 'get' primitive. To extract a
-    column value from a specific row of a rowset, first use 'column' to obtain the
-    list of values for that column, then use 'get' with the row index to retrieve
-    the desired value.
+  content: Never pass more than two arguments to the 'get' primitive. To extract a column value from a
+    specific row of a rowset, first use 'column' to obtain the list of values for that column, then use
+    'get' with the row index to retrieve the desired value.
   created: '2026-06-22'
   deactivated_reason: null
   id: r012
-  reasoning: 'The interpret step failed with: ''get(obj, key) takes 2 positional arguments
-    but 3 were given''. The failing PlanIR compute step was: {"prim":"get","args":["$product_and_total_rowset","0","record_path"],"into":"product_record_path"}.
-    The ''get'' primitive expects exactly two arguments (object and key), but three
-    were supplied. The correct approach to extract a column value from a specific
-    row is to first use ''column'' to get the list of values for that column, then
-    ''get'' to index into that list. This rule prevents misuse of ''get'' with a column
-    name as a third argument.'
+  reasoning: 'The interpret step failed with: ''get(obj, key) takes 2 positional arguments but 3 were
+    given''. The failing PlanIR compute step was: {"prim":"get","args":["$product_and_total_rowset","0","record_path"],"into":"product_record_path"}.
+    The ''get'' primitive expects exactly two arguments (object and key), but three were supplied. The
+    correct approach to extract a column value from a specific row is to first use ''column'' to get the
+    list of values for that column, then ''get'' to index into that list. This rule prevents misuse of
+    ''get'' with a column name as a third argument.'
   status: active
   surface: ir
 last_run:

@@ -1,331 +1,26 @@
 entries:
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: Product not found in catalogue.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
 - agents_md_anchor: null
-  content: When searching for product variants by property value, do not rely on exact
-    string matching in the initial query. Instead, first retrieve all variants matching
-    the brand, product kind, and product family, then filter by property value using
-    case-insensitive or partial matching.
-  created: '2026-06-22'
-  deactivated_reason: Superseded by comprehensive case-insensitive partial matching
-    rule for all string fields.
-  id: r001
-  reasoning: The plan used a single SQL query with exact matches on all fields including
-    property value 'petrol'. The query returned no rows, causing the decision to branch
-    to 'not_found' and outcome OUTCOME_NONE_UNSUPPORTED. The root cause is likely
-    that the property value is stored differently (e.g., 'Petrol', 'petrol ', or a
-    different representation). The plan should have first retrieved all variants for
-    the given brand/kind/family, then filtered the property value with flexible matching.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: No, we do not have the Tool Box and Bag from Festool in the Festool
-    Modular CTL XPW-76I Tool Box and Bag line with storage type tool box.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When searching for product variants by property, do not rely on exact string
-    matching for any field. Instead, use case-insensitive partial matching for brand,
-    product family name, product name, property key, and property value.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: The plan used exact string matching for product family name and product
-    name, and possibly case-sensitive matching for property key, causing zero matches
-    and outcome OUTCOME_NONE_UNSUPPORTED. The existing rule r001 only addressed property
-    value matching. A more comprehensive rule is needed to ensure all string comparisons
-    are case-insensitive partial matches.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Do not use the 'concat' primitive with a single scalar argument; concat
-    requires two list[dict] rowsets. When constructing a boolean or string answer
-    field from a scalar, use 'if', 'eq', or 'gt' primitives instead.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() missing
-    1 required positional argument: ''b''. CONTRACT: concat(a, b): both args must
-    be list[dict] rows. The failing PlanIR fragment: {"prim":"concat","args":["$row_count"],"into":"in_catalogue"}.
-    Root cause: concat expects two rowsets, but only a scalar count was provided.
-    The intent was to set in_catalogue based on row_count > 0, but concat is the wrong
-    primitive. The rule instructs the PLAN phase to avoid this misuse and use appropriate
-    primitives for scalar-to-answer conversion.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a discovery step that queries a database returns an empty result,
-    the plan should include a compute step that checks for emptiness and provides
-    a default value (e.g., false for existence checks) to avoid null answer fields.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: The verify error 'nonempty' failed because the answer field 'in_catalogue'
-    was empty. The observed RPC output for the SQL discovery step was empty (no stdout).
-    The PlanIR used 'first' on the rowset, which returned null when the rowset was
-    empty, leading to a null 'in_catalogue'. The SQL query itself (using COUNT(*))
-    would normally return a row even if no matches, but the empty output suggests
-    the query produced no rows at all. The plan must handle empty discovery output
-    by providing a default value (e.g., false) to satisfy the nonempty requirement.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always include every variable referenced by success_criteria's $answer
-    checks in the 'refs' array of the corresponding answer branch, so that compute-step
-    variables are bound to $answer and visible to the verifier.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'Error: verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''nonempty'',
-    ''lhs'': ''$answer.in_catalogue'', ''rhs'': None, ''args'': []}. The PlanIR compute
-    steps produced ''in_catalogue'' and ''details'' scalars, and the answer message
-    interpolated them, but the answer branch''s ''refs'' was empty []. Consequently
-    $answer.in_catalogue was never bound, causing the nonempty check to see None.
-    The SQL output was ''false,'' (non-empty row), so the root cause is purely a PlanIR
-    shape defect: missing refs binding.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Do not treat the output of an Exec RPC as a rowset; it returns an ExecResponse
-    object (with stdout, stderr, exit_code). When a SQL query is needed, either use
-    a discovery RPC that natively returns rowsets, or add a compute step that parses
-    the ExecResponse's stdout into a list of rows before applying sequence primitives
-    like 'first'.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
-    object is not subscriptable''. Root cause: The PlanIR discovery step used Exec
-    with /bin/sql and bound the result to $query_result, then compute step ''first''
-    tried to subscript it. Exec returns an ExecResponse object, not a list. The failing
-    PlanIR fragment: discovery step with rpc ''Exec'' and bind ''query_result'', followed
-    by compute step {''prim'':''first'',''args'':[''$query_result''],''into'':''row''}.
-    No existing rule covers this Exec-to-rowset mismatch.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: 'When a discovery step queries for existence and may return no rows, do
-    not use a UNION ALL to always produce a row. Instead, let the query return rows
-    only when a match is found. Then use a compute step to check if the resulting
-    rowset is empty, and branch: if non-empty, emit the success outcome with the found
-    data; if empty, emit a different outcome (e.g., OUTCOME_NONE) with a descriptive
-    message.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: 'Error: verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''nonempty'',
-    ''lhs'': ''$answer.in_catalogue'', ''rhs'': None, ''args'': []}. Root cause: The
-    SQL query uses UNION ALL to always return a row (0 when no match), so the rowset
-    is never empty. The plan always takes the first row, sets in_catalogue to 0, and
-    emits OUTCOME_OK. The verifier''s nonempty check fails because 0 is treated as
-    empty. The failing PlanIR fragment is the UNION ALL in the discovery SQL and the
-    lack of a branch on emptiness. The new rule instructs to avoid UNION ALL for existence
-    queries and instead branch on rowset emptiness, so that OUTCOME_OK is only emitted
-    when a match exists and in_catalogue is nonempty.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: No product found matching brand 'Raaco', series 'Professional
-    CarryLite 3CS-7A9', model 'Shelving and Cabinet' with storage type 'shelving unit'.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - no answer provided
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: ''
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Do not use 'column' on a single row; use 'get' to extract a column value
-    from a single row. 'column' expects a list of dicts.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r008
-  reasoning: The compute step used 'first' to extract a single row from the rowset,
-    then attempted 'column' on that single row. 'column' requires a list of dicts,
-    so it failed with 'column expects list[dict]; use get for a single row'. The fix
-    is to replace 'column' with 'get' when extracting fields from a single row. This
-    rule prevents that mistake.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Do not use 'eq' to produce a constant boolean; use 'const' with a boolean
-    value (e.g., {"prim":"const","args":[true],"into":"in_stock"}).
+  content: Do not use 'eq' to produce a constant boolean; use 'const' with a boolean value (e.g., {"prim":"const","args":[true],"into":"in_stock"}).
   created: '2026-06-22'
   deactivated_reason: null
   id: r009
-  reasoning: 'The interpret error ''compute step ''eq'' failed: ''eq'''' occurred
-    because the PlanIR used {"prim":"eq","args":["1","1"],"into":"in_stock"} to set
-    a constant true. The ''eq'' primitive is intended for comparing two variable references,
-    not for emitting a constant. The interpreter could not evaluate it. The correct
-    approach is to use a ''const'' primitive with a literal boolean value.'
+  reasoning: 'The interpret error ''compute step ''eq'' failed: ''eq'''' occurred because the PlanIR used
+    {"prim":"eq","args":["1","1"],"into":"in_stock"} to set a constant true. The ''eq'' primitive is intended
+    for comparing two variable references, not for emitting a constant. The interpreter could not evaluate
+    it. The correct approach is to use a ''const'' primitive with a literal boolean value.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: 'When a success criteria requires a constant boolean field in the answer
-    (e.g., in_stock: true), set it directly in the answer branch object rather than
-    using a compute step with ''const''.'
+  content: 'When a success criteria requires a constant boolean field in the answer (e.g., in_stock: true),
+    set it directly in the answer branch object rather than using a compute step with ''const''.'
   created: '2026-06-22'
   deactivated_reason: null
   id: r010
-  reasoning: 'The compute step ''const'' failed with error ''interpret: compute step
-    ''const'' failed: ''const'''', indicating the interpreter does not support a ''const''
-    primitive. The script attempted to set in_stock to true using ''const'' as per
-    an existing in-session rule. The fix is to embed the constant value directly in
-    the answer branch object (e.g., ''in_stock'': true) instead of using a compute
-    step. This avoids the unsupported primitive.'
+  reasoning: 'The compute step ''const'' failed with error ''interpret: compute step ''const'' failed:
+    ''const'''', indicating the interpreter does not support a ''const'' primitive. The script attempted
+    to set in_stock to true using ''const'' as per an existing in-session rule. The fix is to embed the
+    constant value directly in the answer branch object (e.g., ''in_stock'': true) instead of using a
+    compute step. This avoids the unsupported primitive.'
   status: active
   surface: ir
 - content: null
@@ -336,24 +31,21 @@ entries:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
   status: active
-  submitted_message: No store carries the Bahco Hammer Measuring and Cutting Tool
-    with spirit level.
+  submitted_message: No store carries the Bahco Hammer Measuring and Cutting Tool with spirit level.
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'When matching a product family by name, use a two-step discovery: first
-    query the product_families table with a broad LIKE pattern to retrieve the exact
-    family name, then use that exact name in subsequent joins. This avoids failures
-    due to minor name formatting differences.'
+  content: 'When matching a product family by name, use a two-step discovery: first query the product_families
+    table with a broad LIKE pattern to retrieve the exact family name, then use that exact name in subsequent
+    joins. This avoids failures due to minor name formatting differences.'
   created: '2026-06-22'
   deactivated_reason: null
   id: r011
-  reasoning: The plan's single SQL query used LIKE '%Bahco Workshop BAH 3VZ-SPH Hammer
-    Measuring and Cutting Tool%' to match the product family name, but no rows were
-    returned, causing the decision to fall through to OUTCOME_NONE_UNSUPPORTED. The
-    root cause is likely a mismatch between the provided product line string and the
-    actual family name in the database. A two-phase discovery would first retrieve
-    the exact family name, ensuring a reliable match.
+  reasoning: The plan's single SQL query used LIKE '%Bahco Workshop BAH 3VZ-SPH Hammer Measuring and Cutting
+    Tool%' to match the product family name, but no rows were returned, causing the decision to fall through
+    to OUTCOME_NONE_UNSUPPORTED. The root cause is likely a mismatch between the provided product line
+    string and the actual family name in the database. A two-phase discovery would first retrieve the
+    exact family name, ensuring a reliable match.
   status: active
   surface: ir
 last_run:
