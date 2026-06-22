@@ -5,6 +5,7 @@ produces the authoritative set that replaces answer.refs (the muxx exoskeleton p
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 
@@ -148,3 +149,23 @@ def resolve_record_path(vm, token: str, evidence_paths: list[str],
         if _stat_ok(vm, p):
             return p
     return None
+
+
+def ownership_safe(vm, record_path: str, identity: dict) -> bool:
+    """Phase-1 conservative ownership guard: never auto-cite a record owned by another
+    customer. Cite only public (no owner) or owned records.
+
+    - Non-customer caller (no customer_id): no cross-customer leak risk -> safe.
+    - Customer caller: read the record; public or self-owned -> safe; another owner OR
+      unreadable/unparseable -> drop (errs toward dropping a doubtful record ref).
+    The full identity gate lands in Phase 2."""
+    cust = ((identity or {}).get("customer_id") or "").strip()
+    if not cust:
+        return True
+    try:
+        content = _get(vm.read(path=record_path), "content", "") or ""
+        record = json.loads(content)
+    except Exception:
+        return False
+    owner = str((record or {}).get("customer_id", "")).strip()
+    return owner == "" or owner == cust

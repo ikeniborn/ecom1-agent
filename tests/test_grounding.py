@@ -109,3 +109,41 @@ def test_resolve_sql_fallback_skips_unsafe_token():
     vm = MockVMSpy(fixtures={})
     assert resolve_record_path(vm, "bad token", evidence_paths=[],
                                schema_tables=["catalog"]) is None
+import json as _json
+from agent.grounding import ownership_safe
+from agent.mock_vm_spy import MockVMSpy, fixture_key
+
+
+def _vm_with_record(path, record):
+    return MockVMSpy(fixtures={fixture_key("Read", path): {"content": _json.dumps(record)}})
+
+
+def test_public_record_is_safe_for_customer():
+    path = "/proc/catalog/SKU-FK.json"
+    vm = _vm_with_record(path, {"sku": "SKU-FK"})   # no customer_id -> public
+    assert ownership_safe(vm, path, {"customer_id": "cust_016"}) is True
+
+
+def test_owned_record_is_safe():
+    path = "/proc/baskets/basket_12.json"
+    vm = _vm_with_record(path, {"customer_id": "cust_016"})
+    assert ownership_safe(vm, path, {"customer_id": "cust_016"}) is True
+
+
+def test_cross_customer_record_is_unsafe():
+    path = "/proc/baskets/basket_99.json"
+    vm = _vm_with_record(path, {"customer_id": "cust_777"})
+    assert ownership_safe(vm, path, {"customer_id": "cust_016"}) is False
+
+
+def test_non_customer_caller_never_blocked():
+    # employee/admin identity (no customer_id) -> no cross-customer leak possible.
+    path = "/proc/baskets/basket_99.json"
+    vm = _vm_with_record(path, {"customer_id": "cust_777"})
+    assert ownership_safe(vm, path, {"user": "emp_3"}) is True
+
+
+def test_unreadable_record_dropped_for_customer():
+    # customer caller, record cannot be read -> err toward dropping (conservative).
+    vm = MockVMSpy(fixtures={})   # Read stub -> empty content -> unparseable
+    assert ownership_safe(vm, "/proc/baskets/basket_x.json", {"customer_id": "cust_016"}) is False
