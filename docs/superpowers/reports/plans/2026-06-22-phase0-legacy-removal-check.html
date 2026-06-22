@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка плана — Phase 0 Legacy Removal</title>
+<style>
+:root{
+  --bg:#f6f7fb; --surface:#ffffff; --fg:#2b2b3a; --muted:#6b6b80;
+  --accent:#5c6bc0; --accent-2:#3949ab; --border:#d6d8e6; --line:#9aa0b4; --zebra:#eef0f8;
+  --ok:#43a047; --ok-2:#2e7d32; --warn:#fb8c00; --warn-2:#ef6c00; --danger:#e53935; --danger-2:#c62828;
+  --shadow:rgba(40,40,80,.18);
+}
+body:has(#theme-toggle:checked){
+  --bg:#181825; --surface:#262637; --fg:#cdd6f4; --muted:#a6adc8;
+  --accent:#89b4fa; --accent-2:#5e95f0; --border:#3a3b52; --line:#6c7086; --zebra:#21222f;
+  --ok:#a6e3a1; --ok-2:#74c46e; --warn:#f9e2af; --warn-2:#f5c95b; --danger:#f38ba8; --danger-2:#e8638a;
+  --shadow:rgba(0,0,0,.45);
+}
+body{
+  margin:0 auto; padding:1.5rem 2rem 4rem; max-width:1080px;
+  font:16px/1.55 system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 500px at 100% -10%, color-mix(in srgb,var(--accent) 10%, transparent), transparent),
+    var(--bg);
+  color:var(--fg);
+  transition:background .3s, color .3s;
+}
+.theme-btn{
+  position:sticky; top:.5rem; float:right; z-index:10;
+  cursor:pointer; user-select:none;
+  padding:.25rem .6rem; border:1px solid var(--border); border-radius:6px;
+  background:var(--surface);
+}
+h1{font-size:1.7rem; margin:.2rem 0 .3rem;}
+h2{font-size:1.25rem; margin:2rem 0 .6rem; border-bottom:2px solid var(--border); padding-bottom:.25rem;}
+h3{font-size:1.05rem; margin:1.3rem 0 .4rem; color:var(--accent-2);}
+a{color:var(--accent-2);}
+code{font-family:ui-monospace,Menlo,Consolas,monospace; background:color-mix(in srgb,var(--accent) 12%,var(--surface)); padding:.05rem .3rem; border-radius:4px; font-size:.86em;}
+table{border-collapse:collapse; width:100%; margin:.6rem 0 1rem; font-size:.9rem; background:var(--surface); box-shadow:0 1px 4px var(--shadow); border-radius:8px; overflow:hidden;}
+th,td{border:1px solid var(--border); padding:.45rem .6rem; text-align:left; vertical-align:top;}
+th{background:color-mix(in srgb,var(--accent) 16%,var(--surface)); font-weight:600;}
+tbody tr:nth-child(even){background:var(--zebra);}
+.lead{color:var(--muted); font-size:.95rem;}
+.badge{display:inline-block; padding:.12rem .5rem; border-radius:999px; font-size:.78rem; font-weight:600; white-space:nowrap;}
+.b-ok{background:color-mix(in srgb,var(--ok) 22%,var(--surface)); color:var(--ok-2); border:1px solid var(--ok);}
+.b-warn{background:color-mix(in srgb,var(--warn) 22%,var(--surface)); color:var(--warn-2); border:1px solid var(--warn);}
+.b-danger{background:color-mix(in srgb,var(--danger) 22%,var(--surface)); color:var(--danger-2); border:1px solid var(--danger);}
+.b-neutral{background:color-mix(in srgb,var(--line) 22%,var(--surface)); color:var(--muted); border:1px solid var(--line);}
+.note{background:color-mix(in srgb,var(--accent) 10%,var(--surface)); border-left:4px solid var(--accent); padding:.6rem .9rem; border-radius:6px; margin:.8rem 0;}
+.note-ok{background:color-mix(in srgb,var(--ok) 12%,var(--surface)); border-left-color:var(--ok);}
+.verdict{font-size:1.15rem; font-weight:700; padding:.7rem 1rem; border-radius:8px; margin:1rem 0;}
+.verdict-ok{background:color-mix(in srgb,var(--ok) 18%,var(--surface)); color:var(--ok-2); border:1px solid var(--ok);}
+figure{margin:1rem 0; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:1rem; box-shadow:0 1px 4px var(--shadow);}
+figcaption{color:var(--muted); font-size:.85rem; margin-top:.5rem;}
+.chain{font-family:ui-monospace,monospace; font-size:.85rem; color:var(--muted);}
+.legend{display:flex; gap:1.2rem; flex-wrap:wrap; font-size:.82rem; color:var(--muted); margin:.4rem 0;}
+.legend span{display:inline-flex; align-items:center; gap:.35rem;}
+.swatch{width:.9rem; height:.9rem; border-radius:3px; display:inline-block; border:1px solid var(--border);}
+.matrix td.hit{background:color-mix(in srgb,var(--accent) 28%,var(--surface)); text-align:center; font-weight:700; color:var(--accent-2);}
+.matrix td{text-align:center;}
+.matrix th:first-child, .matrix td:first-child{text-align:left;}
+small.mono{font-family:ui-monospace,monospace; color:var(--muted);}
+</style>
+</head>
+<body>
+<input type="checkbox" id="theme-toggle" hidden>
+<label for="theme-toggle" class="theme-btn" title="Переключить тёмную/светлую тему">🌙 / ☀️</label>
+
+<main class="report">
+<h1>Проверка плана — Phase 0: Legacy Removal</h1>
+<p class="lead">Фазовая валидация плана против исходной спецификации. Дата прогона: 2026-06-22.</p>
+
+<div class="verdict verdict-ok">Вердикт: OK — 0 CRITICAL open, 0 WARNING open</div>
+
+<table>
+  <tr><th>Документ</th><th>Путь</th><th>Хеш тела</th></tr>
+  <tr><td>План</td><td><code>docs/superpowers/plans/2026-06-22-phase0-legacy-removal.md</code></td><td><small class="mono">6dc1865e6a43fbc6</small> (prev: — нет, первый прогон)</td></tr>
+  <tr><td>Спека</td><td><code>docs/superpowers/specs/2026-06-22-phase0-current-impl-audit-legacy-removal-design.md</code></td><td><small class="mono">47f7f6d60c12ccda</small></td></tr>
+</table>
+<p class="chain">Chain: intent (null) → spec (…audit-legacy-removal-design.md) → plan (…phase0-legacy-removal.md)</p>
+
+<!-- ================= БЛОК 1: РЕЗЮМЕ ПЛАНА ================= -->
+<h2>1. Резюме плана — задачи и критерии готовности (DoD)</h2>
+<p class="lead">Субтрактивный план: каждое удаление — изолированный коммит (зелёный набор тестов ДО → удаление кода+тестов+мёртвых импортов → зелёный ПОСЛЕ → grep-guard → коммит).</p>
+<table>
+  <tr><th>Задача</th><th>Суть</th><th>Критерий готовности (DoD)</th></tr>
+  <tr>
+    <td><b>T1</b></td>
+    <td>Удалить harness-distill, сохранить lint-движок</td>
+    <td>Удалён блок distill из <code>harness.py</code> (<code>_DISTILL_SYS</code>/<code>distill</code>/<code>promote</code>/<code>save_checks</code> + импорт), удалён <code>harness_validate.py</code>, снят хук в <code>pipeline.py</code>. Набор тестов зелёный на том же количестве (минус удалённый <code>test_harness_distill.py</code>); grep-guard пуст; <code>load_checks</code>/<code>handler_for</code>/<code>_HANDLERS</code> целы. Коммит.</td>
+  </tr>
+  <tr>
+    <td><b>T2</b></td>
+    <td>Удалить in-pipeline oracle-distill, сохранить retrieval + offline-bridge</td>
+    <td>Удалены <code>_distill_call</code>/<code>_maybe_distill_and_validate</code>/<code>_brief_lessons_text</code> + call-site + импорт line 14, удалён <code>test_pipeline_distill.py</code>. Тесты зелёные; <code>test_oracle_*</code> и <code>test_harness_to_oracle.py</code> остаются зелёными; grep-guard пуст. Коммит.</td>
+  </tr>
+  <tr>
+    <td><b>T3</b></td>
+    <td>Удалить INVESTIGATE data-paths ветку, сохранить slim seed + stop-trace</td>
+    <td>Удалены <code>_data_path_seed</code>, <code>_forced_data_probe</code>, probe-loop; упрощены сигнатура <code>investigate()</code> и call-site; docstring <code>trace.py</code> поправлен; flag-ON тесты удалены, mock-сигнатура исправлена. Базовые INVESTIGATE-тесты зелёные; grep-guard пуст в <code>agent/</code>. Коммит.</td>
+  </tr>
+  <tr>
+    <td><b>T4</b></td>
+    <td>Прунинг неактивных LEARN-правил (~1149)</td>
+    <td>Создан <code>scripts/prune_inactive_rules.py</code> + тест (TDD: fail→pass). Зафиксирован pre-prune fingerprint активных правил; dry-run → prune; число активных правил ИДЕНТИЧНО после; тесты <code>test_learned_store*.py</code> зелёные. Коммит (= архив через git-историю).</td>
+  </tr>
+  <tr>
+    <td><b>T5</b></td>
+    <td>Убрать мёртвые env-vars из документации</td>
+    <td>Удалены строки в <code>.env.example</code>, строки таблицы и прозы в корневом <code>CLAUDE.md</code>, упоминание в <code>agent/CLAUDE.md</code> line 21. <code>ECOM_PREPHASE_PATH_LITERALS</code> и oracle-retrieval env-vars сохранены. grep-guard пуст. Коммит.</td>
+  </tr>
+  <tr>
+    <td><b>T6</b></td>
+    <td>Регенерация затронутых wiki-страниц</td>
+    <td>Re-ingest через <code>iwiki:iwiki-ingest</code> для изменённых источников; <code>iwiki:iwiki-lint</code> — нет битых <code>[[refs]]</code>, нет orphan/stale страниц на удалённые символы. Коммит.</td>
+  </tr>
+  <tr>
+    <td><b>T7</b></td>
+    <td>Измерение load-bearing Oracle (решение-gated, БЕЗ удаления)</td>
+    <td>Выведен measured subset task-id; baseline-прогон (oracle ON) → P_on; toggle-прогон (<code>ECOM_ORACLE_ENABLED=0</code>) → P_off; вычислено <code>dropped = P_on \ P_off</code>; результат (subset, P_on, P_off, вердикт) записан в заметку под <code>docs/superpowers/reports/</code>. Нет коммита в <code>agent/</code>.</td>
+  </tr>
+  <tr>
+    <td><b>T8</b></td>
+    <td>Финальная верификация — Δtasks = 0 + LOC-отчёт</td>
+    <td>Финальный набор тестов зелёный; повторный subset-прогон воспроизводит pre-removal pass-count точно (Δtasks=0); зафиксирована фактическая LOC-дельта <code>agent/</code> (~150–240, без числового обещания); подтверждён скелет (lint-движок + INTENT→INVESTIGATE→PLAN→verify).</td>
+  </tr>
+</table>
+
+<!-- ================= БЛОК 2: СХЕМЫ ================= -->
+<h2>2. Схемы зависимостей и пересечений шагов</h2>
+
+<h3>2.1 Граф зависимостей задач</h3>
+<figure>
+  <svg viewBox="0 0 900 240" width="100%" role="img" aria-label="граф зависимостей задач T1..T8">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+      </marker>
+      <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="var(--shadow)"/>
+      </filter>
+    </defs>
+    <!-- линейная commit-цепочка T1->T2->T3->T4->T5->T6 -->
+    <line x1="92"  y1="60" x2="148" y2="60" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="212" y1="60" x2="268" y2="60" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="332" y1="60" x2="388" y2="60" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="452" y1="60" x2="508" y2="60" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="572" y1="60" x2="628" y2="60" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+    <!-- T7 subset feeds T8 (data dependency, drawn lower) -->
+    <line x1="700" y1="170" x2="760" y2="170" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+    <!-- T6 -> T7 sequence (after wiki regen, measurement) -->
+    <line x1="668" y1="78" x2="685" y2="150" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- nodes row 1 (T1..T6) -->
+    <g font-size="13" font-weight="600" text-anchor="middle">
+      <rect x="32"  y="42" width="60" height="36" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" filter="url(#ds)"/><text x="62"  y="65" fill="var(--fg)">T1</text>
+      <rect x="152" y="42" width="60" height="36" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" filter="url(#ds)"/><text x="182" y="65" fill="var(--fg)">T2</text>
+      <rect x="272" y="42" width="60" height="36" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" filter="url(#ds)"/><text x="302" y="65" fill="var(--fg)">T3</text>
+      <rect x="392" y="42" width="60" height="36" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" filter="url(#ds)"/><text x="422" y="65" fill="var(--fg)">T4</text>
+      <rect x="512" y="42" width="60" height="36" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" filter="url(#ds)"/><text x="542" y="65" fill="var(--fg)">T5</text>
+      <rect x="632" y="42" width="60" height="36" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2" filter="url(#ds)"/><text x="662" y="65" fill="var(--fg)">T6</text>
+    </g>
+    <!-- nodes row 2 (T7, T8) -->
+    <g font-size="13" font-weight="600" text-anchor="middle">
+      <rect x="632" y="152" width="68" height="36" rx="8" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="2" filter="url(#ds)"/><text x="666" y="175" fill="var(--fg)">T7</text>
+      <rect x="762" y="152" width="68" height="36" rx="8" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="2" filter="url(#ds)"/><text x="796" y="175" fill="var(--fg)">T8</text>
+    </g>
+    <text x="730" y="158" font-size="10" fill="var(--muted)" text-anchor="middle">subset</text>
+  </svg>
+  <figcaption>
+    Сплошные стрелки — линейная commit-цепочка (каждая задача стартует от коммита предыдущей: «baseline green continues from Task N's commit»). Штриховая accent-стрелка — data-зависимость: measured subset из T7 Step 1 переиспользуется в T8 Step 2. Циклов и нарушений порядка фаза <code>dependencies</code> не нашла.
+  </figcaption>
+</figure>
+
+<h3>2.2 Внутри-задачная зависимость артефактов (TDD в T4)</h3>
+<figure>
+  <svg viewBox="0 0 720 90" width="100%" role="img" aria-label="TDD-зависимость в задаче T4">
+    <defs>
+      <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+      </marker>
+    </defs>
+    <line x1="150" y1="45" x2="232" y2="45" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow2)"/>
+    <line x1="370" y1="45" x2="452" y2="45" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow2)"/>
+    <line x1="588" y1="45" x2="640" y2="45" stroke="var(--line)" stroke-width="2" marker-end="url(#arrow2)"/>
+    <g font-size="12" text-anchor="middle">
+      <rect x="20"  y="28" width="130" height="34" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="85"  y="49" fill="var(--fg)">S1 тест (fail)</text>
+      <rect x="232" y="28" width="138" height="34" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="301" y="49" fill="var(--fg)">S3 скрипт</text>
+      <rect x="452" y="28" width="136" height="34" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/><text x="520" y="49" fill="var(--fg)">S4 тест (pass)</text>
+      <rect x="640" y="28" width="70" height="34" rx="8" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="2"/><text x="675" y="49" fill="var(--fg)">S6 prune</text>
+    </g>
+  </svg>
+  <figcaption>T4 соблюдает TDD: тест (S1) написан до скрипта (S3), <code>prune_entries</code> создан до прогона прунинга (S6). Артефакт-доступность корректна.</figcaption>
+</figure>
+
+<h3>2.3 Матрица пересечений по артефактам</h3>
+<p class="legend">
+  <span><span class="swatch" style="background:color-mix(in srgb,var(--accent) 28%,var(--surface))"></span> задача изменяет файл</span>
+</p>
+<table class="matrix">
+  <tr><th>Файл / артефакт</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>T6</th></tr>
+  <tr><td><code>agent/harness.py</code></td><td class="hit">✔</td><td></td><td></td><td></td><td></td><td>↻</td></tr>
+  <tr><td><code>agent/harness_validate.py</code></td><td class="hit">✔</td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td><code>agent/pipeline.py</code></td><td class="hit">✔</td><td class="hit">✔</td><td class="hit">✔</td><td></td><td></td><td>↻</td></tr>
+  <tr><td><code>agent/investigate.py</code></td><td></td><td></td><td class="hit">✔</td><td></td><td></td><td>↻</td></tr>
+  <tr><td><code>agent/trace.py</code></td><td></td><td></td><td class="hit">✔</td><td></td><td></td><td></td></tr>
+  <tr><td><code>scripts/prune_inactive_rules.py</code></td><td></td><td></td><td></td><td class="hit">✔</td><td></td><td>↻</td></tr>
+  <tr><td><code>.env.example</code> / <code>CLAUDE.md</code> / <code>agent/CLAUDE.md</code></td><td></td><td></td><td></td><td></td><td class="hit">✔</td><td></td></tr>
+  <tr><td><code>docs/wiki/*.md</code></td><td></td><td></td><td></td><td></td><td></td><td class="hit">✔</td></tr>
+</table>
+<div class="note">
+  <b>Пересечение по <code>agent/pipeline.py</code> (T1, T2, T3).</b> Три задачи редактируют один файл, но в непересекающихся блоках и строго последовательно (commit-цепочка T1→T2→T3), поэтому конфликта правок нет. <code>↻</code> в столбце T6 = файл лишь регенерирует свою wiki-страницу (не правится напрямую). Фаза <code>dependencies</code> подтвердила линейный порядок — нарушений нет.
+</div>
+
+<h3>2.4 Покрытие требований спеки задачами плана</h3>
+<table class="matrix">
+  <tr><th>Требование спеки</th><th>Покрывающая задача</th></tr>
+  <tr><td>REMOVE — harness-distill (unproven)</td><td class="hit">T1</td></tr>
+  <tr><td>REMOVE — oracle-distill paths (unproven)</td><td class="hit">T2</td></tr>
+  <tr><td>REMOVE — INVESTIGATE data-paths branch (unproven)</td><td class="hit">T3</td></tr>
+  <tr><td>REMOVE/DEMOTE — LEARN: prune inactive now</td><td class="hit">T4</td></tr>
+  <tr><td>REMOVE/DEMOTE — Oracle: decision-gated, measure load-bearing</td><td class="hit">T7</td></tr>
+  <tr><td>REMOVE/DEMOTE — Training loop: DEFER (не трогать в Phase 0)</td><td class="hit">— (корректно вне scope)</td></tr>
+  <tr><td>KEEP — cc_client (отдельный tier)</td><td class="hit">— (не удаляется; подтверждено T5 Step 3)</td></tr>
+  <tr><td>KEEP — harness lint-движок</td><td class="hit">T1 (строки 1–193 целы)</td></tr>
+  <tr><td>Execution: каждый REMOVE — свой коммит + его тесты</td><td class="hit">T1–T4</td></tr>
+  <tr><td>Execution: pytest green per commit</td><td class="hit">T1–T4 (предпоследний шаг каждой)</td></tr>
+  <tr><td>Execution: strip dead env vars</td><td class="hit">T5</td></tr>
+  <tr><td>Execution: regen docs/wiki + lint</td><td class="hit">T6</td></tr>
+  <tr><td>Execution: archive corpora (legacy/ tag ИЛИ git history note)</td><td class="hit">T4 (git history = архив)</td></tr>
+  <tr><td>Success: retained tests pass</td><td class="hit">T1–T4 + T8 Step 1</td></tr>
+  <tr><td>Success: Δtasks = 0 на subset</td><td class="hit">T8 Step 2</td></tr>
+  <tr><td>Success: report actual LOC, no numeric promise</td><td class="hit">T8 Step 3</td></tr>
+</table>
+<div class="note note-ok">Каждое требование спеки покрыто ≥1 задачей; лишних (непривязанных к спеке) задач нет. DEFER-training и KEEP-cc_client корректно отражены как не-удаления.</div>
+
+<!-- ================= БЛОК 3: РЕЗУЛЬТАТЫ ПРОВЕРКИ ================= -->
+<h2>3. Результаты проверки по фазам</h2>
+<table>
+  <tr><th>Фаза</th><th>Статус</th><th>Что проверено (закрытый чек-лист)</th></tr>
+  <tr><td>1. structure</td><td><span class="badge b-ok">passed</span></td><td>Плейсхолдеров TODO/TBD/???/FIXME нет (единственный matched «TODO» — внутри прозы self-review «No TODO/TBD»). Задачи 1–8 непрерывны, без дублей. Дублирующихся заголовков нет.</td></tr>
+  <tr><td>2. coverage</td><td><span class="badge b-ok">passed</span></td><td>Все REMOVE/DEMOTE-требования спеки покрыты задачами (см. матрицу 2.4). Лишних задач нет; DEFER/KEEP отражены корректно.</td></tr>
+  <tr><td>3. dependencies</td><td><span class="badge b-ok">passed</span></td><td>Линейная commit-цепочка T1→…→T6; T7-subset → T8 Step 2. TDD-порядок в T4 (тест до скрипта). Циклов нет, нарушений порядка нет, артефакты доступны до использования.</td></tr>
+  <tr><td>4. verifiability</td><td><span class="badge b-ok">passed</span></td><td>Каждый шаг имеет команду <code>Run:</code> + <code>Expected:</code> (измеримый DoD). Расплывчатых «проработать/изучить» без выхода нет.</td></tr>
+  <tr><td>5. consistency</td><td><span class="badge b-ok">passed</span></td><td>spec_hash совпал с frontmatter спеки (<small class="mono">47f7f6d60c12ccda</small>). Выбор «git history note» как архива — явная опция спеки (стр. 152). Дословные код-цитаты совпадают с источником.</td></tr>
+</table>
+
+<h3>Таблица findings</h3>
+<div class="note note-ok">Findings нет — все пять фаз пройдены без замечаний. Первый прогон проверки (frontmatter <code>review:</code> инициализирован).</div>
+<table>
+  <tr><th>id</th><th>severity</th><th>section</th><th>описание</th><th>verdict</th></tr>
+  <tr><td colspan="5" style="text-align:center; color:var(--muted)">— нет findings —</td></tr>
+</table>
+
+<h3>Сводка</h3>
+<table>
+  <tr><th>Метрика</th><th>Значение</th></tr>
+  <tr><td>CRITICAL open</td><td><span class="badge b-ok">0</span></td></tr>
+  <tr><td>WARNING open</td><td><span class="badge b-ok">0</span></td></tr>
+  <tr><td>Финальный вердикт</td><td><span class="badge b-ok">OK</span></td></tr>
+</table>
+
+<div class="verdict verdict-ok">OK — план соответствует спецификации. 0 CRITICAL open, 0 WARNING open.</div>
+
+<p class="chain">Chain: intent (null) → <code>docs/superpowers/specs/2026-06-22-phase0-current-impl-audit-legacy-removal-design.md</code> → <code>docs/superpowers/plans/2026-06-22-phase0-legacy-removal.md</code></p>
+
+<div class="note">
+  <b>Замечание (не finding).</b> Номера строк в адресных ссылках плана слегка смещены относительно текущего источника (блок distill в <code>harness.py</code> начинается со строки 197, в плане — «195–239»). Удаления якорятся к дословным код-цитатам + grep-guard'ам, поэтому остаются исполнимыми; это сугубо ориентировочное расхождение, не блокер. Фаза <code>consistency</code> не повышает его до finding.
+</div>
+</main>
+</body>
+</html>

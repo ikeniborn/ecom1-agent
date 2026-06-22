@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка спецификации — Phase 0: Current-Impl Audit & Legacy Removal</title>
+<style>
+  :root[data-theme="dark"] {
+    --bg: #0f1419; --panel: #1a212b; --panel2: #222c38; --text: #e6edf3;
+    --muted: #9aa7b4; --border: #2d3a47; --accent: #5db0ff; --accent2: #7ee787;
+    --warn: #e3b341; --crit: #f85149; --info: #79c0ff; --ok: #3fb950;
+    --node: #243140; --node-border: #3d5066; --edge: #5db0ff; --shadow: rgba(0,0,0,.45);
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f8fa; --panel: #ffffff; --panel2: #eef2f6; --text: #1f2328;
+    --muted: #57606a; --border: #d0d7de; --accent: #0969da; --accent2: #1a7f37;
+    --warn: #9a6700; --crit: #cf222e; --info: #0550ae; --ok: #1a7f37;
+    --node: #eef4fb; --node-border: #b6c7da; --edge: #0969da; --shadow: rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 0 4rem; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; transition: background .25s, color .25s;
+  }
+  header {
+    padding: 2rem 1.5rem 1.4rem; border-bottom: 1px solid var(--border);
+    background: var(--panel); position: sticky; top: 0; z-index: 5;
+    backdrop-filter: blur(6px);
+  }
+  header .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  h1 { font-size: 1.45rem; margin: 0 0 .3rem; }
+  h2 { font-size: 1.2rem; margin: 2.2rem 0 .8rem; padding-bottom: .35rem; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 1.02rem; margin: 1.6rem 0 .6rem; color: var(--accent); }
+  main { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+  .sub { color: var(--muted); font-size: .9rem; }
+  code { background: var(--panel2); padding: .1em .4em; border-radius: 4px; font-size: .86em;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+  table { width: 100%; border-collapse: collapse; margin: .6rem 0 1.2rem; font-size: .92rem; }
+  th, td { text-align: left; padding: .55rem .7rem; border: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel2); font-weight: 600; }
+  tr:nth-child(even) td { background: color-mix(in srgb, var(--panel) 60%, transparent); }
+  .badge { display: inline-block; padding: .12em .6em; border-radius: 999px; font-size: .76rem;
+    font-weight: 700; letter-spacing: .02em; }
+  .b-ok   { background: color-mix(in srgb, var(--ok) 22%, transparent);   color: var(--ok);   border: 1px solid var(--ok); }
+  .b-warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); border: 1px solid var(--warn); }
+  .b-crit { background: color-mix(in srgb, var(--crit) 20%, transparent); color: var(--crit); border: 1px solid var(--crit); }
+  .b-info { background: color-mix(in srgb, var(--info) 18%, transparent); color: var(--info); border: 1px solid var(--info); }
+  .strike { text-decoration: line-through; opacity: .6; }
+  .note { background: var(--panel2); border-left: 4px solid var(--accent); padding: .7rem 1rem;
+    border-radius: 0 8px 8px 0; margin: 1rem 0; }
+  .note.warn { border-left-color: var(--warn); }
+  .note.ok { border-left-color: var(--ok); }
+  .verdict-banner { font-size: 1.3rem; font-weight: 800; padding: 1rem 1.2rem; border-radius: 10px;
+    background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok);
+    border: 1px solid var(--ok); margin: 1rem 0; }
+  .toggle { cursor: pointer; border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+    border-radius: 999px; padding: .4rem .9rem; font-size: .85rem; }
+  .toggle:hover { border-color: var(--accent); }
+  /* flow diagram */
+  .flow { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; margin: 1rem 0; }
+  .fnode { background: var(--node); border: 1px solid var(--node-border); border-radius: 10px;
+    padding: .7rem .9rem; min-width: 140px; max-width: 220px; box-shadow: 0 2px 8px var(--shadow);
+    display: flex; align-items: center; font-size: .85rem; }
+  .farrow { display: flex; align-items: center; padding: 0 .4rem; color: var(--edge); font-size: 1.4rem; font-weight: 700; }
+  .fnode .t { font-weight: 600; display: block; }
+  .fnode .s { color: var(--muted); font-size: .78rem; }
+  .branch { margin: 1rem 0; padding: 1rem 1.2rem; border: 1px dashed var(--node-border);
+    border-radius: 10px; background: color-mix(in srgb, var(--panel) 70%, transparent); }
+  .branch li { margin: .3rem 0; }
+  figure { margin: 1.2rem 0; }
+  figcaption { color: var(--muted); font-size: .85rem; margin-top: .4rem; }
+  svg { max-width: 100%; height: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  .legend { font-size: .82rem; color: var(--muted); margin: .3rem 0 0; }
+  ul.tight { margin: .3rem 0 1rem; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; font-size: .9rem; }
+  .kv dt { color: var(--muted); }
+  footer { max-width: 1100px; margin: 2rem auto 0; padding: 1rem 1.5rem; color: var(--muted);
+    font-size: .85rem; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div>
+      <h1>Проверка спецификации</h1>
+      <div class="sub">Phase 0 — Current-Implementation Audit &amp; Legacy Removal · 2026-06-22</div>
+    </div>
+    <button class="toggle" id="themeToggle" aria-label="Переключить тему">🌓 Тема</button>
+  </div>
+</header>
+
+<main>
+  <div class="verdict-banner" id="topVerdict">Вердикт: OK — 0 CRITICAL open, 0 WARNING open · все 4 findings исправлены</div>
+
+  <div class="kv" style="margin:1rem 0 1.5rem">
+    <dt>Файл</dt><dd><code>docs/superpowers/specs/2026-06-22-phase0-current-impl-audit-legacy-removal-design.md</code></dd>
+    <dt>spec_hash</dt><dd><code>972ecb5550f4d354</code> <span class="sub">(обновлён после правок; ранее <code>cb45f000afebff3f</code>)</span></dd>
+    <dt>prev_hash</dt><dd><code>cb45f000afebff3f</code> <span class="sub">(прогон до исправлений)</span></dd>
+    <dt>chain</dt><dd>intent → spec · intent doc не найден (<code>intent_path = null</code>)</dd>
+  </div>
+
+  <div class="note ok">
+    <b>Итерация проверки:</b> первый прогон выявил 1 CRITICAL + 3 WARNING. Спека скорректирована;
+    при повторном прогоне все 4 findings закрыты как <code>fixed</code>, section-хеши пересчитаны, фазы passed.
+  </div>
+
+  <!-- ===================== БЛОК 1 ===================== -->
+  <h2>1 · Резюме спецификации</h2>
+  <p class="sub">Сжать и обезрисковать <code>agent/</code> перед determinism-рефактором. Аудит каждой
+  подсистемы → удалить неоправдавшие себя подходы → leaner baseline. Phase 0 <b>только субтрактивна</b> —
+  новых стадий и поведения нет (это Phases 1–3).</p>
+
+  <h3>Требования по секциям</h3>
+  <table>
+    <thead><tr><th style="width:20%">Секция</th><th>Требование</th></tr></thead>
+    <tbody>
+      <tr><td><b>Goal</b></td><td>Субтрактивно сжать <code>agent/</code>: убрать подходы, не сдвинувшие бенчмарк и несущие maintenance-cost; новой логики/детерм. стадий нет.</td></tr>
+      <tr><td><b>Motivating evidence</b></td><td>Run <code>20260621_232850</code>: <code>OK=3/55=5%</code> (ранее ~32%). <code>agent/</code>=6403 LOC. LEARN: 1310 правил, 84% деактивированы. Oracle: 78 атомов ~500 LOC. Default-off флаги unproven. Reference <code>muxx</code> ~90% без oracle/LEARN.</td></tr>
+      <tr><td><b>Audit methodology</b></td><td>На подсистему: строка (LOC, flag default, call sites, run-data effect, конфликт с тезисом) → KEEP/REMOVE/DEFER. <b>Measured subset</b> заморожен: (a) все <code>OUTCOME_OK</code>-задачи двух reference-runs ∪ (b) задачи, где подсистема реально срабатывала; ids пинятся в removal-commit. <b>Load-bearing порог</b>: toggle-off роняет ≥1 задачу pass→fail → KEEP, иначе REMOVE.</td></tr>
+      <tr><td><b>REMOVE — unproven</b></td><td>Удалить (low risk): <code>ECOM_HARNESS_DISTILL</code> (~240), <code>ECOM_INVESTIGATE_DATA_PATHS</code> branch, <code>cc_client.py</code> (396), <code>ECOM_ORACLE_DISTILL</code>/<code>VALIDATE_INLINE</code> пути.</td></tr>
+      <tr><td><b>REMOVE / DEMOTE — decision required</b></td><td>Oracle (~500, +data) → удалить retrieval-into-PLAN, архивировать <code>atoms.yaml</code>. LEARN (214+1310) → <b>только prune</b> 1102 inactive сейчас; структурный demote → <b>defer</b> до post-Phase-1. Training loop → DEFER удаление до решения по LEARN.</td></tr>
+      <tr><td><b>KEEP — skeleton</b></td><td>orchestrator (slim seed), INTENT, INVESTIGATE (минус data-paths), PLAN, <code>interpreter.py</code>, <code>verify.py</code>, <code>ir_models.py</code>, <code>llm.py</code> (минус cc), <code>trace.py</code>, <code>learned_store.py</code> (slimmed).</td></tr>
+      <tr><td><b>Execution plan</b></td><td>Каждый REMOVE — отдельный коммит + удалить его тесты; после коммита <code>pytest -q</code> зелёный; strip dead env vars из CLAUDE.md/agent CLAUDE.md/.env.example; regen docs/wiki через iwiki-ingest + lint; архивировать корпуса под <code>legacy/</code>.</td></tr>
+      <tr><td><b>Success criteria</b></td><td><b>Гарантировано −≥600</b> (cc_client 396 + harness-distill ~240 + data-paths) без зависимости от decision-узлов. <b>Условно +~500</b> при подтверждении Oracle removal → <b>≥1000</b>. Все retained-тесты зелёные. <code>make task</code> subset воспроизводит pre-removal pass-count точно (Δtasks=0).</td></tr>
+      <tr><td><b>Non-goals</b></td><td>Нет новых детерм. стадий (Phases 1–3). Нет правок промптов. Нет финального вердикта по LEARN/training — prune мёртвых 84% и defer структурного решения до post-Phase-1.</td></tr>
+      <tr><td><b>Risks &amp; mitigations</b></td><td>Oracle/LEARN могут нести часть задач → toggle-off замер перед удалением; <code>heuristics</code> ветка как revert-point. Hidden coupling (llm.py routing) → per-commit tests-green gate.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Success Criteria</h3>
+  <ul class="tight">
+    <li><b>Гарантировано:</b> <code>agent/</code> LOC −<b>≥600</b> (firm REMOVE set), без зависимости от decision-required.</li>
+    <li><b>Условно:</b> при подтверждении Oracle removal (0-drop на subset) +~500 → <b>≥1000</b>; если Oracle load-bearing — остаётся, держится ≥600.</li>
+    <li>Все сохранённые тесты проходят.</li>
+    <li><code>make task</code> subset воспроизводит pre-removal pass-count точно (<b>Δtasks = 0</b>); регрессия → load-bearing → revert именно её.</li>
+  </ul>
+
+  <h3>Non-goals</h3>
+  <ul class="tight">
+    <li>Новые детерминированные стадии (Phases 1–3).</li>
+    <li>Правки промптов.</li>
+    <li>Финальный вердикт по LEARN/training-архитектуре (defer до post-Phase-1).</li>
+  </ul>
+
+  <!-- ===================== БЛОК 2 ===================== -->
+  <h2>2 · Схемы решения и зависимостей</h2>
+
+  <h3>Схема решения — субтрактивный аудит-конвейер (на подсистему)</h3>
+  <div class="flow">
+    <div class="fnode"><div><span class="t">Inventory</span><span class="s">LOC · flag · call sites · конфликт</span></div></div>
+    <div class="farrow">→</div>
+    <div class="fnode"><div><span class="t">Measure</span><span class="s">toggle-off на frozen subset</span></div></div>
+    <div class="farrow">→</div>
+    <div class="fnode" style="border-color:var(--accent)"><div><span class="t">Load-bearing?</span><span class="s">роняет ≥1 задачу pass→fail?</span></div></div>
+    <div class="farrow">→</div>
+    <div class="fnode"><div><span class="t">Commit removal</span><span class="s">+ удалить тесты · pytest зелёный</span></div></div>
+    <div class="farrow">→</div>
+    <div class="fnode"><div><span class="t">Docs + archive</span><span class="s">strip env · iwiki · legacy/ tag</span></div></div>
+  </div>
+
+  <div class="branch">
+    <b>Ветвление по <code>Load-bearing?</code>:</b>
+    <ul class="tight">
+      <li><b>нет</b> (0 задач упало) → <b>REMOVE</b> — отдельный коммит, удалить тесты подсистемы</li>
+      <li><b>да</b> (≥1 задача pass→fail) → <b>KEEP</b> — revert этого удаления, задокументировать why</li>
+      <li>core-but-unsettled (Training loop) → <b>DEFER</b> — не удалять в Phase 0</li>
+    </ul>
+  </div>
+
+  <h3>Граф зависимостей — LOC-бюджет и decision-gated узлы</h3>
+  <figure>
+    <svg viewBox="0 0 860 470" role="img" aria-label="Граф зависимостей: вклад удалений в бюджет LOC и decision-gated узлы">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--edge)"/>
+        </marker>
+        <marker id="arrowC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent2)"/>
+        </marker>
+        <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="var(--shadow)"/>
+        </filter>
+      </defs>
+      <style>
+        .gn rect { fill: var(--node); stroke: var(--node-border); stroke-width: 1.2; rx: 9; filter: url(#ds); }
+        .gn text { fill: var(--text); font-size: 12.5px; font-family: ui-monospace, Menlo, monospace; }
+        .gn .lbl { font-size: 10.5px; fill: var(--muted); font-family: sans-serif; }
+        .ge { stroke: var(--edge); stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+        .ge-c { stroke: var(--accent2); stroke-width: 2; fill: none; marker-end: url(#arrowC); stroke-dasharray: 6 3; }
+        .ge-lbl { fill: var(--muted); font-size: 10.5px; font-family: sans-serif; }
+        .ge-lbl-c { fill: var(--accent2); font-size: 10.5px; font-weight: 700; font-family: sans-serif; }
+      </style>
+
+      <!-- edges: firm REMOVE → Guaranteed ≥600 -->
+      <path class="ge" d="M200,114 L615,176"/>
+      <text class="ge-lbl" x="350" y="128">+396</text>
+      <path class="ge" d="M200,164 L615,186"/>
+      <text class="ge-lbl" x="350" y="158">+~240</text>
+      <path class="ge" d="M200,214 L615,196"/>
+      <text class="ge-lbl" x="350" y="206">+~tens</text>
+
+      <!-- edge: Oracle → +500 (conditional, отдельный условный узел) -->
+      <path class="ge-c" d="M215,278 L575,300"/>
+      <text class="ge-lbl-c" x="285" y="270">+~500 · conditional (F-001 fixed)</text>
+
+      <!-- edge: threshold gates Oracle / LEARN -->
+      <path class="ge" d="M345,55 L160,250"/>
+      <text class="ge-lbl" x="205" y="150">gates</text>
+      <path class="ge" d="M440,55 L405,300"/>
+      <text class="ge-lbl" x="448" y="180">gates</text>
+
+      <!-- edge: Training justified by LEARN -->
+      <path class="ge" d="M395,372 L395,348"/>
+      <text class="ge-lbl" x="402" y="364">justifies</text>
+
+      <!-- nodes -->
+      <g class="gn">
+        <rect x="300" y="15" width="230" height="40"/>
+        <text x="314" y="33">Load-bearing threshold</text>
+        <text class="lbl" x="314" y="48">toggle-off роняет ≥1 задачу?</text>
+      </g>
+      <g class="gn">
+        <rect x="35" y="95" width="165" height="38"/>
+        <text x="48" y="118">cc_client.py (396)</text>
+      </g>
+      <g class="gn">
+        <rect x="35" y="145" width="165" height="38"/>
+        <text x="48" y="168">harness-distill ~240</text>
+      </g>
+      <g class="gn">
+        <rect x="35" y="195" width="165" height="38"/>
+        <text x="48" y="218">data-paths branch</text>
+      </g>
+      <g class="gn">
+        <rect x="35" y="250" width="180" height="52" style="stroke:var(--accent2);stroke-width:2"/>
+        <text x="48" y="274">Oracle (~500)</text>
+        <text class="lbl" x="48" y="291">decision required</text>
+      </g>
+      <g class="gn">
+        <rect x="305" y="300" width="180" height="46"/>
+        <text x="318" y="322">LEARN: prune only</text>
+        <text class="lbl" x="318" y="338">demote → defer (Non-goals)</text>
+      </g>
+      <g class="gn">
+        <rect x="305" y="372" width="180" height="38"/>
+        <text x="318" y="395">Training loop · DEFER</text>
+      </g>
+      <g class="gn">
+        <rect x="555" y="290" width="275" height="46" style="stroke:var(--accent2);stroke-width:2"/>
+        <text x="568" y="312">Conditional target</text>
+        <text class="lbl" x="568" y="328">≥1000 при подтверждении Oracle</text>
+      </g>
+      <g class="gn">
+        <rect x="615" y="150" width="215" height="62" style="stroke:var(--accent);stroke-width:2"/>
+        <text x="628" y="176">Guaranteed target</text>
+        <text class="lbl" x="628" y="194">agent/ −≥600 LOC (firm)</text>
+      </g>
+    </svg>
+    <figcaption>Сплошные синие рёбра — твёрдый вклад REMOVE в <b>гарантированные ≥600 LOC</b> (не зависит от решений).
+    <span style="color:var(--accent2)">Зелёное пунктирное</span> — Oracle (~500) ведёт в <b>отдельный условный узел</b> «≥1000 при подтверждении Oracle removal» — противоречие из F-001 устранено разделением гарантированного и условного. LEARN в Phase 0 — только prune; структурный demote отложен (Non-goals) → F-002/F-003 закрыты.</figcaption>
+  </figure>
+
+  <h3>Карта покрытия (задача Phase 0 → требование спеки)</h3>
+  <table>
+    <thead><tr><th style="width:38%">Задача Phase 0</th><th>Покрывающие требования</th></tr></thead>
+    <tbody>
+      <tr><td>T1 · Квантифицированный аудит каждой подсистемы</td><td>§Audit methodology + Load-bearing порог + frozen measured subset <span class="badge b-ok">F-004 fixed</span></td></tr>
+      <tr><td>T2 · Удалить unproven эксперименты</td><td>§REMOVE — unproven (harness-distill, data-paths, cc_client, oracle-distill)</td></tr>
+      <tr><td>T3 · Решение по Oracle / LEARN / Training</td><td>§REMOVE/DEMOTE (prune-only LEARN, demote deferred) <span class="badge b-ok">F-002 fixed</span></td></tr>
+      <tr><td>T4 · Сократить LOC (≥600 firm / ≥1000 cond.)</td><td>§Success criteria (split guaranteed/conditional) <span class="badge b-ok">F-001 fixed</span></td></tr>
+      <tr><td>T5 · Нулевая регрессия (субтрактивность)</td><td>§Success criteria (Δtasks=0) + §Non-goals + §Risks (revert-point <code>heuristics</code>)</td></tr>
+      <tr><td>T6 · Сохранить skeleton</td><td>§KEEP — core skeleton (INTENT→INVESTIGATE→PLAN→verify)</td></tr>
+      <tr><td>T7 · Обновить docs/env, архивировать корпуса</td><td>§Execution plan 3–5 (strip env · iwiki-ingest/lint · legacy/ tag)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===================== БЛОК 3 ===================== -->
+  <h2>3 · Результаты проверки</h2>
+
+  <h3>Статусы фаз</h3>
+  <table>
+    <thead><tr><th>Фаза</th><th>Статус</th><th>Комментарий</th></tr></thead>
+    <tbody>
+      <tr><td>structure</td><td><span class="badge b-ok">passed</span></td><td>Нет плейсхолдеров TODO/TBD/???/FIXME; нет битых внутренних §-ссылок; нумерация именованная без пропусков/дублей; два <code>### REMOVE…</code> различны (не дубли).</td></tr>
+      <tr><td>coverage</td><td><span class="badge b-ok">passed</span></td><td>Все задачи Phase 0 покрыты. F-001 (success vs decision-gated) и F-002 (demote vs defer) исправлены → противоречий нет.</td></tr>
+      <tr><td>clarity</td><td><span class="badge b-ok">passed</span></td><td>F-003 (DoD «thin aid») снят переводом demote в defer; F-004 (subset) — subset теперь явно определён и заморожен.</td></tr>
+      <tr><td>consistency</td><td><span class="badge b-ok">passed</span></td><td>Section-хеши пересчитаны после правок; изменены секции Audit methodology, REMOVE/DEMOTE, Success criteria.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Findings</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Severity</th><th>Секция</th><th>Описание / как исправлено</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>F-001</code></td>
+        <td><span class="badge b-crit">CRITICAL</span></td>
+        <td>Success criteria</td>
+        <td>Гарантированный «≥1000 LOC» считал oracle ~500, но удаление Oracle — «decision required». <b>Исправлено:</b> критерий разделён — гарантированные <b>≥600</b> (firm REMOVE) без зависимости от решений + условные +~500 → ≥1000 только при подтверждении Oracle removal.</td>
+        <td><span class="badge b-ok">fixed</span></td>
+      </tr>
+      <tr>
+        <td><code>F-002</code></td>
+        <td><span class="badge b-warn">WARNING</span></td>
+        <td>Proposed classification / Non-goals</td>
+        <td>«demote LEARN» (действие Phase 0) ⟂ Non-goals «defer структурного решения». <b>Исправлено:</b> Phase 0 делает только <b>prune</b> 1102 inactive; структурный demote явно отложен до post-Phase-1 — согласовано с Non-goals.</td>
+        <td><span class="badge b-ok">fixed</span></td>
+      </tr>
+      <tr>
+        <td><code>F-003</code></td>
+        <td><span class="badge b-warn">WARNING</span></td>
+        <td>Proposed classification</td>
+        <td>«thin diagnostic aid» без DoD. <b>Исправлено:</b> неопределённое действие убрано из Phase 0 (demote → defer); остаётся только измеримый prune inactive-правил.</td>
+        <td><span class="badge b-ok">fixed</span></td>
+      </tr>
+      <tr>
+        <td><code>F-004</code></td>
+        <td><span class="badge b-warn">WARNING</span></td>
+        <td>Audit methodology</td>
+        <td>«measured subset» не определён. <b>Исправлено:</b> subset заморожен = (a) <code>OUTCOME_OK</code>-задачи двух reference-runs ∪ (b) задачи, где подсистема срабатывала; ids пинятся в removal-commit → воспроизводимо.</td>
+        <td><span class="badge b-ok">fixed</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note ok">
+    <b>Сводка:</b> CRITICAL open: <b>0</b> · WARNING open: <b>0</b> · INFO open: <b>0</b> · все 4 finding закрыты как <code>fixed</code>.
+  </div>
+
+  <div class="verdict-banner">Финальный вердикт: OK — нет открытых findings; спека проходит exit-критерий</div>
+
+  <div class="note warn">
+    Chain: <code>intent → spec</code>. Intent doc не найден (<code>intent_path = null</code>);
+    spec = <code>2026-06-22-phase0-current-impl-audit-legacy-removal-design.md</code>.
+    Build order: Phase 0 → Phase 1 → measure → Phase 2 → Phase 3.
+  </div>
+</main>
+
+<footer>
+  Автогенерируемый артефакт навыка <code>check-spec</code> · сгенерирован 2026-06-22 (прогон 2, после исправлений) · открывается офлайн (<code>file://</code>).
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var stored = null;
+    try { stored = localStorage.getItem('cs-theme'); } catch (e) {}
+    root.setAttribute('data-theme', stored || 'dark');
+    document.getElementById('themeToggle').addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('cs-theme', next); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>
