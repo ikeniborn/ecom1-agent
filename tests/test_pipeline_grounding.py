@@ -23,10 +23,17 @@ def _result(captured, env=None, sql_results=None):
 def test_record_ref_grounded_from_evidence_then_verify_passes():
     path = "/proc/catalog/STO-2R84BSHQ.json"
     intent = _intent(required_refs={"OUTCOME_OK": [
-        {"kind": "record_path", "source": "$missing"}]})  # source never binds
+        {"kind": "record_path", "source": "$row.record_path"}]})
     cap = CapturedAnswer(message="STO-2R84BSHQ exists", outcome="OUTCOME_OK", refs=[])
-    res = _result(cap, sql_results=[f"sku,record_path\nSTO-2R84BSHQ,{path}"])
+    # env resolves the required source -> verify enforces the literal path's presence.
+    res = _result(cap, env={"row": {"record_path": path}},
+                  sql_results=[f"sku,record_path\nSTO-2R84BSHQ,{path}"])
     vm = MockVMSpy(fixtures={fixture_key("Stat", path): {"path": path}})
+
+    # Before grounding the required path is absent -> verify must FAIL (proves the
+    # post-grounding pass is load-bearing, not vacuous).
+    ok_before, _ = verify(res, intent)
+    assert not ok_before
 
     res.captured.refs = ground_refs(intent, res.captured, res, vm,
                                     task_text="does STO-2R84BSHQ exist?", docs_read=[])
@@ -67,6 +74,7 @@ def test_cross_customer_record_not_auto_cited():
 
     res = _result(cap, env={"_facts": _Facts()})
     vm = MockVMSpy(fixtures={
+        fixture_key("Find", "/proc"): {"paths": [path]},
         fixture_key("Stat", path): {"path": path},
         fixture_key("Read", path): {"content": json.dumps({"customer_id": "cust_777"})},
     })
