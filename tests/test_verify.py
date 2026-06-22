@@ -128,3 +128,11 @@ def test_i1_unresolved_record_path_source_skipped_when_path_present():
                                  refs=["/proc/catalog/A.json"]))
     ok, err = verify(res, intent)
     assert ok, err
+
+    # Inverse: when env resolves the source, absence from refs MUST fail (proves the
+    # positive case passes because the path is present, not because nothing is required).
+    res_env_resolves = _result(
+        CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]),
+        env={"row": {"record_path": "/proc/catalog/A.json"}})
+    ok2, err2 = verify(res_env_resolves, intent)
+    assert not ok2 and "/proc/catalog/A.json" in err2
