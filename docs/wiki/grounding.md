@@ -42,13 +42,18 @@ for how enforced refs are projected from `intent.required_refs`.
 
 ## Doc refs
 
-`canonical_doc_refs(docs_read, vm, intent, answer)` derives doc refs from the `/docs/*.md`
-paths the [[investigate]] step actually read (accumulated into `brief.env["docs_read"]` by
-`investigate._note_doc_read`). A recall-preserving relies-on filter narrows to docs the
-answer relies on (basename stem in the message, or a declared `policy_doc` in
-`intent.required_refs`) — but only when at least one read doc carries such a signal; with no
-signal it keeps every read doc, so a single relevant doc is never dropped. Each kept doc is
-`stat`-validated and case-corrected against the live tree.
+`canonical_doc_refs(docs_read, vm, intent, answer, doc_inventory)` derives doc refs from two
+sources. (1) The `/docs/*.md` paths the [[investigate]] step actually read (accumulated into
+`brief.env["docs_read"]` by `investigate._note_doc_read`): a recall-preserving relies-on
+filter narrows to docs the answer relies on (basename stem in the message, or a declared
+`policy_doc` in `intent.required_refs`) — but only when at least one read doc carries such a
+signal; with no signal it keeps every read doc, so a single relevant doc is never dropped.
+(2) Operation-implied docs from the pre-phase `doc_inventory` (`facts.docs_inventory`, via
+`_doc_inventory_from`) that the investigator did NOT read — cited ONLY when they carry an
+explicit relies-on signal (never keep-all), recovering a required policy doc the answer's
+operation implicates (e.g. a `Checkout denied` answer citing `/docs/checkout.md`) that the
+investigator skipped and the model under-declared. Each kept doc is `stat`-validated and
+case-corrected against the live tree.
 
 ## verify interaction
 

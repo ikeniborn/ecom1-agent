@@ -200,22 +200,44 @@ def _doc_relied_on_signal(path: str, intent, answer) -> bool:
     return False
 
 
-def canonical_doc_refs(docs_read: list[str], vm, intent=None, answer=None) -> list[str]:
-    """Doc refs derived from the /docs paths the investigator actually read. When an
-    intent/answer is supplied, narrow to the docs the answer relies on (basename stem in
-    the message, or a declared policy_doc) — but ONLY if at least one read doc carries such
-    a signal; with no signal at all, keep every read doc (recall-preserving, since the
-    investigator only reads docs it routed to as relevant for the objective). Each kept doc
-    is stat-validated and case-corrected; unresolvable docs dropped. Deduped, ordered.
-    intent/answer omitted -> no relies-on filter (keep all read docs)."""
-    cands = [p for p in (docs_read or [])
-             if isinstance(p, str) and p.startswith("/docs/") and p.endswith(".md")]
+def _md_docs(paths) -> list[str]:
+    return [p for p in (paths or [])
+            if isinstance(p, str) and p.startswith("/docs/") and p.endswith(".md")]
+
+
+def canonical_doc_refs(docs_read: list[str], vm, intent=None, answer=None,
+                       doc_inventory=None) -> list[str]:
+    """Doc refs derived from (1) the /docs paths the investigator actually read and
+    (2) operation-implied docs from the pre-phase `doc_inventory` that the investigator
+    did NOT read.
+
+    READ docs: when an intent/answer is supplied, narrow to the docs the answer relies on
+    (basename stem in the message, or a declared policy_doc) — but ONLY if at least one read
+    doc carries such a signal; with no signal at all, keep every read doc (recall-preserving,
+    since the investigator only reads docs it routed to as relevant). intent/answer omitted
+    -> no relies-on filter (keep all read docs).
+
+    INVENTORY docs (not read): cited ONLY when they carry an explicit relies-on signal —
+    never keep-all — so the whole inventory is not dumped. This recovers a required policy
+    doc the answer's operation implicates (e.g. a 'Checkout denied' answer citing
+    /docs/checkout.md) that the investigator skipped and the model under-declared.
+
+    Each kept doc is stat-validated and case-corrected; unresolvable docs dropped.
+    Deduped, order-preserving (read docs first, then signalled inventory docs)."""
+    read_cands = _md_docs(docs_read)
     if intent is not None or answer is not None:
-        relied = [p for p in cands if _doc_relied_on_signal(p, intent, answer)]
-        if relied:                       # narrow only when a signal exists; else keep all
-            cands = relied
+        relied = [p for p in read_cands if _doc_relied_on_signal(p, intent, answer)]
+        kept_read = relied if relied else read_cands   # recall-preserving for READ docs
+    else:
+        kept_read = read_cands
+    kept_set = set(kept_read)
+    inv_cands: list[str] = []
+    if intent is not None or answer is not None:
+        for p in _md_docs(doc_inventory):
+            if p not in kept_set and _doc_relied_on_signal(p, intent, answer):
+                inv_cands.append(p)
     out: list[str] = []
-    for p in cands:
+    for p in [*kept_read, *inv_cands]:
         c = _canonical_doc_path(vm, p)
         if c and c not in out:
             out.append(c)
@@ -259,6 +281,26 @@ def _identity_from(result) -> dict:
     return ident or {}
 
 
+_DOC_PATH_RE = re.compile(r"/docs/[A-Za-z0-9_./-]+?\.md")
+
+
+def _doc_inventory_from(result) -> list[str]:
+    """Distinct /docs/*.md paths from facts.docs_inventory (the pre-phase doc listing).
+    Feeds canonical_doc_refs so an operation-implied policy doc the investigator did not
+    read can still be cited when the answer signals it. Empty when no inventory."""
+    facts = (getattr(result, "env", None) or {}).get("_facts")
+    inv = getattr(facts, "docs_inventory", "") if facts is not None else ""
+    if isinstance(facts, dict) and not inv:
+        inv = facts.get("docs_inventory", "")
+    if not isinstance(inv, str) or not inv:
+        return []
+    out: list[str] = []
+    for m in _DOC_PATH_RE.findall(inv):
+        if m not in out:
+            out.append(m)
+    return out
+
+
 def ground_refs(intent, answer, result, vm, task_text: str,
                 docs_read: "list[str] | None" = None) -> list[str]:
     """Authoritative, VM-derived ref set that replaces answer.refs. Best-effort: any
@@ -277,7 +319,8 @@ def ground_refs(intent, answer, result, vm, task_text: str,
             if len(record_refs) >= _RECORD_CAP:
                 break
         record_refs = align_count(record_refs, getattr(answer, "message", ""))
-        doc_refs = canonical_doc_refs(docs_read or [], vm, intent=intent, answer=answer)
+        doc_refs = canonical_doc_refs(docs_read or [], vm, intent=intent, answer=answer,
+                                      doc_inventory=_doc_inventory_from(result))
         merged = _dedup([*base, *record_refs, *doc_refs])
         if merged != base:
             print(f"[grounding] refs {base} -> {merged}")

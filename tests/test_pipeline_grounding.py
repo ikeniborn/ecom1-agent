@@ -81,3 +81,33 @@ def test_cross_customer_record_not_auto_cited():
     out = ground_refs(intent, res.captured, res, vm,
                       task_text="show basket_99", docs_read=[])
     assert path not in out
+
+
+def test_inventory_doc_grounded_for_denial_then_verify_passes():
+    # t50 (original seed) class: a security denial whose answer implicates a checkout
+    # policy the investigator did NOT read but which is in the doc inventory. Grounding
+    # cites it from the inventory via the relies-on stem signal; hardened verify passes.
+    doc_sec, doc_chk = "/docs/security.md", "/docs/checkout.md"
+    intent = _intent(outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+                     required_refs={"OUTCOME_DENIED_SECURITY": [
+                         {"kind": "policy_doc", "path": doc_sec},
+                         {"kind": "policy_doc", "path": doc_chk}]})
+    cap = CapturedAnswer(message="Checkout denied: guests are not authorized",
+                         outcome="OUTCOME_DENIED_SECURITY", refs=[doc_sec])
+
+    class _F:
+        docs_inventory = "docs_inventory (2):\n  /docs/security.md\n  /docs/checkout.md"
+        identity = {}
+
+    res = _result(cap, env={"_facts": _F()})
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", doc_sec): {"path": doc_sec},
+        fixture_key("Stat", doc_chk): {"path": doc_chk},
+    })
+    # before grounding: required checkout.md absent on the denial -> verify fails
+    assert not verify(res, intent)[0]
+    res.captured.refs = ground_refs(intent, res.captured, res, vm,
+                                    task_text="close my basket and check out", docs_read=[doc_sec])
+    assert doc_chk in res.captured.refs            # grounded from the inventory
+    ok, err = verify(res, intent)
+    assert ok, err

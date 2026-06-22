@@ -314,3 +314,81 @@ def test_ground_refs_survives_vm_explosion_via_inner_guards():
     out = ground_refs(_intent(), res.captured, res, Boom(),
                       task_text="STO-ABCDEFGH", docs_read=["/docs/x.md"])
     assert out == ["/docs/a.md"]
+
+
+# --- canonical_doc_refs with doc_inventory (operation-implied, un-read docs) ---
+
+def test_inventory_doc_cited_when_stem_in_message():
+    read = "/docs/security.md"
+    inv_doc = "/docs/checkout.md"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", read): {"path": read},
+        fixture_key("Stat", inv_doc): {"path": inv_doc},
+    })
+    # investigator read only security.md; checkout.md is in the inventory and the answer
+    # message implicates it ("Checkout denied ...") -> cite it too (t50 class).
+    out = canonical_doc_refs([read], vm, intent=None,
+                             answer=_Ans("Checkout denied: guests not authorized"),
+                             doc_inventory=[read, inv_doc])
+    assert read in out and inv_doc in out
+
+
+def test_inventory_doc_not_cited_without_signal():
+    read = "/docs/security.md"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", read): {"path": read},
+        fixture_key("Stat", "/docs/returns.md"): {"path": "/docs/returns.md"},
+        fixture_key("Stat", "/docs/discounts.md"): {"path": "/docs/discounts.md"},
+    })
+    # no stem of returns/discounts in the message, no declared policy_doc -> un-read
+    # inventory docs are NOT cited (no keep-all for inventory).
+    out = canonical_doc_refs([read], vm, intent=None,
+                             answer=_Ans("access denied on security grounds"),
+                             doc_inventory=[read, "/docs/returns.md", "/docs/discounts.md"])
+    assert out == [read]
+
+
+def test_inventory_doc_cited_via_declared_policy_doc():
+    from agent.ir_models import IntentSpec
+    read = "/docs/security.md"
+    inv_doc = "/docs/checkout.md"
+    intent = IntentSpec(objective="o", desired_outcome="OUTCOME_DENIED_SECURITY",
+                        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+                        constraints=[{"anchor": "#s", "rule": "r", "security": True,
+                                      "deny_when": {"op": "nonempty", "lhs": "$x"}}],
+                        success_criteria={}, answer_shape={},
+                        required_refs={"OUTCOME_DENIED_SECURITY": [
+                            {"kind": "policy_doc", "path": inv_doc}]})
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", read): {"path": read},
+        fixture_key("Stat", inv_doc): {"path": inv_doc},
+    })
+    out = canonical_doc_refs([read], vm, intent=intent, answer=_Ans("denied"),
+                             doc_inventory=[read, inv_doc])
+    assert inv_doc in out
+
+
+def test_inventory_dedupes_with_read_doc():
+    read = "/docs/checkout.md"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", read): {"path": read}})
+    out = canonical_doc_refs([read], vm, intent=None, answer=_Ans("Checkout denied"),
+                             doc_inventory=[read])
+    assert out == [read]   # not duplicated
+
+
+def test_inventory_none_preserves_read_keepall():
+    a, b = "/docs/checkout.md", "/docs/returns.md"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", a): {"path": a},
+                             fixture_key("Stat", b): {"path": b}})
+    out = canonical_doc_refs([a, b], vm, intent=None, answer=_Ans("request denied"))
+    assert out == [a, b]   # no inventory -> keep-all read behavior unchanged
+
+
+def test_doc_inventory_from_parses_facts():
+    from agent.grounding import _doc_inventory_from
+    class _F:
+        docs_inventory = "docs_inventory (3):\n  /docs/checkout.md\n  /docs/security.md\n  /docs/returns.md"
+    res = InterpretResult(captured=CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]),
+                          env={"_facts": _F()}, observations=[], sql_results=[],
+                          mutation_landed=False, label="ok")
+    assert _doc_inventory_from(res) == ["/docs/checkout.md", "/docs/security.md", "/docs/returns.md"]
