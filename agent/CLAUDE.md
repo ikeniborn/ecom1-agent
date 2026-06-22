@@ -47,6 +47,11 @@ deterministic Plan-IR interpreter.
    (step-notes + bound `env`); `render_brief(brief)` is injected into every PLAN cycle via
    `run_plan(..., brief_block=...)`. When `ECOM_INVESTIGATE_ENABLED=0`, this step is skipped
    and the pipeline uses the legacy eager gather + whole-instruction oracle dump.
+2.5. **SECURITY PREFLIGHT** (`decide.py:security_preflight`, no LLM) — between INTENT and
+   the loop (in fact right after the INTENT-None guard and **before** INVESTIGATE, so a
+   clear deny does not spend the ReAct budget): a facts/identity-driven terminal
+   `OUTCOME_DENIED_SECURITY` when a security constraint's `deny_when` holds pre-plan.
+   Answers once (`cycles_used=0`) and skips the loop (and any mutation) entirely.
 3. **LOOP** (`cycle = 1..INTERPRETER_MAX_STEPS`):
    - **PLAN** (`reason.py:run_plan(intent, brief_block, learn_ctx, prev_error, oracle_atoms, observed)`)
      — LLM call (reason tier), system prompt `plan.md` → `PlanIR`
@@ -67,6 +72,11 @@ deterministic Plan-IR interpreter.
      ownership guard). Doc refs: investigator `docs_read` (`brief.env["docs_read"]`), narrowed
      by a recall-preserving relies-on filter and case-corrected. Model refs are hints; code
      produces the enforced set.
+   - **decide-outcome** (`decide.py:decide_outcome(intent, result, vm, facts)`) — no LLM.
+     Overwrites the PLAN-authored `result.captured.outcome`/`refs` via the ladder
+     `security_deny > unsupported_or_clarify > anti_give_up_ok > plan-outcome`, sourced
+     from the frozen IntentSpec constraints + `/bin/id` identity. Runs BEFORE verify, so
+     verify is a consistency gate, not where outcomes are born.
    - **verify** (`verify.py:verify(result, intent)`) — no LLM, deterministic. I1 is
      presence-based on **every** outcome (each resolved `required_refs[outcome]` value ⊆
      `answer.refs`, plus a `$`-ref guard). Checks
