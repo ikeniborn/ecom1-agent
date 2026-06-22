@@ -283,6 +283,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     from .interpreter import InterpretError, interpret, lint, repair_sql_stdin
     from .reason import IntentError, PlanEmptyError, PlanError, run_intent, run_plan
     from .verify import verify
+    from .grounding import ground_refs
 
     # Surface collapse (D5): PLAN sees all active rules; the grader-feedback
     # training-mode bug self-heals because learn_from_grader writes the same store.
@@ -430,6 +431,11 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
 
         log_gate_auto("INTERPRET", True, "")
         last_observed = result.observations
+        # Phase 1: deterministic ref-grounding overwrites answer.refs with the
+        # authoritative VM-derived set before VERIFY (best-effort, never raises).
+        _docs_read = (brief.env.get("docs_read") if brief is not None else None) or []
+        result.captured.refs = ground_refs(intent, result.captured, result, vm,
+                                            instruction, docs_read=_docs_read)
         ok, verr = verify(result, intent)
         log_gate_auto("VERIFY", ok, "" if ok else verr)
         if ok:
