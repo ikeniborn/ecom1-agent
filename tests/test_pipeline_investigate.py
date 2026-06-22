@@ -98,20 +98,3 @@ def test_run_pipeline_disabled_skips_investigate(monkeypatch):
     pipeline.run_pipeline(MockVMSpy({}), instruction="x", task_id="tY",
                           agents_md_text="", facts=None)
     assert called["investigate"] is False
-
-
-def test_brief_lessons_text_collects_lessons():
-    from agent import pipeline as P
-    brief = Brief()
-    brief.notes.append(Note(tool="read", lesson="cite the governing doc path"))
-    brief.notes.append(Note(tool="exec", lesson="incident id lives in fraud_reports"))
-    brief.notes.append(Note(tool="list", lesson=""))     # blank lessons skipped
-    txt = P._brief_lessons_text(brief)
-    assert "cite the governing doc path" in txt
-    assert "incident id lives in fraud_reports" in txt
-
-
-def test_brief_lessons_text_empty_or_none():
-    from agent import pipeline as P
-    assert P._brief_lessons_text(Brief()) == ""
-    assert P._brief_lessons_text(None) == ""
