@@ -1,423 +1,4 @@
 entries:
-- agents_md_anchor: null
-  content: When using the all_true primitive, provide a single list argument containing
-    the boolean values to check, not multiple separate arguments.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r001
-  reasoning: 'Error: interpret: compute step ''all_true'' failed: <lambda>() takes
-    1 positional argument but 3 were given. Root cause: The PlanIR compute step for
-    all_true passed three separate arguments (has_color_green, has_finish_eggshell,
-    has_finish_matte) instead of a single list containing those booleans. The contract
-    for all_true expects a single sequence argument. Failing PlanIR fragment: {"prim":"all_true","args":["$has_color_green","$has_finish_eggshell","$has_finish_matte"],"into":"all_props"}.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always bind computed values to variables that exactly match the required
-    ref source paths, including dotted paths (e.g., $product.record_path), not flat
-    names.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: 'Error: ''interpret: unresolved required ref(s) [''$product.record_path'']
-    on OK answer''. The PlanIR computed record_path into a flat variable ''$product_record_path'',
-    but the required ref expects ''$product.record_path''. The answer refs used the
-    flat variable, causing the interpreter to fail to resolve the required ref. The
-    root cause is a mismatch between the variable name used in the answer ref and
-    the required ref path. The rule ensures that compute steps produce variables with
-    the exact dotted path expected by required refs.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always bind variables that are required refs to a default value (e.g.,
-    empty string) before attempting to extract them from a rowset, so they remain
-    resolved even when the rowset is empty.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$product.record_path'']
-    on OK answer. The PlanIR binds $product.record_path via a get on $first_row, but
-    when the product is not found the rowset is empty, first_row is null, and the
-    get primitive may not bind the variable, leaving it unresolved. The required ref
-    is demanded for both found_yes and found_no branches, so it must be bound unconditionally.
-    Root cause: missing default binding for a ref that may be needed even when the
-    source rowset yields no rows.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When using the concat primitive, always provide exactly two arguments (a
-    and b). If you only need to pass a single value, use 'set' or 'get' instead.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: 'The interpret phase failed with: ''concat() missing 1 required positional
-    argument: b''. The PlanIR compute step ''concat'' was called with only one argument:
-    ["$product_sku"]. The concat primitive requires two arguments to concatenate.
-    The step intended to assign the SKU to variable ''sku'', but concat is the wrong
-    primitive for a single value. The fix is to use a single-value assignment primitive
-    (e.g., ''set'' or ''get'') or provide two arguments to concat.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: 'Always use filter_rows with exactly two arguments: the rows list and a
-    predicate dict (e.g., {"column": "<col>", "op": "<op>", "value": "<val>"}). Never
-    pass column, op, and value as separate arguments.'
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'Error: ''filter_rows() takes 2 positional arguments but 4 were given''.
-    The PlanIR compute step ''filter_rows'' was invoked with 4 arguments: rows, column,
-    operator, value. The primitive contract requires exactly 2 arguments: rows (list[dict])
-    and pred (dict). This misuse caused the interpret failure.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: '#plan-phase'
-  content: 'Always use ''get'' with exactly two arguments: the object and the key.
-    To provide a default value, first set the variable to the default using ''set''
-    or ''get'' with a literal, then use ''get'' with two arguments to extract the
-    value from the row if it exists.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: 'The error ''compute step ''get'' failed: <lambda>() takes 2 positional
-    arguments but 3 were given'' occurred because the PlanIR used get with three arguments
-    (row, column, default). The get primitive only accepts two arguments. The existing
-    rule r003 suggests binding defaults, but the implementation must use a separate
-    set/get step for the default before the two-argument get. The failing fragment:
-    ''get'' with args [''$product_row'', ''product_sku'', ''''].'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: Product not found.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When the desired outcome's success criteria require a specific substring
-    in the answer, ensure that every answer message produced by any decision branch
-    contains that substring.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: 'Grader error: ''Answer should contain ''<NO>''''. The PlanIR''s decision
-    branches ''not_found'' and ''claim_present'' produce messages without ''<NO>''
-    (e.g., ''Product not found.'' or ''<YES>...''), while only ''claim_absent'' includes
-    it. If the product was not found or all properties matched, the answer lacked
-    ''<NO>'', failing the grader. Root cause: answer messages for alternative branches
-    do not satisfy the desired outcome''s success criteria. The rule ensures all answer
-    messages incorporate the required pattern to pass the grader.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always include in the answer object every field referenced by the success
-    criteria (e.g., sku, record_path) as a separate key, not only embedded in the
-    message string.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r008
-  reasoning: 'ERROR: verify: success_criteria[OUTCOME_NONE_UNSUPPORTED][0] failed:
-    {''op'': ''nonempty'', ''lhs'': ''$answer.sku'', ''rhs'': None, ''args'': []}.
-    Root cause: The PlanIR answer branches only set ''message'', ''outcome'', and
-    ''refs'', but the success criteria for OUTCOME_NONE_UNSUPPORTED requires a nonempty
-    $answer.sku. The answer object had no ''sku'' field, so the nonempty check failed.
-    The message skeleton ''Product {sku}: {result}'' does not create a separate sku
-    field. The script must explicitly set a ''sku'' field in the answer object. This
-    rule ensures that any field referenced in success criteria is present as a top-level
-    key in the answer object.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always include in the answer object every field referenced by the success
-    criteria (e.g., sku, record_path) as a separate key, not only embedded in the
-    message string.
-  created: '2026-06-22'
-  deactivated_reason: Superseded by a more explicit rule that combines the requirements
-    to include sku, record_path, and msg fields in the answer object.
-  id: r009
-  reasoning: The verify step failed because success_criteria[OUTCOME_NONE_UNSUPPORTED][0]
-    requires a nonempty $answer.sku, but the PlanIR's not_found answer branch only
-    provided 'message' and 'refs', omitting 'sku'. The answer shape must explicitly
-    include all fields checked by success criteria.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always name the answer message field 'msg' (not 'message') so that success
-    criteria referencing $answer.msg can find it.
-  created: '2026-06-22'
-  deactivated_reason: Superseded by a more explicit rule that combines the requirements
-    to include sku, record_path, and msg fields in the answer object.
-  id: r010
-  reasoning: The verify error 'contains_any' on '$answer.msg' failed because the PlanIR
-    answer object for the 'not_found' branch used the key 'message' instead of 'msg'.
-    The success criteria expects $answer.msg, but the answer object had 'message',
-    so the field was missing. The observed RPC output shows the SQL returned data
-    correctly, but the verify step could not locate the message string. The fix is
-    to align the answer field name with the success criteria reference.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always include both a 'message' field and a 'msg' field in the answer object
-    for each outcome branch, with identical content, so that PlanIR validation (which
-    requires 'message') and success criteria referencing $answer.msg are both satisfied.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r011
-  reasoning: PlanIR validation failed with 'answer.found.message Field required' and
-    'answer.not_found.message Field required'. The success criteria for both outcomes
-    reference $answer.msg. The existing in-session rule instructed to name the field
-    'msg', which caused the omission of the required 'message' field. The corrective
-    rule ensures both fields are present.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When searching for a product by name, use a LIKE or ILIKE pattern with
-    wildcards to match the product name, rather than exact equality, to avoid missing
-    the product due to minor naming variations.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r012
-  reasoning: 'Error: verify: success_criteria[OUTCOME_NONE_UNSUPPORTED][0] failed:
-    nonempty sku. Root cause: The SQL query used exact equality on product_name, which
-    likely did not match the actual product name in the database, causing the query
-    to return no rows. Consequently, the compute step ''first'' returned null, and
-    the answer''s sku field was empty, violating the success criteria. The rule instructs
-    future PlanIR to use flexible name matching (LIKE/ILIKE) to reliably find the
-    base product SKU.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When using the all_true primitive, pass a single list of boolean values
-    as the argument, not multiple individual arguments.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r013
-  reasoning: 'The interpret step failed with ''all_true failed: <lambda>() takes 1
-    positional argument but 3 were given''. The PlanIR compute step passed three separate
-    arguments to all_true, but the primitive expects a single sequence (list) of booleans.
-    The correct usage is to wrap the values in a list: args: [["$has_color_blue",
-    "$has_size_xl", "$has_size_l"]]. This rule ensures future PlanIR uses of all_true
-    conform to the contract.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always include in the answer object for each outcome branch a 'sku' field
-    with the product SKU, a 'record_path' field with the record path, and a 'msg'
-    field with the message, as required by the success criteria.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r014
-  reasoning: The PlanIR answer for the 'ok' branch only had a 'message' field and
-    no 'sku' field, causing the verification of success criteria 'nonempty $answer.sku'
-    to fail. The existing rules r009 and r010 already require including all referenced
-    fields and naming the message field 'msg', but they were not applied. A more explicit
-    combined rule will prevent this.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When the intent spec's required_refs specify a source string (e.g., '$product_variant.record_path'),
-    the answer refs must use that exact source string, not a local variable name derived
-    from it.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r015
-  reasoning: 'Error: ''interpret: unresolved required ref(s) [''$product_variant.record_path'']
-    on OK answer''. The PlanIR answer for OK outcome had refs with source ''$record_path'',
-    but the required_refs in the intent spec for OUTCOME_OK demand source ''$product_variant.record_path''.
-    The interpreter could not resolve the required ref because the source strings
-    did not match. The failing fragment: answer.ok.refs[0].source = ''$record_path''
-    instead of ''$product_variant.record_path''. This rule ensures answer refs use
-    the exact source string from required_refs.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When you have a single row (dict) and need a field value, use the 'get'
-    primitive; 'column' is only for extracting a column from a list of rows.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r016
-  reasoning: 'Error: ''column'' expects list[dict] rows; use ''get'' for a single
-    row. The PlanIR used ''first'' to reduce rows to a single dict, then applied ''column''
-    to that dict, causing failure. The fix is to replace ''column'' with ''get'' when
-    extracting fields from a single row.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never use concat to combine scalar values; concat only merges two lists
-    of rows. To create a list of values, use the list primitive.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r017
-  reasoning: 'The interpret step failed with: ''concat() takes 2 positional arguments
-    but 3 were given''. The PlanIR used concat with three scalar booleans (has_color_blue,
-    has_size_xl, has_size_l) to build a list for all_true. However, concat is designed
-    to merge two lists of rows, not to combine scalars. The correct approach is to
-    use the list primitive to create a list from the three booleans, then pass that
-    single list to all_true. This rule prevents misuse of concat for scalar aggregation.'
-  status: inactive
-  surface: ir
 - content: null
   created: '2026-06-22'
   id: v015
@@ -430,55 +11,51 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: When querying product_variants by brand and product_name, use case-insensitive
-    comparison (e.g., LOWER(brand) = LOWER(:brand) AND LOWER(product_name) LIKE LOWER('%'
-    || :product_name_search || '%')) to ensure the product is found even if case differs.
+  content: When querying product_variants by brand and product_name, use case-insensitive comparison (e.g.,
+    LOWER(brand) = LOWER(:brand) AND LOWER(product_name) LIKE LOWER('%' || :product_name_search || '%'))
+    to ensure the product is found even if case differs.
   created: '2026-06-22'
   deactivated_reason: null
   id: r018
-  reasoning: The grader error 'Answer should contain '<NO>'' indicates the answer
-    did not contain '<NO>', meaning the PlanIR took the not_found or claim_present
-    branch instead of claim_absent. Given the objective expects the product to exist
-    but claim absent, the most likely cause is that the SQL query returned no rows
-    due to case-sensitive exact match on brand (e.g., 'Wera' vs 'wera'), leading to
-    the not_found branch and answer 'Product not found.' without '<NO>'. The PlanIR
-    should use case-insensitive matching to robustly find the product.
+  reasoning: The grader error 'Answer should contain '<NO>'' indicates the answer did not contain '<NO>',
+    meaning the PlanIR took the not_found or claim_present branch instead of claim_absent. Given the objective
+    expects the product to exist but claim absent, the most likely cause is that the SQL query returned
+    no rows due to case-sensitive exact match on brand (e.g., 'Wera' vs 'wera'), leading to the not_found
+    branch and answer 'Product not found.' without '<NO>'. The PlanIR should use case-insensitive matching
+    to robustly find the product.
   status: active
   surface: ir
 - agents_md_anchor: null
   content: When a required ref expects a record_path from a variable (e.g., $verified_sku.record_path),
-    ensure that variable is bound to a row object containing a record_path field,
-    not a scalar. Use a rowset extraction that includes the record_path column, then
-    use 'get' to extract the SKU for the message, but keep the row for the ref.
+    ensure that variable is bound to a row object containing a record_path field, not a scalar. Use a
+    rowset extraction that includes the record_path column, then use 'get' to extract the SKU for the
+    message, but keep the row for the ref.
   created: '2026-06-22'
   deactivated_reason: null
   id: r019
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$verified_sku.record_path'']
-    on OK answer. Root cause: The PlanIR extracted verified_sku as a scalar string
-    and verified_record_path as a separate scalar, but the required ref expects a
-    record_path attribute on the verified_sku variable. The interpreter could not
-    resolve $verified_sku.record_path because $verified_sku was a plain string, not
-    a row object. Failing PlanIR fragment: the SQL query returned verified_sku and
-    verified_record_path as independent columns, and the compute block used ''get''
-    to extract them as separate scalars, then the answer block used $verified_record_path
-    for the ref, which did not match the required ref''s source $verified_sku.record_path.
-    The fix is to bind verified_sku to a row that includes record_path, so that the
-    required ref can be satisfied by referencing that row''s record_path field.'
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$verified_sku.record_path''] on OK answer.
+    Root cause: The PlanIR extracted verified_sku as a scalar string and verified_record_path as a separate
+    scalar, but the required ref expects a record_path attribute on the verified_sku variable. The interpreter
+    could not resolve $verified_sku.record_path because $verified_sku was a plain string, not a row object.
+    Failing PlanIR fragment: the SQL query returned verified_sku and verified_record_path as independent
+    columns, and the compute block used ''get'' to extract them as separate scalars, then the answer block
+    used $verified_record_path for the ref, which did not match the required ref''s source $verified_sku.record_path.
+    The fix is to bind verified_sku to a row that includes record_path, so that the required ref can be
+    satisfied by referencing that row''s record_path field.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: 'When using the filter_rows primitive, provide exactly two arguments: the
-    rows list and a predicate dict (e.g., {"op":"eq","lhs":"column_name","rhs":"value"}).
-    Do not pass column name and value as separate arguments.'
+  content: 'When using the filter_rows primitive, provide exactly two arguments: the rows list and a predicate
+    dict (e.g., {"op":"eq","lhs":"column_name","rhs":"value"}). Do not pass column name and value as separate
+    arguments.'
   created: '2026-06-22'
   deactivated_reason: null
   id: r020
-  reasoning: 'The interpret phase failed with: ''filter_rows() takes 2 positional
-    arguments but 3 were given''. The failing PlanIR compute step was: {"prim":"filter_rows","args":["$matching","has_cleaner_type","true"],"into":"cleaner_variants"}.
-    The contract for filter_rows expects (rows, pred) — a list of dicts and a predicate
-    dict. Passing column name and value as separate arguments violates the contract.
-    The rule ensures future PlanIR uses the correct two-argument form with a predicate
-    dict.'
+  reasoning: 'The interpret phase failed with: ''filter_rows() takes 2 positional arguments but 3 were
+    given''. The failing PlanIR compute step was: {"prim":"filter_rows","args":["$matching","has_cleaner_type","true"],"into":"cleaner_variants"}.
+    The contract for filter_rows expects (rows, pred) — a list of dicts and a predicate dict. Passing
+    column name and value as separate arguments violates the contract. The rule ensures future PlanIR
+    uses the correct two-argument form with a predicate dict.'
   status: active
   surface: ir
 last_run:

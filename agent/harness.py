@@ -11,12 +11,10 @@ existing kind are learnable data (common).
 from __future__ import annotations
 
 import inspect
-import os
 from pathlib import Path
 
 import yaml
 
-from .llm import call_llm_json
 from .primitives import PRIMITIVES
 
 _DEFAULT_CHECKS = Path(__file__).resolve().parent.parent / "data" / "harness" / "checks.yaml"
@@ -34,13 +32,6 @@ def load_checks(path=None) -> list[dict]:
         print(f"[lint] checks.yaml load failed: {exc} — lint disabled")
         return []
     return [d for d in data if isinstance(d, dict)]
-
-
-def save_checks(checks: list[dict], path=None) -> None:
-    p = Path(path or _DEFAULT_CHECKS)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(yaml.safe_dump(checks, sort_keys=False, allow_unicode=True, width=100),
-                 encoding="utf-8")
 
 
 # --- kind handlers: (plan, spec) -> list[str] (pure; never raise) ----------
@@ -190,50 +181,3 @@ def handler_for(kind):
     """Return the pure handler for a check `kind`, or None. An unknown kind is skipped
     with a logged warning by the dispatcher — adding a kind is a deliberate code change."""
     return _HANDLERS.get(kind)
-
-
-# --- F8b: distill -> validate -> promote (gated off by default) -------------
-
-_DISTILL_SYS = (
-    "Distill ONE reusable plan-time CHECK-SPEC from an interpreter contract failure. "
-    "Return JSON for a single check of an EXISTING kind "
-    "(primitive_contract|sql_stdin|primitive_exists|primitive_arity): "
-    "{id, kind, prim?, arg_index?, forbid_source?, severity:'error', message}. "
-    "Only the closed structural fields — never natural-language logic."
-)
-
-
-def distill(plan, error, source_task=""):
-    """Propose a `candidate` check-spec generalised from a failing step. LLM, reason
-    tier; never raises. Returns the appended spec dict, or None (unknown kind, dup id,
-    or no usable response). Caller gates on HARNESS_DISTILL."""
-    from .llm import _resolve_model_for_phase
-    user = f"PLAN:\n{plan.model_dump_json()[:4000]}\n\nERROR:\n{error}\n\nReturn the check JSON."
-    try:
-        out = call_llm_json(_DISTILL_SYS, user,
-                            _resolve_model_for_phase("distill", os.environ.get("ECOM_MODEL", "")),
-                            phase="HARNESS_DISTILL")
-    except Exception:
-        return None
-    if not isinstance(out, dict) or out.get("kind") not in _HANDLERS:
-        return None
-    checks = load_checks()
-    if any(c.get("id") == out.get("id") for c in checks):
-        return None
-    spec = {**out, "status": "candidate", "source_task": source_task}
-    checks.append(spec)
-    save_checks(checks)
-    return spec
-
-
-def promote(check_id, path=None) -> bool:
-    """Flip a candidate check-spec to active. Returns True if found."""
-    checks = load_checks(path)
-    found = False
-    for c in checks:
-        if c.get("id") == check_id:
-            c["status"] = "active"
-            found = True
-    if found:
-        save_checks(checks, path)
-    return found

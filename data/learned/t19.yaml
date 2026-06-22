@@ -1,321 +1,14 @@
 entries:
 - agents_md_anchor: null
-  content: When a required ref is a record_path from a query, always include a decision
-    branch that checks if the query returned any rows; if empty, produce an error
-    outcome to avoid unresolved refs.
-  created: '2026-06-21'
-  deactivated_reason: This rule can produce outcomes not in the allowed outcome_space,
-    causing verify failures.
-  id: r001
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$product_variant.record_path'']
-    on OK answer. Root cause: The PlanIR used ''first'' and ''get'' on $inventory_rows
-    to extract product_variant.record_path, but the SQL query returned no rows because
-    the product SKU was not found. The compute step did not set the ref, leaving it
-    unresolved. The PlanIR lacked a decision branch to handle an empty rowset, so
-    it attempted to produce an OK answer without the required record_path. The rule
-    ensures that any required ref derived from a query is guarded by an emptiness
-    check, branching to an error outcome when data is missing.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never include a decision branch that produces an outcome not listed in
-    the outcome_space.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: The plan's decision branch produced OUTCOME_NONE_CLARIFICATION, which
-    is not in the allowed outcome_space ['OUTCOME_OK']. The existing rule 'When a
-    required ref is a record_path from a query, always include a decision branch that
-    checks if the query returned any rows; if empty, produce an error outcome to avoid
-    unresolved refs.' caused this branch. The product SKU method returned no SKU,
-    so product_record_path was empty, triggering the error outcome. The plan must
-    only produce allowed outcomes. Additionally, the product SKU method may have failed
-    because the pre-phase did not deep-read the necessary tables; requesting deep-read
-    of product_variants, product_kinds, and product_variant_properties will help the
-    next run find the product.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always include all required refs in the answer's refs list, mapping each
-    required ref to a computed variable that holds the record_path or value.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: The interpret error 'unresolved required ref(s) ["$product_variant.record_path"]'
-    occurred because the answer block's refs list was empty, while the intent required
-    $product_variant.record_path and $vienna_stores_record_paths. The PlanIR computed
-    product_variant as a row but never extracted its record_path field, and never
-    included any refs in the answer. The rule ensures that every required ref is explicitly
-    provided in the answer's refs list.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always separate the 'into' variable from the 'args' list in compute steps;
-    'args' must contain only the primitive's positional arguments.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: 'Error: ''interpret: compute step ''get'' failed: <lambda>() takes 2
-    positional arguments but 3 were given CONTRACT: get(obj, key)''. The failing PlanIR
-    compute step was: {"prim":"get","args":["$product_total_row","0","total"],"into":"total"}.
-    The ''into'' variable ''total'' was incorrectly placed inside the ''args'' array,
-    causing the interpreter to pass three arguments to the get primitive. The correct
-    structure should have args: ["$product_total_row","0"] and into: "total".'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never design a PlanIR that requires a nonempty ref from a query that may
-    return no rows, unless the outcome_space includes a fallback outcome for missing
-    data.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: The PlanIR's required ref $product_record_path depended on a product
-    query that returned no rows, causing the 'first' primitive to fail and the variable
-    to be undefined, leading to an unresolved ref error. The outcome_space only contained
-    OUTCOME_OK, so there was no way to handle the missing product gracefully. The
-    rule prevents such fragile dependencies.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always use 'first' with a single sequence argument; to extract a field
-    from the first row, apply 'first' then 'column'.
-  created: '2026-06-22'
-  deactivated_reason: r006 incorrectly advises using 'column' after 'first' to extract
-    a field from a single row; the correct primitive is 'get'.
-  id: r006
-  reasoning: 'interpret: compute step ''first'' failed: <lambda>() takes 1 positional
-    argument but 2 were given CONTRACT: first(seq). The PlanIR compute step {"prim":"first","args":["$inventory_rows","product_record_path"],"into":"product.record_path"}
-    incorrectly passes two arguments to the ''first'' primitive, which expects only
-    one (a sequence). Root cause: misunderstanding of primitive contract. Failing
-    PlanIR fragment: compute step for ''first''. Rule linkage: corrects usage of ''first''
-    primitive.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always define rowsets to parse RPC outputs into sequences before using
-    compute primitives like first, column, etc.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: The compute step 'first' failed with 'ExecResponse object is not subscriptable'
-    because it received the raw ExecResponse from the SQL RPC instead of a sequence.
-    The PlanIR omitted rowsets definitions that would parse the stdout into a rowset.
-    The fix is to add rowsets that convert RPC outputs into sequences, then apply
-    'first' to the resulting rowset.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: Product not found
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always name answer refs and compute 'into' targets exactly as specified
-    in the TOOL_PLAN required_refs sources, preserving dots and structure (e.g., use
-    '$product.record_path' not '$product_record_path').
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r008
-  reasoning: The error 'unresolved required ref(s) ["$product.record_path", "$vienna_stores"]
-    on OK answer' occurred because the PlanIR answer refs list used '$product_record_path'
-    instead of the required '$product.record_path'. The TOOL_PLAN required_refs for
-    OUTCOME_OK specify source '$product.record_path', but the compute section bound
-    the record_path into '$product_record_path' and the answer refs listed that. The
-    interpreter could not resolve the required ref, causing the failure. The $vienna_stores
-    ref may also have been unresolved if the compute section's output was not a record_path,
-    but the primary issue is the naming mismatch. This rule ensures exact alignment
-    with required_refs sources.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When extracting a field from a single row (e.g., after 'first'), use 'get'
-    instead of 'column'; 'column' requires a list of rows.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r009
-  reasoning: 'The interpret step failed with: ''column'' expects list[dict]; use ''get''
-    for a single row. The PlanIR used ''first'' to obtain a single row, then incorrectly
-    applied ''column'' to extract ''product_record_path''. The correct primitive for
-    a single row is ''get''. Existing rule r006 (''Always use first with a single
-    sequence argument; to extract a field from the first row, apply first then column'')
-    is directly contradicted by this error and must be deactivated.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: Product not found
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always ensure that every answer branch's outcome field exactly matches
-    one of the outcomes listed in the TOOL_PLAN's outcome_space.
+  content: Always ensure that every answer branch's outcome field exactly matches one of the outcomes
+    listed in the TOOL_PLAN's outcome_space.
   created: '2026-06-22'
   deactivated_reason: null
   id: r010
-  reasoning: The error 'expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION'
-    indicates the PlanIR produced an outcome not in the allowed outcome_space. The
-    script code shows a mapping for unsupported to OUTCOME_NONE_UNSUPPORTED, but the
-    actual PlanIR likely had a different mapping. To prevent this, the PLAN phase
-    must restrict answer outcomes to the outcome_space.
+  reasoning: The error 'expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION' indicates the PlanIR
+    produced an outcome not in the allowed outcome_space. The script code shows a mapping for unsupported
+    to OUTCOME_NONE_UNSUPPORTED, but the actual PlanIR likely had a different mapping. To prevent this,
+    the PLAN phase must restrict answer outcomes to the outcome_space.
   status: active
   surface: ir
 - content: null
@@ -330,32 +23,30 @@ entries:
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: When writing SQL discovery queries that filter by property values, always
-    use case-insensitive and whitespace-insensitive comparisons (e.g., LOWER(TRIM(property_value_text))
-    = LOWER(TRIM('storage bin'))) to avoid empty results due to formatting differences.
+  content: When writing SQL discovery queries that filter by property values, always use case-insensitive
+    and whitespace-insensitive comparisons (e.g., LOWER(TRIM(property_value_text)) = LOWER(TRIM('storage
+    bin'))) to avoid empty results due to formatting differences.
   created: '2026-06-22'
   deactivated_reason: null
   id: r011
-  reasoning: 'Error: grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED.
-    The PlanIR''s decision defaulted to ''no_product'' because the product discovery
-    query returned no rows. The SQL used exact string matches for property values
-    (''storage bin'', ''Red'', ''3 l''), which likely failed due to case or whitespace
-    differences in the actual data. The rule ensures future plans use robust matching,
-    preventing empty product rowsets when the product exists.'
+  reasoning: 'Error: grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED. The PlanIR''s
+    decision defaulted to ''no_product'' because the product discovery query returned no rows. The SQL
+    used exact string matches for property values (''storage bin'', ''Red'', ''3 l''), which likely failed
+    due to case or whitespace differences in the actual data. The rule ensures future plans use robust
+    matching, preventing empty product rowsets when the product exists.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: When a required ref needs a field from a single row (e.g., after 'first'),
-    always use a 'get' primitive to extract the field into a named variable and reference
-    that variable; never use dot notation like '$row.field' in refs.
+  content: When a required ref needs a field from a single row (e.g., after 'first'), always use a 'get'
+    primitive to extract the field into a named variable and reference that variable; never use dot notation
+    like '$row.field' in refs.
   created: '2026-06-22'
   deactivated_reason: null
   id: r012
-  reasoning: 'The error ''interpret: unresolved required refs [''$product.record_path'']
-    on OK answer'' occurred because the PlanIR used ''first'' to capture a single
-    row into $product, then attempted to reference $product.record_path directly in
-    the answer refs. The interpreter cannot resolve dot-notation field access on a
-    row object; the field must be extracted via a ''get'' compute step into a named
+  reasoning: 'The error ''interpret: unresolved required refs [''$product.record_path''] on OK answer''
+    occurred because the PlanIR used ''first'' to capture a single row into $product, then attempted to
+    reference $product.record_path directly in the answer refs. The interpreter cannot resolve dot-notation
+    field access on a row object; the field must be extracted via a ''get'' compute step into a named
     variable, and that variable referenced.'
   status: active
   surface: ir

@@ -3,65 +3,151 @@
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/security.md"
+        "path": "/docs/payments/3ds.md"
       },
-      "bind": "policy_doc"
+      "bind": "$policy_3ds"
     },
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/id"
+        "path": "/bin/sql",
+        "stdin": "WITH fraudulent_candidates AS (\n  SELECT pt.record_path, pt.is_archived_basket_reference, pt.customer_id, pt.payment_id\n  FROM payment_transactions pt\n  JOIN shopping_baskets sb ON pt.basket_id = sb.basket_id\n  WHERE pt.is_archived_basket_reference = 1\n    AND sb.basket_status = 'checked_out'\n    AND pt.payment_status = 'requires_3ds_action'\n    AND pt.three_ds_status = 'recoverable'\n    AND pt.three_ds_attempts < pt.three_ds_max_attempts\n)\nSELECT * FROM fraudulent_candidates;"
       },
-      "bind": "id_raw"
+      "bind": "$raw_rows"
     }
   ],
   "rowsets": [
     {
-      "from_": "id_raw",
-      "format": "json",
-      "into": "id_parsed",
-      "columns": []
+      "from_": "$raw_rows",
+      "format": "auto_delim",
+      "into": "$rows",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "is_archived_basket_reference",
+          "candidates": [
+            "is_archived_basket_reference"
+          ]
+        },
+        {
+          "into": "customer_id",
+          "candidates": [
+            "customer_id"
+          ]
+        },
+        {
+          "into": "payment_id",
+          "candidates": [
+            "payment_id"
+          ]
+        }
+      ]
     }
   ],
   "compute": [
     {
-      "prim": "first",
+      "prim": "count",
       "args": [
-        "$id_parsed"
+        "$rows"
       ],
-      "into": "id_obj"
+      "into": "$count"
     },
     {
-      "prim": "get",
+      "prim": "column",
       "args": [
-        "$id_obj",
-        "kind"
+        "$rows",
+        "record_path"
       ],
-      "into": "identity_kind"
+      "into": "$record_paths_list"
+    },
+    {
+      "prim": "concat",
+      "args": [
+        "$record_paths_list",
+        ", "
+      ],
+      "into": "$record_paths"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "eq",
-          "lhs": "$identity_kind",
-          "rhs": "guest",
-          "args": []
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "eq",
+              "lhs": "$_facts.identity.kind",
+              "rhs": "customer",
+              "args": []
+            },
+            {
+              "op": "ne",
+              "lhs": "$rows.0.customer_id",
+              "rhs": "$_facts.identity.customer_id",
+              "args": []
+            }
+          ]
         },
-        "label": "deny"
+        "label": "deny_security"
+      },
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$rows.0.record_path",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$rows.0.is_archived_basket_reference",
+              "rhs": 1,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$count",
+              "rhs": 1,
+              "args": []
+            }
+          ]
+        },
+        "label": "ok"
       }
     ],
-    "default_label": "deny"
+    "default_label": "not_found"
   },
   "ops": [],
   "answer": {
-    "deny": {
-      "message": "Access denied: guest accounts cannot view payment records.",
+    "deny_security": {
+      "message": "Access denied: you do not own this payment record.",
       "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
+    },
+    "ok": {
+      "message": "Identified {count} fraudulent payment record(s): {record_paths}",
+      "outcome": "OUTCOME_OK",
       "refs": [
-        "$policy_doc"
+        "$policy_3ds",
+        "$rows.0.record_path"
       ]
+    },
+    "not_found": {
+      "message": "No fraudulent payment record found.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
     }
   },
   "custom_extract": []

@@ -1,327 +1,4 @@
 entries:
-- agents_md_anchor: null
-  content: When a required parameter is missing, Always include a discovery step to
-    attempt to resolve it from the caller's active session or identity before falling
-    back to clarification.
-  created: '2026-06-21'
-  deactivated_reason: Superseded by stricter rule forbidding clarify-only plans without
-    discovery.
-  id: r001
-  reasoning: 'Error: ''interpret: attempt grounded discovery before clarifying (clarify-only
-    plan rejected while OUTCOME_OK is reachable)''. The PlanIR was a pure clarify-only
-    plan (discovery empty, decision default clarify). The interpret phase rejected
-    it because OUTCOME_OK is reachable without clarification, implying the basket_id
-    could be inferred from the session. The plan should have included a discovery
-    step to resolve the basket_id from the caller''s active session or identity before
-    defaulting to clarification.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a specific record path is unknown, Always list the parent directory
-    first to discover available records before attempting to read a specific path.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: 'The script attempted to read ''/customer/guest'' which does not exist,
-    causing ''real_vm: read failed: not found''. The plan should have first listed
-    ''/customer'' to see what records are available, then used a valid path or branched
-    to clarification. The existing rule about missing parameters does not cover this
-    discovery failure.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always use the 'get' primitive to extract a field from a single row; 'column'
-    expects a list[dict] and will fail on a single dict.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'ERROR: interpret: compute step ''column'' failed: ''column'' expects
-    list[dict]; use ''get'' for a single row. Root cause: PlanIR used ''first'' to
-    reduce basket_info_rows to a single row, then incorrectly used ''column'' to extract
-    fields from that single dict. The failing fragment: {"prim":"first","args":["$basket_info_rows"],"into":"basket_info"}
-    followed by {"prim":"column","args":["$basket_info","basket_id"],"into":"basket_id"}.
-    The ''column'' primitive requires a list of rows; for a single row, ''get'' is
-    the correct primitive. This rule prevents future misuse of ''column'' on single-row
-    bindings.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never emit a PlanIR that only contains a clarify decision without any discovery
-    steps when the objective's required parameters are missing.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: The PlanIR contained only a clarify decision with no discovery steps,
-    despite the basket_id parameter being missing. The interpret phase rejected it
-    as clarify-only while OUTCOME_OK is reachable. The existing rule (r001) advised
-    including discovery but was not enforced; this stricter rule forbids clarify-only
-    plans outright.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never use 'concat' to build strings; 'concat' merges two rowsets. Use 'format'
-    to interpolate values into a template string.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: The compute step 'concat' failed because it was given three arguments
-    (two strings and a reference) instead of two list[dict] rowsets. The intent was
-    to build a file path string. The correct primitive for string interpolation is
-    'format', which takes a template string and a list of bindings. This rule will
-    prevent future misuse of concat for string construction.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_013.json'
-  source: verdict
-  status: inactive
-  submitted_message: I couldn't find an active basket for your guest session. Please
-    provide your basket ID to proceed with checkout.
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always include a decision branch that constructs a record_path ref from
-    discovered identifiers when the objective's success criteria require a record_path
-    ref; the branch must emit the ref in the answer.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: 'Error: ''grader: answer missing required reference ''/proc/baskets/basket_013.json''''.
-    The PlanIR only had a clarify answer with no refs. Discovery found a basket_id
-    via SQL but did not map it to a record_path. The decision had no branches, so
-    it defaulted to clarify, which lacks the required ref. Root cause: PlanIR omitted
-    a branch for successful discovery and did not construct the record_path. The rule
-    ensures future plans include such a branch and path construction.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_CLARIFICATION, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: Checkout is not supported for guest users. Basket provided by
-    the caller; if not provided, clarification required. As a guest, the caller cannot
-    look up baskets by customer_id. cannot be processed.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs:
-  - /docs/checkout.md
-- agents_md_anchor: null
-  content: Always include a discovery step to extract caller-provided parameters before
-    using them in decision branches.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: 'Error: expected OUTCOME_NONE_CLARIFICATION, got OUTCOME_NONE_UNSUPPORTED.
-    The PlanIR''s decision branch for clarification checks isnull($basket_id), but
-    $basket_id was never bound from the caller''s input. Without a discovery step
-    to extract the caller-provided basket_id, the ref likely evaluated as not null,
-    causing the guest branch to match and produce unsupported. Root cause: missing
-    discovery step for the required parameter.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_026.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_090.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_037.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_042.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_019.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always include a discovery step to read the record for any caller-provided
-    identifier that appears in the answer message, and include its record_path as
-    a reference in the answer for every outcome that uses that identifier.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r008
-  reasoning: 'Error: grader: answer missing required reference ''/proc/baskets/basket_019.json''.
-    The PlanIR only had branches for clarify and unsupported, and the unsupported
-    answer included only a policy_doc ref. The basket_id parameter was used in the
-    message but no discovery step read the basket record, so its record_path was missing.
-    The grader expected a reference to the basket record. Root cause: PlanIR omitted
-    a discovery step to read the basket record and did not include its record_path
-    in the answer refs. Corrective rule: always read the record for any caller-provided
-    identifier used in the answer message and include its record_path as a ref.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_CLARIFICATION, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: Checkout denied for security reasons.
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/checkout.md
-  - /docs/security.md
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_042.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_016.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_042.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_007.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_179.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_024.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always extract record_path values into a dedicated top-level variable using
-    a compute step before using them as ref sources in answer branches; never use
-    nested field access like $basket.record_path directly in a ref source.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r009
-  reasoning: 'Error: ''grader: answer missing required reference ''/proc/baskets/basket_024.json''''.
-    The PlanIR answer branches for OUTCOME_OK included a record_path ref with source
-    ''$basket.record_path''. The basket record was discovered and non-null (otherwise
-    the ''unsupported'' branch would have fired), yet the interpreter omitted the
-    ref. Root cause: the interpreter likely failed to resolve the nested path when
-    emitting the answer ref. Extracting the record_path value into a top-level variable
-    (e.g., via a compute ''get'' step) and using that variable as the ref source avoids
-    this resolution gap.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: 'Always provide exactly two arguments to the ''get'' primitive: an object
-    and a key. Never use ''get'' to assign a literal value; use a ''literal'' compute
-    step or embed the value directly in the answer refs.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r010
-  reasoning: 'The PlanIR compute step ''get'' was called with a single argument ''/docs/security.md'',
-    violating the contract ''get(obj, key)''. The interpreter raised ''missing 1 required
-    positional argument: key''. The intent was to set a variable to a literal path,
-    which should be done via a ''literal'' step or by placing the path directly in
-    the answer refs. This rule prevents future misuse of the ''get'' primitive.'
-  status: inactive
-  surface: ir
 - content: null
   created: '2026-06-22'
   id: v015
@@ -335,97 +12,48 @@ entries:
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: When a parameter is marked as 'extract from instruction, or null if not
-    provided', always include a decision branch that checks if the parameter is null
-    and, if so, routes to a clarification outcome before evaluating any security constraints.
-  created: '2026-06-22'
-  deactivated_reason: r011 required null‑checks before security constraints, which
-    violates the security‑first ordering enforced by the interpret phase.
-  id: r011
-  reasoning: Grader expected OUTCOME_NONE_CLARIFICATION, got OUTCOME_DENIED_SECURITY.
-    The PlanIR only had a branch for identity.kind == guest leading to deny, and default
-    deny. It did not check for basket_id presence. The instruction likely lacked a
-    basket_id, so the plan should have clarified. The rule ensures missing required
-    parameters trigger clarification before security checks.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always order decision branches so that any branch leading to OUTCOME_DENIED_SECURITY
-    is evaluated before any branch leading to a non-DENIED outcome. This includes
-    null‑checks for parameters that would otherwise route to OUTCOME_NONE_CLARIFICATION.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r012
-  reasoning: The interpret phase rejected the PlanIR because the DENIED_SECURITY branch
-    (checking is_guest) appeared after the non-DENIED ask_basket_id branch. Existing
-    rule r011 instructed placing the null‑check before security constraints, which
-    caused the violation. The new rule enforces security‑first ordering and supersedes
-    r011.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always include all required refs for each outcome in the answer branch,
-    using compute steps to extract nested field sources into top-level variables as
-    per r009.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r013
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$basket.record_path'']
-    on OK answer. The PlanIR answer for ''ok'' had no refs, but the intent spec requires
-    a record_path ref sourced from $basket.record_path. The PlanIR must include that
-    ref, and per r009, must first extract the nested field into a top-level variable
-    via a compute step.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never use the output of an Exec RPC as a sequence argument to 'first' or
-    'column' primitives; Exec RPC returns an ExecResponse object, not a list of rows.
-    If you need a null value for a parameter, use a 'literal' compute step instead.
+  content: Never use the output of an Exec RPC as a sequence argument to 'first' or 'column' primitives;
+    Exec RPC returns an ExecResponse object, not a list of rows. If you need a null value for a parameter,
+    use a 'literal' compute step instead.
   created: '2026-06-22'
   deactivated_reason: null
   id: r014
-  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
-    object is not subscriptable''. Root cause: the discovery step bound basket_id_src
-    to an Exec RPC that ran ''SELECT NULL AS basket_id;''. The Exec RPC returns an
-    ExecResponse object, not a list of rows. The compute step ''first'' tried to subscript
-    that object, causing the failure. Failing PlanIR fragment: discovery step with
-    bind ''basket_id_src'' and compute step ''first'' on ''$basket_id_src''. The correct
-    approach is to use a ''literal'' compute step to assign null when the parameter
-    is not provided.'
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse'' object is not subscriptable''.
+    Root cause: the discovery step bound basket_id_src to an Exec RPC that ran ''SELECT NULL AS basket_id;''.
+    The Exec RPC returns an ExecResponse object, not a list of rows. The compute step ''first'' tried
+    to subscript that object, causing the failure. Failing PlanIR fragment: discovery step with bind ''basket_id_src''
+    and compute step ''first'' on ''$basket_id_src''. The correct approach is to use a ''literal'' compute
+    step to assign null when the parameter is not provided.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Never use the 'concat' primitive to build strings; concat only merges two
-    lists of rows. To construct a string value, use a 'literal' compute step or embed
-    the string directly in the operation's args.
+  content: Never use the 'concat' primitive to build strings; concat only merges two lists of rows. To
+    construct a string value, use a 'literal' compute step or embed the string directly in the operation's
+    args.
   created: '2026-06-22'
   deactivated_reason: null
   id: r015
-  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes
-    2 positional arguments but 3 were given. CONTRACT: concat(a, b): both args must
-    be list[dict] rows (parse Exec output via rowsets first).'' The failing PlanIR
-    compute step was: {"prim":"concat","args":["/payments/","$new_payment_id",".json"],"into":"payment_record_path"}.
-    The concat primitive expects exactly two row-list arguments, not three string
-    arguments. The same misuse appears in the step building payment_json. Root cause:
-    the planner attempted to use concat for string concatenation, which is not its
-    purpose. The rule ensures future plans use proper string construction (literal
-    or direct embedding) instead.'
+  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes 2 positional arguments
+    but 3 were given. CONTRACT: concat(a, b): both args must be list[dict] rows (parse Exec output via
+    rowsets first).'' The failing PlanIR compute step was: {"prim":"concat","args":["/payments/","$new_payment_id",".json"],"into":"payment_record_path"}.
+    The concat primitive expects exactly two row-list arguments, not three string arguments. The same
+    misuse appears in the step building payment_json. Root cause: the planner attempted to use concat
+    for string concatenation, which is not its purpose. The rule ensures future plans use proper string
+    construction (literal or direct embedding) instead.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Always include discovery steps to extract parameters from the instruction
-    when the parameter is marked as 'extract from instruction, or null if not provided',
-    before any decision branches that check for null.
+  content: Always include discovery steps to extract parameters from the instruction when the parameter
+    is marked as 'extract from instruction, or null if not provided', before any decision branches that
+    check for null.
   created: '2026-06-22'
   deactivated_reason: null
   id: r016
-  reasoning: 'Error: interpret: attempt grounded discovery before clarifying (clarify-only
-    plan rejected while OUTCOME_OK is reachable). Root cause: PlanIR lacks discovery
-    steps to extract basket_id from instruction; it immediately routes to clarify
-    without attempting extraction. Failing PlanIR fragment: discovery empty, decision
-    only checks null and defaults to clarify. Existing rule r011 covers null-check
-    branch but not discovery. New rule ensures discovery steps are included before
-    null-check.'
+  reasoning: 'Error: interpret: attempt grounded discovery before clarifying (clarify-only plan rejected
+    while OUTCOME_OK is reachable). Root cause: PlanIR lacks discovery steps to extract basket_id from
+    instruction; it immediately routes to clarify without attempting extraction. Failing PlanIR fragment:
+    discovery empty, decision only checks null and defaults to clarify. Existing rule r011 covers null-check
+    branch but not discovery. New rule ensures discovery steps are included before null-check.'
   status: active
   surface: ir
 last_run:

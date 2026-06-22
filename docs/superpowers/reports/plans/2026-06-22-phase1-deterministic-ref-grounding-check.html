@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка плана — Phase 1 Deterministic Ref-Grounding</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a212b; --panel2:#212b36; --txt:#e6edf3; --muted:#9fb0c0;
+    --line:#2d3845; --accent:#4ea1ff; --ok:#3fb950; --warn:#d29922; --crit:#f85149;
+    --okbg:#16361f; --warnbg:#3a2f12; --chip:#26313d; --shadow:rgba(0,0,0,.45);
+  }
+  [data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#f0f3f6; --txt:#1f2328; --muted:#57606a;
+    --line:#d0d7de; --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --crit:#cf222e;
+    --okbg:#dafbe1; --warnbg:#fff8c5; --chip:#eaeef2; --shadow:rgba(140,149,159,.2);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;padding:0 0 64px}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border-bottom:1px solid var(--line);padding:20px 28px;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;box-shadow:0 2px 12px var(--shadow)}
+  header h1{font-size:19px;margin:0;font-weight:650}
+  header .sub{color:var(--muted);font-size:13px;margin-top:3px}
+  main{max-width:1080px;margin:0 auto;padding:28px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:22px 24px;margin:0 0 24px;box-shadow:0 1px 6px var(--shadow)}
+  h2{font-size:16px;margin:0 0 16px;display:flex;align-items:center;gap:10px}
+  h2 .n{font-size:12px;color:var(--bg);background:var(--accent);border-radius:6px;
+    padding:2px 8px;font-weight:700}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  tr:last-child td{border-bottom:none}
+  code{background:var(--chip);padding:1px 6px;border-radius:5px;font-size:12.5px;
+    font-family:"SF Mono",Menlo,Consolas,monospace}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:650}
+  .pass{background:var(--okbg);color:var(--ok)} .warn{background:var(--warnbg);color:var(--warn)}
+  .fixed{background:var(--okbg);color:var(--ok)} .crit{background:#3a1414;color:var(--crit)}
+  .verdict{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:15px;
+    background:var(--okbg);border:1px solid var(--ok);border-radius:10px;padding:14px 18px}
+  .verdict .big{font-size:22px;font-weight:750;color:var(--ok)}
+  .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:6px}
+  .phase{background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+    padding:12px;text-align:center}
+  .phase .lbl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .phase .st{margin-top:7px}
+  .chain{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .chain code{color:var(--txt)}
+  .chain .arrow{color:var(--accent);font-weight:800}
+  .note{border-left:3px solid var(--accent);background:var(--panel2);padding:10px 14px;
+    border-radius:0 8px 8px 0;font-size:13px;color:var(--muted);margin-top:14px}
+  .mtx td.hit{background:var(--accent);color:var(--bg);font-weight:800;text-align:center;border-radius:4px}
+  .mtx td.dot{text-align:center;color:var(--muted)}
+  .mtx th.rot{font-size:11px;white-space:nowrap}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:12px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:13px;height:13px;border-radius:3px;display:inline-block}
+  button#tg{background:var(--chip);color:var(--txt);border:1px solid var(--line);
+    border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:600}
+  button#tg:hover{border-color:var(--accent)}
+  figure{margin:0}
+  svg text{font-family:-apple-system,"Segoe UI",Roboto,sans-serif}
+  .muted{color:var(--muted)}
+  details summary{cursor:pointer;font-weight:600;color:var(--accent);font-size:13px}
+  @media(max-width:760px){.grid5{grid-template-columns:repeat(2,1fr)}main{padding:16px}}
+</style>
+</head>
+<body data-theme="dark">
+<header>
+  <div>
+    <h1>Проверка плана — Phase 1 Deterministic Ref-Grounding</h1>
+    <div class="sub">IDD-гейт <code>/check-plan</code> · 2026-06-22 · 5 фаз · вердикт <strong style="color:var(--ok)">OK</strong> · 4 WARNING <strong style="color:var(--ok)">→ все fixed</strong></div>
+  </div>
+  <button id="tg" onclick="(function(){var b=document.body;b.dataset.theme=b.dataset.theme==='dark'?'light':'dark';})()">◐ Тема</button>
+</header>
+<main>
+
+  <section>
+    <div class="verdict">
+      <span class="big">✓ OK</span>
+      <span><strong>0 CRITICAL</strong> · <strong>4 WARNING — все исправлены</strong> (verdict <code>fixed</code>). План полностью покрывает спеку.</span>
+    </div>
+    <div class="grid5" style="margin-top:18px">
+      <div class="phase"><div class="lbl">structure</div><div class="st"><span class="pill pass">passed</span></div></div>
+      <div class="phase"><div class="lbl">coverage</div><div class="st"><span class="pill pass">passed</span></div></div>
+      <div class="phase"><div class="lbl">dependencies</div><div class="st"><span class="pill pass">passed</span></div></div>
+      <div class="phase"><div class="lbl">verifiability</div><div class="st"><span class="pill pass">passed</span></div></div>
+      <div class="phase"><div class="lbl">consistency</div><div class="st"><span class="pill pass">passed</span></div></div>
+    </div>
+    <div class="chain" style="margin-top:16px">
+      <strong style="color:var(--txt)">Chain:</strong>
+      <span>intent <code>null</code></span><span class="arrow">→</span>
+      <span>spec <code>…/specs/2026-06-22-phase1-deterministic-ref-grounding-design.md</code></span><span class="arrow">→</span>
+      <span>plan <code>…/plans/2026-06-22-phase1-deterministic-ref-grounding.md</code></span>
+    </div>
+    <div class="note">
+      Файлы: план <code>plan_hash 0d255368dbfceb20</code> · спека <code>spec_hash 9526087f3a09f16c</code>.
+      Frontmatter <code>review:</code> обновлён (все findings <code>fixed</code>); на повторном прогоне с тем же телом сработает quick-exit.
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">1</span> Резюме плана — задачи и Definition-of-Done</h2>
+    <table>
+      <thead><tr><th style="width:64px">Задача</th><th style="width:34%">Файл</th><th>Definition-of-Done</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Task 1</strong></td><td><code>agent/grounding.py</code> (new) · <code>tests/test_grounding.py</code></td><td><code>extract_entity_tokens</code>; <code>pytest tests/test_grounding.py</code> зелёный (6 тестов)</td></tr>
+        <tr><td><strong>Task 2</strong></td><td><code>agent/grounding.py</code></td><td><code>resolve_record_path</code> (evidence + find + <strong>generic SQL fallback</strong> <code>_sql_record_paths/_schema_tables_from</code>); <code>pytest -k "resolve or proc_paths"</code> зелёный</td></tr>
+        <tr><td><strong>Task 3</strong></td><td><code>agent/grounding.py</code></td><td><code>ownership_safe</code> (cross-customer guard); <code>pytest -k ownership</code> зелёный (5)</td></tr>
+        <tr><td><strong>Task 4</strong></td><td><code>agent/grounding.py</code></td><td><code>canonical_doc_refs</code> + <strong>recall-preserving relies-on фильтр</strong> (<code>intent/answer</code>); <code>pytest -k "canonical or relies_on"</code> зелёный (7)</td></tr>
+        <tr><td><strong>Task 5</strong></td><td><code>agent/grounding.py</code></td><td><code>align_count</code> + <code>ground_refs</code> (merge union/dedup/stable, прокидка <code>schema_tables</code>+<code>intent/answer</code>); вся <code>test_grounding.py</code> зелёная</td></tr>
+        <tr><td><strong>Task 6</strong></td><td><code>agent/investigate.py</code> · <code>tests/test_investigate_doc_grounding.py</code></td><td><code>_note_doc_read</code> + 2 call-site wiring; investigate-сьют зелёный</td></tr>
+        <tr><td><strong>Task 7</strong></td><td><code>agent/verify.py</code> · <code>tests/test_verify.py</code></td><td>I1 presence-based на всех outcomes + <code>$</code>-ref guard; rewrite 2 теста; <code>test_verify.py</code> зелёный</td></tr>
+        <tr><td><strong>Task 8</strong></td><td><code>agent/pipeline.py</code></td><td>вызов <code>ground_refs</code> между interpret и verify + проброс <code>docs_read</code>; pipeline-сьют зелёный</td></tr>
+        <tr><td><strong>Task 9</strong></td><td><code>tests/test_pipeline_grounding.py</code> (new)</td><td>интеграция grounding+verify; <code>test_pipeline_grounding.py</code> зелёный (3)</td></tr>
+        <tr><td><strong>Task 10</strong></td><td><code>docs/wiki/</code> · <code>CLAUDE.md</code> · <code>agent/CLAUDE.md</code></td><td><code>pytest tests/ -q</code> (единств. известный red — t09 stale); iwiki-ingest 4 файлов + <strong>DoD <code>test -f docs/wiki/grounding.md</code></strong>; <code>/iwiki-lint</code> чистый</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="n">2a</span> Граф зависимостей шагов</h2>
+    <figure>
+      <svg viewBox="0 0 1000 360" width="100%" role="img" aria-label="Граф зависимостей задач">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"></path>
+          </marker>
+          <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="var(--shadow)"></feDropShadow>
+          </filter>
+        </defs>
+        <style>
+          .nd{fill:var(--panel2);stroke:var(--ok);stroke-width:1.6;filter:url(#ds)}
+          .nd.term{stroke:var(--accent)}
+          .nl{fill:var(--txt);font-size:13px;font-weight:600;text-anchor:middle}
+          .ed{stroke:var(--accent);stroke-width:1.8;fill:none;marker-end:url(#arr);opacity:.85}
+        </style>
+        <line class="ed" x1="150" y1="52" x2="240" y2="52"></line>
+        <line class="ed" x1="330" y1="52" x2="420" y2="52"></line>
+        <line class="ed" x1="510" y1="52" x2="600" y2="52"></line>
+        <line class="ed" x1="690" y1="52" x2="780" y2="52"></line>
+        <path class="ed" d="M825,72 C825,150 560,150 470,196"></path>
+        <path class="ed" d="M840,72 C880,200 760,250 700,288"></path>
+        <line class="ed" x1="160" y1="218" x2="372" y2="218"></line>
+        <path class="ed" d="M560,238 C620,260 640,270 632,288"></path>
+        <line class="ed" x1="470" y1="240" x2="640" y2="288"></line>
+        <path class="ed" d="M700,330 C760,355 840,345 870,312"></path>
+
+        <g><rect class="nd" x="44"  y="32" width="96" height="40" rx="9"></rect><text class="nl" x="92"  y="57">Task 1</text></g>
+        <g><rect class="nd" x="234" y="32" width="96" height="40" rx="9"></rect><text class="nl" x="282" y="57">Task 2</text></g>
+        <g><rect class="nd" x="414" y="32" width="96" height="40" rx="9"></rect><text class="nl" x="462" y="57">Task 3</text></g>
+        <g><rect class="nd" x="594" y="32" width="96" height="40" rx="9"></rect><text class="nl" x="642" y="57">Task 4</text></g>
+        <g><rect class="nd" x="780" y="32" width="100" height="40" rx="9"></rect><text class="nl" x="830" y="57">Task 5</text></g>
+        <g><rect class="nd" x="44"  y="198" width="116" height="40" rx="9"></rect><text class="nl" x="102" y="223">Task 6</text></g>
+        <g><rect class="nd term" x="372" y="196" width="98" height="44" rx="9"></rect><text class="nl" x="421" y="222">Task 8</text></g>
+        <g><rect class="nd" x="470" y="196" width="98" height="44" rx="9"></rect><text class="nl" x="519" y="222">Task 7</text></g>
+        <g><rect class="nd term" x="600" y="286" width="100" height="44" rx="9"></rect><text class="nl" x="650" y="312">Task 9</text></g>
+        <g><rect class="nd term" x="860" y="280" width="100" height="44" rx="9"></rect><text class="nl" x="910" y="306">Task 10</text></g>
+      </svg>
+    </figure>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--ok)"></i> цепочка сборки <code>grounding.py</code> (T1→T5)</span>
+      <span><i class="sw" style="background:var(--accent)"></i> потребители: pipeline (T8), integration (T9), регрессия (T10)</span>
+      <span style="color:var(--ok);font-weight:600">✓ циклов нет · все рёбра M→N при M&lt;N</span>
+    </div>
+    <div class="note">Фаза <code>dependencies</code>: нарушений порядка и циклов не найдено. <code>ground_refs</code> готова к Task 5 до её вызова в Task 8/9; <code>_note_doc_read</code> создаётся в Task 6 до чтения <code>brief.env["docs_read"]</code> в Task 8; <code>_project_required_refs</code> уже существует в <code>interpreter.py</code> для импорта в Task 7.</div>
+  </section>
+
+  <section>
+    <h2><span class="n">2b</span> Матрица пересечений «задача × артефакт»</h2>
+    <table class="mtx">
+      <thead>
+        <tr>
+          <th>Задача</th>
+          <th class="rot">grounding.py</th>
+          <th class="rot">test_grounding</th>
+          <th class="rot">investigate.py</th>
+          <th class="rot">test_invest_doc</th>
+          <th class="rot">verify.py</th>
+          <th class="rot">test_verify</th>
+          <th class="rot">pipeline.py</th>
+          <th class="rot">test_pipe_grnd</th>
+          <th class="rot">docs/CLAUDE</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Task 1</strong></td><td class="hit">●</td><td class="hit">●</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td></tr>
+        <tr><td><strong>Task 2</strong></td><td class="hit">●</td><td class="hit">●</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td></tr>
+        <tr><td><strong>Task 3</strong></td><td class="hit">●</td><td class="hit">●</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td></tr>
+        <tr><td><strong>Task 4</strong></td><td class="hit">●</td><td class="hit">●</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td></tr>
+        <tr><td><strong>Task 5</strong></td><td class="hit">●</td><td class="hit">●</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td></tr>
+        <tr><td><strong>Task 6</strong></td><td class="dot">·</td><td class="dot">·</td><td class="hit">●</td><td class="hit">●</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td></tr>
+        <tr><td><strong>Task 7</strong></td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="hit">●</td><td class="hit">●</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td></tr>
+        <tr><td><strong>Task 8</strong></td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="hit">●</td><td class="dot">·</td><td class="dot">·</td></tr>
+        <tr><td><strong>Task 9</strong></td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="hit">●</td><td class="dot">·</td></tr>
+        <tr><td><strong>Task 10</strong></td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="dot">·</td><td class="hit">●</td></tr>
+      </tbody>
+    </table>
+    <div class="note">
+      <strong>Overlap:</strong> <code>grounding.py</code> + <code>test_grounding.py</code> инкрементально строят 5 задач (T1–T5) — единственная зона совместного редактирования; разрешена линейной зависимостью (T1→…→T5), мердж-конфликтов нет. Остальные файлы — по одной задаче.<br>
+      <strong>Покрытие требований:</strong> «record refs» → T1+T2+T3+T5 (incl. generic SQL fallback) · «doc refs» → T4+T6 (incl. relies-on filter) · «verify hardening» → T7 · «pipeline wiring» → T8 · «integration» → T9.
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span> Результаты проверки — findings</h2>
+    <table>
+      <thead><tr><th style="width:62px">ID</th><th style="width:96px">Severity</th><th style="width:104px">Фаза</th><th style="width:84px">Verdict</th><th>Секция · описание</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>F-001</strong></td><td><span class="pill warn">WARNING</span></td><td>coverage</td><td><span class="pill fixed">fixed</span></td>
+          <td><em>Task 2 — generic SQL record fallback.</em> Добавлен generic SQL-fallback 3-й ступенью <code>resolve_record_path</code> (<code>_sql_record_paths</code> + <code>_schema_tables_from</code>): имена таблиц из <code>facts.schema</code>, <code>record_path LIKE token</code>, SQL-safe-token guard — без per-task значений. Спека §Design «Record refs» покрыта.</td>
+        </tr>
+        <tr>
+          <td><strong>F-002</strong></td><td><span class="pill warn">WARNING</span></td><td>coverage</td><td><span class="pill fixed">fixed</span></td>
+          <td><em>Task 4 — relies-on doc filter.</em> <code>canonical_doc_refs</code> вернул параметры <code>intent/answer</code> с recall-сохраняющим relies-on фильтром (сужение к сигнальным докам только при наличии сигнала, иначе keep all). Сигнатура по спеке, без потери recall.</td>
+        </tr>
+        <tr>
+          <td><strong>F-003</strong></td><td><span class="pill warn">WARNING</span></td><td>verifiability</td><td><span class="pill fixed">fixed</span></td>
+          <td><em>Task 5 Step 1.</em> Тест переписан: взрыв через <code>answer.message</code> (потребляет негардированный <code>_proc_paths_in</code>) реально бьёт внешний <code>try/except</code>; второй тест покрывает inner-guard путь vm-взрыва.</td>
+        </tr>
+        <tr>
+          <td><strong>F-004</strong></td><td><span class="pill warn">WARNING</span></td><td>verifiability</td><td><span class="pill fixed">fixed</span></td>
+          <td><em>Task 10 Step 2.</em> Шаг wiki-ingest получил измеримый DoD: <code>test -f docs/wiki/grounding.md</code> + <code>git status</code>-diff по четырём страницам.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="display:flex;gap:14px;margin-top:18px;flex-wrap:wrap">
+      <div class="phase" style="flex:1;min-width:150px"><div class="lbl">CRITICAL open</div><div class="st" style="font-size:24px;font-weight:750;color:var(--ok)">0</div></div>
+      <div class="phase" style="flex:1;min-width:150px"><div class="lbl">WARNING open</div><div class="st" style="font-size:24px;font-weight:750;color:var(--ok)">0</div></div>
+      <div class="phase" style="flex:1;min-width:150px"><div class="lbl">WARNING fixed</div><div class="st" style="font-size:24px;font-weight:750;color:var(--ok)">4</div></div>
+      <div class="phase" style="flex:2;min-width:200px"><div class="lbl">Финальный вердикт</div><div class="st" style="font-size:18px;font-weight:700;color:var(--ok)">OK · готов к исполнению</div></div>
+    </div>
+
+    <details style="margin-top:18px">
+      <summary>Заметки независимой проверки (clean-context субагент)</summary>
+      <div class="note" style="border-color:var(--ok)">
+        Подтверждено по исходникам: два call-site <code>_ground_doc_refs</code> на <code>investigate.py:344</code> и <code>:355</code> (Task 6 вставляет рядом <code>_note_doc_read</code>) · <code>brief</code> инициализируется <code>None</code> на <code>pipeline.py:324</code> и в scope на interpret→verify блоке (Task 8) · <code>_project_required_refs(intent, outcome, env) → tuple</code> существует на <code>interpreter.py:126</code> (импорт Task 7) · MockVMSpy <code>find/stat/read/exec</code> принимают <code>**kwargs</code>, <code>_DEFAULT_STUB</code> без ключа <code>path</code>/<code>paths</code> · сигнатура <code>ground_refs(…, docs_read=None)</code> идентична в Tasks 5/8/9. Все 4 WARNING закрыты реальными правками плана (<code>fixed</code>), не приняты как долг.
+      </div>
+    </details>
+  </section>
+
+  <p class="muted" style="text-align:center;font-size:12px;margin-top:8px">
+    Автогенерируемый артефакт <code>/check-plan</code> · перезаписывается при каждом прогоне · 2026-06-22
+  </p>
+</main>
+</body>
+</html>

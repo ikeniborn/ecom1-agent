@@ -1,146 +1,29 @@
 entries:
-- agents_md_anchor: null
-  content: Never use concat to construct a literal string; embed literal paths directly
-    in the answer refs array. Concat is only for merging two rowsets.
-  created: '2026-06-21'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r001
-  reasoning: 'The PlanIR compute step used concat with a single string argument ''/docs/ops-policy-notes/catalogue-count-nuts-bolts-washers-vienna-2025-06-22.md'',
-    but concat requires two list[dict] rowsets. The interpreter failed with ''missing
-    1 required positional argument: b''. The correct approach is to embed the literal
-    path directly in the answer refs array, avoiding compute for static values.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - Answer should be "<COUNT:2>"
-  source: verdict
-  status: inactive
-  submitted_message: COUNT:2
-  submitted_outcome: OUTCOME_OK
-  submitted_refs:
-  - /docs/ops-policy-notes/catalogue-count-nuts-bolts-washers-vienna-2025-06-22.md
-- agents_md_anchor: null
-  content: Always extract classification criteria from a policy doc and translate
-    them into the filtering logic (e.g., SQL WHERE conditions) rather than hardcoding
-    a guessed product_kind_id.
-  created: '2026-06-22'
-  deactivated_reason: Superseded by a more specific rule that explicitly forbids guessing
-    product_kind_id and requires extracting exact names/categories from the policy
-    doc.
-  id: r002
-  reasoning: The error 'Answer should be "<COUNT:2>"' indicates the PlanIR returned
-    a wrong count. The PlanIR read the policy doc but ignored its content, hardcoding
-    'product_kind_id = \'nuts_bolts_washers\'' in the SQL query. The policy doc likely
-    defines Nut, Bolt, Washer as separate product kinds or via product name, so the
-    query missed the correct products. The root cause is failure to use the policy
-    doc's classification rules to construct the filter.
-  status: inactive
-  surface: ir
 - agents_md_anchor: '#plan-phase'
-  content: Always use the 'value' field (not 'message') in the answer section when
-    the success criteria involve numeric operators (ge, le, eq, etc.), and always
-    include all required refs from the intent spec.
+  content: Always use the 'value' field (not 'message') in the answer section when the success criteria
+    involve numeric operators (ge, le, eq, etc.), and always include all required refs from the intent
+    spec.
   created: '2026-06-22'
   deactivated_reason: null
   id: r003
-  reasoning: 'The verify phase failed with ''success_criteria[OUTCOME_OK][0] failed:
-    {"op": "ge", "lhs": "$answer", "rhs": 0, "args": []}''. The PlanIR produced an
-    answer with a ''message'' skeleton "{count}", yielding a string. The success criteria
-    expects a numeric comparison, so the answer must provide a numeric ''value'' field.
-    Additionally, the answer refs were empty, but the intent spec required a policy_doc
-    ref. The rule ensures numeric answers use ''value'' and all required refs are
-    included.'
+  reasoning: 'The verify phase failed with ''success_criteria[OUTCOME_OK][0] failed: {"op": "ge", "lhs":
+    "$answer", "rhs": 0, "args": []}''. The PlanIR produced an answer with a ''message'' skeleton "{count}",
+    yielding a string. The success criteria expects a numeric comparison, so the answer must provide a
+    numeric ''value'' field. Additionally, the answer refs were empty, but the intent spec required a
+    policy_doc ref. The rule ensures numeric answers use ''value'' and all required refs are included.'
   status: active
   surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
 - agents_md_anchor: null
-  content: When a policy document defines a product classification, read the document
-    and extract the exact product names, categories, or attributes to use in SQL WHERE
-    conditions; never use a guessed product_kind_id.
+  content: When a policy document defines a product classification, read the document and extract the
+    exact product names, categories, or attributes to use in SQL WHERE conditions; never use a guessed
+    product_kind_id.
   created: '2026-06-22'
   deactivated_reason: null
   id: r004
-  reasoning: The plan read the policy doc but then hardcoded product_kind_id = 'wood_drywall_screws'
-    without extracting the actual criteria. This caused the SQL query to return no
-    rows, leading to a null count and the plan returning OUTCOME_NONE_CLARIFICATION.
-    Existing rule r002 says to extract criteria, but it wasn't specific enough to
-    prevent this guess. The new rule explicitly forbids using a guessed product_kind_id
+  reasoning: The plan read the policy doc but then hardcoded product_kind_id = 'wood_drywall_screws' without
+    extracting the actual criteria. This caused the SQL query to return no rows, leading to a null count
+    and the plan returning OUTCOME_NONE_CLARIFICATION. Existing rule r002 says to extract criteria, but
+    it wasn't specific enough to prevent this guess. The new rule explicitly forbids using a guessed product_kind_id
     and mandates extracting exact names/categories.
   status: active
   surface: ir
@@ -157,16 +40,15 @@ entries:
   submitted_refs:
   - /docs/catalogue-addenda/2025-06-22-reporting-wood-drywall-screws-linz.md
 - agents_md_anchor: null
-  content: When extracting a value from a single row, use 'get' instead of 'column';
-    'column' expects a list of rows.
+  content: When extracting a value from a single row, use 'get' instead of 'column'; 'column' expects
+    a list of rows.
   created: '2026-06-22'
   deactivated_reason: null
   id: r005
-  reasoning: 'Error: interpret: compute step ''column'' failed: ''column'' expects
-    list[dict]; use ''get'' for a single row. Root cause: The PlanIR used ''first''
-    to reduce rows to a single row, then applied ''column'' to that single row. ''column''
-    requires a list of dicts. The correct primitive for a single row is ''get''. Failing
-    PlanIR fragment: {"prim":"first","args":["$rows"],"into":"first_row"}, {"prim":"column","args":["$first_row","cnt"],"into":"count"}.
+  reasoning: 'Error: interpret: compute step ''column'' failed: ''column'' expects list[dict]; use ''get''
+    for a single row. Root cause: The PlanIR used ''first'' to reduce rows to a single row, then applied
+    ''column'' to that single row. ''column'' requires a list of dicts. The correct primitive for a single
+    row is ''get''. Failing PlanIR fragment: {"prim":"first","args":["$rows"],"into":"first_row"}, {"prim":"column","args":["$first_row","cnt"],"into":"count"}.
     No existing rule covers this.'
   status: active
   surface: ir

@@ -1,341 +1,4 @@
 entries:
-- agents_md_anchor: null
-  content: 'Always pass two arguments to sum_col: the rows (list of dicts) and the
-    column name. Do not first extract a column into a scalar list and then try to
-    sum it.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r001
-  reasoning: 'Error: ''interpret: compute step ''sum_col'' failed: _sum_col() missing
-    1 required positional argument: ''col''''. The PlanIR used sum_col with a single
-    argument (a list of scalars from a prior column extraction) instead of the required
-    two arguments (rows, col). The contract states sum_col(rows, col) expects list[dict]
-    rows. The failing fragments: compute steps ''old_total_cents'' and ''new_total_cents''
-    both called sum_col on extracted scalar lists. The fix is to call sum_col directly
-    on the rowset with the column name.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always construct filter_rows predicates using the predicate builder (e.g.,
-    Predicate(op='in_set', lhs='$row.product_sku', rhs='$receipt_skus')) rather than
-    a plain dict.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: 'The interpret error ''dict'' object has no attribute ''op'' indicates
-    the filter_rows step received a plain dict for the predicate argument, but the
-    interpreter expects a predicate object with an ''op'' attribute. The script used
-    a dict: {"op":"in_set","lhs":"$row.product_sku","rhs":"$receipt_skus"}. The rule
-    instructs to use the predicate builder to create a proper predicate object.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always use the 'rows' primitive to convert the output of an Exec RPC (SQL
-    query) into a list of dicts before passing it to primitives that expect list[dict]
-    (e.g., filter_rows, sum_col).
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'Error: ''filter_rows'' expects list[dict]; use ''get'' for a single
-    row. Root cause: PlanIR discovery step bound $all_products directly to Exec output
-    of ''SELECT product_sku, price_cents FROM product_variants;'', which is likely
-    a raw string (stdout) rather than a list of dicts. The compute step then tried
-    filter_rows on that string, violating the primitive''s contract. Failing PlanIR
-    fragment: discovery bind ''all_products'' from Exec, then compute filter_rows
-    with first arg ''$all_products''. The PlanIR should have inserted a ''rows'' primitive
-    to parse the Exec output into a list of dicts before using it in filter_rows.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a required file path resolves to a directory, use a discovery step
-    to list the directory contents and select the appropriate file before reading.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: 'real_vm: read failed: is a directory. The PlanIR discovery step Read
-    used $receipt_file_path, which resolved to a directory (likely /uploads/). The
-    plan lacked a step to list the directory and pick a file. The pre-phase should
-    also deep-read /uploads/ to provide the exact file path.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never use the concat primitive to build JSON strings; concat is only for
-    concatenating two list[dict] rows. To convert any Exec RPC output (JSON object
-    or table) into a list of dicts, always use the 'rows' primitive with the appropriate
-    format directly on the output, and never manually wrap it in brackets.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'The interpreter failed on the first concat step: ''concat'' received
-    three string arguments (''['', ''$id_raw'', '']'') but expects exactly two list[dict]
-    rows. The plan attempted to wrap the Exec /bin/id JSON object in brackets to create
-    a JSON array string for the rowsets parser. This misuse of concat for string building
-    is the root cause. The same pattern appears for tables_json and receipt_file_json.
-    The existing rule about using ''rows'' for SQL outputs is too narrow; this new
-    rule generalizes it to all Exec outputs and explicitly forbids concat-based JSON
-    construction.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always structure each PlanIR step as an object with an 'rpc' field for
-    Exec RPC calls, and use a 'then' field to chain primitives; never use 'rowsets'
-    or 'compute' as top-level step types.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: The PlanIR validation failed with 38 errors because the discovery steps
-    used invalid top-level keys 'rowsets' and 'compute' instead of the required 'rpc'
-    field. The schema expects every step to have an 'rpc' field (for Exec RPC) and
-    optionally a 'then' list of primitives; 'rowsets' and 'compute' are not permitted
-    as step types. This rule corrects the PlanIR shape for all future cycles.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a Read RPC's path argument depends on a previous discovery step, always
-    place the Read step after the compute that extracts the path, or use a 'then'
-    chain to sequence the extraction and the Read. Never use a variable in an RPC
-    argument that is not yet bound by a preceding compute step.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: 'Error: real_vm: read failed: invalid path: path must be absolute: "discover
-    the receipt file from /uploads/ directory listing". Root cause: The PlanIR placed
-    the Read RPC in the discovery array before the compute step that sets receipt_file_path
-    from the Find output. The variable $receipt_file_path was unbound at Read time,
-    causing the interpreter to substitute the literal param description. The rule
-    ensures dependent RPCs are sequenced after the compute that binds their arguments.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Never apply list-based primitives (first, get, filter, etc.) directly to
-    an Exec RPC output; always use the 'rows' primitive first to convert it to a list
-    of dicts.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r008
-  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
-    object is not subscriptable''. The PlanIR discovery step bound an Exec RPC result
-    to ''receipt_analysis'', then compute used ''first'' on it. Exec RPC returns an
-    ExecResponse object, not a list, so ''first'' fails. The correct pattern is to
-    chain ''rows'' to convert the output into a list of dicts before applying list
-    primitives. Existing rule r005 advises using ''rows'' for conversion but does
-    not explicitly forbid direct use of list primitives on Exec outputs.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always use the 'sum' primitive to sum a list of scalar numbers; use 'sum_col'
-    only when you have a list of dicts and need to sum a specific column.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r009
-  reasoning: 'The error ''sum_col() missing 1 required positional argument: ''col''''
-    occurred because the plan applied sum_col to a list of scalars (old_price_cents_list)
-    extracted via ''column'' primitive. sum_col expects a list of dicts and a column
-    name. The correct primitive for summing a list of numbers is ''sum''.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: 'Always provide exactly two arguments to filter_rows: the rows list and
-    a predicate expression; never pass a column name and a value list as separate
-    arguments.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r010
-  reasoning: 'Error: ''interpret: compute step ''filter_rows'' failed: _filter_rows()
-    takes 2 positional arguments but 3 were given. CONTRACT: filter_rows(rows, pred):
-    first arg must be list[dict] rows''. The failing PlanIR compute step was: {"prim":"filter_rows","args":["$all_products","product_sku","$unique_skus"],"into":"filtered_products"}.
-    The step passed three arguments (rows, column name, list of values) instead of
-    the required two (rows, predicate). Root cause: incorrect understanding of filter_rows
-    signature. No existing rule covers this specific argument count error.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always ensure that all arguments to Exec RPCs are strings; never pass a
-    list, dict, or other non-string value directly. If a variable contains complex
-    data, serialize it to a JSON string using a compute step before passing it to
-    Exec.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r011
-  reasoning: 'Error: real_vm: bad argument type for built-in operation. The Exec RPC
-    in discovery uses $receipt_data.items_json as an argument. receipt_data is produced
-    by a custom_extract step that likely returns a dict or list, not a string. Passing
-    a non-string reference to Exec causes a type error. Additionally, the Exec step
-    appears before the custom_extract step in the execution order, so receipt_data
-    may be undefined, but the error message points to a type mismatch rather than
-    an undefined variable. The root cause is that the argument is not a string. The
-    failing PlanIR fragment: {"rpc":"Exec","args":{"path":"/bin/sql","stdin":"...","args":["--items_json","$receipt_data.items_json"]}}.
-    The new rule ensures that Exec arguments are always strings, preventing type errors.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
 - content: null
   created: '2026-06-22'
   id: v015
@@ -344,67 +7,46 @@ entries:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
   status: active
-  submitted_message: The total price difference is  cents, which is exceeds the 2
-    EUR threshold.
+  submitted_message: The total price difference is  cents, which is exceeds the 2 EUR threshold.
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'When extracting structured data from a receipt file, do not use a single
-    complex SQL query to parse and join; instead, separate the steps: first read the
-    file content, then parse it into a list of items using compute primitives, then
-    query the database for current prices, and finally compute totals using the ''sum''
-    primitive.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r012
-  reasoning: The plan attempted to parse the receipt and join with product_variants
-    in one SQL query, which likely failed to correctly extract sku, quantity, and
-    unit_price_cents from the unstructured file, leading to an incorrect total and
-    the wrong outcome. A stepwise approach with dedicated parsing and separate database
-    query is more robust.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a file path must be discovered from a directory listing, do not place
-    the Read RPC in the discovery section; instead, list the directory in discovery,
-    compute the file path, and then perform the Read in the compute section.
+  content: When a file path must be discovered from a directory listing, do not place the Read RPC in
+    the discovery section; instead, list the directory in discovery, compute the file path, and then perform
+    the Read in the compute section.
   created: '2026-06-22'
   deactivated_reason: null
   id: r013
-  reasoning: 'The error ''real_vm: read failed: is a directory'' occurred because
-    the Read RPC in the discovery section attempted to read a path that was not yet
-    resolved, likely defaulting to the directory /uploads. The receipt path was computed
-    later in the compute section, but discovery RPCs execute first. The Read RPC must
-    be moved to the compute section after the path is determined.'
+  reasoning: 'The error ''real_vm: read failed: is a directory'' occurred because the Read RPC in the
+    discovery section attempted to read a path that was not yet resolved, likely defaulting to the directory
+    /uploads. The receipt path was computed later in the compute section, but discovery RPCs execute first.
+    The Read RPC must be moved to the compute section after the path is determined.'
   status: active
   surface: ir
 - agents_md_anchor: '#discovery'
-  content: When listing a directory to find a file, always filter the list to include
-    only entries where type == 'file' before selecting a path to Read.
+  content: When listing a directory to find a file, always filter the list to include only entries where
+    type == 'file' before selecting a path to Read.
   created: '2026-06-22'
   deactivated_reason: null
   id: r014
-  reasoning: 'The error ''real_vm: read failed: is a directory'' occurred because
-    the PlanIR attempted to Read a path that was a directory, not a file. The List
-    RPC returned a list of entries from /uploads, and the script used the first entry''s
-    path without checking its type. The existing rule (in-session) only addressed
-    moving Read to compute, but did not ensure the path is a file. Therefore, a new
-    rule is needed to always filter directory listings to include only files before
-    selecting a path to Read.'
+  reasoning: 'The error ''real_vm: read failed: is a directory'' occurred because the PlanIR attempted
+    to Read a path that was a directory, not a file. The List RPC returned a list of entries from /uploads,
+    and the script used the first entry''s path without checking its type. The existing rule (in-session)
+    only addressed moving Read to compute, but did not ensure the path is a file. Therefore, a new rule
+    is needed to always filter directory listings to include only files before selecting a path to Read.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: When using Find to locate a file, always verify that the returned entry's
-    type is 'file' before using its path in a Read RPC; if the type is not 'file',
-    fall back to listing the parent directory and filtering for files manually.
+  content: When using Find to locate a file, always verify that the returned entry's type is 'file' before
+    using its path in a Read RPC; if the type is not 'file', fall back to listing the parent directory
+    and filtering for files manually.
   created: '2026-06-22'
   deactivated_reason: null
   id: r015
-  reasoning: 'real_vm: read failed: is a directory. The PlanIR used Find to discover
-    a receipt file, but the Read step attempted to read a directory. The Find RPC
-    likely returned a directory entry (possibly the root itself) instead of a file,
-    and the PlanIR did not check the entry''s type before using its path. The corrective
-    rule ensures that any path passed to Read is verified as a file, preventing this
+  reasoning: 'real_vm: read failed: is a directory. The PlanIR used Find to discover a receipt file, but
+    the Read step attempted to read a directory. The Find RPC likely returned a directory entry (possibly
+    the root itself) instead of a file, and the PlanIR did not check the entry''s type before using its
+    path. The corrective rule ensures that any path passed to Read is verified as a file, preventing this
     class of error.'
   status: active
   surface: ir

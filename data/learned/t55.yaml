@@ -1,269 +1,29 @@
 entries:
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: 'Access denied: guest identities are not authorized to view payment
-    transactions.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
 - agents_md_anchor: null
-  content: When a security constraint denies only for a specific condition, the decision
-    default_label must lead to the allowed outcome, and the answer must include a
-    branch for that outcome with the required refs.
-  created: '2026-06-22'
-  deactivated_reason: Superseded by a more comprehensive rule that includes data fetching
-    and full constraint evaluation, while retaining the default_label and answer branch
-    guidance.
-  id: r001
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. The
-    PlanIR decision only has a branch for guest -> denied and default_label ''denied'',
-    so it always denies. The constraint only denies guest identities; non-guests should
-    be allowed. The answer lacks an allowed branch with required refs (record_path).
-    Root cause: default_label and missing allowed branch.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: 'Access denied: guest users cannot view payment transactions.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- agents_md_anchor: '#payment-access-control'
-  content: When a security constraint references fields from a record, the PlanIR
-    must include discovery steps to fetch that record using the provided query or
-    path, and to fetch identity roles if referenced. The decision must evaluate all
-    deny conditions, with the default_label set to the allowed outcome. The answer
-    must include a branch for the allowed outcome with the required refs.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: 'The script''s decision only checks for guest identity and defaults to
-    denied, ignoring the other deny conditions (customer not owning, employee without
-    role). It also fails to fetch the payment record and identity roles, so it cannot
-    evaluate those conditions. The error ''expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY''
-    indicates the test identity was allowed, but the script denied. Root cause: incomplete
-    constraint evaluation and missing data retrieval. The new rule ensures future
-    PlanIRs fetch all necessary data and implement full decision logic.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When using an Exec RPC to retrieve rows, the PlanIR must include a custom_extract
-    step to parse the stdout into a list of rows before using sequence primitives
-    like 'first'.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
-    object is not subscriptable''. The PlanIR bound the Exec RPC result directly to
-    ''payment_rows'' and then applied ''first'' to it. Exec RPC returns an ExecResponse
-    object, not a list. The compute step expected a sequence. Root cause: missing
-    extraction of rows from stdout. The failing PlanIR fragment: discovery step with
-    bind ''payment_rows'' and compute step ''first'' on ''$payment_rows''. The new
-    rule instructs to always parse stdout into a list before using sequence primitives.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: Access denied.
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- agents_md_anchor: null
-  content: Never include identity-based deny conditions in the decision unless the
-    IntentSpec explicitly requires them.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: The plan included a decision branch that denied access when identity_kind
-    was 'guest', leading to OUTCOME_DENIED_SECURITY. The IntentSpec has no security
-    constraints and only requires a nonempty last_transaction with a specific record_path
-    prefix. The spurious identity check caused the failure. The plan should only evaluate
-    the success criteria and default to the allowed outcome when they are met.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Do not use 'column' on a single row; use 'get' to extract a field from
-    a single row.
+  content: Do not use 'column' on a single row; use 'get' to extract a field from a single row.
   created: '2026-06-22'
   deactivated_reason: null
   id: r005
-  reasoning: 'Error: ''column'' expects list[dict]; use ''get'' for a single row.
-    Root cause: PlanIR used ''first'' to reduce rows to a single row, then applied
-    ''column'' to that row. The contract requires ''get'' for single-row field extraction.
-    Failing PlanIR fragment: compute steps after ''first'' used ''column'' on $row.'
+  reasoning: 'Error: ''column'' expects list[dict]; use ''get'' for a single row. Root cause: PlanIR used
+    ''first'' to reduce rows to a single row, then applied ''column'' to that row. The contract requires
+    ''get'' for single-row field extraction. Failing PlanIR fragment: compute steps after ''first'' used
+    ''column'' on $row.'
   status: active
   surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: 'Access denied: guests are not authorized to view payment transactions.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: 'Access denied: guests are not authorized to view payment transactions.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
 - agents_md_anchor: '#security'
-  content: When the IntentSpec contains a security constraint, the PlanIR must include
-    a discovery step to resolve the identity fact and a decision branch that evaluates
-    the deny condition, with a deny outcome only when the condition is true, and a
-    default branch that proceeds to the main objective.
+  content: When the IntentSpec contains a security constraint, the PlanIR must include a discovery step
+    to resolve the identity fact and a decision branch that evaluates the deny condition, with a deny
+    outcome only when the condition is true, and a default branch that proceeds to the main objective.
   created: '2026-06-22'
   deactivated_reason: null
   id: r006
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. Root
-    cause: PlanIR produced a hardcoded deny outcome without checking the user''s identity.
-    The IntentSpec includes a security constraint that denies guests, but the plan
-    must first discover the identity and then conditionally deny only if the user
-    is a guest; otherwise, it should retrieve the transaction. The failing PlanIR
-    fragment: decision with no branches and default_label ''deny'', no discovery for
-    identity. Existing rule r004 permits identity-based deny conditions when explicitly
-    required, but the plan omitted the required identity check entirely.'
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. Root cause: PlanIR produced
+    a hardcoded deny outcome without checking the user''s identity. The IntentSpec includes a security
+    constraint that denies guests, but the plan must first discover the identity and then conditionally
+    deny only if the user is a guest; otherwise, it should retrieve the transaction. The failing PlanIR
+    fragment: decision with no branches and default_label ''deny'', no discovery for identity. Existing
+    rule r004 permits identity-based deny conditions when explicitly required, but the plan omitted the
+    required identity check entirely.'
   status: active
   surface: ir
 - content: null
@@ -279,19 +39,18 @@ entries:
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: Do not set the default_label to 'deny' when a security constraint is present;
-    instead, set it to a label that proceeds to the main objective (e.g., 'proceed').
+  content: Do not set the default_label to 'deny' when a security constraint is present; instead, set
+    it to a label that proceeds to the main objective (e.g., 'proceed').
   created: '2026-06-22'
   deactivated_reason: null
   id: r007
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. The
-    PlanIR decision has only a deny branch for guest identity and a default_label
-    of ''deny'', causing all non-guest identities to also be denied. The IntentSpec
-    requires deny only when identity.kind is guest, so the default branch must lead
-    to the main objective (retrieving payment details). Failing PlanIR fragment: decision.default_label
-    = ''deny''. Existing rule r006 already states the default branch should proceed
-    to the main objective, but the plan violated it; this new rule explicitly forbids
-    using ''deny'' as the default label in security-constrained plans.'
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. The PlanIR decision has
+    only a deny branch for guest identity and a default_label of ''deny'', causing all non-guest identities
+    to also be denied. The IntentSpec requires deny only when identity.kind is guest, so the default branch
+    must lead to the main objective (retrieving payment details). Failing PlanIR fragment: decision.default_label
+    = ''deny''. Existing rule r006 already states the default branch should proceed to the main objective,
+    but the plan violated it; this new rule explicitly forbids using ''deny'' as the default label in
+    security-constrained plans.'
   status: active
   surface: ir
 last_run:

@@ -42,9 +42,9 @@ In the single Plan-IR pipeline, atoms flow into PLAN as the `oracle_atoms` input
 
 ## Distill
 
-`distill()` (`agent/oracle.py:122`) generalizes a working run into an atom. It feeds the design intent, error, and script (truncated to 4000 chars) to an LLM with a system prompt that strips all run-specific values (ids, paths, skus, amounts) and returns `{id, description, domain, content}` JSON.
+`distill()` (`agent/oracle.py:167`) generalizes a working run into an atom. It feeds the design intent, error, and script (truncated to 4000 chars) to an LLM with a system prompt that strips all run-specific values (ids, paths, skus, amounts) and returns `{id, description, domain, content}` JSON.
 
-A non-dict response or one with empty `content` yields `None`. Otherwise it builds an `Atom` with `source="distilled"`, `embedding_hash=content_hash(content)`, the originating `source_task`, and the caller-supplied `status` and `polarity` (default `candidate`/`method`, keeping the in-pipeline success-path caller back-compatible), then appends and persists it via `add_candidate` (`agent/oracle.py:117`). The distill phase resolves through the reason tier (`_resolve_model_for_phase("distill", …)`). `ECOM_ORACLE_DISTILL=1` enables this on the success path.
+A non-dict response or one with empty `content` yields `None`. Otherwise it builds an `Atom` with `source="distilled"`, `embedding_hash=content_hash(content)`, the originating `source_task`, and the caller-supplied `status` and `polarity` (default `candidate`/`method`), then appends and persists it via `add_candidate` (`agent/oracle.py:121`). The distill phase resolves through the reason tier (`_resolve_model_for_phase("distill", …)`). The live callers are `pipeline.distill_from_grader` (end-of-run, `status="active"`), the offline teach bridge (`scripts/harness_to_oracle.py`), and the offline `promote.py` gate — there is no in-pipeline success-path distill (the `ECOM_ORACLE_DISTILL` path was removed in Phase 0).
 
 ## End-of-run self-fill (distill_from_grader)
 
@@ -54,7 +54,7 @@ A non-dict response or one with empty `content` yields `None`. Otherwise it buil
 
 `validate_atom_via_grader` (`agent/oracle_validate.py:55`) re-runs a plan on a fresh `StartRun` and reports whether the real grader score meets `min_score` (default 1.0). It is best-effort — any failure (no live grader, replay error) returns `False`, leaving the atom a candidate, and never raises.
 
-It builds an answer via `interpret(plan, intent, vm, facts=None)` and runs it through `grade_candidate` (`agent/oracle_validate.py:27`), which serializes harness trials: start the target trial, answer it, then `end_trial` immediately to lock DONE-with-answer before later trials start. `parse_score` extracts the score from the matching trial. Known limitation: plans whose predicates read `$_facts.*` degrade on the fresh facts-less VM and may under-promote (conservative by design). `ECOM_ORACLE_VALIDATE_INLINE=1` (default) gates this inline pass.
+It builds an answer via `interpret(plan, intent, vm, facts=None)` and runs it through `grade_candidate` (`agent/oracle_validate.py:27`), which serializes harness trials: start the target trial, answer it, then `end_trial` immediately to lock DONE-with-answer before later trials start. `parse_score` extracts the score from the matching trial. Known limitation: plans whose predicates read `$_facts.*` degrade on the fresh facts-less VM and may under-promote (conservative by design). This function is retained for the offline `promote.py` gate; the in-pipeline `ECOM_ORACLE_VALIDATE_INLINE` success-path caller that drove it was removed in Phase 0.
 
 ## Efficacy Validation via Full Run
 
@@ -64,7 +64,7 @@ It builds an answer via `interpret(plan, intent, vm, facts=None)` and runs it th
 
 ## Promote (Inline)
 
-`promote()` (`agent/oracle.py:137`) flips a candidate atom to `active`, stamping `validated_by` and `validated_at`, then persists the bank. On the success path it is called after `validate_atom_via_grader` confirms an improvement (distill → validate → promote). See [[pipeline]].
+`promote()` (`agent/oracle.py:184`) flips a candidate atom to `active`, stamping `validated_by` and `validated_at`, then persists the bank. It is called by the offline `promote.py` gate and the teach bridge after validation confirms an improvement (distill → validate → promote). The earlier in-pipeline success-path promotion was removed in Phase 0; the in-run self-fill now happens via `distill_from_grader`, which writes `active` atoms directly without a separate promote step. See [[oracle#End-of-run self-fill (distill_from_grader)]].
 
 ## Promote (Offline Gate)
 
@@ -78,7 +78,7 @@ It builds an answer via `interpret(plan, intent, vm, facts=None)` and runs it th
 
 ## Environment Knobs
 
-The `ORACLE_*` family tunes retrieval and the distill/promote lifecycle. All are read at call time from the environment. See the full table in [[data-files]].
+The `ORACLE_*` family tunes retrieval. All are read at call time from the environment. See the full table in [[data-files]]. (The in-pipeline distill/promote knobs `ECOM_ORACLE_DISTILL` and `ECOM_ORACLE_VALIDATE_INLINE` were removed in Phase 0 along with the success-path distill they gated — they are no longer read anywhere.)
 
 | Var | Default | Effect |
 |-----|---------|--------|
@@ -87,8 +87,6 @@ The `ORACLE_*` family tunes retrieval and the distill/promote lifecycle. All are
 | `ECOM_ORACLE_K` | 4 | Final atoms returned after re-rank |
 | `ECOM_ORACLE_FLOOR` | 0.5 | Min cosine; below-floor candidates discarded |
 | `ECOM_ORACLE_RANK_ENABLED` | 1 | `0` → skip LLM re-rank, use cosine top-k |
-| `ECOM_ORACLE_DISTILL` | 0 | `1` → distill a candidate atom on success |
-| `ECOM_ORACLE_VALIDATE_INLINE` | 1 | `1` → grader-validate + promote inline |
 | `ECOM_ORACLE_FORCE_ACTIVE` | (unset) | Comma-separated atom ids forced retrievable in `_active` for one efficacy run |
 | `ECOM_MODEL_EMBED` | nomic-embed-text | Embedding model id |
 | `ECOM_MODEL_RANK` | `ECOM_MODEL` | Stage-2 re-rank model |

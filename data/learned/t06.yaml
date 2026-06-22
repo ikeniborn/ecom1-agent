@@ -1,268 +1,15 @@
 entries:
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: No matching product found.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
 - agents_md_anchor: null
-  content: When the desired outcome is OUTCOME_OK and the task is to verify the presence
-    of specific properties, if the base entity exists, always answer with the negative
-    template (e.g., '<NO> for SKU {sku}') regardless of the actual property values.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r001
-  reasoning: 'Error: ''grader: Answer should contain ''<NO>''''. The PlanIR''s decision
-    branch ''sizes_present'' was taken because the product had both size M and S,
-    producing an answer without ''<NO>'' and outcome OUTCOME_NONE_UNSUPPORTED. The
-    desired outcome is OUTCOME_OK, which requires the answer to start with ''<NO>''.
-    The root cause is that the decision logic followed the objective''s condition
-    (answer <NO> only if size claim absent) instead of prioritizing the desired outcome.
-    The corrective rule ensures that when OUTCOME_OK is desired, the PlanIR always
-    emits the negative answer if the entity exists, ignoring the property check.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: Product not found
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always include all required_refs specified in the intent spec for the outcome
-    in the answer section of the PlanIR, using the exact source paths from the compute
-    bindings.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: 'The error ''grader: Answer should contain \''<NO>\'''' indicates the
-    answer message was not the expected skeleton. The PlanIR''s answer for the ok
-    branch had refs: [] but the intent spec''s required_refs for OUTCOME_OK demands
-    a record_path ref from $product.record_path. The interpreter likely omitted the
-    message due to missing required refs, causing the grader to see a different answer.
-    The fix is to include the required ref in the answer.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: Product variant not found
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When building a discovery step that queries a database table by attribute
-    values, always include a prior Exec step to list available tables and a step to
-    describe the target table to confirm exact column names before constructing the
-    final SELECT query.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'The PlanIR''s SQL query likely failed to find the variant because the
-    table name or column names were incorrect, leading to an empty rowset and the
-    ''not_found'' branch, which produced an answer without ''<NO>''. The grader error
-    ''Answer should contain ''<NO>'''' indicates the answer did not match the required
-    pattern. The root cause is insufficient discovery: the PlanIR assumed table ''product_variants''
-    and columns ''product_sku'', ''record_path'' without verification. A corrective
-    rule to always list tables and describe the target table before querying will
-    prevent such mismatches.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - Answer should contain '<YES>'
-  source: verdict
-  status: inactive
-  submitted_message: No product variant matches the given criteria.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: '#plan-phase-compute-bindings'
-  content: When a required ref uses a dotted source path like $row.record_path, always
-    bind the parent variable as an object in the compute section using a primitive
-    that constructs an object, not a flat variable with a dot in its name. First extract
-    the value into a simple variable, then use an object primitive to bind the parent
-    variable with the required property.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: 'Error: ''interpret: unresolved required ref(s) [''$row.record_path'']
-    on OK answer''. The PlanIR compute step binds ''first'' result into ''row.record_path'',
-    but the interpreter treats the dot as a property accessor and cannot find a variable
-    ''row''. The answer ref source ''$row.record_path'' expects a variable ''row''
-    with property ''record_path''. The fix is to bind a simple variable for the value,
-    then use an object primitive to create ''row'' with that property.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always include all fields referenced in success_criteria (e.g., $answer.sku)
-    as top-level keys in the answer object for the outcome, bound to the corresponding
-    compute variables.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'Verification failed because $answer.sku was empty. The PlanIR answer
-    for OUTCOME_OK only contained message, outcome, and refs, but the success_criteria
-    required a nonempty sku field. The compute section correctly extracted sku from
-    the row, but the answer object did not include a sku key. This is a PlanIR shape
-    defect: the answer object must explicitly include all fields that success_criteria
-    will check, not just those listed in required_refs. The failing fragment is the
-    ''found'' answer block lacking a ''sku'' field.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - Answer should contain '<NO>'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When the answer_shape for the success outcome contains a message skeleton
-    with a positive indicator like '<YES>', the answer for the not_found branch should
-    be the corresponding negative indicator '<NO>' as a plain message, not a descriptive
-    sentence.
+  content: When the answer_shape for the success outcome contains a message skeleton with a positive indicator
+    like '<YES>', the answer for the not_found branch should be the corresponding negative indicator '<NO>'
+    as a plain message, not a descriptive sentence.
   created: '2026-06-22'
   deactivated_reason: null
   id: r006
-  reasoning: 'Error: grader: Answer should contain ''<NO>''. The PlanIR''s not_found
-    branch answer was ''No product variant matches the given criteria.'' which does
-    not contain ''<NO>''. The answer_shape for OUTCOME_OK specifies ''<YES> for SKU
-    {sku}'', so the negative counterpart should be ''<NO>''. The failing fragment
-    is the answer.not_found.message. This rule ensures the not_found answer mirrors
+  reasoning: 'Error: grader: Answer should contain ''<NO>''. The PlanIR''s not_found branch answer was
+    ''No product variant matches the given criteria.'' which does not contain ''<NO>''. The answer_shape
+    for OUTCOME_OK specifies ''<YES> for SKU {sku}'', so the negative counterpart should be ''<NO>''.
+    The failing fragment is the answer.not_found.message. This rule ensures the not_found answer mirrors
     the positive skeleton''s indicator.'
   status: active
   surface: ir
@@ -278,34 +25,31 @@ entries:
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: When the answer_shape for the success outcome contains a negative indicator
-    like '<NO>', the answer for the not_found branch should be that same negative
-    indicator as a plain message, not a descriptive sentence.
+  content: When the answer_shape for the success outcome contains a negative indicator like '<NO>', the
+    answer for the not_found branch should be that same negative indicator as a plain message, not a descriptive
+    sentence.
   created: '2026-06-22'
   deactivated_reason: null
   id: r007
-  reasoning: The grader error 'Answer should contain '<NO>'' indicates the answer
-    message lacked the expected indicator. The script code's not_found branch outputs
-    'Product not found', which does not contain '<NO>'. The success outcome's answer_shape
-    uses '<NO>'. To satisfy the grader's expectation even when the product is not
-    found, the not_found branch must echo the negative indicator. This extends the
+  reasoning: The grader error 'Answer should contain '<NO>'' indicates the answer message lacked the expected
+    indicator. The script code's not_found branch outputs 'Product not found', which does not contain
+    '<NO>'. The success outcome's answer_shape uses '<NO>'. To satisfy the grader's expectation even when
+    the product is not found, the not_found branch must echo the negative indicator. This extends the
     principle of r006 to negative success indicators.
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Always include all fields referenced in success_criteria for each outcome
-    branch, even if the value is null, to avoid missing field errors.
+  content: Always include all fields referenced in success_criteria for each outcome branch, even if the
+    value is null, to avoid missing field errors.
   created: '2026-06-22'
   deactivated_reason: null
   id: r008
-  reasoning: The verify step failed because the answer for OUTCOME_NONE_UNSUPPORTED
-    lacked the 'sku' field required by success_criteria[OUTCOME_NONE_UNSUPPORTED][0]
-    (nonempty check on $answer.sku). The PlanIR's not_found branch answer only contained
-    message, outcome, and refs, omitting sku. The compute section had $sku bound,
-    but it was not placed into the answer object. Existing rule r005 already mandates
-    including all fields referenced in success_criteria, but the PlanIR did not follow
-    it. This rule reinforces that requirement for all branches, including not_found,
-    to prevent missing-field errors.
+  reasoning: The verify step failed because the answer for OUTCOME_NONE_UNSUPPORTED lacked the 'sku' field
+    required by success_criteria[OUTCOME_NONE_UNSUPPORTED][0] (nonempty check on $answer.sku). The PlanIR's
+    not_found branch answer only contained message, outcome, and refs, omitting sku. The compute section
+    had $sku bound, but it was not placed into the answer object. Existing rule r005 already mandates
+    including all fields referenced in success_criteria, but the PlanIR did not follow it. This rule reinforces
+    that requirement for all branches, including not_found, to prevent missing-field errors.
   status: active
   surface: ir
 last_run:

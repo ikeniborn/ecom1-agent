@@ -1,290 +1,4 @@
 entries:
-- agents_md_anchor: '#security-guest-access'
-  content: 'When using identity roles in decision branches that require a list (e.g.,
-    contains_any), always pre-process roles with a compute step that coerces the value
-    to a list: if it is a string, wrap it in a list; if it is null or missing, default
-    to an empty list.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r001
-  reasoning: 'Error ''real_vm: bad argument type for built-in operation'' occurred
-    during execution. Root cause: the /bin/id command returned a JSON object where
-    the ''roles'' field was not a list (likely a string or missing), causing the decision
-    primitive ''contains_any'' to fail because it expects a list as its first argument.
-    Failing PlanIR fragment: decision branch {"when":{"op":"not",...,"args":[{"op":"contains_any","lhs":"$identity.roles","rhs":["refund_manager"]}]}}.
-    The rule ensures identity roles are normalized to a list before list-based operations,
-    preventing type errors in security checks.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: 'Refund approval for return ret_020: denied due to security policy.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- agents_md_anchor: null
-  content: Always set the decision's default_label to the desired outcome (e.g., OUTCOME_OK)
-    and only add branches for denial conditions; never set default_label to a denial
-    outcome unless the denial condition is always true.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: The plan's decision had a single branch for guest -> denied_security
-    and default_label also denied_security, causing all paths to yield OUTCOME_DENIED_SECURITY.
-    The correct plan should have default_label OUTCOME_OK and a branch for guest ->
-    denied_security. The error is purely a decision-structure bug.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: 'Refund approval for payment pay_017 denied: guest access does
-    not permit write operations.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- agents_md_anchor: null
-  content: Always set the answer block's outcome to the desired_outcome from the IntentSpec,
-    not a hardcoded value.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'The grader expected outcome OUTCOME_NONE_UNSUPPORTED but the PlanIR''s
-    answer block hardcoded OUTCOME_DENIED_SECURITY. The root cause is that the answer
-    block did not use the IntentSpec''s desired_outcome. The failing fragment: answer.denied.outcome
-    = ''OUTCOME_DENIED_SECURITY''. The new rule ensures the PLAN phase emits the correct
-    outcome by referencing the IntentSpec.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a security constraint's deny_when condition holds, always add a decision
-    branch that leads to the denial outcome (e.g., OUTCOME_DENIED_SECURITY) and include
-    a corresponding answer block for that outcome; never map the denial condition
-    to the desired outcome.
-  created: '2026-06-22'
-  deactivated_reason: r004 did not specify that the decision branch must set the outcome,
-    leading to OUTCOME_NONE_CLARIFICATION; new rule explicitly requires setting outcome
-    in the branch.
-  id: r004
-  reasoning: The plan's decision branch for the security constraint '#security-guest-refund'
-    mapped to label 'unsupported' (OUTCOME_NONE_UNSUPPORTED) instead of the denial
-    outcome. The verify phase detected that the constraint's deny_when held, but the
-    outcome was not DENIED_SECURITY. The plan must branch to the denial outcome when
-    a security constraint triggers, and the answer block must include that outcome.
-    The existing rule r002 says to add branches for denial conditions, but the plan
-    still misrouted the branch to the desired outcome. This rule explicitly forbids
-    that.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When a param is defined as a record from a table, always include a discovery
-    step to fetch that record and bind it to the param name, so that required refs
-    can be resolved.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'Error: interpret: unresolved required refs [''$return_request.record_path'']
-    on OK answer. Root cause: PlanIR omitted any discovery step to fetch the return_request
-    record, so the interpreter could not resolve the required ref. The failing PlanIR
-    fragment is the empty ''rowsets'' and missing discovery for $return_request. The
-    new rule ensures that whenever the IntentSpec defines a param as a record from
-    a table, the plan includes a discovery step to materialize that record and bind
-    it to the param name, enabling ref resolution.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never use the concat primitive to build a string; concat is for merging
-    two lists of rows. Use a format or template step to construct strings from a template
-    and a list of values.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() takes 2
-    positional arguments but 3 were given. CONTRACT: concat(a, b): both args must
-    be list[dict] rows (parse Exec output via rowsets first). Root cause: the PlanIR
-    used concat with three string arguments to build an SQL UPDATE statement, but
-    concat is designed to concatenate two lists of rows, not strings. Failing PlanIR
-    fragment: {"prim":"concat","args":["UPDATE return_requests SET return_status =
-    ''approved'' WHERE return_id = ''","$return_request.return_id","'';"],"into":"update_sql"}.
-    The plan should have used a format or template step to construct the SQL string
-    from a template and a list of values. No existing rule covers this.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When a security constraint's deny_when condition is present, always add
-    a decision branch that evaluates the condition using the facts and params, and
-    set the branch's 'outcome' to the denial outcome (e.g., OUTCOME_DENIED_SECURITY);
-    never rely on the default branch or the answer block's outcome field to set the
-    final outcome.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: The PlanIR had no decision branches, so the condition was not evaluated.
-    The default_label 'denied' led to an answer block with outcome OUTCOME_DENIED_SECURITY,
-    but the system did not use that outcome, resulting in OUTCOME_NONE_CLARIFICATION.
-    The grader expected OUTCOME_NONE_UNSUPPORTED (likely a misalignment), but the
-    root cause is that the outcome was not set by a decision branch. Existing rule
-    r004 says to add a branch but does not require setting the outcome in the branch,
-    which is necessary.
-  status: inactive
-  surface: ir
 - content: null
   created: '2026-06-22'
   id: v015
@@ -298,49 +12,44 @@ entries:
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: When a param is defined as a record from a table, always include a decision
-    branch that checks if the record was found (i.e., the rowset is non-empty), and
-    if not, set the outcome to OUTCOME_NONE_UNSUPPORTED.
+  content: When a param is defined as a record from a table, always include a decision branch that checks
+    if the record was found (i.e., the rowset is non-empty), and if not, set the outcome to OUTCOME_NONE_UNSUPPORTED.
   created: '2026-06-22'
   deactivated_reason: null
   id: r008
-  reasoning: The PlanIR only had a decision branch for guest identity, and the default
-    branch also set OUTCOME_DENIED_SECURITY. The return_request lookup for pay_023
-    returned no rows, so the correct outcome should have been OUTCOME_NONE_UNSUPPORTED,
-    as the grader expected. The PlanIR lacked a branch to handle missing record, causing
-    the wrong outcome.
+  reasoning: The PlanIR only had a decision branch for guest identity, and the default branch also set
+    OUTCOME_DENIED_SECURITY. The return_request lookup for pay_023 returned no rows, so the correct outcome
+    should have been OUTCOME_NONE_UNSUPPORTED, as the grader expected. The PlanIR lacked a branch to handle
+    missing record, causing the wrong outcome.
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Never use the 'get' primitive with a single argument; 'get' requires an
-    object and a key. To assign a literal value to a param, use a 'literal' compute
-    step instead.
+  content: Never use the 'get' primitive with a single argument; 'get' requires an object and a key. To
+    assign a literal value to a param, use a 'literal' compute step instead.
   created: '2026-06-22'
   deactivated_reason: null
   id: r009
-  reasoning: 'The compute step ''get'' failed with ''missing 1 required positional
-    argument: key'' because the script provided only one argument (''pay_027'') instead
-    of the required two (object, key). The intent was to set the payment_id param
-    to the literal ''pay_027'', but ''get'' is designed to retrieve a value from an
-    object by key. The correct approach is to use a ''literal'' compute step to assign
-    a constant value. The script also omitted a discovery step for the return_requests
-    table, but the immediate error is the misuse of ''get''.'
+  reasoning: 'The compute step ''get'' failed with ''missing 1 required positional argument: key'' because
+    the script provided only one argument (''pay_027'') instead of the required two (object, key). The
+    intent was to set the payment_id param to the literal ''pay_027'', but ''get'' is designed to retrieve
+    a value from an object by key. The correct approach is to use a ''literal'' compute step to assign
+    a constant value. The script also omitted a discovery step for the return_requests table, but the
+    immediate error is the misuse of ''get''.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: When binding identity from /bin/id, always parse the output into a structured
-    fact with a 'kind' field (e.g., 'employee', 'guest') and bind it as $identity,
-    so that decision branches and security constraints can reference $identity.kind.
+  content: When binding identity from /bin/id, always parse the output into a structured fact with a 'kind'
+    field (e.g., 'employee', 'guest') and bind it as $identity, so that decision branches and security
+    constraints can reference $identity.kind.
   created: '2026-06-22'
   deactivated_reason: null
   id: r010
-  reasoning: The script bound the raw /bin/id output to 'identity' but did not parse
-    it into a structured object with a 'kind' field. The decision branch `$identity.kind
-    == 'guest'` therefore never matched, causing the script to fall through to the
-    default 'unsupported' outcome. The security constraint's deny_when condition evaluated
-    true (likely because the interpreter extracted 'kind' from the raw output differently),
-    but the script's outcome was OUTCOME_NONE_UNSUPPORTED, violating the constraint.
-    The fix is to parse the /bin/id output to set identity.kind explicitly.
+  reasoning: The script bound the raw /bin/id output to 'identity' but did not parse it into a structured
+    object with a 'kind' field. The decision branch `$identity.kind == 'guest'` therefore never matched,
+    causing the script to fall through to the default 'unsupported' outcome. The security constraint's
+    deny_when condition evaluated true (likely because the interpreter extracted 'kind' from the raw output
+    differently), but the script's outcome was OUTCOME_NONE_UNSUPPORTED, violating the constraint. The
+    fix is to parse the /bin/id output to set identity.kind explicitly.
   status: active
   surface: ir
 last_run:

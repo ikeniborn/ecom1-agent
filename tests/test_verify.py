@@ -25,13 +25,13 @@ def test_i1_ok_with_unresolved_dollar_ref_fails():
     assert not ok and "ref" in err.lower()
 
 
-def test_i1_ok_missing_a_required_ref_fails():
-    # one record_path required, but the answer carries no refs -> fail
+def test_i1_ok_missing_a_required_policy_doc_fails():
+    # required policy_doc resolves to a literal path; absent from refs -> fail.
     intent = _intent(required_refs={"OUTCOME_OK": [
-        {"kind": "record_path", "source": "$row.record_path"}]})
+        {"kind": "policy_doc", "path": "/docs/counting.md"}]})
     res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]))
     ok, err = verify(res, intent)
-    assert not ok
+    assert not ok and "/docs/counting.md" in err
 
 
 def test_i1_ok_with_all_required_refs_passes():
@@ -91,3 +91,48 @@ def test_success_criteria_must_hold():
     res_ok = _result(CapturedAnswer(message="hi", outcome="OUTCOME_OK", refs=["x"]))
     ok, err = verify(res_ok, intent)
     assert ok, err
+
+
+def test_i1_required_ref_enforced_on_non_ok_outcome():
+    # the t26 class: a denial must still cite its required policy doc.
+    intent = _intent(required_refs={"OUTCOME_NONE_UNSUPPORTED": [
+        {"kind": "policy_doc", "path": "/docs/checkout.md"}]})
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_NONE_UNSUPPORTED",
+                                 refs=["/docs/security.md"]))
+    ok, err = verify(res, intent)
+    assert not ok and "/docs/checkout.md" in err
+
+
+def test_i1_required_ref_present_on_non_ok_passes():
+    intent = _intent(required_refs={"OUTCOME_NONE_UNSUPPORTED": [
+        {"kind": "policy_doc", "path": "/docs/checkout.md"}]})
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_NONE_UNSUPPORTED",
+                                 refs=["/docs/checkout.md"]))
+    ok, err = verify(res, intent)
+    assert ok, err
+
+
+def test_i1_dollar_ref_guard_fires_on_non_ok():
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_NONE_UNSUPPORTED",
+                                 refs=["$unresolved"]))
+    ok, err = verify(res, _intent())
+    assert not ok and "ref" in err.lower()
+
+
+def test_i1_unresolved_record_path_source_skipped_when_path_present():
+    # required record_path whose $source isn't in env, but grounding put the literal
+    # path in refs -> presence-based check skips the unresolved source and passes.
+    intent = _intent(required_refs={"OUTCOME_OK": [
+        {"kind": "record_path", "source": "$row.record_path"}]})
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK",
+                                 refs=["/proc/catalog/A.json"]))
+    ok, err = verify(res, intent)
+    assert ok, err
+
+    # Inverse: when env resolves the source, absence from refs MUST fail (proves the
+    # positive case passes because the path is present, not because nothing is required).
+    res_env_resolves = _result(
+        CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]),
+        env={"row": {"record_path": "/proc/catalog/A.json"}})
+    ok2, err2 = verify(res_env_resolves, intent)
+    assert not ok2 and "/proc/catalog/A.json" in err2

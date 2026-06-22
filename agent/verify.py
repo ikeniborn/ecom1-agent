@@ -4,7 +4,7 @@ Same predicate engine as the interpreter. Returns (ok, error); error feeds LEARN
 """
 from __future__ import annotations
 
-from .interpreter import InterpretResult
+from .interpreter import InterpretResult, _project_required_refs
 from .ir_models import IntentSpec
 from .predicates import evaluate
 
@@ -18,17 +18,17 @@ def verify(result: InterpretResult, intent: IntentSpec) -> tuple[bool, str]:
     if ans.outcome not in intent.outcome_space:
         return False, f"I2: outcome {ans.outcome!r} not in outcome_space {intent.outcome_space!r}"
 
-    # I1: ref-grounding on OK answers — every required ref for the selected
-    # outcome must be present and non-empty. refs are projected by the
-    # interpreter from intent.required_refs, so this is defense-in-depth.
-    if ans.outcome == "OUTCOME_OK":
-        unresolved = [r for r in ans.refs if isinstance(r, str) and r.startswith("$")]
-        if unresolved:
-            return False, f"I1: unresolved refs {unresolved!r} on OK answer"
-        n_required = len(intent.required_refs.get(ans.outcome, []))
-        if n_required and len(ans.refs) < n_required:
-            return False, (f"I1: OK answer carries {len(ans.refs)} ref(s) "
-                           f"but {n_required} required")
+    # I1: ref-grounding — enforced on EVERY outcome (not just OK), presence-based
+    # (not count). grounding.ground_refs has already overwritten ans.refs with the
+    # authoritative VM-derived set before verify runs.
+    unresolved = [r for r in ans.refs if isinstance(r, str) and r.startswith("$")]
+    if unresolved:
+        return False, f"I1: unresolved refs {unresolved!r} on {ans.outcome} answer"
+    required_vals, _missing_src = _project_required_refs(intent, ans.outcome, env)
+    absent = [v for v in required_vals if v not in ans.refs]
+    if absent:
+        return False, (f"I1: required ref(s) {absent!r} absent from "
+                       f"{ans.outcome} answer")
 
     # I3: independent security re-check from the frozen IntentSpec (defense in depth)
     for c in intent.constraints:

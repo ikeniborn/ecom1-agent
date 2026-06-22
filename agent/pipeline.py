@@ -2,16 +2,14 @@
 from __future__ import annotations
 
 import os
-from datetime import date
 from pathlib import Path
 
 from .json_extract import _extract_json_from_text
 from .learned_store import _format_entry, apply_learn_diff, load_entries, save_last_run
 from .llm import (
-    CLI_BLUE, CLI_CLR, CLI_GREEN, CLI_YELLOW,
+    CLI_BLUE, CLI_CLR, CLI_YELLOW,
     OUTCOME_BY_NAME, _resolve_model_for_phase, call_llm_raw,
 )
-from .oracle_validate import validate_atom_via_grader
 from .models import LearnConsolidateOutput
 from .prompt import load_prompt
 from .trace import log_gate_auto, set_cycle
@@ -119,24 +117,6 @@ def _enrich_prim_error(err: str) -> str:
     return err
 
 
-def _data_path_seed(instruction: str, task_id: str) -> list[str]:
-    """Deterministic data-path seed for INVESTIGATE: absolute-path literals in the
-    instruction UNION learned prephase_deep_read absolute paths. Empty (no-op) unless
-    ECOM_INVESTIGATE_DATA_PATHS=1. Bounded by ECOM_PREPHASE_PATH_LITERALS — no wandering.
-    Imports are function-level: orchestrator imports pipeline, so a module-level import
-    here would be a cycle; by call time orchestrator is fully loaded."""
-    import os as _os
-    if _os.environ.get("ECOM_INVESTIGATE_DATA_PATHS", "0") != "1":
-        return []
-    from .orchestrator import _extract_path_literals
-    from .learned_store import load_prephase_deep_read
-    seed = list(_extract_path_literals(instruction))
-    for d in load_prephase_deep_read(task_id):
-        if d.startswith("/") and d not in seed:
-            seed.append(d)
-    return seed
-
-
 # ---------------------------------------------------------------------------
 # Learn + consolidate (merged LLM call)
 # ---------------------------------------------------------------------------
@@ -235,54 +215,15 @@ def _new_oracle():
     return KnowledgeOracle()
 
 
-def _brief_lessons_text(brief) -> str:
-    """One-line-per-step lessons from an investigation brief, for distillation."""
-    if brief is None or not getattr(brief, "notes", None):
-        return ""
-    return "\n".join(f"- {n.lesson}" for n in brief.notes if n.lesson)
-
-
-def _distill_call(oracle, intent, plan, task_id, outcome_note):
-    # `error` param is repurposed as a short success note; the distill prompt
-    # strips all run-specific values, so a success note is fine (spec §Distill).
-    return oracle.distill(design_intent=intent.objective,
-                          error=outcome_note,
-                          script_code=plan.model_dump_json(),
-                          source_task=task_id)
-
-
-def _maybe_distill_and_validate(intent, plan, task_id, outcome_note) -> None:
-    """On a successful cycle, distill a candidate atom (ORACLE_DISTILL=1) and,
-    when ORACLE_VALIDATE_INLINE=1, grader-validate then promote. Never raises."""
-    if (os.environ.get("ECOM_ORACLE_ENABLED", "1") == "0"
-            or os.environ.get("ECOM_ORACLE_DISTILL", "0") != "1"):
-        return
-    try:
-        oracle = _new_oracle()
-        atom = _distill_call(oracle, intent, plan, task_id, outcome_note)
-    except Exception as e:
-        print(f"{CLI_YELLOW}[pipeline] oracle distill skipped: {e}{CLI_CLR}")
-        return
-    if not atom or os.environ.get("ECOM_ORACLE_VALIDATE_INLINE", "1") != "1":
-        return
-    try:
-        if validate_atom_via_grader(atom, task_id, intent, plan):
-            oracle.promote(atom.id, validated_by="grader-oracle",
-                           validated_at=str(date.today()))
-            print(f"{CLI_GREEN}[pipeline] atom {atom.id} promoted (grader-validated){CLI_CLR}")
-    except Exception as e:
-        print(f"{CLI_YELLOW}[pipeline] atom promote skipped: {e}{CLI_CLR}")
-
-
 def distill_from_grader(task_id: str, score: float, score_detail: list[str]) -> None:
     """End-of-run self-fill: distill an ACTIVE polarity atom from the grader score.
 
     pass (score >= 1.0) -> 'method' atom (effective knowledge);
     fail (score < 1.0)  -> 'anti_pattern' atom (failure cause, steers away next run).
 
-    Uses the score already returned by SubmitRun — NOT a live grader round-trip
-    (ORACLE_VALIDATE_INLINE stays 0 by default). Never raises; the run result is
-    unchanged if distill yields nothing. Reads the persisted IntentSpec + PlanIR.
+    Uses the score already returned by SubmitRun — NOT a live grader round-trip.
+    Never raises; the run result is unchanged if distill yields nothing. Reads the
+    persisted IntentSpec + PlanIR.
     """
     if os.environ.get("ECOM_ORACLE_ENABLED", "1") == "0":
         return
@@ -329,47 +270,6 @@ def _make_answer_once(vm):
 
 
 # ---------------------------------------------------------------------------
-# F8b: gated distill -> validate -> promote hook
-# ---------------------------------------------------------------------------
-
-def _load_good_plan(task_id):
-    """Last persisted successful PlanIR for this task (known-good), or None. Persisted
-    only on a success path (_persist_artifacts), so it exists once the task has passed
-    at least once — the false-positive reference for inline check validation."""
-    pp = Path("data/heuristics") / f"{task_id}.plan.json"
-    if not pp.exists():
-        return None
-    try:
-        from .ir_models import PlanIR
-        return PlanIR.model_validate_json(pp.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-
-
-def _maybe_harness_distill(plan, error, task_id) -> None:
-    """F8b (gated HARNESS_DISTILL=1, default 0): after an F1-class compute contract
-    failure, propose a `candidate` check-spec. When HARNESS_VALIDATE_INLINE=1 (default),
-    validate it — the candidate MUST flag this failing plan AND must NOT flag the last
-    known-good plan — and promote (candidate -> active) on success; otherwise it stays a
-    warn-only candidate for an offline promote. Never raises (cannot dead-end a run)."""
-    if os.environ.get("ECOM_HARNESS_DISTILL", "0") != "1":
-        return
-    if "compute step" not in error and "custom_extract" not in error:
-        return
-    try:
-        from . import harness
-        candidate = harness.distill(plan, error, source_task=task_id)
-        if not candidate or os.environ.get("ECOM_HARNESS_VALIDATE_INLINE", "1") != "1":
-            return
-        from .harness_validate import validate_check_via_grader
-        if validate_check_via_grader(candidate, plan, _load_good_plan(task_id)):
-            harness.promote(candidate["id"])
-            print(f"{CLI_GREEN}[pipeline] check {candidate['id']} promoted (validated){CLI_CLR}")
-    except Exception as e:
-        print(f"{CLI_YELLOW}[pipeline] harness distill skipped: {e}{CLI_CLR}")
-
-
-# ---------------------------------------------------------------------------
 # Main entry — Plan-IR interpreter pipeline
 # ---------------------------------------------------------------------------
 
@@ -383,6 +283,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     from .interpreter import InterpretError, interpret, lint, repair_sql_stdin
     from .reason import IntentError, PlanEmptyError, PlanError, run_intent, run_plan
     from .verify import verify
+    from .grounding import ground_refs
 
     # Surface collapse (D5): PLAN sees all active rules; the grader-feedback
     # training-mode bug self-heals because learn_from_grader writes the same store.
@@ -421,12 +322,11 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
 
     # INVESTIGATE (read-only ReAct) — build a compact brief the PLAN consumes in place
     # of the front-loaded facts dump. Skipped (oracle dumped eagerly above) when off.
-    brief = None                                  # kept in scope for the success-path distill (Task 11)
+    brief = None
     brief_block = None
     if _investigate_on:
         try:
-            brief = investigate(vm, intent, seed=facts, oracle=_oracle,
-                                data_paths=_data_path_seed(instruction, task_id))
+            brief = investigate(vm, intent, seed=facts, oracle=_oracle)
             brief_block = render_brief(brief) or None
         except Exception as e:                    # graceful: fall back to the slim seed facts
             print(f"{CLI_YELLOW}[pipeline] investigate failed, using seed facts: {e}{CLI_CLR}")
@@ -504,7 +404,6 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             log_gate_auto("INTERPRET", False, last_error)
             _ilearn(task_id, learn_ctx, intent, plan.model_dump_json(), last_error,
                     observed=None)
-            _maybe_harness_distill(plan, last_error, task_id)
             if getattr(e, "mutation_landed", False):
                 break
             if _stuck_on_same_error(last_error):
@@ -532,6 +431,11 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
 
         log_gate_auto("INTERPRET", True, "")
         last_observed = result.observations
+        # Phase 1: deterministic ref-grounding overwrites answer.refs with the
+        # authoritative VM-derived set before VERIFY (best-effort, never raises).
+        _docs_read = (brief.env.get("docs_read") if brief is not None else None) or []
+        result.captured.refs = ground_refs(intent, result.captured, result, vm,
+                                            instruction, docs_read=_docs_read)
         ok, verr = verify(result, intent)
         log_gate_auto("VERIFY", ok, "" if ok else verr)
         if ok:
@@ -539,11 +443,6 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             refs = _ground_security_refs(ans.outcome, list(ans.refs))
             answer_once(ans.message, ans.outcome, refs)
             _persist_artifacts(task_id, intent, plan)
-            _note = f"OK: {verr or 'verify passed'}"
-            _lessons = _brief_lessons_text(brief)
-            if _lessons:
-                _note = _note + "\nINVESTIGATION_LESSONS:\n" + _lessons
-            _maybe_distill_and_validate(intent, plan, task_id, _note)
             status = "success" if ans.outcome == "OUTCOME_OK" else "failure"
             save_last_run(task_id, status, ans.outcome, cycle)
             return {"cycles_used": cycle, "outcome": ans.outcome, "status": status,

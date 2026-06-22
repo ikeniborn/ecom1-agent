@@ -1,315 +1,38 @@
 entries:
 - agents_md_anchor: null
-  content: When a security constraint includes a deny_when condition, the decision
-    must contain a branch that evaluates that condition and, if true, routes to a
-    DENIED_SECURITY outcome with an appropriate message and the required refs.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r001
-  reasoning: The PlanIR lacked a decision branch to check the deny_when condition
-    (identity.kind == 'guest'). The security constraint explicitly forbids guest access
-    to customer-specific resources, so the plan should have produced OUTCOME_DENIED_SECURITY
-    instead of defaulting to unsupported. The rule ensures future plans include such
-    security checks.
-  status: inactive
-  surface: ir
-- agents_md_anchor: '#plan/compute'
-  content: Never use the 'get' primitive with a single argument; 'get' requires an
-    object and a key. To include a literal required ref path in the answer, place
-    it directly in the answer's refs array without a compute step.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: The PlanIR compute step 'get' was called with only one argument ('/docs/security.md'),
-    violating the contract 'get(obj, key)'. The intent required a policy doc ref;
-    the correct approach is to embed the literal path directly in the answer's refs
-    array, not to compute it via 'get'.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a decision branch evaluates a security constraint's deny_when condition,
-    the lhs must use the exact variable path from the IntentSpec (e.g., $_facts.identity.kind)
-    rather than a shortened or assumed name (e.g., $identity.kind).
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'Error: ''verify: I3: security constraint ''#customer/guest'' deny_when
-    holds but outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY''. The
-    PlanIR decision branch used ''$identity.kind'' as lhs, but the IntentSpec defines
-    the caller identity as ''$_facts.identity''. The branch condition failed to match
-    because the variable was undefined, causing the default ''none_unsupported'' outcome
-    to be selected. The existing rule about including a deny_when branch is correct
-    but insufficient; the branch must reference the exact variable path from the IntentSpec.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/checkout.md'
-  source: verdict
-  status: inactive
-  submitted_message: 'Access denied: guest identities cannot access shopping baskets.
-    See /docs/security.md.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- agents_md_anchor: null
-  content: When constructing the answer's refs array, include all policy document
-    paths that appear as anchors in the constraints, not only those listed in the
-    outcome's required_refs.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: 'The grader error ''answer missing required reference ''/docs/checkout.md''''
-    occurred because the PlanIR answer for the denied_security branch only included
-    the /docs/security.md ref, but the constraints contain an anchor for #docs/checkout.md.
-    The grader expects that any policy document referenced in the constraints must
-    be included in the answer''s refs array, regardless of whether it is explicitly
-    listed in the outcome''s required_refs. The script''s answer omitted /docs/checkout.md,
-    causing the failure.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_093.json'
-  source: verdict
-  status: inactive
-  submitted_message: 'Checkout denied: guest users cannot perform this action. Please
-    sign in to continue.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-  - /docs/checkout.md
-- agents_md_anchor: null
-  content: When the objective references a specific entity (e.g., 'most recently created
-    open shopping basket'), the PlanIR must include discovery steps to locate that
-    entity and include its resolved path in the answer's refs array, regardless of
-    the outcome.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'Error: ''grader: answer missing required reference ''/proc/baskets/basket_093.json''''.
-    Root cause: The PlanIR omitted any discovery of the basket that is the subject
-    of the checkout objective. The answer refs only contained policy docs (/docs/security.md,
-    /docs/checkout.md) but the grader expected the path of the most recent basket.
-    The failing PlanIR fragment is the answer.deny_guest.refs array, which lacked
-    the basket path. No existing rule covers entity refs; r004 only addresses policy
-    doc refs from constraints.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/security.md'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/security.md'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/security.md'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/security.md'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/checkout.md'
-  source: verdict
-  status: inactive
-  submitted_message: 'Checkout denied: guest users cannot perform checkout.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- agents_md_anchor: null
-  content: When the objective describes a business action (e.g., checkout, return,
-    cancel), include a reference to the corresponding policy document (e.g., /docs/checkout.md)
-    in the answer's refs array, regardless of the outcome.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: 'Error: ''grader: answer missing required reference ''/docs/checkout.md''''.
-    The PlanIR''s answer refs for OUTCOME_DENIED_SECURITY included /docs/security.md
-    (from constraints) and a basket record, but the grader expected /docs/checkout.md
-    because the objective involves checkout. The plan''s required_refs for this outcome
-    only listed /docs/security.md, but the grader''s check implies that the checkout
-    action itself requires its policy document. The root cause is that the PLAN phase
-    did not infer the need for the action-specific policy doc. The new rule instructs
-    the PLAN phase to always include the policy document matching the objective''s
-    action verb.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Do not use the concat primitive to build SQL query strings; concat is only
-    for merging rowsets. Instead, construct the SQL query using a string template
-    with variable substitution directly in the Exec step's stdin field, or use a dedicated
-    string-formatting primitive if available.
+  content: Do not use the concat primitive to build SQL query strings; concat is only for merging rowsets.
+    Instead, construct the SQL query using a string template with variable substitution directly in the
+    Exec step's stdin field, or use a dedicated string-formatting primitive if available.
   created: '2026-06-22'
   deactivated_reason: null
   id: r007
-  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes
-    2 positional arguments but 3 were given. CONTRACT: concat(a, b): both args must
-    be list[dict] rows (parse Exec output via rowsets first)''. Root cause: PlanIR
-    used concat primitive with three string arguments to assemble a SQL query, violating
-    the primitive''s contract. Failing fragment: compute step {"prim":"concat","args":["SELECT
-    basket_id, record_path, basket_status, store_id FROM shopping_baskets WHERE customer_id
-    = ''","$cid","'' AND basket_status = ''open'' ORDER BY basket_created_at DESC
-    LIMIT 1"],"into":"basket_sql"}. The concat primitive is designed to merge rowsets,
-    not strings. The plan should instead embed the variable directly in the Exec stdin
-    using a template (e.g., stdin: "SELECT ... WHERE customer_id = ''$cid'' AND ...")
-    or use a string-formatting primitive if the toolset provides one. This rule prevents
-    future misuse of concat for string assembly.'
+  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes 2 positional arguments
+    but 3 were given. CONTRACT: concat(a, b): both args must be list[dict] rows (parse Exec output via
+    rowsets first)''. Root cause: PlanIR used concat primitive with three string arguments to assemble
+    a SQL query, violating the primitive''s contract. Failing fragment: compute step {"prim":"concat","args":["SELECT
+    basket_id, record_path, basket_status, store_id FROM shopping_baskets WHERE customer_id = ''","$cid","''
+    AND basket_status = ''open'' ORDER BY basket_created_at DESC LIMIT 1"],"into":"basket_sql"}. The concat
+    primitive is designed to merge rowsets, not strings. The plan should instead embed the variable directly
+    in the Exec stdin using a template (e.g., stdin: "SELECT ... WHERE customer_id = ''$cid'' AND ...")
+    or use a string-formatting primitive if the toolset provides one. This rule prevents future misuse
+    of concat for string assembly.'
   status: active
   surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_119.json'
-  source: verdict
-  status: inactive
-  submitted_message: 'Checkout denied: Authentication required.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-  - /docs/checkout.md
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/security.md'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/security.md'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/security.md'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/security.md'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/docs/security.md'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/baskets/basket_173.json'
-  source: verdict
-  status: inactive
-  submitted_message: 'Checkout result: OUTCOME_DENIED_SECURITY for basket N/A.'
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/checkout.md
-  - /docs/security.md
 - agents_md_anchor: null
   content: Do not re-resolve identity facts in the PlanIR; use the pre-resolved $_facts.identity.kind
     directly in decision branches.
   created: '2026-06-22'
   deactivated_reason: null
   id: r008
-  reasoning: 'verify: I3: security constraint ''#security-guest-checkout-denied''
-    deny_when holds but outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY.
-    The PlanIR included a discovery step to run /bin/id and bind it as ''identity'',
-    then used $identity.kind in the decision branch. The pre-phase already resolved
-    identity.kind as ''guest'', but the PlanIR''s re-resolution returned ''customer''
-    (or the branch used the wrong source). The security constraint requires that when
-    identity.kind is ''guest'', the outcome must be DENIED_SECURITY. The PlanIR''s
-    decision branch used $identity.kind (from its own discovery) instead of $_facts.identity.kind,
-    causing the branch to not fire and default to OUTCOME_NONE_UNSUPPORTED, violating
-    the constraint. The PlanIR must not re-resolve identity; it must use the pre-resolved
-    $_facts.identity.kind directly.'
+  reasoning: 'verify: I3: security constraint ''#security-guest-checkout-denied'' deny_when holds but
+    outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY. The PlanIR included a discovery step
+    to run /bin/id and bind it as ''identity'', then used $identity.kind in the decision branch. The pre-phase
+    already resolved identity.kind as ''guest'', but the PlanIR''s re-resolution returned ''customer''
+    (or the branch used the wrong source). The security constraint requires that when identity.kind is
+    ''guest'', the outcome must be DENIED_SECURITY. The PlanIR''s decision branch used $identity.kind
+    (from its own discovery) instead of $_facts.identity.kind, causing the branch to not fire and default
+    to OUTCOME_NONE_UNSUPPORTED, violating the constraint. The PlanIR must not re-resolve identity; it
+    must use the pre-resolved $_facts.identity.kind directly.'
   status: active
   surface: ir
 - content: null
@@ -320,28 +43,24 @@ entries:
   - answer missing required reference '/proc/baskets/basket_152.json'
   source: verdict
   status: active
-  submitted_message: Checkout cannot be performed because you are not authenticated
-    as a customer.
+  submitted_message: Checkout cannot be performed because you are not authenticated as a customer.
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
   - /docs/checkout.md
 - agents_md_anchor: null
-  content: Always include a reference to the primary discovered record (the one matching
-    the objective's target entity) in the answer's refs array, even if the answer
-    shape does not explicitly require it.
+  content: Always include a reference to the primary discovered record (the one matching the objective's
+    target entity) in the answer's refs array, even if the answer shape does not explicitly require it.
   created: '2026-06-22'
   deactivated_reason: null
   id: r009
   reasoning: 'The grader reported: ''answer missing required reference ''/proc/baskets/basket_152.json''''.
-    The PlanIR discovered the newest open basket and placed a record ref with path
-    ''$newest_open_basket_path'' in the answer''s refs array for both outcome branches.
-    However, the interpreter likely omitted this ref because the answer shape only
-    specified a message skeleton and did not mandate any refs beyond the policy docs.
-    The root cause is that the PlanIR assumed the interpreter would include the refs,
-    but the interpreter only includes what the answer shape explicitly requires. The
-    corrective rule ensures that discovered record refs are always included in the
-    answer, regardless of the answer shape.'
+    The PlanIR discovered the newest open basket and placed a record ref with path ''$newest_open_basket_path''
+    in the answer''s refs array for both outcome branches. However, the interpreter likely omitted this
+    ref because the answer shape only specified a message skeleton and did not mandate any refs beyond
+    the policy docs. The root cause is that the PlanIR assumed the interpreter would include the refs,
+    but the interpreter only includes what the answer shape explicitly requires. The corrective rule ensures
+    that discovered record refs are always included in the answer, regardless of the answer shape.'
   status: active
   surface: ir
 last_run:

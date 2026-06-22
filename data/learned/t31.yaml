@@ -1,264 +1,29 @@
 entries:
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: Payment pay_050 for basket basket_250 has been processed with
-    outcome OUTCOME_DENIED_SECURITY.
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- agents_md_anchor: '#decision-branches'
-  content: When a decision includes a deny branch for a constraint condition, set
-    the default_label to the desired outcome (e.g., 'ok') and add a branch for the
-    deny condition only. Never set default_label to a deny outcome unless the deny
-    condition is always true.
-  created: '2026-06-22'
-  deactivated_reason: Superseded by a more precise rule that explicitly handles deny
-    outcomes as the desired outcome.
-  id: r001
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. Root
-    cause: decision block has a single branch for guest -> denied, and default_label
-    is ''denied''. Since the identity is not guest, the branch is skipped and default_label
-    ''denied'' is taken, always producing denied. The PlanIR fragment: decision.branches
-    only contains the deny condition, and default_label is ''denied''. No path to
-    OUTCOME_OK exists. The answer block also only defines the denied outcome, but
-    the primary bug is the decision logic. No existing rule covers this.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: 3DS verification cannot be resolved for this payment due to current
-    state.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs:
-  - /docs/payments/3ds.md
 - agents_md_anchor: null
-  content: When building a decision for a payment action, do not add branches that
-    check unrelated entity states (like basket status) unless the policy doc explicitly
-    requires them. Derive eligibility conditions solely from the relevant policy document's
-    content, extracting allowed statuses or other criteria, and never hardcode a list
-    of values.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED. Root
-    cause: The decision branch `when: {op: ne, lhs: $basket_status, rhs: "checked_out"}`
-    matched because the basket status was not "checked_out", leading to the unsupported
-    outcome. This branch is an over-constraint not required by the instruction or
-    policy. Additionally, the branch checking three_ds_status against a hardcoded
-    set ["status2","status3"] may have failed if the actual status was different;
-    the plan should have extracted eligible statuses from the 3ds.md policy document.
-    Failing PlanIR fragment: decision branches for basket_status and the hardcoded
-    in_set check. The rule prevents adding extraneous entity-state checks and mandates
-    deriving conditions from policy docs rather than hardcoding.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When a discovery SQL query joins a primary entity with a secondary entity
-    that may be missing, use LEFT JOIN instead of implicit cross join to ensure the
-    primary row is always returned. This prevents empty rowsets that cause compute
-    failures and CLARIFICATION outcomes.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: The interpreter returned OUTCOME_NONE_CLARIFICATION, indicating a plan
-    execution error rather than a business-logic mismatch. The PlanIR's discovery
-    SQL used a cross join ('FROM pay, basket') which returns zero rows if the basket
-    subquery is empty. The subsequent compute step 'first' on an empty rowset likely
-    failed, causing the interpreter to fall back to CLARIFICATION. Additionally, the
-    table name 'shopping_baskets' may be incorrect; the pre-phase did not deep-read
-    the database schema to confirm it. The decision branch checking basket_status
-    (ne 'checked_out') is unnecessary per r002 but did not cause this error.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: Guest users are not authorized to perform payment operations.
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- agents_md_anchor: null
-  content: When the desired outcome is a deny outcome (e.g., OUTCOME_DENIED_SECURITY)
-    and the deny condition is not always true, set the default_label to a non-deny
-    outcome (e.g., 'ok') and add a branch for the deny condition only. Never set default_label
-    to a deny outcome unless the deny condition is always true.
+  content: When the desired outcome is a deny outcome (e.g., OUTCOME_DENIED_SECURITY) and the deny condition
+    is not always true, set the default_label to a non-deny outcome (e.g., 'ok') and add a branch for
+    the deny condition only. Never set default_label to a deny outcome unless the deny condition is always
+    true.
   created: '2026-06-22'
   deactivated_reason: null
   id: r004
-  reasoning: The script's decision default_label was 'deny', which maps to OUTCOME_DENIED_SECURITY.
-    The deny condition (identity.kind == 'guest') was not always true, so the outcome
-    was produced even when identity.kind was 'customer', causing the success criteria
-    to fail. Existing rule r001 warns against this but was not applied; this rule
-    clarifies the case when the desired outcome itself is a deny outcome.
+  reasoning: The script's decision default_label was 'deny', which maps to OUTCOME_DENIED_SECURITY. The
+    deny condition (identity.kind == 'guest') was not always true, so the outcome was produced even when
+    identity.kind was 'customer', causing the success criteria to fail. Existing rule r001 warns against
+    this but was not applied; this rule clarifies the case when the desired outcome itself is a deny outcome.
   status: active
   surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: Payment pay_008 cannot be processed because you are not authenticated.
-    Please log in as the customer or contact an employee.
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-  - /proc/payments/pay_008.json
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
 - agents_md_anchor: null
-  content: Do not hardcode constant values in discovery queries to simulate facts
-    that are already available in the interpreter's $_facts (e.g., identity.kind).
-    Instead, reference the $_facts path directly in decision branch conditions.
+  content: Do not hardcode constant values in discovery queries to simulate facts that are already available
+    in the interpreter's $_facts (e.g., identity.kind). Instead, reference the $_facts path directly in
+    decision branch conditions.
   created: '2026-06-22'
   deactivated_reason: null
   id: r005
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION. The
-    script''s discovery step hardcoded ''guest'' as kind in a SQL constant, but the
-    actual identity is not guest, and the query likely failed due to missing column
-    ''record_path'' in payment_transactions, causing empty rows and a compute failure
-    that led to clarification. The root cause is fabricating a fact instead of using
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION. The script''s discovery
+    step hardcoded ''guest'' as kind in a SQL constant, but the actual identity is not guest, and the
+    query likely failed due to missing column ''record_path'' in payment_transactions, causing empty rows
+    and a compute failure that led to clarification. The root cause is fabricating a fact instead of using
     $_facts.identity.kind, and possibly selecting a non-existent column.'
   status: active
   surface: ir
@@ -275,19 +40,18 @@ entries:
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: When a decision branch uses $_facts.identity.kind to enforce a security
-    constraint, include a discovery step to read the identity source file (e.g., /home/user/.session)
-    and use its content to determine the kind, rather than relying solely on $_facts.
+  content: When a decision branch uses $_facts.identity.kind to enforce a security constraint, include
+    a discovery step to read the identity source file (e.g., /home/user/.session) and use its content
+    to determine the kind, rather than relying solely on $_facts.
   created: '2026-06-22'
   deactivated_reason: null
   id: r006
-  reasoning: 'Error: grader expected OUTCOME_OK but got OUTCOME_DENIED_SECURITY. The
-    PlanIR decision branch correctly checks $_facts.identity.kind == ''guest'' to
-    deny, but the pre-phase mis-set identity.kind to ''guest'' even though the true
-    identity is not guest (desired outcome OK). The PlanIR had no independent verification
-    of identity, so it trusted the incorrect $_facts and took the deny branch. The
-    new rule ensures the PlanIR reads the identity source file directly, making the
-    decision robust to pre-phase errors.'
+  reasoning: 'Error: grader expected OUTCOME_OK but got OUTCOME_DENIED_SECURITY. The PlanIR decision branch
+    correctly checks $_facts.identity.kind == ''guest'' to deny, but the pre-phase mis-set identity.kind
+    to ''guest'' even though the true identity is not guest (desired outcome OK). The PlanIR had no independent
+    verification of identity, so it trusted the incorrect $_facts and took the deny branch. The new rule
+    ensures the PlanIR reads the identity source file directly, making the decision robust to pre-phase
+    errors.'
   status: active
   surface: ir
 last_run:

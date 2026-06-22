@@ -433,19 +433,3 @@ def test_learn_from_grader_consumes_ir_artifacts(tmp_path, monkeypatch):
     data = __import__("yaml").safe_load((tmp_path / "t_ir.yaml").read_text())
     assert any(e.get("content") for e in data["entries"])
 
-
-def test_data_path_seed_empty_when_flag_off(monkeypatch):
-    from agent import pipeline
-    monkeypatch.delenv("ECOM_INVESTIGATE_DATA_PATHS", raising=False)
-    assert pipeline._data_path_seed("read /proc/payments/p_1.json", "t01") == []
-
-
-def test_data_path_seed_unions_literals_and_deep_read(monkeypatch, tmp_path):
-    from agent import pipeline, learned_store
-    monkeypatch.setenv("ECOM_INVESTIGATE_DATA_PATHS", "1")
-    monkeypatch.setattr(learned_store, "_LEARNED_DIR", tmp_path)
-    learned_store.append_prephase_deep_read("tZ", ["/proc/ledger", "orders"])
-    seed = pipeline._data_path_seed("inspect /proc/payments now", "tZ")
-    assert "/proc/payments" in seed      # instruction path-literal
-    assert "/proc/ledger" in seed        # learned absolute path
-    assert "orders" not in seed          # non-absolute (table name) excluded

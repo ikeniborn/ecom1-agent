@@ -1,414 +1,18 @@
 entries:
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/catalog/automotive/engine_oil/AUT-2WSTNOGZ.json'
-  source: verdict
-  status: inactive
-  submitted_message: 'count : 0'
-  submitted_outcome: OUTCOME_OK
-  submitted_refs: []
 - agents_md_anchor: null
-  content: When a discovery step retrieves product_sku, always project it into a rowset
-    column and include it in the answer refs.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r001
-  reasoning: 'Error: grader: answer missing required reference ''/proc/catalog/automotive/engine_oil/AUT-2WSTNOGZ.json''.
-    The PlanIR only extracted the count, not the product_sku values. The TOOL_PLAN''s
-    required_refs was empty, but the grader still required the product reference.
-    Root cause: the PLAN phase did not include the discovered product_sku in the answer
-    refs. The failing PlanIR fragment: answer.ok.refs = [] and rowsets only captured
-    ''cnt'' column, ignoring product_sku. The rule ensures future PlanIRs always capture
-    and include product_sku references.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always verify that rowsets bound to required refs are non-empty before
-    using them in an answer; if empty, branch to an error outcome.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: 'Error: ''unresolved required ref(s) ["$store.record_path", "$row.record_path"]
-    on OK answer''. The PlanIR''s discovery steps query store and product data, but
-    the decision block has no branches to check if those rowsets are empty. If the
-    store or product queries return no rows, the refs cannot be resolved, causing
-    the interpret failure. The PlanIR must include a decision branch that verifies
-    the rowset is non-empty before proceeding to the OK answer that requires those
-    refs.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: '#plan-ir-compute-primitives'
-  content: Never use the 'concat' primitive to build SQL strings or any string value;
-    'concat' only merges two list[dict] rowsets. Build dynamic SQL directly in the
-    'stdin' field of an Exec discovery step using $variable references.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'Error: ''concat'' failed: <lambda>() takes 2 positional arguments but
-    13 were given. The failing PlanIR used ''concat'' with many string fragments to
-    assemble ''count_sql'' and ''paths_sql''. The ''concat'' primitive is designed
-    to merge two rowsets (list[dict]), not to concatenate strings. The correct PLAN
-    technique is to write the full SQL query directly in the Exec step''s ''stdin'',
-    embedding $store_id as a variable reference, avoiding any compute-time string
-    assembly.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always include all required refs in the answer section, mapping each required
-    ref's source to the corresponding rowset column that contains the record_path.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: The interpret phase failed with 'unresolved required ref(s) ['$store.record_path',
-    '$row.record_path'] on OK answer'. The PlanIR answer section had 'refs':[] but
-    the intent's required_refs for OUTCOME_OK demanded record_path from $store and
-    $row. The discovery steps and rowsets correctly extracted record_path columns,
-    but the answer omitted them. The rule ensures future plans always include required
-    refs.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When extracting a column value from a single row (e.g., after using 'first'),
-    use the 'get' primitive instead of 'column'.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'The interpret error ''column expects list[dict] rows; use get for a
-    single row'' occurred because the compute step applied ''column'' to the result
-    of ''first'', which is a single dict. The correct primitive for extracting a field
-    from a single row is ''get''. The failing PlanIR fragment: compute step ''column''
-    with args [''$first_store'',''store_id''] after ''first'' on $store.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When deduplicating a rowset by a column, first use the 'column' primitive
-    to extract the column values into a list, then apply 'dedupe' to that list; never
-    pass a rowset and column name directly to 'dedupe'.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: 'Error: ''interpret: compute step ''dedupe'' failed: <lambda>() takes
-    1 positional argument but 2 were given. CONTRACT: dedupe(seq)''. The PlanIR step
-    `{"prim":"dedupe","args":["$matching_rows","spec_id"],"into":"unique_specs"}`
-    passed two arguments to dedupe, but the primitive expects a single sequence. The
-    correct pattern is to first extract the spec_id column from matching_rows using
-    ''column'', then dedupe that list, then count the deduplicated list. This rule
-    prevents future misuse of dedupe.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always include all required refs in the answer section's 'refs' array,
-    using objects with 'ref' pointing to the computed variable and 'kind' matching
-    the required ref's kind (e.g., 'record_path').
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
-    ''$row.record_path''] on OK answer. Root cause: The answer section in the PlanIR
-    had ''refs'': [] but the required refs for OUTCOME_OK demanded record_path refs
-    from $store.record_path and $row.record_path. The compute section correctly derived
-    those variables, but they were not placed into the answer refs. The existing in-session
-    rule ''Always include all required refs in the answer section'' was not followed;
-    this new rule provides explicit format guidance.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a discovery SQL query may produce rows that need post-filtering (e.g.,
-    removing nulls from an outer join), always apply the filter directly in the SQL
-    query's WHERE clause or by using an INNER JOIN, rather than relying on a filter_rows
-    compute step with a predicate object.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r008
-  reasoning: 'Error: interpret: compute step ''filter_rows'' failed: ''dict'' object
-    has no attribute ''op''. The interpreter''s filter_rows implementation uses attribute
-    access (pred.op) on the predicate argument, but the PlanIR supplied a plain dict
-    {''op'':''not'',...}. This caused an AttributeError. Root cause: the PlanIR used
-    a predicate dict for post-SQL filtering of null spec_index rows from a LEFT JOIN.
-    The failing fragment: {"prim":"filter_rows","args":["$inventory_rows",{"op":"not","args":[{"op":"isnull","lhs":"$row.spec_index"}]}],"into":"matched_rows"}.
-    The corrective rule instructs the PLAN phase to avoid filter_rows with predicate
-    objects entirely and instead embed the filtering condition in the discovery SQL
-    query (e.g., WHERE m.spec_index IS NOT NULL or use INNER JOIN), which is a robust
-    PLAN technique that bypasses the interpreter''s predicate-handling limitation.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Always pass SQL queries to the sql binary via the '-cmd' argument in the
-    'args' field of the Exec RPC, not via 'stdin'.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r009
-  reasoning: 'Error: ''interpret: sql returned usage banner — SQL not delivered via
-    stdin''. The first discovery step used ''stdin'' to pass a static SQL query, but
-    the Exec RPC failed to deliver it, causing the sql binary to print its usage banner.
-    Root cause: the Exec RPC''s stdin delivery mechanism is unreliable or requires
-    additional arguments to activate. The failing PlanIR fragment: {"rpc":"Exec","args":{"path":"/bin/sql","stdin":"SELECT
-    store_id, record_path FROM stores WHERE store_name LIKE ''%Jakomini%'' AND city
-    = ''Graz'';"},"bind":"store_info_raw"}. This rule ensures SQL is always passed
-    as a ''-cmd'' argument, which the sql binary accepts directly, avoiding stdin
-    issues.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/catalog/storage/shelving_cabinets/STO-1VDIQKBE.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When the task involves counting or listing specific items, always include
-    a discovery step to retrieve the catalog references for those items and add them
-    to the answer's refs array, even if the TOOL_PLAN's required_refs is empty.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r010
-  reasoning: 'Error: ''grader: answer missing required reference ''/proc/catalog/storage/shelving_cabinets/STO-1VDIQKBE.json''''.
-    The PlanIR''s answer section had an empty refs array, but the grader expected
-    a reference to a product catalog entry. Root cause: the PLAN phase did not include
-    any discovery step to fetch catalog paths for the matched products, relying solely
-    on the empty required_refs in TOOL_PLAN. The task counts products with low availability;
-    the answer likely must include references to those products'' catalog entries.
-    The new rule instructs the PLAN to always retrieve and include such references
-    when counting or listing items, preventing missing ref errors.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/catalog/Sonax/AUT-3GTNI5W7.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When the TOOL_PLAN requires refs of kind record_path sourced from a row
-    object, always extract the record_path column from the rowset into a dedicated
-    compute variable and use that variable as the answer ref, never the row object
-    itself.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r011
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
-    ''$product_0.record_path'', ...] on OK answer. Root cause: PlanIR answer refs
-    listed ''$store'' and ''$product_0'' (the row objects), but the required refs
-    expect the actual record_path values. The compute section used ''first'' and ''get''
-    to bind row objects, but did not extract the record_path field. The interpreter
-    could not resolve dot-notation refs. Fix: extract record_path columns explicitly
-    via ''column'' prim and bind them as separate variables, then reference those
-    variables in the answer refs.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never use dot-path expressions (e.g., '$store.record_path') as the source
-    of an answer ref; always extract the required field into a dedicated compute variable
-    using a 'get' primitive and use that variable as the source.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r012
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
-    ''$product_0.record_path'', ...]. The PlanIR''s answer refs used dot-path sources
-    like ''$store.record_path'', which the interpret phase cannot resolve because
-    it expects a compute variable name. The existing rule [in-session] already advises
-    extracting record_path into a dedicated variable, but the PlanIR did not follow
-    it. A new explicit prohibition of dot-path expressions in answer ref sources will
-    prevent this.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/catalog/Keter/STO-3GODQ8BL.json'
-  source: verdict
-  status: inactive
-  submitted_message: Store not found
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When the TOOL_PLAN requires multiple record_path refs sourced from a rowset,
-    always verify that the rowset contains exactly the expected number of rows before
-    extracting individual refs; if the count is less, branch to an unsupported outcome.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r013
-  reasoning: 'Error: ''grader: answer missing required reference ''/proc/catalog/Keter/STO-3GODQ8BL.json''''.
-    Root cause: The PlanIR''s SQL query may not return all 6 products if some are
-    missing from the catalog, resulting in a rowset with fewer than 6 rows. The compute
-    step blindly extracts product_0 through product_5 using ''get'' primitives, which
-    fail or produce null for missing indices, causing the answer to lack required
-    refs. The decision branch only checks for zero rows (no store) and defaults to
-    ''ok'', so missing products still lead to OUTCOME_OK with incomplete refs. The
-    rule ensures the PlanIR validates row count before extracting individual refs
-    and branches to unsupported if the count is insufficient.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When the TOOL_PLAN success_criteria references a variable $X, always include
-    a ref in the answer mapping X to the compute variable that holds the value.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r014
-  reasoning: The verify step failed because the success_criteria used $count but the
-    answer refs were empty, so $count was undefined. The PlanIR computed count_num
-    but did not map it to 'count' in the answer refs. The answer message skeleton
-    used count_num, but the verify step requires a named variable 'count' to evaluate
-    the criteria. The root cause is a missing ref mapping in the answer section.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/catalog/Philips/ELC-32HZWSG4.json'
-  source: verdict
-  status: inactive
-  submitted_message: Product list not provided in instruction; cannot determine which
-    products to count.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/catalog/fasteners/wood_drywall_screws/FST-1GZ71C60.json'
-  source: verdict
-  status: inactive
-  submitted_message: Store not found.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/catalog/3M/SFE-HICY750I.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/catalog/plumbing/pipe_fittings/PLB-12OUP2QQ.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - answer missing required reference '/proc/catalog/Bahco/HND-2O9KS4GG.json'
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When a rowset is expected to contain exactly one row and you need to extract
-    a field from it using an index (e.g., '0.field'), always set the rowset format
-    to 'json' (not 'auto_delim') to ensure the result is always a list, even for a
-    single row.
+  content: When a rowset is expected to contain exactly one row and you need to extract a field from it
+    using an index (e.g., '0.field'), always set the rowset format to 'json' (not 'auto_delim') to ensure
+    the result is always a list, even for a single row.
   created: '2026-06-22'
   deactivated_reason: null
   id: r015
   reasoning: 'Error: ''grader: answer missing required reference ''/proc/catalog/Bahco/HND-2O9KS4GG.json''''.
-    Root cause: The rowset ''store_result'' was parsed with format ''auto_delim'',
-    which for a single-row SQL result likely produced a single object instead of a
-    list. The subsequent compute step ''get'' with path ''0.record_path'' failed to
-    extract the value because the rowset was not indexable, leaving ''$store_record_path''
-    empty. Consequently, the answer ref for ''record_path'' was missing or had a null
-    path, causing the grader to report the required reference as missing. Failing
-    PlanIR fragment: rowsets[0] format ''auto_delim'' and compute step ''get'' with
-    args [''$store_result'', ''0.record_path''].'
+    Root cause: The rowset ''store_result'' was parsed with format ''auto_delim'', which for a single-row
+    SQL result likely produced a single object instead of a list. The subsequent compute step ''get''
+    with path ''0.record_path'' failed to extract the value because the rowset was not indexable, leaving
+    ''$store_record_path'' empty. Consequently, the answer ref for ''record_path'' was missing or had
+    a null path, causing the grader to report the required reference as missing. Failing PlanIR fragment:
+    rowsets[0] format ''auto_delim'' and compute step ''get'' with args [''$store_result'', ''0.record_path''].'
   status: active
   surface: ir
 - content: null
@@ -419,40 +23,36 @@ entries:
   - answer missing required reference '/proc/catalog/hand_tools/pliers_wrenches/HND-HINAM6H9.json'
   source: verdict
   status: active
-  submitted_message: 'Access denied: guest users are not authorized to perform this
-    operation.'
+  submitted_message: 'Access denied: guest users are not authorized to perform this operation.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: Never omit the OUTCOME_OK answer branch when the TOOL_PLAN defines success
-    criteria for it; always include the required refs for that outcome.
+  content: Never omit the OUTCOME_OK answer branch when the TOOL_PLAN defines success criteria for it;
+    always include the required refs for that outcome.
   created: '2026-06-22'
   deactivated_reason: null
   id: r016
   reasoning: 'The error ''grader: answer missing required reference ''/proc/catalog/hand_tools/pliers_wrenches/HND-HINAM6H9.json''''
-    occurred because the PlanIR only contained a decision for security and an answer
-    for OUTCOME_DENIED_SECURITY, completely ignoring the main objective and its required
-    refs for OUTCOME_OK. The script code had no discovery, rowsets, compute, or answer
-    for the OK outcome, so the answer lacked the required record_path ref. The root
-    cause is that the PlanIR failed to implement the task''s objective, defaulting
-    to denied. The rule ensures that the PlanIR always includes the OUTCOME_OK branch
-    and its required refs when the TOOL_PLAN defines success criteria for it.'
+    occurred because the PlanIR only contained a decision for security and an answer for OUTCOME_DENIED_SECURITY,
+    completely ignoring the main objective and its required refs for OUTCOME_OK. The script code had no
+    discovery, rowsets, compute, or answer for the OK outcome, so the answer lacked the required record_path
+    ref. The root cause is that the PlanIR failed to implement the task''s objective, defaulting to denied.
+    The rule ensures that the PlanIR always includes the OUTCOME_OK branch and its required refs when
+    the TOOL_PLAN defines success criteria for it.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Always include a valid decision tree in the PlanIR; the decision field
-    must be a dictionary with at least a 'type' key and appropriate branches, never
-    null or missing.
+  content: Always include a valid decision tree in the PlanIR; the decision field must be a dictionary
+    with at least a 'type' key and appropriate branches, never null or missing.
   created: '2026-06-22'
   deactivated_reason: null
   id: r017
-  reasoning: 'The error ''plan: PLAN: validation failed: 1 validation error for PlanIR
-    decision Input should be a valid dictionary or instance of DecisionTree [type=model_type,
-    input_value=None, input_type=NoneType]'' indicates the PlanIR had a null or missing
-    decision field. The script code is empty, so the PLAN phase emitted a PlanIR without
-    a proper decision tree. This rule ensures the PLAN phase always constructs a valid
-    decision structure.'
+  reasoning: 'The error ''plan: PLAN: validation failed: 1 validation error for PlanIR decision Input
+    should be a valid dictionary or instance of DecisionTree [type=model_type, input_value=None, input_type=NoneType]''
+    indicates the PlanIR had a null or missing decision field. The script code is empty, so the PLAN phase
+    emitted a PlanIR without a proper decision tree. This rule ensures the PLAN phase always constructs
+    a valid decision structure.'
   status: active
   surface: ir
 last_run:

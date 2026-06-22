@@ -8,7 +8,7 @@ A front-loaded pre-phase dump (all doc bodies, sample rows, listings) bloats the
 
 ## Brief and Note models
 
-`Note` (goal, tool, args, observation_digest, lesson, refs_found) is one read-only step's condensed record; `Brief` holds an ordered `notes` list plus an `env` dict of bound facts (e.g. `incident_id`, `policy_doc:<path>`, `<row>.record_path`). Both are Pydantic models with `extra="forbid"` (matching [[data-files]]'s `ir_models` convention). `env` is the sufficiency gate's ground truth.
+`Note` (goal, tool, args, observation_digest, lesson, refs_found) is one read-only step's condensed record; `Brief` holds an ordered `notes` list plus an `env` dict of bound facts (e.g. `incident_id`, `policy_doc:<path>`, `<row>.record_path`). Both are Pydantic models with `extra="forbid"` (matching [[data-files]]'s `ir_models` convention). `env` is the sufficiency gate's ground truth. `env["docs_read"]` accumulates the `/docs/*.md` paths the investigator actually read (via `_note_doc_read` at the two `_ground_doc_refs` call sites); [[pipeline]] threads it into [[grounding]] so the deterministic ref-grounding stage can auto-cite the docs the answer relied on.
 
 ## render_brief
 
@@ -28,12 +28,13 @@ A front-loaded pre-phase dump (all doc bodies, sample rows, listings) bloats the
 
 ## Priority action queue
 
-Before free routing, the loop checks two forced-action layers in priority order:
+Before free routing, the loop checks one forced-action layer:
 
 1. **`_forced_doc_read(env, refs)`** — if any investigator-groundable `required_ref` (one with a `read_target`) is still ungrounded in `env`, returns a forced `read` action for its path. This ensures governing docs are fetched before free exploration.
-2. **`_forced_data_probe(data_paths, probed)`** — if any seed data-path passed in via `data_paths` has not yet been probed, returns a `read` (file with `.` in basename) or `list` (directory) action. Marks the path probed immediately to enforce probe-once semantics regardless of outcome. The `_seed` key is dropped before passing to `run_tool`/`tool_signature`.
 
-Only when both layers return `None` does the loop call `router` (priority 3). When `ECOM_INVESTIGATE_MERGE_STEPS=1`, a cached `pending_action` from the previous `digest_and_route` call is tried between data probes and the free router.
+When it returns `None` the loop calls `router` (the free router). When `ECOM_INVESTIGATE_MERGE_STEPS=1`, a cached `pending_action` from the previous `digest_and_route` call is tried between the forced doc-read and the free router.
+
+> **Removed in Phase 0:** the `_forced_data_probe(data_paths, probed)` seed-data-path probe layer and its `ECOM_INVESTIGATE_DATA_PATHS` gate were removed. `investigate()` no longer takes a `data_paths` argument, so no seed paths are probed — the investigator relies on the forced doc-read and free router only.
 
 ## Deterministic ref-grounding — _ground_doc_refs
 
@@ -41,15 +42,7 @@ Only when both layers return `None` does the loop call `router` (priority 3). Wh
 
 ## Sufficiency gate
 
-`sufficient(intent, env, data_paths, probed)` is the loop's stop condition. It returns True when:
-- every `required_ref` for `intent.desired_outcome` is groundable from `env` (a `None` from `ref.grounded(env)` means PLAN produces this ref, e.g. `record_path`, and the investigator skips it), AND
-- every seed `data_paths` entry has been probed (i.e. appears in `probed`).
-
-The `data_paths`/`probed` clause is inert when `data_paths` is `None` (pre-feature behaviour). No required refs and no data paths → trivially sufficient. See [[interpreter#Answer-ref assembly]] for how `required_refs` drives ref enforcement downstream.
-
-## Probed data paths in env
-
-When a seed data-path probe completes, the loop calls `brief.env.setdefault("data_paths", {})[probe_seed] = observation[:200]`, surfacing the first 200 bytes of the probe result to PLAN via the brief's `RESOLVED_ENV` section. This lets PLAN know which data paths were inspected and their digest.
+`sufficient(intent, env)` is the loop's stop condition. It returns True when every `required_ref` for `intent.desired_outcome` is groundable from `env` (a `None` from `ref.grounded(env)` means PLAN produces this ref, e.g. `record_path`, and the investigator skips it). No required refs → trivially sufficient. See [[interpreter#Answer-ref assembly]] for how `required_refs` drives ref enforcement downstream.
 
 ## router and digest (LLM steps)
 
@@ -57,26 +50,26 @@ When a seed data-path probe completes, the loop calls `brief.env.setdefault("dat
 
 ## Merged digest-and-route — digest_and_route
 
-`digest_and_route(goal, tool, args, observation, escalate)` collapses the digest and next-action routing into a single LLM call, returning `(Note, env_updates, next_action|None)`. Enabled by `ECOM_INVESTIGATE_MERGE_STEPS=1` (default off). When active, the returned `next_action` is stored as `pending_action` and consumed at the top of the next loop iteration (priority 2.5, between data probes and free routing). This halves the LLM call budget per step at the cost of slightly less focused routing.
+`digest_and_route(goal, tool, args, observation, escalate)` collapses the digest and next-action routing into a single LLM call, returning `(Note, env_updates, next_action|None)`. Enabled by `ECOM_INVESTIGATE_MERGE_STEPS=1` (default off). When active, the returned `next_action` is stored as `pending_action` and consumed at the top of the next loop iteration (between the forced doc-read and the free router). This halves the LLM call budget per step at the cost of slightly less focused routing.
 
 ## The investigate() loop
 
-`investigate(vm, intent, seed, oracle, max_steps, data_paths)` runs `cycle = 1..ECOM_INVESTIGATE_MAX_STEPS` (default 6):
+`investigate(vm, intent, seed=None, oracle=None, max_steps=None)` runs `cycle = 1..ECOM_INVESTIGATE_MAX_STEPS` (default 6):
 
 1. Pick a goal (objective on step 1, else the last note's lesson).
 2. Retrieve `ECOM_INVESTIGATE_ORACLE_K` (default 2) scoped oracle atoms.
-3. Resolve the next action via the priority queue: forced doc read → forced data probe → pending merged action → free router.
+3. Resolve the next action via the priority queue: forced doc read → pending merged action (when `ECOM_INVESTIGATE_MERGE_STEPS=1`) → free router.
 4. If `done`, stop with `stop_reason="sufficient"`.
 5. `run_tool` → stall check → optional one reason-tier escalation → if still stalled after escalation, digest and stop.
 6. Record the signature in `seen`; call `digest` (or `digest_and_route` when `ECOM_INVESTIGATE_MERGE_STEPS=1`).
 7. Append note + env, call `_ground_doc_refs`.
-8. Check `sufficient(intent, brief.env, data_seed, probed)` — if true, stop.
+8. Check `sufficient(intent, brief.env)` — if true, stop.
 
 It NEVER raises: a `ToolRejected` and any per-step exception are recorded as a lesson and the loop continues. `seed` is accepted for caller compatibility but is reserved/unused in v1 — slim facts still reach PLAN via `run_plan`'s `facts` argument. See [[oracle]].
 
 ## Stop reason telemetry
 
-The loop tracks a `stop_reason` string (`"budget"`, `"sufficient"`, `"data_probed"`) and calls `log_investigate_stop_auto(stop_reason, len(data_seed), len(probed))` in the `finally` block. This emits a structured trace record regardless of whether the loop exits normally or via an exception, giving per-task observability on why the investigator terminated. See [[tooling#Trace schema v2]].
+The loop tracks a `stop_reason` string (`"budget"` or `"sufficient"`) and calls `log_investigate_stop_auto(stop_reason, 0, 0)` in the `finally` block (the two trailing counts are hardcoded zero now that the seed-data-path probe is removed). This emits a structured trace record regardless of whether the loop exits normally or via an exception, giving per-task observability on why the investigator terminated. See [[tooling#Trace schema v2]].
 
 ## Trace tagging
 

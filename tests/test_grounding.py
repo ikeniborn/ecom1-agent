@@ -1,0 +1,394 @@
+from agent.grounding import extract_entity_tokens
+
+
+def test_extracts_sku_dash_id_token():
+    toks = extract_entity_tokens("Does STO-2R84BSHQ exist in the catalog?", "")
+    assert "STO-2R84BSHQ" in toks
+
+
+def test_extracts_short_sku_token():
+    toks = extract_entity_tokens("check SKU-FK availability", "")
+    assert "SKU-FK" in toks
+
+
+def test_extracts_prefixed_entity_id():
+    toks = extract_entity_tokens("refund basket_12 for cust_016", "")
+    assert "basket_12" in toks
+    assert "cust_016" in toks
+
+
+def test_scans_both_task_text_and_message():
+    toks = extract_entity_tokens("task mentions STO-2R84BSHQ", "answer cites SKU-FK")
+    assert "STO-2R84BSHQ" in toks and "SKU-FK" in toks
+
+
+def test_dedupes_and_preserves_order():
+    toks = extract_entity_tokens("SKU-FK then SKU-FK again", "SKU-FK")
+    assert toks.count("SKU-FK") == 1
+
+
+def test_does_not_extract_non_allowlisted_prefix_words():
+    # 'record_path' / 'product_sku' are schema words, not entity ids — must NOT match.
+    toks = extract_entity_tokens("select record_path, product_sku from product_variants", "")
+    assert toks == []
+
+
+def test_allowlisted_prefix_sql_columns_are_extracted_known_limitation():
+    # Allowlisted-prefix SQL columns DO match (e.g. 'order_id'); this is acceptable because
+    # downstream stat-validation drops any token that does not resolve to a real /proc path.
+    toks = extract_entity_tokens("SELECT order_id FROM orders WHERE return_reason IS NULL", "")
+    assert "order_id" in toks and "return_reason" in toks
+from agent.grounding import resolve_record_path, _proc_paths_in
+from agent.mock_vm_spy import MockVMSpy, fixture_key
+from agent.interpreter import InterpretResult, CapturedAnswer
+
+
+def _result(env=None, sql_results=None, message=""):
+    return InterpretResult(
+        captured=CapturedAnswer(message=message, outcome="OUTCOME_OK", refs=[]),
+        env=env or {}, observations=[], sql_results=sql_results or [],
+        mutation_landed=False, label="ok")
+
+
+def test_resolve_via_find_then_stat():
+    path = "/proc/catalog/STO-2R84BSHQ.json"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Find", "/proc"): {"paths": [path]},
+        fixture_key("Stat", path): {"path": path},
+    })
+    assert resolve_record_path(vm, "STO-2R84BSHQ", evidence_paths=[]) == path
+
+
+def test_resolve_drops_token_with_no_stat_match():
+    # find returns nothing, no evidence -> token does not resolve to a real path.
+    vm = MockVMSpy(fixtures={})
+    assert resolve_record_path(vm, "STO-NOPE", evidence_paths=[]) is None
+
+
+def test_resolve_evidence_fastpath_when_stat_ok():
+    path = "/proc/catalog/SKU-FK.json"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", path): {"path": path}})
+    # path already present in evidence (SQL returned it) -> no find needed.
+    assert resolve_record_path(vm, "SKU-FK", evidence_paths=[path]) == path
+
+
+def test_resolve_evidence_path_dropped_when_stat_fails():
+    path = "/proc/catalog/SKU-STALE.json"
+    vm = MockVMSpy(fixtures={})   # no Stat fixture -> stub has no "path" -> not ok
+    assert resolve_record_path(vm, "SKU-STALE", evidence_paths=[path]) is None
+
+
+def test_proc_paths_scans_sql_results_and_env_and_message():
+    res = _result(
+        env={"rows": [{"record_path": "/proc/catalog/SKU-A.json"}]},
+        sql_results=["product_sku,record_path\nSKU-B,/proc/catalog/SKU-B.json"],
+        message="see /proc/catalog/SKU-C.json")
+    found = _proc_paths_in(res, res.captured)
+    assert set(found) == {
+        "/proc/catalog/SKU-A.json",
+        "/proc/catalog/SKU-B.json",
+        "/proc/catalog/SKU-C.json",
+    }
+
+
+def test_resolve_via_sql_fallback_when_find_empty():
+    # evidence + find both empty -> generic SQL fallback selects record_path from a
+    # schema table by LIKE-token, then stat-validates.
+    path = "/proc/catalog/STO-2R84BSHQ.json"
+    sql = "SELECT record_path FROM catalog WHERE record_path LIKE '%STO-2R84BSHQ%' LIMIT 5"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Exec", "/bin/sql", [sql]): {"stdout": f"record_path\n{path}"},
+        fixture_key("Stat", path): {"path": path},
+    })
+    assert resolve_record_path(vm, "STO-2R84BSHQ", evidence_paths=[],
+                               schema_tables=["catalog"]) == path
+
+
+def test_resolve_sql_fallback_skips_unsafe_token():
+    # a token with a space is not SQL-safe -> fallback is skipped (no injection), None.
+    vm = MockVMSpy(fixtures={})
+    assert resolve_record_path(vm, "bad token", evidence_paths=[],
+                               schema_tables=["catalog"]) is None
+import json as _json
+from agent.grounding import ownership_safe
+from agent.mock_vm_spy import MockVMSpy, fixture_key
+
+
+def _vm_with_record(path, record):
+    return MockVMSpy(fixtures={fixture_key("Read", path): {"content": _json.dumps(record)}})
+
+
+def test_public_record_is_safe_for_customer():
+    path = "/proc/catalog/SKU-FK.json"
+    vm = _vm_with_record(path, {"sku": "SKU-FK"})   # no customer_id -> public
+    assert ownership_safe(vm, path, {"customer_id": "cust_016"}) is True
+
+
+def test_owned_record_is_safe():
+    path = "/proc/baskets/basket_12.json"
+    vm = _vm_with_record(path, {"customer_id": "cust_016"})
+    assert ownership_safe(vm, path, {"customer_id": "cust_016"}) is True
+
+
+def test_cross_customer_record_is_unsafe():
+    path = "/proc/baskets/basket_99.json"
+    vm = _vm_with_record(path, {"customer_id": "cust_777"})
+    assert ownership_safe(vm, path, {"customer_id": "cust_016"}) is False
+
+
+def test_non_customer_caller_never_blocked():
+    # employee/admin identity (no customer_id) -> no cross-customer leak possible.
+    path = "/proc/baskets/basket_99.json"
+    vm = _vm_with_record(path, {"customer_id": "cust_777"})
+    assert ownership_safe(vm, path, {"user": "emp_3"}) is True
+
+
+def test_unreadable_record_dropped_for_customer():
+    # customer caller, record cannot be read -> err toward dropping (conservative).
+    vm = MockVMSpy(fixtures={})   # Read stub -> empty content -> unparseable
+    assert ownership_safe(vm, "/proc/baskets/basket_x.json", {"customer_id": "cust_016"}) is False
+
+from agent.grounding import canonical_doc_refs
+from agent.mock_vm_spy import MockVMSpy, fixture_key
+
+
+def test_keeps_existing_doc_path_as_is():
+    path = "/docs/payments/3ds.md"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", path): {"path": path}})
+    assert canonical_doc_refs([path], vm) == [path]
+
+
+def test_case_corrects_via_find_basename():
+    real = "/docs/Checkout.md"
+    asked = "/docs/checkout.md"
+    vm = MockVMSpy(fixtures={
+        # asked path does not stat; find by basename returns the real-cased path.
+        fixture_key("Find", "/docs"): {"paths": [real]},
+    })
+    assert canonical_doc_refs([asked], vm) == [real]
+
+
+def test_drops_unresolvable_doc():
+    vm = MockVMSpy(fixtures={})   # neither stat nor find resolves
+    assert canonical_doc_refs(["/docs/ghost.md"], vm) == []
+
+
+def test_dedupes_doc_refs():
+    path = "/docs/security.md"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", path): {"path": path}})
+    assert canonical_doc_refs([path, path], vm) == [path]
+
+
+class _Ans:
+    def __init__(self, message):
+        self.message = message
+
+
+def test_relies_on_filter_keeps_only_signalled_doc():
+    a, b = "/docs/checkout.md", "/docs/returns.md"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", a): {"path": a},
+        fixture_key("Stat", b): {"path": b},
+    })
+    # 'checkout' stem appears in the message -> only that doc is relied on.
+    out = canonical_doc_refs([a, b], vm, intent=None, answer=_Ans("the checkout policy blocks this"))
+    assert out == [a]
+
+
+def test_relies_on_keeps_all_when_no_signal():
+    a, b = "/docs/checkout.md", "/docs/returns.md"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", a): {"path": a},
+        fixture_key("Stat", b): {"path": b},
+    })
+    # no doc stem in the message and no declared policy_doc -> recall-preserving: keep all.
+    out = canonical_doc_refs([a, b], vm, intent=None, answer=_Ans("request cannot proceed"))
+    assert out == [a, b]
+
+
+def test_relies_on_policy_doc_signal_from_intent():
+    from agent.ir_models import IntentSpec
+    a, b = "/docs/checkout.md", "/docs/returns.md"
+    intent = IntentSpec(objective="o", desired_outcome="OUTCOME_NONE_UNSUPPORTED",
+                        outcome_space=["OUTCOME_OK", "OUTCOME_NONE_UNSUPPORTED"],
+                        constraints=[], success_criteria={}, answer_shape={},
+                        required_refs={"OUTCOME_NONE_UNSUPPORTED": [
+                            {"kind": "policy_doc", "path": a}]})
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", a): {"path": a},
+        fixture_key("Stat", b): {"path": b},
+    })
+    out = canonical_doc_refs([a, b], vm, intent=intent, answer=_Ans("denied"))
+    assert out == [a]
+
+from agent.grounding import align_count, ground_refs
+from agent.ir_models import IntentSpec
+from agent.mock_vm_spy import MockVMSpy, fixture_key
+from agent.interpreter import InterpretResult, CapturedAnswer
+
+
+def test_align_count_truncates_catalog_refs_to_leading_number():
+    refs = ["/proc/catalog/A.json", "/proc/catalog/B.json", "/proc/catalog/C.json"]
+    assert align_count(refs, "2 products are in stock") == refs[:2]
+
+
+def test_align_count_noop_without_leading_number():
+    refs = ["/proc/catalog/A.json", "/proc/catalog/B.json"]
+    assert align_count(refs, "these products are in stock") == refs
+
+
+def test_align_count_noop_when_not_all_catalog():
+    refs = ["/proc/baskets/b.json", "/proc/catalog/A.json"]
+    assert align_count(refs, "1 found") == refs
+
+
+def _intent():
+    return IntentSpec(objective="o", desired_outcome="OUTCOME_OK",
+                      outcome_space=["OUTCOME_OK"], constraints=[],
+                      success_criteria={}, answer_shape={}, required_refs={})
+
+
+def _result(message, env=None, sql_results=None, refs=None):
+    return InterpretResult(
+        captured=CapturedAnswer(message=message, outcome="OUTCOME_OK", refs=refs or []),
+        env=env or {}, observations=[], sql_results=sql_results or [],
+        mutation_landed=False, label="ok")
+
+
+def test_ground_refs_adds_record_ref_from_evidence():
+    path = "/proc/catalog/STO-2R84BSHQ.json"
+    res = _result(message="STO-2R84BSHQ exists",
+                  sql_results=[f"sku,record_path\nSTO-2R84BSHQ,{path}"])
+    vm = MockVMSpy(fixtures={fixture_key("Stat", path): {"path": path}})
+    out = ground_refs(_intent(), res.captured, res, vm,
+                      task_text="does STO-2R84BSHQ exist?", docs_read=[])
+    assert path in out
+
+
+def test_ground_refs_adds_doc_ref_from_docs_read():
+    doc = "/docs/payments/3ds.md"
+    res = _result(message="3DS required")
+    vm = MockVMSpy(fixtures={fixture_key("Stat", doc): {"path": doc}})
+    out = ground_refs(_intent(), res.captured, res, vm,
+                      task_text="payment", docs_read=[doc])
+    assert doc in out
+
+
+def test_ground_refs_preserves_existing_enforced_refs_first():
+    res = _result(message="ok", refs=["/docs/counting.md"])
+    vm = MockVMSpy(fixtures={})
+    out = ground_refs(_intent(), res.captured, res, vm, task_text="x", docs_read=[])
+    assert out[0] == "/docs/counting.md"
+
+
+def test_ground_refs_never_raises_returns_base_on_error():
+    # Force a throw INSIDE ground_refs's try but OUTSIDE the inner per-RPC guards:
+    # answer.message is consumed by _proc_paths_in / extract_entity_tokens (which are
+    # NOT individually guarded), so a raising message exercises the OUTER try/except and
+    # ground_refs returns the interpreter refs unchanged.
+    res = _result(message="ok")
+
+    class _BoomAnswer:
+        refs = ["/docs/a.md"]
+
+        @property
+        def message(self):
+            raise RuntimeError("message exploded")
+
+    vm = MockVMSpy(fixtures={})
+    out = ground_refs(_intent(), _BoomAnswer(), res, vm,
+                      task_text="STO-ABCDEFGH", docs_read=[])
+    assert out == ["/docs/a.md"]
+
+
+def test_ground_refs_survives_vm_explosion_via_inner_guards():
+    # Complementary path: a VM that raises on every call is swallowed by the inner
+    # _find_paths/_stat_ok/ownership_safe guards (record + doc refs resolve to nothing),
+    # so base is preserved without reaching the outer except.
+    res = _result(message="ok", refs=["/docs/a.md"])
+
+    class Boom:
+        def __getattr__(self, _):
+            raise RuntimeError("vm exploded")
+
+    out = ground_refs(_intent(), res.captured, res, Boom(),
+                      task_text="STO-ABCDEFGH", docs_read=["/docs/x.md"])
+    assert out == ["/docs/a.md"]
+
+
+# --- canonical_doc_refs with doc_inventory (operation-implied, un-read docs) ---
+
+def test_inventory_doc_cited_when_stem_in_message():
+    read = "/docs/security.md"
+    inv_doc = "/docs/checkout.md"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", read): {"path": read},
+        fixture_key("Stat", inv_doc): {"path": inv_doc},
+    })
+    # investigator read only security.md; checkout.md is in the inventory and the answer
+    # message implicates it ("Checkout denied ...") -> cite it too (t50 class).
+    out = canonical_doc_refs([read], vm, intent=None,
+                             answer=_Ans("Checkout denied: guests not authorized"),
+                             doc_inventory=[read, inv_doc])
+    assert read in out and inv_doc in out
+
+
+def test_inventory_doc_not_cited_without_signal():
+    read = "/docs/security.md"
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", read): {"path": read},
+        fixture_key("Stat", "/docs/returns.md"): {"path": "/docs/returns.md"},
+        fixture_key("Stat", "/docs/discounts.md"): {"path": "/docs/discounts.md"},
+    })
+    # no stem of returns/discounts in the message, no declared policy_doc -> un-read
+    # inventory docs are NOT cited (no keep-all for inventory).
+    out = canonical_doc_refs([read], vm, intent=None,
+                             answer=_Ans("access denied on security grounds"),
+                             doc_inventory=[read, "/docs/returns.md", "/docs/discounts.md"])
+    assert out == [read]
+
+
+def test_inventory_doc_cited_via_declared_policy_doc():
+    from agent.ir_models import IntentSpec
+    read = "/docs/security.md"
+    inv_doc = "/docs/checkout.md"
+    intent = IntentSpec(objective="o", desired_outcome="OUTCOME_DENIED_SECURITY",
+                        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+                        constraints=[{"anchor": "#s", "rule": "r", "security": True,
+                                      "deny_when": {"op": "nonempty", "lhs": "$x"}}],
+                        success_criteria={}, answer_shape={},
+                        required_refs={"OUTCOME_DENIED_SECURITY": [
+                            {"kind": "policy_doc", "path": inv_doc}]})
+    vm = MockVMSpy(fixtures={
+        fixture_key("Stat", read): {"path": read},
+        fixture_key("Stat", inv_doc): {"path": inv_doc},
+    })
+    out = canonical_doc_refs([read], vm, intent=intent, answer=_Ans("denied"),
+                             doc_inventory=[read, inv_doc])
+    assert inv_doc in out
+
+
+def test_inventory_dedupes_with_read_doc():
+    read = "/docs/checkout.md"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", read): {"path": read}})
+    out = canonical_doc_refs([read], vm, intent=None, answer=_Ans("Checkout denied"),
+                             doc_inventory=[read])
+    assert out == [read]   # not duplicated
+
+
+def test_inventory_none_preserves_read_keepall():
+    a, b = "/docs/checkout.md", "/docs/returns.md"
+    vm = MockVMSpy(fixtures={fixture_key("Stat", a): {"path": a},
+                             fixture_key("Stat", b): {"path": b}})
+    out = canonical_doc_refs([a, b], vm, intent=None, answer=_Ans("request denied"))
+    assert out == [a, b]   # no inventory -> keep-all read behavior unchanged
+
+
+def test_doc_inventory_from_parses_facts():
+    from agent.grounding import _doc_inventory_from
+    class _F:
+        docs_inventory = "docs_inventory (3):\n  /docs/checkout.md\n  /docs/security.md\n  /docs/returns.md"
+    res = InterpretResult(captured=CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]),
+                          env={"_facts": _F()}, observations=[], sql_results=[],
+                          mutation_landed=False, label="ok")
+    assert _doc_inventory_from(res) == ["/docs/checkout.md", "/docs/security.md", "/docs/returns.md"]

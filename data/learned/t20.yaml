@@ -1,276 +1,6 @@
 entries:
 - content: null
   created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: No matching product variant found.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: 'When a product must be identified by multiple attributes (e.g., brand,
-    family, and properties), structure the discovery into two steps: first, find candidate
-    products by brand and family; second, filter by properties using a separate query
-    or compute step. This ensures the plan can detect whether the product family exists
-    at all, and if not, can fail early with a clear reason rather than defaulting
-    to an unsupported outcome.'
-  created: '2026-06-22'
-  deactivated_reason: r001 recommended a two-step structure but was not enforced;
-    this new rule strictly prohibits the combined pattern, superseding r001.
-  id: r001
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED. Root
-    cause: The single SQL query joined product_variants with product_variant_properties
-    on exact property keys/values. If the properties did not match (e.g., due to key
-    naming differences), the entire product_info subquery returned empty, causing
-    the decision branch to trigger ''unsupported'' because product.record_path was
-    empty. The plan lacked a way to distinguish ''product family not found'' from
-    ''properties not matching'', and defaulted to unsupported. The corrective rule
-    advises a two-step discovery: first, a broad lookup by brand/family to verify
-    existence; second, property filtering. Additionally, a pre-phase deep-read of
-    product_variant_properties is requested to surface actual property keys and values,
-    enabling correct filtering in the next run.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: No matching product or stores found in Graz.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: 'Never combine product identification by brand/family with property filtering
-    in a single discovery step. Always use separate discovery steps: first find candidate
-    products by brand and family, then in a subsequent step filter by properties.
-    This allows the plan to detect missing product family vs missing variant and produce
-    appropriate outcomes.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: The plan used a single SQL query that joined product_variants, product_families,
-    and product_variant_properties in one step. When the query returned no rows, the
-    plan defaulted to OUTCOME_NONE_UNSUPPORTED, but the grader expected OUTCOME_OK,
-    indicating the product exists. The single-step approach made it impossible to
-    determine whether the product family was missing or the property filter failed,
-    and it violated existing rule r001. The new rule enforces a strict separation
-    to enable stepwise verification and clear failure reasons.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: 'Always use separate discovery steps when identifying a product by brand/family
-    and filtering by variant properties: first query product_variants joined with
-    product_families to get candidate SKUs, then in a subsequent step filter those
-    SKUs using product_variant_properties. Never combine these into a single SQL query,
-    as a combined query may return no rows ambiguously (e.g., when the family exists
-    but properties don''t match) and cause the interpreter to default to a clarification
-    outcome instead of the intended unsupported outcome.'
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: The plan violated existing rule r002 by combining product identification
-    and property filtering in a single discovery SQL query. This likely caused the
-    query to either fail or return an empty result that the interpreter could not
-    map to the 'unsupported' answer block, resulting in an unexpected OUTCOME_NONE_CLARIFICATION.
-    The corrective rule enforces separation of discovery steps to ensure clear detection
-    of missing product family vs. missing variant, and to allow the plan's decision
-    branches to correctly route to OUTCOME_NONE_UNSUPPORTED.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: No Wiper Blade variant matches length 700 and adapter type 'hook'.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always bind discovery steps to variables that match the required refs specified
-    in the IntentSpec. When the IntentSpec requires `$product.record_path`, bind the
-    final product identification step to `$product`. When it requires `$stores[*].record_path`,
-    bind the store lookup step to `$stores`. Use these exact variable names in the
-    answer refs.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$product.record_path'',
-    ''$stores[*].record_path''] on OK answer. Root cause: The PlanIR bound product
-    discovery to `candidate_skus` and `matching_skus`, and stores to `graz_stores`,
-    then used `$product_record_path` and `$graz_stores[*].record_path` in the answer
-    refs. The interpreter expected refs exactly matching the IntentSpec''s required
-    refs, which are `$product.record_path` and `$stores[*].record_path`. Failing PlanIR
-    fragment: answer.ok.refs = ["$product_record_path","$graz_stores[*].record_path"].
-    No existing rule covers variable naming for required refs.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: Product not found.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: Always parse every discovery output that will be used in a decision condition
-    or answer ref into a rowset. When a discovery step binds a variable (e.g., $product,
-    $stores) and that variable is later referenced in a decision branch (nonempty,
-    eq, etc.) or as a ref source, include a corresponding rowset entry that parses
-    the raw text into structured rows with named columns. This ensures the interpreter
-    can evaluate conditions and extract record_paths correctly.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'The plan produced OUTCOME_NONE_CLARIFICATION instead of the expected
-    OUTCOME_OK or OUTCOME_NONE_UNSUPPORTED. Root cause: discovery steps bound $product
-    and $stores to raw text outputs, but the plan lacked rowsets to parse those outputs
-    into structured rows. The decision condition ''nonempty'' on $product and the
-    answer refs ($product.record_path, $stores[*].record_path) require parsed rowsets;
-    without them, the interpreter could not evaluate the condition and defaulted to
-    clarification. Failing PlanIR fragment: the rowsets section only parsed $sum_result_text,
-    omitting rowsets for $product and $stores. This is a PlanIR-shape bug, not a data
-    issue.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
   id: v015
   score: 0.0
   score_detail:
@@ -281,53 +11,46 @@ entries:
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: 'When a filter condition in the method lacks a table qualifier, do not
-    assume it belongs to a specific table. Instead, ensure the pre-phase deep-reads
-    the schemas of all tables involved in the query, and use the discovered columns
-    to place the condition correctly. If schema is not available, split the step:
-    first retrieve rows using only filters with clear table affiliation, then in a
-    subsequent step filter by the ambiguous condition using a query that checks all
-    candidate tables.'
+  content: 'When a filter condition in the method lacks a table qualifier, do not assume it belongs to
+    a specific table. Instead, ensure the pre-phase deep-reads the schemas of all tables involved in the
+    query, and use the discovered columns to place the condition correctly. If schema is not available,
+    split the step: first retrieve rows using only filters with clear table affiliation, then in a subsequent
+    step filter by the ambiguous condition using a query that checks all candidate tables.'
   created: '2026-06-22'
   deactivated_reason: null
   id: r006
-  reasoning: The interpreter returned OUTCOME_NONE_UNSUPPORTED because the decision
-    branch evaluated $candidate_skus as empty. The first discovery SQL placed `brand='Fiskars'`
-    on `product_variants`, but in the actual schema `brand` is likely a column of
-    `product_families`. This caused the query to return no rows despite the product
-    existing. The method did not specify which table holds `brand`, so the PLAN phase
-    guessed incorrectly. No existing rule prevents this; a new rule should enforce
-    schema-aware placement or a safe two-step approach.
+  reasoning: The interpreter returned OUTCOME_NONE_UNSUPPORTED because the decision branch evaluated $candidate_skus
+    as empty. The first discovery SQL placed `brand='Fiskars'` on `product_variants`, but in the actual
+    schema `brand` is likely a column of `product_families`. This caused the query to return no rows despite
+    the product existing. The method did not specify which table holds `brand`, so the PLAN phase guessed
+    incorrectly. No existing rule prevents this; a new rule should enforce schema-aware placement or a
+    safe two-step approach.
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: 'Always use filter_rows with exactly two arguments: the rows variable and
-    a predicate object. The predicate object must contain keys ''column'', ''op'',
-    and ''value'' (e.g., {''column'': ''type'', ''op'': ''eq'', ''value'': ''product''}).
-    Do not pass column, op, and value as separate arguments.'
+  content: 'Always use filter_rows with exactly two arguments: the rows variable and a predicate object.
+    The predicate object must contain keys ''column'', ''op'', and ''value'' (e.g., {''column'': ''type'',
+    ''op'': ''eq'', ''value'': ''product''}). Do not pass column, op, and value as separate arguments.'
   created: '2026-06-22'
   deactivated_reason: null
   id: r007
-  reasoning: 'interpret: compute step ''filter_rows'' failed: _filter_rows() takes
-    2 positional arguments but 4 were given. The PlanIR used filter_rows with four
-    arguments: rows variable, column name, operator, and value. The interpreter expects
-    exactly two arguments: the rows variable and a predicate object. This caused the
-    interpreter to fail. The correct usage is to pass a predicate object like {''column'':
+  reasoning: 'interpret: compute step ''filter_rows'' failed: _filter_rows() takes 2 positional arguments
+    but 4 were given. The PlanIR used filter_rows with four arguments: rows variable, column name, operator,
+    and value. The interpreter expects exactly two arguments: the rows variable and a predicate object.
+    This caused the interpreter to fail. The correct usage is to pass a predicate object like {''column'':
     ''type'', ''op'': ''eq'', ''value'': ''product''} as the second argument.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: 'Always use `get` with exactly two arguments: the rowset variable and the
-    column name. Do not pass an index argument; the primitive retrieves the value
-    from the first row of the rowset.'
+  content: 'Always use `get` with exactly two arguments: the rowset variable and the column name. Do not
+    pass an index argument; the primitive retrieves the value from the first row of the rowset.'
   created: '2026-06-22'
   deactivated_reason: null
   id: r008
-  reasoning: 'The compute step `get` was called with three arguments: `["$sum_row",
-    "0", "total_count"]`. The interpreter''s `get` lambda expects only two arguments
-    (rowset and column name). The index `"0"` is unnecessary because `get` returns
-    the value from the first row. The correct call is `["$sum_row", "total_count"]`.
-    This rule prevents future misuse of the `get` primitive.'
+  reasoning: 'The compute step `get` was called with three arguments: `["$sum_row", "0", "total_count"]`.
+    The interpreter''s `get` lambda expects only two arguments (rowset and column name). The index `"0"`
+    is unnecessary because `get` returns the value from the first row. The correct call is `["$sum_row",
+    "total_count"]`. This rule prevents future misuse of the `get` primitive.'
   status: active
   surface: ir
 last_run:

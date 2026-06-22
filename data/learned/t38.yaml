@@ -1,205 +1,5 @@
 entries:
 - agents_md_anchor: null
-  content: When the success criteria require $answer.msg, the answer block must include
-    a top-level 'msg' field, not nested under a branch label.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r001
-  reasoning: The verify step failed because success_criteria[OUTCOME_DENIED_SECURITY]
-    checked for nonempty $answer.msg, but the PlanIR placed the message inside a branch-specific
-    'deny' object (deny.message). The answer block must directly set 'msg' to satisfy
-    the criteria.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When success_criteria references $answer.msg, the answer block must contain
-    a top-level 'msg' field, not nested under a branch label.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r002
-  reasoning: The PlanIR placed the message inside a branch label 'denied' (answer.denied.message),
-    but the interpreter maps $answer.msg to the top-level 'msg' field. The verify
-    step failed because $answer.msg was empty. The security doc was read successfully,
-    so the failure is purely a PlanIR shape bug.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When success_criteria reference $answer.msg, the answer block must be a
-    dictionary containing a 'msg' key, not a plain string.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r003
-  reasoning: 'PlanIR validation error: ''answer.msg Input should be a valid dictionary
-    or instance of AnswerTemplateIR [type=model_type, input_value=''Access denied:
-    guest acc...access payment records.'', input_type=str]''. Root cause: the answer
-    block was emitted as a plain string instead of a dict with a ''msg'' field. Existing
-    rules cover nesting but not the type mismatch.'
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v001
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When the outcome space includes both a deny and an allow outcome, the answer
-    block must contain 'deny' and 'allow' branches, each with a 'message' field.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r004
-  reasoning: PlanIR validation failed with 'answer.deny.message Field required' and
-    'answer.allow.message Field required'. The PlanIR likely had an answer block with
-    deny/allow branches but omitted the 'message' field inside each. The schema requires
-    both branches to have a 'message' field, even if the allow outcome's success criteria
-    do not reference $answer.msg. Existing rules r001-r003 address top-level 'msg'
-    fields, not branch-level 'message' fields, so they do not cover this failure.
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a required ref in the answer block references a field from an RPC
-    output (e.g., $payment.record_path), the PlanIR must include a compute step that
-    extracts that field from the bound output and binds it to a variable matching
-    the source path, so the ref can be resolved.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r005
-  reasoning: 'Error: ''interpret: unresolved required ref(s) [''$payment.record_path'']
-    on OK answer''. The PlanIR script fetches payment data via Exec and binds to ''payments_raw'',
-    but never extracts the ''record_path'' field into a variable named ''$payment.record_path''.
-    The answer block''s allow branch references ''$payment.record_path'' as a required
-    ref, but no such variable exists. Root cause: missing compute step to extract
-    the field from the RPC output. Failing PlanIR fragment: the answer block''s refs
-    list and the absence of a corresponding compute extraction.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: When a required ref in the answer block references a variable (e.g., $payment.record_path),
-    the PlanIR must include a discovery step to retrieve the data and a compute step
-    to bind that variable to the actual path of the retrieved records, so the ref
-    can be resolved.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r006
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$payment.record_path'']
-    on OK answer. Root cause: The PlanIR''s allow answer branch requires a ref with
-    source ''$payment.record_path'', but the PlanIR contains no RPC step to retrieve
-    payment records and no compute step to bind that variable. The failing fragment
-    is the ''allow'' answer block: {"message":"Payment records retrieved.","outcome":"OUTCOME_OK","refs":[{"kind":"record_path","path":null,"source":"$payment.record_path"}]}.
-    The variable $payment.record_path is never bound, so the ref cannot be resolved.
-    This rule ensures that any variable-sourced ref is backed by a discovery step
-    and a compute binding.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
-  content: Never use an RPC bind name directly as the source of a required ref in
-    the answer block without a compute step that extracts the actual path string from
-    the RPC output and binds it to a variable with the same name.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r007
-  reasoning: The error 'unresolved required ref(s) ["$payment.record_path"] on OK
-    answer' occurred because the PlanIR bound the SQL RPC output to 'payment.record_path'
-    and used that as the source for the required ref, but the interpreter expects
-    the ref source to resolve to a literal path string. The RPC output is a table,
-    not a path. The PlanIR lacked a compute step to extract the 'record_path' column
-    from the bound output and bind it to a variable named 'payment.record_path'. The
-    existing in-session rule described this requirement but was not applied; a stronger
-    Never rule is needed to prevent direct binding without extraction.
-  status: inactive
-  surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v002
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v003
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v004
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v005
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v006
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v007
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- agents_md_anchor: null
-  content: When using filter_rows, always provide a predicate function as the second
-    argument, not a column name and value.
-  created: '2026-06-22'
-  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
-  id: r008
-  reasoning: 'The error ''filter_rows() takes 2 positional arguments but 3 were given''
-    occurred because the PlanIR compute step passed three arguments: rows, column
-    name, and value. The primitive expects a predicate function as the second argument.
-    The failing fragment: filter_rows($combined_rows, ''type'', ''fraud''). The rule
-    ensures future PlanIR uses a predicate function.'
-  status: inactive
-  surface: ir
-- agents_md_anchor: null
   content: When using Exec with /bin/sql, always provide the SQL query as the stdin
     string and do not use args for parameter substitution; embed parameter values
     directly into the SQL string using compute steps to construct the query.
@@ -217,91 +17,6 @@ entries:
     via a compute step and pass it as stdin only.'
   status: active
   surface: ir
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v008
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
-  source: verdict
-  status: inactive
-  submitted_message: No fraud hit or associated payments found.
-  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v009
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
-  source: verdict
-  status: inactive
-  submitted_message: No single fraudulent payment record found.
-  submitted_outcome: OUTCOME_DENIED_SECURITY
-  submitted_refs:
-  - /docs/security.md
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v010
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v011
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v012
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v013
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
-- content: null
-  created: '2026-06-22'
-  deactivated_reason: superseded by newer verdict
-  id: v014
-  score: 0.0
-  score_detail:
-  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
-  source: verdict
-  status: inactive
-  submitted_message: ''
-  submitted_outcome: OUTCOME_NONE_CLARIFICATION
-  submitted_refs: []
 - agents_md_anchor: null
   content: Do not use logical operators (or, and, not) in decision branch conditions;
     instead, use multiple branches with the same label to represent OR conditions,
@@ -318,12 +33,13 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Access denied: guest accounts cannot view payment records.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
@@ -415,9 +131,35 @@ entries:
     rule instructs to not default to deny when policy only denies for a specific condition.'
   status: active
   surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Access denied: guest users cannot access payment_transactions.
+    Refer to the security policy.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- content: null
+  created: '2026-06-22'
+  id: v017
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: active
+  submitted_message: No fraudulent payment record found.
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
 last_run:
-  cycles_used: 3
+  cycles_used: 1
   date: '2026-06-22'
-  outcome: OUTCOME_NONE_CLARIFICATION
+  outcome: OUTCOME_DENIED_SECURITY
   status: failure
 task_id: t38
