@@ -1,97 +1,39 @@
 {
   "discovery": [
     {
-      "rpc": "Read",
-      "args": {
-        "path": "/docs/security.md"
-      },
-      "bind": "security_policy"
-    },
-    {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT customer_id, record_path, customer_email FROM customer_accounts WHERE customer_id = 'cust_100';"
+        "path": "/bin/id"
       },
-      "bind": "customer_account_raw"
+      "bind": "identity"
     }
   ],
-  "rowsets": [
-    {
-      "from_": "customer_account_raw",
-      "format": "auto_delim",
-      "into": "customer_account_rows",
-      "columns": [
-        {
-          "into": "customer_id",
-          "candidates": [
-            "customer_id"
-          ]
-        },
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
-          ]
-        },
-        {
-          "into": "customer_email",
-          "candidates": [
-            "customer_email"
-          ]
-        }
-      ]
-    }
-  ],
-  "compute": [
-    {
-      "prim": "first",
-      "args": [
-        "$customer_account_rows"
-      ],
-      "into": "customer_account"
-    }
-  ],
+  "rowsets": [],
+  "compute": [],
   "decision": {
     "branches": [
       {
         "when": {
           "op": "eq",
-          "lhs": "$_facts.identity.kind",
+          "lhs": "$identity.kind",
           "rhs": "guest",
           "args": []
         },
-        "label": "denied"
+        "label": "deny"
       }
     ],
-    "default_label": "ok"
+    "default_label": "deny"
   },
   "ops": [],
   "answer": {
-    "denied": {
-      "message": "Email change for account {customer_id} to {new_email}: OUTCOME_DENIED_SECURITY",
+    "deny": {
+      "message": "Email update denied: guest access not permitted.",
       "outcome": "OUTCOME_DENIED_SECURITY",
       "refs": [
         {
           "kind": "policy_doc",
           "path": "/docs/security.md",
           "source": null
-        }
-      ]
-    },
-    "ok": {
-      "message": "Email change for account {customer_id} to {new_email}: OUTCOME_OK",
-      "outcome": "OUTCOME_OK",
-      "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/security.md",
-          "source": null
-        },
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$customer_account.record_path"
         }
       ]
     }

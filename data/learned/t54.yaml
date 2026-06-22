@@ -1,62 +1,91 @@
 entries:
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v006
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
   source: verdict
-  status: active
-  submitted_message: 'Email change for customer the customer ID specified in the instruction (e.g., ''cust_053'')
-    denied: guest access not permitted.'
+  status: inactive
+  submitted_message: 'Email change for customer the customer ID specified in the instruction
+    (e.g., ''cust_053'') denied: guest access not permitted.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: When a decision tree includes a branch for a denial condition, the default_label must not be
-    the denial outcome; instead, include a branch for the non-denied case leading to a success outcome
-    and set the default_label to that success outcome.
+  content: When a decision tree includes a branch for a denial condition, the default_label
+    must not be the denial outcome; instead, include a branch for the non-denied case
+    leading to a success outcome and set the default_label to that success outcome.
   created: '2026-06-22'
   deactivated_reason: null
   id: r003
-  reasoning: 'Error: grader: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY. The PlanIR''s decision
-    has a single branch for identity.kind eq guest -> deny_guest, and default_label is also deny_guest.
-    Thus, even when identity is not guest, the plan outputs OUTCOME_DENIED_SECURITY. The plan must handle
-    the non-guest case with a success outcome (OUTCOME_OK) and default to that. The desired_outcome in
-    TOOL_PLAN is OUTCOME_DENIED_SECURITY only for the guest case; the plan must still produce OUTCOME_OK
-    for other identities.'
+  reasoning: 'Error: grader: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY.
+    The PlanIR''s decision has a single branch for identity.kind eq guest -> deny_guest,
+    and default_label is also deny_guest. Thus, even when identity is not guest, the
+    plan outputs OUTCOME_DENIED_SECURITY. The plan must handle the non-guest case
+    with a success outcome (OUTCOME_OK) and default to that. The desired_outcome in
+    TOOL_PLAN is OUTCOME_DENIED_SECURITY only for the guest case; the plan must still
+    produce OUTCOME_OK for other identities.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: When an answer ref requires a record_path from a source variable, the PlanIR must include a
-    discovery step that fetches the record and binds it to that variable.
+  content: When an answer ref requires a record_path from a source variable, the PlanIR
+    must include a discovery step that fetches the record and binds it to that variable.
   created: '2026-06-22'
   deactivated_reason: null
   id: r004
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$customer_account.record_path''] on OK answer.
-    Root cause: PlanIR lacks a discovery step to fetch the customer account record, so $customer_account
-    is never bound and the ref cannot be resolved. Failing fragment: answer for ''allow'' branch includes
-    ref with source ''$customer_account.record_path''. Discovery steps only extract params and identity.
-    Rule ensures future PlanIRs include a record-fetching step when such a ref is required.'
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$customer_account.record_path'']
+    on OK answer. Root cause: PlanIR lacks a discovery step to fetch the customer
+    account record, so $customer_account is never bound and the ref cannot be resolved.
+    Failing fragment: answer for ''allow'' branch includes ref with source ''$customer_account.record_path''.
+    Discovery steps only extract params and identity. Rule ensures future PlanIRs
+    include a record-fetching step when such a ref is required.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Always guard required refs that depend on rowset variables with a nonempty check and branch
-    to a safe outcome if empty.
+  content: Always guard required refs that depend on rowset variables with a nonempty
+    check and branch to a safe outcome if empty.
   created: '2026-06-22'
   deactivated_reason: null
   id: r005
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$customer_account.record_path''] on OK answer.
-    Root cause: The PlanIR''s ok answer branch uses a required ref sourced from $customer_account.record_path,
-    but $customer_account is bound via ''first'' on the customer_account_rows rowset, which may be empty
-    if the SQL query returns no rows. In that case, $customer_account is null, making the ref unresolved.
-    Failing PlanIR fragment: compute step {"prim":"first","args":["$customer_account_rows"],"into":"customer_account"}
-    and answer ref {"kind":"record_path","path":null,"source":"$customer_account.record_path"}. Rule linkage:
-    new rule to ensure required refs are always resolvable by checking rowset nonempty before use.'
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$customer_account.record_path'']
+    on OK answer. Root cause: The PlanIR''s ok answer branch uses a required ref sourced
+    from $customer_account.record_path, but $customer_account is bound via ''first''
+    on the customer_account_rows rowset, which may be empty if the SQL query returns
+    no rows. In that case, $customer_account is null, making the ref unresolved. Failing
+    PlanIR fragment: compute step {"prim":"first","args":["$customer_account_rows"],"into":"customer_account"}
+    and answer ref {"kind":"record_path","path":null,"source":"$customer_account.record_path"}.
+    Rule linkage: new rule to ensure required refs are always resolvable by checking
+    rowset nonempty before use.'
   status: active
   surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: active
+  submitted_message: 'Email update denied: guest access not permitted.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
 last_run:
-  cycles_used: 3
+  cycles_used: 1
   date: '2026-06-22'
   outcome: OUTCOME_DENIED_SECURITY
   status: failure

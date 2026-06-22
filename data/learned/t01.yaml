@@ -1,57 +1,99 @@
 entries:
 - agents_md_anchor: null
-  content: Do not pass both stdin and command-line arguments to Exec when the tool expects SQL on stdin;
-    use stdin alone.
+  content: Do not pass both stdin and command-line arguments to Exec when the tool
+    expects SQL on stdin; use stdin alone.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r007
-  reasoning: 'Error: ''interpret: sql returned usage banner — SQL not delivered via stdin''. The PlanIR
-    RPC used both ''stdin'' (SQL query) and ''args'' (--brand=Heco, etc.). The interpreter likely passed
-    the args as command-line arguments and did not properly pipe stdin, causing the SQL tool to print
-    its usage banner. Root cause: mixing stdin and args for a tool that expects SQL only via stdin. Failing
+  reasoning: 'Error: ''interpret: sql returned usage banner — SQL not delivered via
+    stdin''. The PlanIR RPC used both ''stdin'' (SQL query) and ''args'' (--brand=Heco,
+    etc.). The interpreter likely passed the args as command-line arguments and did
+    not properly pipe stdin, causing the SQL tool to print its usage banner. Root
+    cause: mixing stdin and args for a tool that expects SQL only via stdin. Failing
     PlanIR fragment: {"rpc":"Exec","args":{"path":"/bin/sql","stdin":"SELECT ...","args":["--brand=Heco",...]}}.
-    Rule: never combine stdin and command-line arguments for SQL execution; use stdin alone.'
-  status: active
+    Rule: never combine stdin and command-line arguments for SQL execution; use stdin
+    alone.'
+  status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: When a discovery step uses Exec, always include an on_error handler that maps to a valid outcome
-    from the IntentSpec's outcome_space, to prevent the system from defaulting to an invalid outcome like
-    OUTCOME_NONE_CLARIFICATION.
+  content: When a discovery step uses Exec, always include an on_error handler that
+    maps to a valid outcome from the IntentSpec's outcome_space, to prevent the system
+    from defaulting to an invalid outcome like OUTCOME_NONE_CLARIFICATION.
   created: '2026-06-22'
   deactivated_reason: null
   id: r008
-  reasoning: The plan produced outcome OUTCOME_NONE_CLARIFICATION, which is not in the IntentSpec's outcome_space.
-    The likely cause is that the Exec RPC failed (e.g., SQL error, missing table) and the plan lacked
-    an on_error handler, causing the system to default to an invalid outcome. The PlanIR must include
-    error handling for discovery steps to ensure the outcome is always one of the allowed outcomes.
+  reasoning: The plan produced outcome OUTCOME_NONE_CLARIFICATION, which is not in
+    the IntentSpec's outcome_space. The likely cause is that the Exec RPC failed (e.g.,
+    SQL error, missing table) and the plan lacked an on_error handler, causing the
+    system to default to an invalid outcome. The PlanIR must include error handling
+    for discovery steps to ensure the outcome is always one of the allowed outcomes.
   status: active
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
-  status: active
+  status: inactive
   submitted_message: Product not found in catalogue.
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: When verifying existence of a product with multiple attributes, structure the PlanIR to first
-    discover candidate rows using the most stable attributes (e.g., brand, series, model) and then filter
-    or verify the remaining attributes in a subsequent compute step, to avoid false negatives caused by
-    exact-match failures on optional or variable properties.
+  content: When verifying existence of a product with multiple attributes, structure
+    the PlanIR to first discover candidate rows using the most stable attributes (e.g.,
+    brand, series, model) and then filter or verify the remaining attributes in a
+    subsequent compute step, to avoid false negatives caused by exact-match failures
+    on optional or variable properties.
   created: '2026-06-22'
   deactivated_reason: null
   id: r009
-  reasoning: 'The PlanIR executed a single SQL query with all attribute filters (including property_key
-    and property_value_text). The query returned no rows, causing the decision to default to ''not_found''
-    and outcome OUTCOME_NONE_UNSUPPORTED, while the grader expected OUTCOME_OK. Root cause: the exact-match
-    query was too restrictive, likely because the property value ''threaded rod'' was stored differently
-    or missing. The plan lacked a fallback to detect the product by core attributes alone.'
+  reasoning: 'The PlanIR executed a single SQL query with all attribute filters (including
+    property_key and property_value_text). The query returned no rows, causing the
+    decision to default to ''not_found'' and outcome OUTCOME_NONE_UNSUPPORTED, while
+    the grader expected OUTCOME_OK. Root cause: the exact-match query was too restrictive,
+    likely because the property value ''threaded rod'' was stored differently or missing.
+    The plan lacked a fallback to detect the product by core attributes alone.'
   status: active
   surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: The product is not in the catalogue.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Do not use concat to set a literal string value; use a literal step or
+    bind the string directly. Concat requires two list[dict] arguments.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'The PlanIR compute step ''concat'' was called with a single string argument
+    ''Nut Bolt and Washer'', but concat expects two list[dict] arguments (rowsets).
+    The error: ''concat() missing 1 required positional argument: b''. The intent
+    was to set product_name for the answer message, which should be done via a literal
+    primitive or by referencing the param directly, not concat.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v017
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: The product  is not in the catalogue.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
   cycles_used: 2
   date: '2026-06-22'

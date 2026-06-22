@@ -1586,3 +1586,198 @@
   embedding_hash: 48ac0cd72f2b3ab2a564e6743014a04022083e62e3a5bee9f07bf05d671d934b
   source_task: t53
   polarity: anti_pattern
+- id: count-catalogue-items-by-category
+  description: Count the number of catalogue products classified under a specific category using a SQL
+    query and return the count in a message.
+  domain:
+  - catalogue
+  - inventory
+  - data-query
+  content: 'To count items of a specific category from a database table:
+
+    1. Use an Exec step to run a SQL query: SELECT COUNT(*) AS cnt FROM <table> WHERE <category_column>
+    = ''<category_value>'';
+
+    2. Bind the output to a variable (e.g., sql_output).
+
+    3. Parse the result rows using auto_delim format, mapping the count column to a variable (e.g., cnt).
+
+    4. Extract the count from the first row''s mapped column (e.g., $rows.0.cnt).
+
+    5. Return a message containing the count, e.g., "[QTY:{count}]", with an OK outcome and a reference
+    to the policy document if needed.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 48b10b3659517622c93cba8ce5c57c49586c901953b892ce4704c6d056a4b9a8
+  source_task: t09
+  polarity: method
+- id: count-available-products-by-kind-and-store-with-policy-check
+  description: Count distinct product SKUs of a given kind in a given store, ensuring the store is open
+    and products are available, after verifying a non-empty policy document.
+  domain:
+  - data-retrieval
+  - sql-query
+  - policy-validation
+  content: '1. Read the policy document from a specified path. 2. If the document is empty, return an
+    unsupported outcome. 3. Otherwise, execute a SQL query: SELECT COUNT(DISTINCT pv.product_sku) FROM
+    product_variants pv JOIN store_inventory si ON pv.product_sku = si.product_sku JOIN stores s ON si.store_id
+    = s.store_id WHERE pv.product_kind_id = <kind_id> AND s.store_name = <store_name> AND s.is_open =
+    1 AND si.available_today_quantity > 0; 4. Extract the count from the query result and return it as
+    the answer.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 8f1d22baba6c64c317f6c26d77ee7aa60e657fb66157f62051870dce47ca4ba2
+  source_task: t11
+  polarity: anti_pattern
+- id: guard-missing-facts-in-decision-branches
+  description: When decision branches depend on external facts, explicitly check for missing facts to
+    avoid unintended clarification outcomes.
+  domain:
+  - decision-making
+  - error-handling
+  - scripting
+  content: 'In decision scripts, if a branch condition references a fact that may be absent (e.g., $_facts.identity.kind),
+    include a prior check for the existence of that fact. If the fact is missing, route to an appropriate
+    outcome (like OUTCOME_NONE_UNSUPPORTED) rather than allowing the system to default to OUTCOME_NONE_CLARIFICATION.
+    Example: add a branch ''when $_facts.identity is null'' before other identity checks.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 6e58a789ca25d6802ad3e35ab72f38ce13eadcd03264dd6e5646ffd30bbe261a
+  source_task: t21
+  polarity: anti_pattern
+- id: include-resource-path-in-not-found-error
+  description: When a requested resource is not found, the error response should include the expected
+    resource path to aid debugging and verification.
+  domain:
+  - api-design
+  - error-handling
+  content: In error responses for resource not found (e.g., 404), always include the requested resource
+    path (e.g., '/proc/baskets/{basket_id}.json') as a reference. This helps the caller identify the missing
+    resource and verify the identifier used. The path should be constructed from the request parameters,
+    not hardcoded.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 5f690589df453938f5fd69c527bb60b6863feaa5690c561e48ec841c00a93db8
+  source_task: t22
+  polarity: anti_pattern
+- id: 3ds-recovery-guest-deny
+  description: When restarting a 3-D Secure recovery flow, deny the request if the identity kind is 'guest',
+    otherwise initiate recovery and reference the 3DS documentation and payment record path.
+  domain:
+  - payments
+  - security
+  content: To restart a 3-D Secure recovery flow, check the identity kind. If identity.kind equals 'guest',
+    deny the request with an OUTCOME_DENIED_SECURITY and reference the security policy document (/docs/security.md).
+    Otherwise, initiate recovery with OUTCOME_OK, referencing the 3DS documentation (/docs/payments/3ds.md)
+    and the payment's record path.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 335d02e21c49354c0040e1f787956312278f9145ba048c6e0e49ffb7dc90c96a
+  source_task: t30
+  polarity: anti_pattern
+- id: atom-unsupported-check
+  description: Before aggregating data across entities, verify existence of both primary entity and related
+    entities; if either is missing, return unsupported outcome.
+  domain:
+  - data-retrieval
+  - sql
+  - decision-logic
+  content: When performing a cross-entity aggregation (e.g., summing inventory for a product across stores),
+    first query the primary entity (product) and the related entities (stores) separately. If either query
+    returns zero rows, the operation is unsupported and should return an appropriate outcome (e.g., OUTCOME_NONE_UNSUPPORTED)
+    rather than attempting the aggregation. This avoids misleading results or errors due to missing data.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 4ea5edfa4a467ba61fedbefc0ccbfe02aefc0ed3da680066ac0e39ef24e62adf
+  source_task: t33
+  polarity: anti_pattern
+- id: handbook_exception_check
+  description: Method to determine if a specific exception is permitted by a handbook, with permission
+    verification, and produce appropriate outcomes.
+  domain:
+  - policy_enforcement
+  - handbook_lookup
+  - exception_handling
+  content: "To check if a handbook permits a specific exception:\n1. Read the handbook document and the\
+    \ caller's identity (e.g., from /docs/security.md).\n2. Search the handbook for lines containing the\
+    \ exception name (e.g., 'queue-save quick complete').\n3. If no matching section is found, the exception\
+    \ is unsupported (OUTCOME_NONE_UNSUPPORTED).\n4. If a matching section is found, verify the caller's\
+    \ permissions:\n   - If the caller lacks required permissions (e.g., identity kind is 'guest'), deny\
+    \ with OUTCOME_DENIED_SECURITY.\n   - If the caller has sufficient permissions, the exception is supported\
+    \ and can be applied (OUTCOME_OK or similar).\n5. Do not default to unsupported when a matching section\
+    \ exists; ensure proper branching to avoid clarification outcomes."
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 66a7cb49bf3724cefbff1ae24200e6a3c08d12c454f24c84c36f57a703189f06
+  source_task: t36
+  polarity: anti_pattern
+- id: authorization_check_deny_pattern
+  description: Pattern to securely deny unauthorized requests using a definitive authorization check to
+    avoid clarification outcomes.
+  domain:
+  - security
+  - authorization
+  - discount
+  content: When implementing an authorization check that must deny unauthorized callers, use a discovery
+    command that returns a clear boolean 'authorized' field (or equivalent). In the decision, branch on
+    'authorized == false' to a deny answer with outcome OUTCOME_DENIED_SECURITY. Avoid relying on ambiguous
+    identity fields (e.g., 'kind') that may be missing or undefined, as this can lead to an OUTCOME_NONE_CLARIFICATION
+    outcome instead of the intended denial.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 3c57db68260412ea2188a479d0b0a2201c781a7de19edada6d124ddeb73e956c
+  source_task: t37
+  polarity: anti_pattern
+- id: row-reference-concatenation
+  description: To generate per-row record paths for citing individual rows, use element-wise string concatenation
+    of a base path with a row identifier column.
+  domain:
+  - data-processing
+  - row-referencing
+  content: When processing tabular data and needing to reference specific rows (e.g., for error messages
+    or citations), construct a new column of unique row paths by concatenating a fixed base string (like
+    a file path or sheet name) with a row identifier (such as a row number or ID column) using an element-wise
+    string concatenation operation. This requires a primitive that can concatenate a scalar string with
+    each element of a column, or two columns element-wise. Without this primitive, per-row references
+    cannot be generated.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 615e531fe79d4f3ec27fdaf3a0d84b54d6f84161873c15dd880274d059cca77e
+  source_task: t48
+  polarity: anti_pattern
+- id: guest-access-denial-catalogue
+  description: Deny guest users access to restricted catalogue data, returning a security denial outcome.
+  domain:
+  - security
+  - access-control
+  content: 'When a user with the role ''guest'' attempts to access a resource that requires authentication
+    or higher privileges (e.g., catalogue data), the system must deny the request. The denial should produce
+    an OUTCOME_DENIED_SECURITY outcome, include a clear message explaining the restriction (e.g., ''Access
+    denied: guest users cannot access catalogue data.''), and reference the relevant security policy document.
+    This rule ensures that unauthenticated or low-privilege users cannot view sensitive or restricted
+    information.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 4fa2e2507ae087f119f611470603a1b44400363f27aace55c06243024c81262e
+  source_task: t49
+  polarity: anti_pattern
