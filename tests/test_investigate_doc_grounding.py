@@ -44,3 +44,30 @@ def test_forced_read_none_when_already_grounded():
 
 def test_forced_read_none_without_policy_refs():
     assert _forced_doc_read({}, []) is None
+
+
+from agent.investigate import _note_doc_read
+
+
+def test_note_doc_read_appends_md_path():
+    env = {}
+    _note_doc_read(env, "read", {"path": "/docs/payments/3ds.md"})
+    assert env["docs_read"] == ["/docs/payments/3ds.md"]
+
+
+def test_note_doc_read_dedupes():
+    env = {"docs_read": ["/docs/a.md"]}
+    _note_doc_read(env, "read", {"path": "/docs/a.md"})
+    assert env["docs_read"] == ["/docs/a.md"]
+
+
+def test_note_doc_read_ignores_non_docs_path():
+    env = {}
+    _note_doc_read(env, "read", {"path": "/proc/catalog/x.json"})
+    assert "docs_read" not in env
+
+
+def test_note_doc_read_ignores_non_read_tool():
+    env = {}
+    _note_doc_read(env, "list", {"path": "/docs/a.md"})
+    assert "docs_read" not in env

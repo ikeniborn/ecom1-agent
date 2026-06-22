@@ -185,6 +185,18 @@ def _ground_doc_refs(env: dict, tool: str, args: dict, refs: list) -> None:
             env[r.env_key()] = True
 
 
+def _note_doc_read(env: dict, tool: str, args: dict) -> None:
+    """Record a /docs/*.md path the investigator actually read into env['docs_read']
+    (deduped). Phase-1 grounding consumes this to auto-cite docs the answer relied on."""
+    if (tool or "").lower() != "read":
+        return
+    path = args.get("path", "")
+    if isinstance(path, str) and path.startswith("/docs/") and path.endswith(".md"):
+        lst = env.setdefault("docs_read", [])
+        if path not in lst:
+            lst.append(path)
+
+
 def _forced_doc_read(env: dict, refs: list) -> "dict | None":
     """If any investigator-groundable ref (one with a read_target) is still ungrounded,
     return a forced read action for its target path (prioritized over free routing);
@@ -342,6 +354,7 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
                         note, env_updates = digest(goal, tool, args, observation, escalate=True)
                         brief.notes.append(note); brief.env.update(env_updates)
                         _ground_doc_refs(brief.env, tool, args, req_refs)
+                        _note_doc_read(brief.env, tool, args)
                         stop_reason = "budget"   # stalled even after escalation — gave up, not satisfied
                         break
                 seen.add(sig)
@@ -353,6 +366,7 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
                 brief.notes.append(note)
                 brief.env.update(env_updates)
                 _ground_doc_refs(brief.env, tool, args, req_refs)
+                _note_doc_read(brief.env, tool, args)
                 if sufficient(intent, brief.env):
                     stop_reason = "sufficient"
                     break
