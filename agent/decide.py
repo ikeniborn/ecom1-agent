@@ -97,3 +97,19 @@ def unsupported_or_clarify(intent: IntentSpec, env: dict) -> str | None:
             if "OUTCOME_NONE_CLARIFICATION" in space:
                 return "OUTCOME_NONE_CLARIFICATION"
     return None
+
+
+def anti_give_up_ok(intent: IntentSpec, result, env: dict) -> bool:
+    """True iff OK is reachable and the plan produced a grounded result satisfying
+    EVERY success_criteria[OUTCOME_OK]. Strictly gated: empty criteria or any
+    unresolved $-ref -> False (cannot fabricate OK). This is the spec's false-OK
+    mitigation — the model cannot downgrade a solved task, and code cannot invent one."""
+    if "OUTCOME_OK" not in (intent.outcome_space or []):
+        return False
+    crits = intent.success_criteria.get("OUTCOME_OK", [])
+    if not crits:
+        return False
+    refs = getattr(result.captured, "refs", []) or []
+    if any(isinstance(r, str) and r.startswith("$") for r in refs):
+        return False
+    return all(_holds(c, env) for c in crits)

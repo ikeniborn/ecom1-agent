@@ -157,3 +157,39 @@ def test_outcome_gated_by_space():
 
 def test_no_predicate_returns_none():
     assert unsupported_or_clarify(_intent(), {"state": "open"}) is None
+
+
+from agent.decide import anti_give_up_ok
+
+
+def test_anti_give_up_forces_ok_when_criteria_hold():
+    intent = _intent(success_criteria={"OUTCOME_OK": [{"op": "nonempty", "lhs": "$answer.message"}]})
+    res = _result(message="5 in stock")
+    env = {"answer": {"message": "5 in stock"}}
+    assert anti_give_up_ok(intent, res, env) is True
+
+
+def test_anti_give_up_false_when_criteria_fail():
+    intent = _intent(success_criteria={"OUTCOME_OK": [{"op": "nonempty", "lhs": "$answer.message"}]})
+    res = _result(message="")
+    env = {"answer": {"message": ""}}
+    assert anti_give_up_ok(intent, res, env) is False
+
+
+def test_anti_give_up_false_when_no_criteria():
+    # empty criteria -> cannot assert solved -> never fabricate OK.
+    assert anti_give_up_ok(_intent(success_criteria={}), _result(message="x"), {}) is False
+
+
+def test_anti_give_up_false_when_ok_not_in_space():
+    intent = _intent(outcome_space=["OUTCOME_DENIED_SECURITY"],
+                     constraints=[{"anchor": "#s", "rule": "r", "security": True,
+                                   "deny_when": {"op": "nonempty", "lhs": "$x"}}],
+                     success_criteria={"OUTCOME_OK": [{"op": "nonempty", "lhs": "$answer.message"}]})
+    assert anti_give_up_ok(intent, _result(message="x"), {"answer": {"message": "x"}}) is False
+
+
+def test_anti_give_up_false_when_unresolved_ref_present():
+    intent = _intent(success_criteria={"OUTCOME_OK": [{"op": "nonempty", "lhs": "$answer.message"}]})
+    res = _result(message="x", refs=["$still_a_ref"])
+    assert anti_give_up_ok(intent, res, {"answer": {"message": "x"}}) is False
