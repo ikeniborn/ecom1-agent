@@ -156,12 +156,11 @@ def is_stalled(result: str, signature: str, seen_signatures: set[str]) -> bool:
     return False
 
 
-def sufficient(intent, env: dict, data_paths=None, probed=None) -> bool:
+def sufficient(intent, env: dict) -> bool:
     """True when every investigator-groundable required_ref for the desired outcome is
-    grounded in env AND every seed data-path has been probed. Refs whose grounding is
-    PLAN's responsibility (e.g. record_path resolved from a $source) are skipped — the
-    investigator cannot ground them and must not block on them. data_paths/probed default
-    to None ⇒ the data clause is inert (pre-feature behaviour)."""
+    grounded in env. Refs whose grounding is PLAN's responsibility (e.g. record_path
+    resolved from a $source) are skipped — the investigator cannot ground them and must
+    not block on them."""
     outcome = intent.desired_outcome
     refs = (intent.required_refs or {}).get(outcome, [])
     for ref in refs:
@@ -169,9 +168,6 @@ def sufficient(intent, env: dict, data_paths=None, probed=None) -> bool:
         if g is None:            # PLAN produces this ref (e.g. record_path) — not the investigator's job
             continue
         if not g:
-            return False
-    if data_paths:
-        if any(p not in (probed or set()) for p in data_paths):
             return False
     return True
 

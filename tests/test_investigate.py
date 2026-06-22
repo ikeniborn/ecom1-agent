@@ -198,13 +198,6 @@ def test_sufficient_true_when_only_record_path_refs():
     assert sufficient(intent, env={}) is True
 
 
-def test_sufficient_data_clause_inert_when_no_data_paths():
-    # regression guard: omitting data_paths/probed reproduces the old behaviour
-    env = {"policy_doc:/docs/security.md": True, "row.record_path": "/p.json"}
-    assert sufficient(_intent_with_refs(), env=env) is True
-    assert sufficient(_intent_with_refs(), env={}) is False
-
-
 import agent.investigate as inv
 
 
