@@ -193,3 +193,66 @@ def test_anti_give_up_false_when_unresolved_ref_present():
     intent = _intent(success_criteria={"OUTCOME_OK": [{"op": "nonempty", "lhs": "$answer.message"}]})
     res = _result(message="x", refs=["$still_a_ref"])
     assert anti_give_up_ok(intent, res, {"answer": {"message": "x"}}) is False
+
+
+from agent.decide import decide_outcome, security_preflight
+
+
+def test_decide_security_deny_outranks_all():
+    intent = _intent(
+        constraints=[{"anchor": "#s", "rule": "no override", "security": True,
+                      "deny_when": {"op": "contains_any", "lhs": "$flags", "rhs": ["override"]}}],
+        success_criteria={"OUTCOME_OK": [{"op": "nonempty", "lhs": "$answer.message"}]})
+    res = _result(outcome="OUTCOME_OK", env={"flags": ["override"]}, message="x")
+    out, refs = decide_outcome(intent, res, MockVMSpy(fixtures={}), None)
+    assert out == "OUTCOME_DENIED_SECURITY"
+    assert "/docs/security.md" in refs
+
+
+def test_decide_unsupported_outranks_anti_give_up():
+    intent = _intent(
+        constraints=[{"anchor": "#p", "rule": "paid",
+                      "unsupported_when": {"op": "eq", "lhs": "$state", "rhs": "paid"}}],
+        success_criteria={"OUTCOME_OK": [{"op": "nonempty", "lhs": "$answer.message"}]})
+    res = _result(outcome="OUTCOME_OK", env={"state": "paid"}, message="x")
+    out, _ = decide_outcome(intent, res, MockVMSpy(fixtures={}), None)
+    assert out == "OUTCOME_NONE_UNSUPPORTED"
+
+
+def test_decide_anti_give_up_flips_over_refusal_to_ok():
+    # The 5-over-refusal class: PLAN authored DENIED, but no deny_when holds and the OK
+    # criteria are satisfied -> forced OK.
+    intent = _intent(
+        constraints=[{"anchor": "#s", "rule": "no override", "security": True,
+                      "deny_when": {"op": "contains_any", "lhs": "$flags", "rhs": ["override"]}}],
+        success_criteria={"OUTCOME_OK": [{"op": "nonempty", "lhs": "$answer.message"}]})
+    res = _result(outcome="OUTCOME_DENIED_SECURITY", env={"flags": []}, message="5 in stock")
+    out, _ = decide_outcome(intent, res, MockVMSpy(fixtures={}), None)
+    assert out == "OUTCOME_OK"
+
+
+def test_decide_falls_back_to_plan_outcome():
+    # Nothing fires (no criteria, no predicates) -> the plan's own outcome stands.
+    res = _result(outcome="OUTCOME_NONE_CLARIFICATION", message="need more info")
+    out, _ = decide_outcome(_intent(), res, MockVMSpy(fixtures={}), None)
+    assert out == "OUTCOME_NONE_CLARIFICATION"
+
+
+def test_preflight_terminal_deny_from_identity():
+    intent = _intent(
+        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+        constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
+                      "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}])
+    out = security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"}))
+    assert out is not None
+    outcome, msg, refs = out
+    assert outcome == "OUTCOME_DENIED_SECURITY"
+    assert "guests not authorized" in msg
+    assert "/docs/security.md" in refs
+
+
+def test_preflight_none_when_no_deny():
+    intent = _intent(
+        constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
+                      "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}])
+    assert security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "customer"})) is None

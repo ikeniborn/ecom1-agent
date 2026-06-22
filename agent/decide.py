@@ -113,3 +113,58 @@ def anti_give_up_ok(intent: IntentSpec, result, env: dict) -> bool:
     if any(isinstance(r, str) and r.startswith("$") for r in refs):
         return False
     return all(_holds(c, env) for c in crits)
+
+
+def _decision_env(intent: IntentSpec, result, vm, facts) -> dict:
+    """Env for post-interpret decisions: the plan's bound env + the /bin/id identity +
+    the assembled answer (so success_criteria over $answer.* resolve)."""
+    env = dict(result.env)
+    env["identity"] = identity_of(vm, facts)
+    cap = result.captured
+    env["answer"] = {"message": cap.message, "outcome": cap.outcome, "refs": list(cap.refs)}
+    return env
+
+
+def decide_outcome(intent: IntentSpec, result, vm, facts) -> tuple[str, list]:
+    """Reconcile the plan's outcome with the frozen IntentSpec + /bin/id identity.
+    Ladder: security_deny > unsupported_or_clarify > anti_give_up_ok > the plan's own
+    outcome. Returns (outcome, refs); refs default to the grounded answer.refs.
+
+    verify (Task 7) re-checks consistency afterwards — this is where outcomes are
+    decided, not where they are validated."""
+    env = _decision_env(intent, result, vm, facts)
+    base_refs = list(result.captured.refs or [])
+    protected = has_protected_action(intent, result)
+
+    c = security_deny(intent, env, protected)
+    if c is not None:
+        refs = _merge_constraint_refs(base_refs, c, env)
+        if SECURITY_POLICY_DOC not in refs:
+            refs.append(SECURITY_POLICY_DOC)
+        return "OUTCOME_DENIED_SECURITY", refs
+
+    uc = unsupported_or_clarify(intent, env)
+    if uc is not None:
+        return uc, base_refs
+
+    if anti_give_up_ok(intent, result, env):
+        return "OUTCOME_OK", base_refs
+
+    return result.captured.outcome, base_refs
+
+
+def security_preflight(intent: IntentSpec, vm, facts) -> tuple[str, str, list] | None:
+    """Pre-loop terminal security gate. Builds a facts-only env (plan-produced bindings
+    do not exist yet, so only identity/facts-based deny_when can fire) and returns
+    (outcome, message, refs) when a security deny holds, else None (proceed to loop)."""
+    env: dict = dict(intent.params or {})
+    env["_facts"] = facts
+    env["identity"] = identity_of(vm, facts)
+    protected = has_protected_action(intent, None)
+    c = security_deny(intent, env, protected)
+    if c is None:
+        return None
+    refs = _merge_constraint_refs([], c, env)
+    if SECURITY_POLICY_DOC not in refs:
+        refs.append(SECURITY_POLICY_DOC)
+    return "OUTCOME_DENIED_SECURITY", f"Denied by security policy: {c.rule}", refs
