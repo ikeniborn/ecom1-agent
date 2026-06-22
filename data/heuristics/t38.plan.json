@@ -1,0 +1,68 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "policy_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "id_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "id_raw",
+      "format": "json",
+      "into": "id_parsed",
+      "columns": []
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$id_parsed"
+      ],
+      "into": "id_obj"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$id_obj",
+        "kind"
+      ],
+      "into": "identity_kind"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$identity_kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "deny"
+      }
+    ],
+    "default_label": "deny"
+  },
+  "ops": [],
+  "answer": {
+    "deny": {
+      "message": "Access denied: guest accounts cannot view payment records.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        "$policy_doc"
+      ]
+    }
+  },
+  "custom_extract": []
+}

@@ -1,0 +1,309 @@
+entries:
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Checkout recovery for basket  denied: security policy violation.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: When fetching a payment record for a state-dependent operation (like recovery),
+    do not filter the discovery query by a specific expected status; instead, retrieve
+    the most recent payment for the basket and use decision branches to check its
+    actual status fields.
+  created: '2026-06-22'
+  deactivated_reason: r001 advised retrieving the single most recent payment and checking
+    its state, which caused this failure when the most recent payment was not the
+    one requiring recovery. The new rule supersedes it by retrieving multiple payments
+    and filtering for the eligible one.
+  id: r001
+  reasoning: The cycle produced OUTCOME_DENIED_SECURITY because the payment discovery
+    query (SELECT ... WHERE payment_status = 'requires_3ds_action') likely returned
+    no rows, making $payment null and triggering the 'isnull' branch. The root cause
+    is an overly restrictive WHERE clause that assumed a specific payment_status.
+    The PlanIR should have fetched the payment without that filter and evaluated its
+    state in the decision branches.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: '3DS recovery conditions not met: payment does not meet security
+    requirements.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: '#3ds-recovery'
+  content: When recovering a checkout after a 3DS failure, do not limit the payment
+    discovery query to a single most recent row; instead, retrieve the most recent
+    payments (e.g., all payments for the basket ordered by created_at descending)
+    and use a decision branch to select the one that satisfies the required state
+    conditions (three_ds_status = 'failed' and payment_status = 'requires_3ds_action').
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: The PlanIR's discovery query used 'LIMIT 1' to fetch the single most
+    recent payment for basket_230. That payment did not have three_ds_status='failed'
+    and three_ds_attempts equal to three_ds_max_attempts, so the decision branch correctly
+    triggered 'deny_security'. The grader expected OUTCOME_OK, indicating that a payment
+    meeting the 3DS failure conditions exists but was not the absolute most recent.
+    The root cause is that the discovery step assumed the most recent payment is the
+    one needing recovery, which is not always true. The corrective rule instructs
+    the PLAN phase to retrieve multiple payments and select the most recent eligible
+    one, ensuring the security check passes on the correct payment.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include an explicit branch for the desired success outcome in the
+    decision block, checking all required state conditions, rather than relying on
+    a default_label fallback.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: The script's decision block had no branch for the case where all conditions
+    for OUTCOME_OK were met (payment_id nonempty, three_ds_status='failed', attempts==max,
+    payment_status='requires_3ds_action', basket_status='checked_out'). The interpreter
+    fell through to OUTCOME_NONE_CLARIFICATION because no branch matched and the default_label
+    was not used. The fix is to add an explicit branch for the success outcome.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always provide both the source object and the key when using the 'get'
+    primitive in a compute step; the first argument must be the object reference,
+    the second the key to extract.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'The interpret phase failed with: ''compute step ''get'' failed: <lambda>()
+    missing 1 required positional argument: ''key''''. The PlanIR compute step was:
+    {"prim":"get","args":["basket_264"],"into":"basket_id"}. The ''get'' primitive
+    requires two arguments (obj, key), but only one was supplied. The step intended
+    to extract the basket_id, but the source object was missing. The rule ensures
+    future PlanIRs always supply both arguments to ''get''.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using filter_rows in a compute step, provide exactly two arguments:
+    the rows reference and a predicate object (e.g., {"op":"eq","lhs":"column","rhs":"value"}),
+    not separate column and value arguments.'
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'The PlanIR compute step ''filter_rows'' failed with: ''_filter_rows()
+    takes 2 positional arguments but 3 were given''. The step was: {"prim":"filter_rows","args":["$payments_rows","payment_status","requires_3ds_action"],"into":"filtered1"}.
+    The interpreter contract requires filter_rows(rows, pred) where pred is a predicate
+    object, not a column name and value. This rule ensures future PlanIR uses the
+    correct two-argument form.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Checkout recovery for basket basket_264: denied. Payment N/A.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: 'Checkout recovery not supported for basket : preconditions not
+    met.'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /docs/payments/3ds.md
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include an explicit catch-all branch in the decision block with
+    a condition that always evaluates to true (e.g., {'op':'true'}) as the final branch,
+    rather than relying on the default_label, to ensure a defined outcome is always
+    produced.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: ''grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION''.
+    The PlanIR''s decision block used ''default_label'': ''unsupported'' but the interpreter
+    produced OUTCOME_NONE_CLARIFICATION, an undefined outcome, instead of OUTCOME_NONE_UNSUPPORTED.
+    Root cause: reliance on default_label failed, likely because the interpreter fell
+    back to a built-in clarification outcome when no branch matched or evaluation
+    errored. Failing PlanIR fragment: decision block with only two conditional branches
+    and a default_label, no explicit always-true catch-all. This extends rule r003''s
+    guidance against default_label reliance for the success outcome to all outcomes.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: active
+  submitted_message: 'Checkout recovery denied: guest users are not authorized for
+    customer-specific actions.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: When a plan must evaluate multiple constraints, include discovery steps
+    for all required data sources (policy docs, records) and decision branches for
+    each constraint, with a final branch for the success outcome.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'The plan only evaluated the guest constraint and defaulted to denied_security,
+    ignoring the 3DS constraint and the success path. It lacked discovery of the payment
+    record and the 3DS policy, and lacked decision branches for the 3DS constraint
+    and success outcome. The error: ''expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY''.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 1
+  date: '2026-06-22'
+  outcome: OUTCOME_DENIED_SECURITY
+  status: failure
+prephase_deep_read:
+- /docs/payments/3ds.md
+task_id: t27

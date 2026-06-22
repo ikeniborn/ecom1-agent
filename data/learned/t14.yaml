@@ -1,0 +1,755 @@
+entries:
+- agents_md_anchor: null
+  content: Always include all required refs in the answer block's refs array, mapping
+    each ref to a computed variable that holds the exact value (scalar or array) expected
+    by the ref pattern. When a ref requires a field from a record, extract that field
+    into a dedicated variable and map the ref to it.
+  created: '2026-06-21'
+  deactivated_reason: The rule 'Always include all required refs... mapping each ref
+    to a computed variable that holds the exact value... When a ref requires a field
+    from a record, extract that field into a dedicated variable' incorrectly advised
+    pre-extracting fields for list ref patterns, leading to this type error. The new
+    rule supersedes it for list patterns.
+  id: r001
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$counted_products[*].record_path''] on OK answer. The PlanIR''s answer block
+    has an empty refs array, but the IntentSpec requires those refs for OUTCOME_OK.
+    The compute section stores the full store JSON object and the counted_products
+    JSON array, but does not extract the record_path fields into dedicated variables,
+    nor does it map the required refs to any values. The plan must compute the exact
+    scalar record_path from store and an array of record_paths from counted_products,
+    then include them in the answer refs.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not pass a second argument to dedupe; it accepts only a sequence. To
+    deduplicate by a specific field, first extract that field into a list using column
+    or map, then dedupe that list.
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'Error: ''interpret: compute step ''dedupe'' failed: <lambda>() takes
+    1 positional argument but 2 were given. CONTRACT: dedupe(seq)''. Root cause: PlanIR
+    compute step ''dedupe'' was called with two arguments ([''$eligible_rows'',''criteria_index''])
+    but the primitive expects only a sequence. Failing fragment: {"prim":"dedupe","args":["$eligible_rows","criteria_index"],"into":"$unique_criteria"}.
+    The intent was to deduplicate eligible rows by criteria_index, but dedupe cannot
+    accept a key. The correct pattern is to first project the criteria_index column
+    into a separate list, then dedupe that list. This rule prevents future misuse
+    of dedupe with extra arguments.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When a compute step needs to bind a rowset to a variable without transformation,
+    always provide two list arguments to concat: the rowset and an empty rowset (obtained
+    from a discovery step that returns no rows). Never call concat with a single argument.'
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. Root cause: The PlanIR compute step used
+    concat with only one argument (the matching_skus_rows rowset) to assign it to
+    counted_products. The concat primitive requires exactly two list[dict] arguments.
+    The failing fragment: {"prim":"concat","args":["$matching_skus_rows"],"into":"counted_products"}.
+    The rule ensures future PLAN phases always supply a second argument (an empty
+    rowset) when using concat for identity binding, preventing this interpreter error.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required ref pattern includes `[*].field`, do not pre-extract the
+    field into a separate list. Instead, keep the list of records (e.g., the rowset)
+    in a variable and map that variable directly to the ref. The interpreter will
+    extract the field automatically.
+  created: '2026-06-21'
+  deactivated_reason: These rules advised using base variables in answer refs, which
+    caused unresolved required refs. Superseded by new rule requiring exact required
+    ref strings.
+  id: r004
+  reasoning: 'The error ''real_vm: bad argument type for built-in operation'' occurred
+    because the answer block mapped the ref for ''$counted_products[*].record_path''
+    to ''$counted_products_record_paths'', a pre-extracted list of strings. The interpreter
+    attempted to access the ''record_path'' attribute on each string element, causing
+    a type error. The required pattern expects a list of records, not a flat list
+    of field values. The fix is to keep the matching rows as a variable (e.g., ''$counted_products'')
+    and map that to the ref, letting the interpreter extract the field.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Bosch/PWR-2VIRPPWC.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#plan-answer-refs'
+  content: Always include all required refs from the IntentSpec in the answer step's
+    refs list, mapping each required ref to the variable that holds the corresponding
+    record_path or rowset. Never leave the refs list empty when the IntentSpec specifies
+    required refs.
+  created: '2026-06-22'
+  deactivated_reason: These rules incorrectly suggest using base variables instead
+    of exact required ref strings, causing unresolved ref errors.
+  id: r005
+  reasoning: The interpret error 'unresolved required ref(s) [\'$store.record_path\',
+    \'$matched_products[*].record_path\'] on OK answer' occurred because the PlanIR
+    answer step had an empty refs list, despite the IntentSpec requiring those refs.
+    The compute steps correctly bound $store and $matched_products, but the answer
+    step did not include them. The root cause is a missing mapping from required refs
+    to bound variables in the answer step.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When required refs specify a source pattern with a field extraction (e.g.,
+    '$store.record_path' or '$matched_products[*].record_path'), include the base
+    variable (e.g., '$store' or '$matched_products') in the answer refs, not a pre-extracted
+    field variable. The interpreter will extract the field automatically.
+  created: '2026-06-22'
+  deactivated_reason: These rules incorrectly suggest using base variables instead
+    of exact required ref strings, causing unresolved ref errors.
+  id: r006
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$matched_products[*].record_path''] on OK answer. Root cause: The answer refs
+    list contained pre-extracted field variable ''$store_record_path'' and renamed
+    rowset ''$matched_rows'' instead of the base variables ''$store'' and ''$matched_products''
+    that the interpreter expects to resolve the required ref patterns. The PlanIR
+    should have bound the store record to ''$store'' and the product rowset to ''$matched_products'',
+    then included those in answer refs.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include the exact required ref strings from the IntentSpec in the
+    answer step's refs list, not just the base variable. For example, if required
+    ref is '$store.record_path', include '$store.record_path' in refs, not '$store'.
+    For '$matched_products[*].record_path', include '$matched_products[*].record_path'.
+  created: '2026-06-22'
+  deactivated_reason: r007 instructs to include the exact required ref strings with
+    dotted paths, which leads to unresolved ref errors. The correct approach is to
+    use base rowset variable names.
+  id: r007
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$matched_products[*].record_path''] on OK answer. Root cause: answer step refs
+    list contained base variables ''$store'' and ''$matched_products'' instead of
+    the exact required ref strings. The interpreter expects the refs to match the
+    required ref strings exactly, then resolves the field from the rowset. Existing
+    rules r004 and in-session rule incorrectly advised using base variables. Failing
+    PlanIR fragment: answer step ''refs'':[''$store'',''$matched_products''].'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Wiha/HND-2FFOGA9T.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Schneider Electric/ELC-1ECVU00O.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Keter/STO-3CP6YA7I.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Bosch/MAC-12UYEJXW.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#plan-phase'
+  content: Always provide exactly two list-of-dict arguments to concat, each derived
+    from a rowset or a previous compute step that outputs a list of rows. Never call
+    concat with empty args. If you need to aggregate multiple row sources, first discover
+    and parse each source into a rowset, then concatenate them.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: The plan's compute step 'concat' was called with empty args, violating
+    the contract that concat requires two list-of-dict arguments. The plan lacked
+    discovery steps to fetch product data and rowsets to parse them, so no row lists
+    were available. The rule ensures concat is always supplied with two row lists
+    derived from prior discovery and parsing steps.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use dotted field extraction paths like '$store.record_path' or '$matched_products[*].record_path'
+    in the answer refs list. Instead, use the base rowset variable name (e.g., '$store',
+    '$matched_products'). The interpreter will extract the required field automatically.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: The interpret error 'unresolved required ref(s) ['$store.record_path',
+    '$matched_products[*].record_path']' shows that the interpreter cannot resolve
+    dotted paths as refs. The answer step should provide the base rowset variable
+    names, not pre-extracted field paths. Existing rule r006 correctly advises using
+    base variables, but r007 conflicts by insisting on exact required ref strings.
+    The script followed r007 and failed. Therefore, deactivate r007 and reinforce
+    the correct approach.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use stdin to deliver SQL queries to the sql tool; pass the SQL as
+    a command-line argument (e.g., as the first positional argument) or write it to
+    a temp file and execute that file.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: 'Error: ''interpret: sql returned usage banner — SQL not delivered via
+    stdin''. The PlanIR used Exec with stdin field for SQL, but the sql tool did not
+    receive the query via stdin, likely because it expects SQL as a command-line argument.
+    Root cause: incorrect delivery method for SQL input. Failing PlanIR fragment:
+    Exec step with path ''/bin/sql'' and stdin containing the SQL query. No existing
+    rule covers this.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include the exact required ref strings from the IntentSpec in the
+    answer step's refs list, including any dotted field paths or wildcards. Do not
+    substitute base variable names when the required ref specifies a field extraction.
+  created: '2026-06-22'
+  deactivated_reason: These rules incorrectly required exact dotted ref strings in
+    the answer refs list, conflicting with the interpreter's expected behavior and
+    causing unresolved ref errors.
+  id: r011
+  reasoning: The interpret error 'unresolved required ref(s) ['$store.record_path',
+    '$matched_products[*].record_path']' occurred because the answer refs list contained
+    '$store' and '$matched_products' instead of the exact required ref strings. The
+    interpreter expects the refs to match the required refs exactly, including dotted
+    paths. Existing rule r006 incorrectly advised using base variable names, which
+    directly caused this failure. The new rule reinforces r007 and explicitly forbids
+    the substitution that r006 allowed.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When required refs in the IntentSpec contain dotted field extractions (e.g.,
+    '$store.record_path' or '$matched_products[*].record_path'), include only the
+    base rowset variable (e.g., '$store' or '$matched_products') in the answer refs
+    list. The interpreter will extract the required field automatically.
+  created: '2026-06-22'
+  deactivated_reason: 'Conflicting guidance: required refs must be included exactly
+    as specified, not as base variables. The interpreter does not automatically extract
+    dotted fields from base variables; the answer refs list must match the required
+    ref strings.'
+  id: r012
+  reasoning: The error 'unresolved required ref(s) ['$store.record_path', '$matched_products[*].record_path']'
+    occurred because the answer step used the exact dotted paths from the IntentSpec.
+    The interpreter cannot resolve these dotted refs; it expects the base rowset variable
+    names. Existing rule r007 incorrectly mandates using the exact required ref strings,
+    which caused the failure. The new rule corrects this by instructing to use base
+    rowset variables, aligning with r006 and the in-session rule.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include the exact required ref strings from the IntentSpec in the
+    answer step's refs list, including any dotted field paths or wildcards. Do not
+    substitute base variable names when the required ref specifies a field extraction.
+  created: '2026-06-22'
+  deactivated_reason: These rules incorrectly required exact dotted ref strings in
+    the answer refs list, conflicting with the interpreter's expected behavior and
+    causing unresolved ref errors.
+  id: r013
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$matched_products[*].record_path''] on OK answer. The PlanIR answer refs list
+    contained [''$store'', ''$matched_products''] instead of the exact required ref
+    strings. Existing rules r005 and r006 (and an in-session rule) incorrectly advised
+    using base variables, causing the interpreter to reject the answer. The correct
+    behavior is to include the exact required ref strings as specified in the IntentSpec.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Gorilla/ADH-3KO8R29L.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always ensure that every required ref in the answer step is resolvable
+    by guaranteeing that the corresponding rowset extraction produces the necessary
+    columns and at least one row (with nulls if needed) when the discovery may return
+    zero results.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r014
+  reasoning: The interpret phase reported unresolved required refs ['$store.record_path',
+    '$matched_products[*].record_path']. The plan's answer step included these exact
+    refs, but the rowset extraction likely produced empty rowsets or missing columns,
+    making the refs unresolvable. The discovery SQL may have returned zero rows because
+    the store or products were not found, or the output format caused column mapping
+    failure. The plan needs a fallback to ensure required refs are always resolvable.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that rowsets bound to required refs contain at least one
+    row with the necessary columns, even if the discovery query returns no results.
+    Use a compute step to insert a default row with nulls if the rowset is empty,
+    so that the ref is resolvable.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r015
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$matched_products[*].record_path''] on OK answer. Root cause: The PlanIR''s
+    discovery steps may return empty rowsets (e.g., store query or product matching
+    query returning zero rows), causing the interpreter to fail to resolve the required
+    refs even though the answer step includes the exact ref strings. The failing PlanIR
+    fragment is the rowsets ''store'' and ''matched_products'' that lack a guarantee
+    of at least one row. Existing rule r011/r013 correctly require exact ref strings,
+    but the PlanIR did not ensure the rowsets are non-empty. This new rule addresses
+    the emptiness problem.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using Exec with /bin/sql, embed all variable data directly into the
+    SQL query string in the stdin field; do not pass extra named arguments to Exec
+    beyond 'path' and 'stdin'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r016
+  reasoning: 'The error ''interpret: tool validation: arg ''store_name'' not accepted
+    by Exec (accepts: args, path, stdin)'' occurred because the plan passed ''store_name''
+    as a separate argument to Exec. Exec only accepts ''path'' and ''stdin'' (and
+    optionally ''args'' for subprocess arguments). The store name should have been
+    embedded directly in the SQL string, e.g., ''WHERE store_name = ''''Graz Lend
+    hardware shop'''''', rather than passed as a named parameter. The script code
+    shows the SQL already contains the literal, but the extra argument caused the
+    validation failure.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using the dedupe primitive, pass only a single sequence argument (a
+    list of values). To deduplicate a rowset by a column, first extract that column
+    into a list using a compute step (e.g., 'project' or 'extract_column') and then
+    apply dedupe to that list.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r017
+  reasoning: 'Error: ''interpret: compute step ''dedupe'' failed: <lambda>() takes
+    1 positional argument but 2 were given CONTRACT: dedupe(seq)''. The PlanIR compute
+    step {"prim":"dedupe","args":["$matched_products","product_family_id"],"into":"$unique_specs"}
+    passed two arguments (a rowset and a column name) to dedupe, which expects a single
+    sequence. The root cause is misuse of the dedupe primitive: it cannot accept a
+    rowset and column name directly. The fix is to first extract the product_family_id
+    column into a list, then dedupe that list.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include the exact required ref strings from the IntentSpec in the
+    answer step's refs list, including any dotted field paths or wildcards. Do not
+    substitute base variable names when the required ref specifies a field extraction.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r018
+  reasoning: 'The error ''interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$matched_products[*].record_path'']'' occurred because the answer step''s refs
+    list contained only ''$store'' and ''$matched_products'', not the exact dotted
+    paths required by the IntentSpec. The rowsets did contain the necessary columns,
+    so the failure was purely due to incorrect ref strings. Existing rules r011 and
+    r013 already state this, but the script violated them. r012 contradicts this by
+    advising to use base variable names only. The new rule reinforces the correct
+    behavior and supersedes r011, r012, r013.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required ref in the IntentSpec contains a dotted field extraction
+    (e.g., '$store.record_path' or '$matched_products[*].record_path'), include only
+    the base rowset variable (e.g., '$store' or '$matched_products') in the answer
+    refs list. The interpreter will automatically extract the required field from
+    the rowset. Do not include the dotted path in the refs list.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r019
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$matched_products[*].record_path''] on OK answer. The PlanIR answer step used
+    the exact dotted ref strings from the IntentSpec, but the interpreter could not
+    resolve them. The root cause is that the interpreter expects base rowset variables
+    in the answer refs list, not dotted field extractions. Existing rule r012 correctly
+    states this, but conflicting rules r011 and r013 instructed the opposite. The
+    script followed the conflicting rules, causing the failure. The corrective rule
+    reinforces r012 and supersedes r011/r013.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#plan-answer-refs'
+  content: Always include the exact required ref strings from the IntentSpec in the
+    answer step's refs list, including any dotted field paths or wildcards. Do not
+    substitute base variable names when the required ref specifies a field extraction.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r020
+  reasoning: 'The interpret phase failed with ''unresolved required ref(s) ["$store.record_path",
+    "$matched_products[*].record_path"]''. The PlanIR answer step provided refs ["$store",
+    "$matched_products"], but the IntentSpec required the dotted paths. The interpreter
+    could not resolve the required refs because the answer refs list omitted the field
+    extractions. The rowsets themselves contained the necessary columns (record_path),
+    so the failure is purely a PlanIR shape bug: the answer step must list the exact
+    required ref strings from the IntentSpec.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Bosch/PWR-2VIRPPWC.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Bosch/PWR-3FM3NHV4.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Ryobi/PWR-RZ0VIO7N.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/3M/SFE-2PLXTQAV.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Helios/PNT-169R7W8O.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Bosch/PWR-3FM3NHV4.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: 'Always provide two arguments to the ''get'' primitive: the rowset variable
+    and the field name as a string. Do not pass a dotted path as a single argument.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r021
+  reasoning: 'Error: interpret: compute step ''get'' failed: <lambda>() missing 1
+    required positional argument: ''key'' CONTRACT: get(obj, key). Root cause: compute
+    step used ''get'' with a single argument ''$first_row.store_record_path'' instead
+    of two arguments ''$first_row'' and ''store_record_path''. Failing PlanIR fragment:
+    {"prim":"get","args":["$first_row.store_record_path"],"into":"store"}. This rule
+    ensures correct argument count for ''get''.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use a Read RPC to fetch the instruction text; the pre-phase already
+    provides it as a literal. Use the instruction literal directly in compute steps.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r022
+  reasoning: 'real_vm: read failed: not found. The PlanIR attempted to Read ''/proc/instruction.json'',
+    which does not exist. The pre-phase provides the instruction text as a literal;
+    the PlanIR should not hardcode a file read for it. The failing PlanIR fragment:
+    {"rpc":"Read","args":{"path":"/proc/instruction.json"},"bind":"$instruction_raw"}.
+    This caused the cycle to fail before any grounding.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never pass an ExecResponse directly to a compute primitive that expects
+    a rowset; always include a rowsets step to parse the ExecResponse into a table,
+    binding the rowset to a variable.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r023
+  reasoning: 'Error: ''interpret: compute step ''count'' failed: object of type ''ExecResponse''
+    has no len() CONTRACT: count(seq): arg must be a rowset/list, not a single record''.
+    Root cause: The PlanIR discovery step for ''matched_products'' used an Exec RPC
+    to run a SQL query, which returns an ExecResponse object. The compute step ''count''
+    then received $matched_products directly, but count expects a rowset. The PlanIR
+    lacked a rowsets step to convert the ExecResponse into a table. Failing fragment:
+    compute step {"prim":"count","args":["$matched_products"],"into":"count"} with
+    no prior rowsets step for matched_products. No existing rule covers this.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always represent predicates in filter_rows as a list, e.g., ['eq', '$row.store_id',
+    '$store_id'], not a dict with 'op' and 'args'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r024
+  reasoning: The error 'dict' object has no attribute 'op' occurred because the filter_rows
+    predicate was a dict, but the interpreter expects a predicate object with an .op
+    attribute. Using a list format avoids this mismatch.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required ref in the IntentSpec is of kind 'record_path' and source
+    is a variable, ensure that variable is a rowset containing a 'record_path' column.
+    Do not extract the record_path into a scalar or list; keep the rowset with the
+    column and use that rowset as the ref.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r025
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store''] on OK answer.
+    The PlanIR computed a scalar string for ''$store'' by extracting the record_path
+    field from a row, but the interpreter expects a rowset with a record_path column
+    for a required ref of kind ''record_path''. The same issue likely applies to ''$matched_products'',
+    which was extracted as a list of strings. The fix is to keep the rowsets from
+    filter_rows as the required refs, ensuring they contain the record_path column.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the 'concat' primitive with string literals; it only accepts
+    two rowset variables (list[dict] rows). To construct a rowset from a scalar value,
+    use a 'rowsets' step with format 'json' and provide a JSON string via a compute
+    step that uses 'format' or 'join', or directly embed the scalar in the 'from_'
+    field.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r026
+  reasoning: 'interpret: compute step ''concat'' failed: <lambda>() takes 2 positional
+    arguments but 3 were given. CONTRACT: concat(a, b): both args must be list[dict]
+    rows (parse Exec output via rowsets first). The failing PlanIR fragment: {"prim":"concat","args":["[{\"record_path\":\"","$store_rec_path","\"}]"],"into":"$store_json"}.
+    Root cause: concat was given three string arguments instead of two rowset variables.
+    The intent was to construct a JSON string for a rowset, but concat is for merging
+    rowsets, not string concatenation. This rule prevents future misuse of concat.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a rowset is guaranteed to contain exactly one row (e.g., from a SQL
+    query with LIMIT 1), use the 'get' primitive to extract a field value, not 'column'.
+    'column' expects a list of rows and will fail on a single row.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r027
+  reasoning: 'Error: ''interpret: compute step ''column'' failed: ''column'' expects
+    list[dict] rows; use ''get'' for a single row''. Root cause: The PlanIR used ''column''
+    on $store, which is a single row from a LIMIT 1 query. The rowsets step produced
+    a single dict, not a list. The correct primitive is ''get'' to extract a field
+    from a single row. Failing PlanIR fragment: compute step {"prim":"column","args":["$store","store_id"],"into":"$store_id"}.
+    Rule linkage: new rule to prefer ''get'' for single-row extraction.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not include a 'guard_label' field in any PlanIR step (discovery, rowsets,
+    compute, custom_extract). The PlanIR schema does not permit this field.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r028
+  reasoning: 'PlanIR validation failed with 9 errors: ''Extra inputs are not permitted''
+    for ''guard_label'' in discovery, rowsets, compute, and custom_extract steps.
+    The PlanIR schema does not define ''guard_label'' as a valid field. The fix is
+    to remove all ''guard_label'' entries from the PlanIR.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Dresselhaus/FST-VBCWS2XQ.json'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a SQL query returns a single row containing a JSON object in a named
+    column (e.g., 'result'), always use a compute 'get' step to extract that column's
+    value into a variable before extracting nested fields; never directly 'get' nested
+    fields from the rowset itself.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r029
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ...] on OK answer. Root cause: The PlanIR''s rowsets step parsed the SQL output
+    into ''inventory_data'' as a rowset with a single row containing a ''result''
+    column (the json_object). The compute steps then attempted to ''get'' fields like
+    ''store'' directly from ''$inventory_data'', but the rowset only has the ''result''
+    column, so those variables were never populated, leaving refs unresolvable. Failing
+    PlanIR fragment: compute steps ''get'' [''$inventory_data'',''store''] etc. without
+    first extracting ''result''. Rule linkage: This new rule ensures nested JSON extraction
+    is always preceded by top-level column extraction.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the IntentSpec's required refs specify a source like '$store.record_path',
+    the PlanIR must use that exact variable name (e.g., 'store.record_path') in the
+    'into' field of the compute step that extracts the value, and the answer refs
+    must use the same source string '$store.record_path'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r030
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$product1.record_path'', ...] on OK answer. Root cause: The PlanIR''s answer
+    refs used source ''$store_record_path'' (underscore) but the IntentSpec''s required
+    refs expect ''$store.record_path'' (dot). The compute steps extracted into variables
+    named ''store_record_path'', etc., causing a mismatch. The interpret phase could
+    not resolve the required refs because no variable ''$store.record_path'' existed.
+    The PlanIR must align variable names exactly with the required refs'' source strings.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using the ''get'' primitive to extract a field from a rowset, always
+    provide two separate arguments: the rowset reference (e.g., ''$query_result.0'')
+    and the column name (e.g., ''count''), never a single dotted path like ''$query_result.0.count''.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r031
+  reasoning: 'Error: ''interpret: compute step ''get'' failed: <lambda>() missing
+    1 required positional argument: ''key'' CONTRACT: get(obj, key)''. The PlanIR
+    compute steps used ''get'' with a single dotted-path argument (e.g., ''$query_result.0.count'')
+    instead of two arguments: the rowset reference and the column name. This violated
+    the primitive''s contract, causing the interpreter to fail. Root cause: incorrect
+    argument structure in the ''get'' calls. Failing fragment: all compute steps under
+    ''compute'' that use ''get'' with a single dotted path.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a discovery query may return zero rows and the answer requires refs
+    from that query, always guard the extraction of required refs with a nonempty
+    check and provide a fallback value (e.g., empty string) before the answer refs
+    are evaluated.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r032
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$product1.record_path'', ...] on OK answer. Root cause: The PlanIR''s compute
+    steps assume the query result rowset is non-empty, but if the store or any product
+    lookup returns no rows, the rowset is empty, causing the ''get'' from index 0
+    to fail and the ref variables to remain unset, leading to unresolved refs. Failing
+    fragment: compute steps that directly ''get'' from ''$query_result.0'' without
+    checking emptiness. Rule linkage: new rule to guard against empty rowsets.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a discovery query may return zero rows and the answer requires refs
+    from that query, always guard the extraction of required refs with a nonempty
+    check and provide a fallback value (e.g., empty string) before the answer refs
+    are evaluated.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r033
+  reasoning: The interpret error 'unresolved required ref(s) [list]' occurred because
+    the SQL query returned zero rows (store or products not found), making the rowset
+    empty. The compute steps used 'get' on $query_result.0, which failed to extract
+    values, leaving the required refs unset. The PlanIR must include a guard (e.g.,
+    a decision branch or compute step checking rowset length) that sets fallback empty
+    strings for all required refs when the rowset is empty, ensuring the answer refs
+    are always resolved.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a discovery SQL query returns a single row and the answer requires
+    refs extracted from that row, always use rowsets format 'json' and have the SQL
+    query output a JSON object (e.g., via json_object()) with the exact keys needed
+    for subsequent 'get' steps, rather than relying on auto_delim and column name
+    mapping.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r034
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$product1.record_path'', ...] on OK answer. The PlanIR used a single SQL query
+    returning one row, parsed with auto_delim, then get steps to extract refs. The
+    likely root cause is that auto_delim produced a rowset with column names that
+    did not match the expected keys (e.g., positional names like col0), causing the
+    get steps to return null, which the interpreter treats as unresolved. The fix
+    is to use format ''json'' and have the SQL output a JSON object with the exact
+    keys, guaranteeing correct extraction.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 6
+  date: '2026-06-22'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t14

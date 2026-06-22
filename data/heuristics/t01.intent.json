@@ -1,8 +1,10 @@
 {
-  "objective": "Determine whether a product matching 'metabo 125 grinder body, regular or flat' exists in the catalogue.",
+  "objective": "Determine if a product variant with brand 'Heco', series 'Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw', and screw type 'drywall screw' exists in the catalogue.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_query": "lookup from product_variants where brand = 'metabo' and product_name contains '125' and 'grinder' and 'body', then check product_variant_properties for a property indicating 'regular' or 'flat' body type"
+    "brand": "exact match 'Heco'",
+    "series": "exact match 'Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw'",
+    "screw_type": "property key 'screw type' equals 'drywall screw'"
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -13,21 +15,27 @@
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$rows.0.product_sku",
+        "lhs": "$answer.product_sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$answer.record_path",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "The product {product_name} (SKU: {sku}) is {status} in the catalogue."
+    "msg_skeleton": "The product is {availability} in the catalogue."
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$rows.0.record_path"
+        "source": "$found_product.record_path"
       }
     ]
   }

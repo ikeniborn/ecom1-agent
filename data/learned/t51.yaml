@@ -1,0 +1,536 @@
+entries:
+- agents_md_anchor: null
+  content: Always include compute steps to derive all variables referenced in the
+    answer template or success criteria.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: The PlanIR only performed discovery (Find, Exec, Read) and a security
+    decision, but the answer template and success criteria reference $price_difference_abs_cents.
+    No compute steps were included to parse the receipt, look up current prices, or
+    calculate the difference. The verify step failed because the required variable
+    was never computed. The plan must include rowsets/compute to derive price_difference_abs_cents
+    from the receipt content and product_variants table.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using the List RPC, the result is a ListResponse object; always use
+    a 'get' primitive to extract the 'items' list before applying sequence primitives
+    like 'first'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: The error 'ListResponse object is not subscriptable' occurred because
+    the PlanIR applied 'first' directly to the output of a List RPC. The List RPC
+    returns a structured object, not a plain list. The root cause is missing extraction
+    of the 'items' list. The rule ensures future PlanIRs include a 'get' step to retrieve
+    the list before using sequence primitives.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Access denied: guests cannot access receipt files.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: When a security constraint may deny access, the PlanIR must include a decision
+    branch for the denial condition, but the default branch must proceed to compute
+    all required variables and evaluate the success criteria to produce the correct
+    outcome.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: The plan's decision tree had a single branch for the denial condition
+    and set the default label to 'denied', causing every run to produce OUTCOME_DENIED_SECURITY
+    regardless of the actual identity and path. The plan lacked any steps to read
+    the receipt, look up prices, compute totals, or check the price difference against
+    the success criteria. The root cause is an incomplete decision structure that
+    never reaches the computation needed for OUTCOME_OK.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using the 'any_true' primitive, always supply a sequence argument
+    (e.g., a list of boolean values) to evaluate.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'The PlanIR compute step ''any_true'' was called with no arguments, causing
+    the error: ''any_true() missing 1 required positional argument: seq''. The primitive
+    requires a sequence to check for any true value. The rule ensures future PlanIRs
+    provide the required argument.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When using the List RPC to discover a specific file, always include a decision
+    branch that checks if the items list is empty; if empty, produce OUTCOME_NONE_UNSUPPORTED,
+    otherwise proceed with the computation. Never assume the listing is non-empty.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: The PlanIR's compute step applies 'first' to the items list from List
+    /uploads without checking if it's empty. If the directory is empty, 'first' returns
+    null, and the subsequent 'get' on null fails, causing the interpreter to produce
+    OUTCOME_NONE_CLARIFICATION instead of a valid outcome. The error 'expected OUTCOME_OK,
+    got OUTCOME_NONE_CLARIFICATION' indicates a runtime failure before the decision,
+    consistent with an empty listing. Additionally, the decision default label is
+    'denied', which violates r003 (default must proceed to computation), but that
+    would yield OUTCOME_DENIED_SECURITY, not CLARIFICATION. The immediate fix is to
+    handle empty discovery results gracefully.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Never use the 'concat' primitive to create a string literal; use the 'literal'
+    primitive to bind a constant string value.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'The compute step ''concat'' failed with error: <lambda>() missing 1
+    required positional argument: ''b''. The concat primitive expects two list[dict]
+    row arguments, but the PlanIR supplied only one argument, a string literal ''/uploads/receipt_ocr_5YuPD1B3.txt''.
+    The intended use was to set the variable ''receipt_file_path'' to that path string.
+    The correct primitive for binding a literal string is ''literal'', not ''concat''.
+    This rule prevents future misuse of concat for string literals.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#plan-primitives'
+  content: 'When using the filter_rows primitive, always provide exactly two arguments:
+    the rows (list of dicts) and a predicate function. Do not pass column name and
+    set directly; instead, use a predicate-building primitive (e.g., ''in_set_pred'')
+    to create the predicate, then pass it as the second argument.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: 'The interpreter failed on step ''filter_rows'' because it received 4
+    arguments: ''$all_variants'', ''product_sku'', ''in_set'', ''$unique_skus''. The
+    contract for filter_rows requires exactly 2 arguments: rows and a predicate function.
+    The PlanIR incorrectly attempted to specify a column and a set inline. The fix
+    is to first build a predicate using a dedicated primitive (e.g., ''in_set_pred'')
+    that takes a column name and a set, then pass that predicate to filter_rows. This
+    ensures the interpreter receives the correct number of arguments.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using the 'literal' primitive to bind a constant string value, always
+    provide the string directly as the 'value' field, not inside an 'args' list.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: 'The error ''interpret: compute step ''literal'' failed: ''literal''''
+    occurred because the PlanIR used the ''literal'' primitive with an ''args'' list
+    containing the string. The interpreter likely expects the literal value to be
+    provided directly as a ''value'' field. The failing PlanIR fragment: {"prim":"literal","args":["/uploads/receipt_ocr_5YuPD1B3.txt"],"into":"receipt_file_path"}.
+    The existing rule [in-session] advises using ''literal'' for constant strings
+    but does not specify the correct argument structure. This new rule clarifies the
+    required format to prevent future failures.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using the 'literal' primitive in a compute step, never include a 'value'
+    field at the step level; instead, pass the constant string as the sole element
+    of the 'args' list.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: The PlanIR validation error 'Extra inputs are not permitted' occurred
+    because a compute step included a 'value' field containing the file path string
+    '/uploads/receipt_ocr_5YuPD1B3.txt'. The correct PlanIR schema for a literal binding
+    requires the constant to be placed inside the 'args' list, not as a top-level
+    'value' field. The existing in-session rule incorrectly advised using a 'value'
+    field, which directly caused this schema violation.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When constructing a compute step in PlanIR, always include the 'prim' field
+    with the primitive name and an 'args' list containing the arguments. Do not use
+    'name' or 'input' fields; the step's name is defined by the 'into' field, and
+    the input is passed via 'args'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: 'The PlanIR generation produced a compute step with ''name'' and ''input''
+    fields instead of the required ''prim'' and ''args'' fields, causing validation
+    errors: ''compute.1.prim Field required'', ''compute.1.name Extra inputs are not
+    permitted'', ''compute.1.input Extra inputs are not permitted''. The correct structure
+    for a compute step is {''prim'': ''<primitive_name>'', ''args'': [...], ''into'':
+    ''<variable_name>''}.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using the 'literal' primitive to bind a constant string value, always
+    provide the string in the 'value' field of the step, not in an 'args' list.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r011
+  reasoning: 'The PlanIR compute step ''literal'' failed because it used an ''args''
+    list to pass the string ''/uploads/receipt_ocr_5YuPD1B3.txt''. The interpreter
+    expects the string to be provided via a ''value'' field. The existing in-session
+    rule that says ''never include a value field at the step level; instead, pass
+    the constant string as the sole element of the args list'' is incorrect and caused
+    this failure. The correct format is: {"prim":"literal","value":"/uploads/receipt_ocr_5YuPD1B3.txt","into":"receipt_file_path"}.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using the 'literal' primitive in a compute step, always provide the
+    constant string in the 'value' field of the step, not in an 'args' list.
+  created: '2026-06-22'
+  deactivated_reason: r012 incorrectly suggests that a compute step can have a 'value'
+    field for a literal primitive; the error shows that compute steps do not accept
+    a 'value' field. The new rule supersedes it by directing the use of a literal
+    step instead.
+  id: r012
+  reasoning: 'The interpret error ''compute step ''literal'' failed: ''literal''''
+    indicates that the literal step format with ''args'' containing the string is
+    not accepted by the interpreter. The correct format is to use a ''value'' field
+    directly in the step, as per one existing in-session rule. The conflicting in-session
+    rule that says to use ''args'' should be deactivated but lacks an ID. The failing
+    PlanIR fragment is the literal steps for receipt_file_path and product_variants.record_path.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always structure the 'answer' field in PlanIR as a list of objects, each
+    with a 'label' field matching a decision branch label, not as a dictionary keyed
+    by label.
+  created: '2026-06-22'
+  deactivated_reason: r013 advised using a list for the answer field, which contradicts
+    the validator's requirement for a dictionary.
+  id: r013
+  reasoning: 'The PlanIR''s answer section was a dictionary {"denied": {...}} instead
+    of a list. The interpreter could not map the decision label to an outcome, defaulting
+    to OUTCOME_NONE_CLARIFICATION. The error ''expected OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION''
+    confirms the answer structure was invalid. The decision logic also always denies,
+    but the immediate failure is the malformed answer.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always structure the 'answer' field in PlanIR as a dictionary mapping decision
+    branch labels to answer objects, not as a list.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r014
+  reasoning: 'PLAN validation error: ''answer Input should be a valid dictionary [type=dict_type,
+    input_value=[{''label'': ''unsupported'',...}], input_type=list]''. The script
+    emitted a list of answer objects, but the PlanIR schema requires a dictionary
+    keyed by decision branch labels. Existing rule r013 incorrectly prescribed a list
+    structure, causing this failure.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: 'Unable to process request: file reading capability not available
+    for guest identity.'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When performing a comparison, use a compare step with 'op' field set to
+    'eq' or 'neq', not a compute step with 'is' or 'is not' keys.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r015
+  reasoning: 'PLAN validation error: compute steps 6 and 7 had extra forbidden keys
+    ''is'' and ''is not'' in their value fields. The PlanIR schema does not allow
+    these keys in compute steps. The correct way to express equality/inequality is
+    via a compare step with an ''op'' field (e.g., ''eq'' for equals, ''neq'' for
+    not equals). This rule prevents misuse of compute steps for comparisons.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using filter_rows, always define the predicate as a separate compute
+    step and reference it by its bind name, never inline a dict with op/lhs/rhs.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r016
+  reasoning: 'Error: interpret: compute step ''filter_rows'' failed: ''dict'' object
+    has no attribute ''op''. The filter_rows step in the plan provided a predicate
+    as an inline dict {"op":"in_set","lhs":"$row.product_sku","rhs":"$receipt_skus"}.
+    The interpreter expects the predicate argument to be a reference to a compute
+    step that has an ''op'' attribute, not a raw dict. Root cause: incorrect predicate
+    structure. Failing PlanIR fragment: {"prim":"filter_rows","args":["$variants_rows",{"op":"in_set","lhs":"$row.product_sku","rhs":"$receipt_skus"}],"into":"current_prices_rows"}.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use a compute step to define a comparison, filter predicate, or conditional.
+    Compute steps must only bind a literal value (string, number, boolean) or a reference
+    to another step's bind name. For comparisons, use a compare step with 'op' field.
+    For filter predicates, reference a compare step's bind name in the filter step.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r017
+  reasoning: 'PlanIR validation failed because compute steps contained dicts (e.g.,
+    {''op'': ''in_set'', ''lhs'': ''...'', ''rhs'': ''$sku_list''}) and lists (e.g.,
+    [{''bool'': True, ''text'': ''...''}]) as their ''value'', which are not permitted.
+    The schema expects compute steps to bind simple literals or references, not structured
+    predicates or conditionals. The user likely attempted to define filter predicates
+    and comparisons as compute steps, violating the intended step types. This rule
+    ensures compute steps are used only for literal/reference binding, while compare
+    steps handle comparisons and filter steps reference those bind names.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use a compute step to bind a literal value. Use a literal step with
+    the 'value' field set to the constant.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r018
+  reasoning: The error 'compute.3.value Extra inputs are not permitted' indicates
+    that a compute step was given a 'value' field containing the integer 300, which
+    is not allowed. The failing PlanIR fragment likely attempted to bind a constant
+    number using a compute step. The correct approach is to use a literal step for
+    any constant value (string, number, boolean).
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Never produce a PlanIR that directly returns an unsupported outcome without
+    first attempting the required operations; always include discovery steps to attempt
+    data retrieval and a decision branch that checks for success or failure.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r019
+  reasoning: 'Error: grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION.
+    Root cause: The PlanIR contained no discovery steps to attempt reading the receipt
+    file or querying the database, and no decision branches to evaluate results. The
+    interpreter, having no steps to execute, fell back to a clarification outcome
+    instead of either computing the price difference or returning the intended unsupported
+    outcome. Failing PlanIR fragment: entire plan with empty discovery, rowsets, compute,
+    and decision branches, default_label ''unsupported'' but no branch to trigger
+    it. The plan must include at least one discovery step to attempt the operation
+    and a branch on its outcome to avoid the interpreter''s clarification fallback.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Unable to determine the price difference.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include discovery steps to list a directory and select the target
+    file when the intent specifies such a method, and always bind all parameters used
+    in Exec steps to outputs of prior discovery steps; never hardcode a file path
+    or leave parameters unbound.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r020
+  reasoning: 'Error: expected OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED. Root cause:
+    The PlanIR hardcoded ''/uploads/receipt_ocr_N1JVzBm3.txt'' instead of listing
+    /uploads/ to find the receipt file, and the SQL query used parameter :receipt_data
+    which was never bound by any prior step (the custom_extract was defined but not
+    integrated into the discovery flow). This caused the query to return nulls, triggering
+    the unsupported outcome. The rule enforces proper file discovery and parameter
+    binding.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When listing a directory to locate a file, always filter the listing to
+    include only entries of type 'file' before selecting an entry to read.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r021
+  reasoning: 'The real_vm error ''read failed: is a directory'' occurred because the
+    PlanIR selected the first entry from the /uploads listing without checking its
+    type. The listing likely returned a directory entry first, causing the subsequent
+    Read step to fail. The PlanIR must filter directory listings to only files before
+    selecting a path to read.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When listing a directory to locate a file, always include a decision branch
+    that checks whether the filtered list of file entries is non-empty before attempting
+    to read the first file; if the list is empty, branch to an unsupported outcome.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r022
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. The PlanIR listed /uploads/,
+    filtered for files, but did not verify that the filtered list was non-empty. The
+    ''first'' step on an empty list likely returned null, causing ''concat'' to produce
+    ''/uploads/'' (a directory) as the read path. The Read RPC then failed because
+    it received a directory path. The new rule ensures a check for file existence
+    before reading, preventing the directory read attempt.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When filtering a directory listing to select files, always use the field
+    that indicates the entry type (commonly 'type' or 'is_dir') and compare to the
+    value that represents a file (e.g., 'file' or false). Do not assume the field
+    is 'kind'.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r023
+  reasoning: 'Error: real_vm: read failed: is a directory. Root cause: The filter_rows
+    step used ''kind'' as the field to identify files, but the List RPC output likely
+    uses a different field (e.g., ''type''), so the filter did not exclude directories.
+    The first entry remained a directory, causing receipt_path to be a directory and
+    the Read RPC to fail. Failing PlanIR fragment: filter_rows with condition on ''kind''.
+    Existing in-session rule about filtering for files was too vague, leading to this
+    field-name mistake.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 3
+  date: '2026-06-22'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t51

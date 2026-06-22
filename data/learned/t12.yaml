@@ -1,0 +1,274 @@
+entries:
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: Obsolete verdict, not a technique rule; superseded by new rule
+    on using policy doc content.
+  id: v001
+  score: 0.0
+  score_detail:
+  - Answer should be "<COUNT:143>"
+  source: verdict
+  status: inactive
+  submitted_message: COUNT:143
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/catalogue-addenda/2021-08-09-reporting-cordless-saw-sander-fam-power-tools-cordless-saw-sander-0007-uu3fvg4v.md
+- agents_md_anchor: null
+  content: When a policy document defines a product classification, always extract
+    the exact set of products from the document (e.g., by reading its content and
+    parsing a list of product IDs or a family identifier) rather than relying on a
+    hardcoded product kind name or excluding a family ID.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a more specific rule that covers both extraction
+    technique and correct handling of ReadResponse fields.
+  id: r001
+  reasoning: 'Error: grader: Answer should be ''<COUNT:143>''. The PlanIR''s SQL query
+    hardcoded product_kind_name = ''Cordless Saw and Sander'' and excluded product_family_id
+    != ''fam_power_tools_cordless_saw_sander_0007_uu3fvg4v'', but the policy doc likely
+    defines the classification differently (e.g., a specific family or list of IDs).
+    The doc was read but its content was not used to ground the query, causing an
+    incorrect count. Root cause: PlanIR did not parse the policy doc to determine
+    the exact classification criteria. New rule instructs PLAN to always extract classification
+    from the doc content.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When querying a database for rows, always use a structured query RPC (e.g.,
+    Query) that returns a list of dicts, not Exec with SQL which returns raw text.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'Error: ''filter_rows'' expects list[dict]; use ''get'' for a single
+    row. Root cause: PlanIR discovery step used Exec RPC with SQL ''SELECT product_sku
+    FROM product_variants;'' and bound output to ''all_skus_rows''. Exec returns raw
+    stdout string, not a list of dicts. The compute step filter_rows then failed because
+    its first argument was a string, not a list of dicts. Failing PlanIR fragment:
+    discovery step with Exec and compute step filter_rows. Rule linkage: new rule
+    to prevent using Exec for structured row retrieval.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a policy document defines a product family identifier, always extract
+    the identifier from the document's text content using a regex or string parsing,
+    and use the extracted value in subsequent SQL queries and decision checks. Never
+    use the entire ReadResponse object in string operations; always access its 'content'
+    field to get the text.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: The error 'Protocol message ReadResponse has no "fam_workwear_work_jackets_0001_3f3vgi5c"
+    field.' occurred because the PlanIR's decision branch used a contains_any check
+    on the bound variable $doc_content, which was the entire ReadResponse message,
+    not its text content. The interpreter attempted to access a protobuf field named
+    after the family ID, which does not exist. Additionally, the SQL query hardcoded
+    the family ID, violating the principle of extracting it from the document. The
+    new rule ensures the PlanIR binds the 'content' field of ReadResponse and extracts
+    the identifier dynamically, preventing both the field-access error and hardcoding.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always set the answer message to a literal string that already contains
+    the computed value, not a template with variable placeholders.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r004
+  reasoning: The verify step failed because the answer message was '<COUNT:{count_val}>'
+    (a template with a placeholder) instead of the literal '<COUNT:1>'. The regex
+    ^<COUNT:\d+>$ did not match the placeholder syntax. The PlanIR must embed the
+    computed value directly into the answer message string.
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: Product family identifier not found in document.
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When adding a compute step to PlanIR, always use the 'prim' field to specify
+    the operation (e.g., 'extract_regex') and use 'source' to reference the input
+    data. Never include 'name' or 'input' fields.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'The PlanIR validation error indicates that a compute step contained
+    a dict with ''name'': ''fuzzy_sku_receipt'' and ''input'': ''$policy_text'' instead
+    of the required ''prim'' field. The schema expects a ''prim'' field for the operation
+    and does not permit ''name'' or ''input'' as extra fields. This rule ensures future
+    compute steps are correctly structured.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#planir-compute-prims'
+  content: When the answer shape is a formatted string (e.g., '<COUNT:%d>'), use a
+    compute step with prim 'format' and args [template, value] to produce the final
+    message string. Never use concat for string building; concat is only for merging
+    two row lists.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() takes 2
+    positional arguments but 3 were given. CONTRACT: concat(a, b): both args must
+    be list[dict] rows. Root cause: PlanIR compute step used concat with three arguments
+    (a string literal, a number, a string literal) to build a formatted message string,
+    but concat is designed to merge two row lists, not to concatenate strings. Failing
+    fragment: {"prim":"concat","args":["<COUNT:","$count_num",">"],"into":"final_msg"}.
+    The correct approach is to use a ''format'' prim to produce the final message
+    string from a template and the count value. This rule ensures future plans use
+    the appropriate prim for string formatting.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 6
+  date: '2026-06-22'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t12

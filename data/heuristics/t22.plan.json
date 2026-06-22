@@ -1,0 +1,284 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_doc"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/checkout.md"
+      },
+      "bind": "checkout_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT hex(randomblob(16)) AS payment_id, hex(randomblob(16)) AS record_suffix;"
+      },
+      "bind": "gen_ids"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT b.customer_id, b.store_id, b.basket_status, b.record_path, SUM(bi.requested_quantity * pv.price_cents) AS total_cents FROM shopping_baskets b JOIN shopping_basket_items bi ON b.basket_id = bi.basket_id JOIN product_variants pv ON bi.product_sku = pv.product_sku WHERE b.basket_id = :basket_id GROUP BY b.basket_id;"
+      },
+      "bind": "basket_query"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "gen_ids",
+      "format": "auto_delim",
+      "into": "gen_ids_rows",
+      "columns": [
+        {
+          "into": "payment_id",
+          "candidates": [
+            "payment_id"
+          ]
+        },
+        {
+          "into": "record_suffix",
+          "candidates": [
+            "record_suffix"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "basket_query",
+      "format": "auto_delim",
+      "into": "basket_info",
+      "columns": [
+        {
+          "into": "customer_id",
+          "candidates": [
+            "customer_id"
+          ]
+        },
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "basket_status",
+          "candidates": [
+            "basket_status"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "total_cents",
+          "candidates": [
+            "total_cents"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$gen_ids_rows"
+      ],
+      "into": "gen_ids_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$gen_ids_row",
+        "payment_id"
+      ],
+      "into": "payment_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$gen_ids_row",
+        "record_suffix"
+      ],
+      "into": "record_suffix"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$basket_info"
+      ],
+      "into": "basket_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_row",
+        "basket_status"
+      ],
+      "into": "basket_status"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_row",
+        "record_path"
+      ],
+      "into": "basket_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_row",
+        "total_cents"
+      ],
+      "into": "total_cents"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_row",
+        "customer_id"
+      ],
+      "into": "customer_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_row",
+        "store_id"
+      ],
+      "into": "store_id"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$identity.kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "denied_security"
+      },
+      {
+        "when": {
+          "op": "isnull",
+          "lhs": "$basket_id",
+          "rhs": null,
+          "args": []
+        },
+        "label": "clarify_missing_basket_id"
+      },
+      {
+        "when": {
+          "op": "not",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$basket_info",
+              "rhs": null,
+              "args": []
+            }
+          ]
+        },
+        "label": "clarify_basket_not_found"
+      },
+      {
+        "when": {
+          "op": "ne",
+          "lhs": "$basket_status",
+          "rhs": "active",
+          "args": []
+        },
+        "label": "clarify_basket_not_active"
+      }
+    ],
+    "default_label": "proceed_checkout"
+  },
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH ins AS (INSERT INTO payment_transactions (payment_id, record_path, basket_id, is_archived_basket_reference, customer_id, store_id, payment_amount_cents, payment_currency, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude, three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts) VALUES (:payment_id, '/payments/' || :record_suffix || '.json', :basket_id, 0, :customer_id, :store_id, :total_cents, 'USD', 'completed', datetime('now'), 'guest_method', 'guest_device', 0.0, 0.0, NULL, NULL, NULL, NULL) RETURNING payment_id) SELECT payment_id FROM ins;"
+      },
+      "bind": null,
+      "guard_label": "proceed_checkout",
+      "outcome_from_exit": null
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "UPDATE shopping_baskets SET basket_status = 'checked_out' WHERE basket_id = :basket_id;"
+      },
+      "bind": null,
+      "guard_label": "proceed_checkout",
+      "outcome_from_exit": null
+    }
+  ],
+  "answer": {
+    "denied_security": {
+      "message": "Checkout denied: guest users are not permitted to checkout.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$basket_record_path"
+        }
+      ]
+    },
+    "clarify_missing_basket_id": {
+      "message": "Please provide a basket ID to checkout.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    },
+    "clarify_basket_not_found": {
+      "message": "Basket {basket_id} not found.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    },
+    "clarify_basket_not_active": {
+      "message": "Basket {basket_id} is not active (status: {basket_status}).",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    },
+    "proceed_checkout": {
+      "message": "Checkout completed: payment {payment_id} for basket {basket_id}.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/checkout.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$basket_record_path"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

@@ -1,0 +1,439 @@
+entries:
+- agents_md_anchor: null
+  content: Always extract the matches list from a Search RPC response before applying
+    sequence primitives like first. Use a rowset with format 'search_response' or
+    a get primitive with key 'matches' to obtain the list.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: The compute step 'first' failed with 'SearchResponse' object is not subscriptable.
+    The PlanIR passed the raw Search RPC bind ($exception_search) directly to the
+    first primitive, but the RPC returns a response object, not a list. The contract
+    for first expects a sequence. The fix is to extract the matches list from the
+    response before using first.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Action denied: caller is not an employee as required by /docs/security.md.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: When a plan includes both a security constraint and a policy-document check
+    for an exception, order the decision branches to first verify the exception's
+    existence; only if the exception is found should the security constraint be evaluated.
+    If the exception is not found, the outcome should be unsupported without evaluating
+    security.
+  created: '2026-06-22'
+  deactivated_reason: r002's ordering (exception existence before security) caused
+    the plan to ignore a violated security constraint, producing an incorrect unsupported
+    outcome instead of DENIED_SECURITY.
+  id: r002
+  reasoning: 'The grader expected OUTCOME_NONE_UNSUPPORTED because the exception is
+    not in the handbook, but the script''s decision branch checked security first,
+    leading to OUTCOME_DENIED_SECURITY. The root cause is the ordering of decision
+    branches: the security check (identity.kind != employee) was placed before the
+    exception existence check (contains_any on handbook_text). The correct order should
+    first check if the exception is supported; if not, go to unsupported. Only if
+    the exception is found should the security constraint be evaluated. The failing
+    PlanIR fragment is the decision block with branches ordered security first, then
+    exception_found.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the content from a Read RPC response using a rowset with
+    format 'read_response' and a column mapping to 'content', or use a compute get
+    with key 'content'.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by new rule that explicitly forbids using raw Read
+    output in decision branches.
+  id: r003
+  reasoning: 'The error ''real_vm: Protocol message ReadResponse has no ''f'' field.''
+    indicates that the PlanIR discovery step bound the raw Read RPC response to ''handbook_text'',
+    but the interpreter later tried to access a field ''f'' (likely a default) that
+    does not exist. The correct PLAN technique is to extract the file content from
+    the structured Read response using a rowset or get primitive. Failing PlanIR fragment:
+    {"rpc":"Read","args":{"path":"/docs/store-associate-exception-handbook.md"},"bind":"handbook_text"}.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Never use the raw output of a Read RPC directly in a decision branch; always
+    extract the content using a rowset with format 'read_response' and a column mapping
+    to 'content' before checking for phrases.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: The plan used $handbook_text directly in a decision branch's contains_any
+    check, but $handbook_text was the raw RPC response, not the extracted content.
+    This caused a false positive match on the exception phrase, leading the plan to
+    take the exception_found branch and attempt an Exec that failed, resulting in
+    OUTCOME_NONE_CLARIFICATION instead of the expected OUTCOME_NONE_UNSUPPORTED. The
+    existing rule r003 requires extracting content, but the plan violated it. A stronger
+    rule is needed to prevent direct use of raw Read output.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#decision-branch-ordering'
+  content: Always order decision branches so that all DENIED outcomes (e.g., DENIED_SECURITY)
+    are evaluated before any non-DENIED outcomes (e.g., OUTCOME_OK). When a plan includes
+    a security constraint, place the branch that leads to DENIED_SECURITY immediately
+    after the existence check and before the authorized branch, and ensure its condition
+    explicitly tests that the security constraint is NOT met.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: 'The plan placed the ''authorized'' (OUTCOME_OK) branch before the ''denied_security''
+    branch, causing a security-first violation. The correct order is: 1) exception
+    not found -> unsupported, 2) exception found AND security fails -> denied_security,
+    3) exception found AND security passes -> authorized. The denied_security condition
+    must explicitly check that the security constraint is not satisfied (e.g., using
+    ''not'' around the security checks). Existing rule r002 partially addressed ordering
+    but did not enforce that DENIED branches precede non-DENIED branches, so it is
+    superseded.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use the concat primitive to bind a constant string or to construct
+    JSON strings. Use the literal primitive to emit a constant value, and the format
+    primitive to build strings from variables.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. Root cause: The PlanIR compute step used
+    concat with a single string literal ''basket_184'' (and similarly for payment_id
+    and payment_json_str) instead of two list[dict] rowset arguments. The concat primitive
+    expects two rowset lists to concatenate, not a constant string. The plan attempted
+    to set basket_id to a constant string, but the correct primitive for emitting
+    a constant value is literal. Failing PlanIR fragment: {"prim":"concat","args":["basket_184"],"into":"basket_id"}
+    and the subsequent concat steps for payment_id and payment_json_str. No existing
+    rule covers this misuse.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#decision'
+  content: When a plan includes a security constraint that denies based on identity/role,
+    evaluate that constraint first in the decision tree; if the deny_when condition
+    holds, produce OUTCOME_DENIED_SECURITY. Only if the security constraint passes
+    should the plan check for the existence of the exception.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: The plan's decision tree only checked for the exception's existence and
+    went to OUTCOME_NONE_UNSUPPORTED when not found, ignoring the security constraint.
+    The security constraint's deny_when held (user not authorized), so the correct
+    outcome should have been OUTCOME_DENIED_SECURITY. Rule r002 incorrectly advised
+    to check exception existence first and skip security evaluation if not found,
+    which caused this violation. The new rule ensures security is evaluated first
+    and leads to DENIED_SECURITY when violated.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using the ''get'' primitive in a compute step, provide exactly two
+    arguments: the object and the key. Do not include an extra empty list or any third
+    argument.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: 'The interpret error ''get() takes 2 positional arguments but 3 were
+    given'' occurred because the compute step for ''employee_roles'' passed three
+    arguments: [''$identity_row'', ''roles'', []]. The ''get'' primitive contract
+    expects only two arguments (obj, key). The empty list is extraneous and caused
+    the lambda invocation to fail. The PlanIR fragment responsible is: {"prim":"get","args":["$identity_row","roles",[]],"into":"employee_roles"}.
+    Removing the third argument will fix the grounding.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a plan includes a security constraint that can lead to OUTCOME_DENIED_SECURITY,
+    place the branch that tests the security constraint first in the decision tree,
+    before any branch that leads to a non-DENIED outcome (including OUTCOME_NONE_UNSUPPORTED).
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: 'interpret: security-first violation: a DENIED_SECURITY branch follows
+    a non-DENIED branch in the decision tree. The plan placed the unsupported branch
+    (non-DENIED) before the denied_security branch. The security-first rule requires
+    DENIED branches to be evaluated before any non-DENIED branch. The existing in-session
+    rule already states this, but the plan did not follow it. This new rule makes
+    the ordering explicit for all non-DENIED outcomes.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Access denied: only authorized store associates may invoke exceptions.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: When a plan needs to execute a tool referenced in a policy document, include
+    a discovery step that extracts the tool's path from the document (e.g., by reading
+    the document and using a rowset to parse the path) before using it in an Exec
+    step; never hardcode a path like /finalization.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: 'real_vm: stat failed: not found. The plan hardcoded the path /finalization
+    for the finalization tool, but that path does not exist. The plan should have
+    discovered the correct path by reading the handbook and extracting the tool''s
+    location, or by searching for the tool. Failing PlanIR fragment: discovery step
+    {"rpc":"Stat","args":{"path":"/finalization"},"bind":"finalization_stat"} and
+    ops step {"rpc":"Exec","args":{"path":"/finalization",...}}. The rule ensures
+    future plans always discover tool paths from policy documents before execution.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use the 'concat' primitive to bind a single literal value; 'concat'
+    requires two list[dict] rowsets. Use the 'literal' primitive for a single value,
+    or reference the parameter directly in the answer template.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r011
+  reasoning: 'Error: ''concat'' failed: missing 1 required positional argument: ''b''.
+    CONTRACT: concat(a, b) requires both args to be list[dict] rows. The plan used
+    concat with a single string literal ''basket_124'' to bind basket_id, violating
+    the primitive''s contract. The correct approach is to use the ''literal'' primitive
+    or directly reference the parameter in the answer message.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a decision branch uses a ref obtained from a Read RPC (e.g., handbook
+    content), first check that the ref is non-empty; if it is empty, route directly
+    to the outcome that corresponds to the document not containing the required information
+    (e.g., OUTCOME_NONE_UNSUPPORTED) without evaluating the content condition.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r012
+  reasoning: The plan produced OUTCOME_NONE_CLARIFICATION instead of OUTCOME_NONE_UNSUPPORTED.
+    The root cause is likely that the handbook Read RPC returned empty content (e.g.,
+    file missing or unreadable), causing the 'contains_any' condition on a null ref
+    to trigger a clarification request. The decision tree lacked a guard branch for
+    empty content, so the interpreter could not resolve the condition and fell back
+    to clarification. The fix is to add a branch that checks for non-empty content
+    before evaluating the content condition, routing empty reads directly to the unsupported
+    outcome.
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: active
+  submitted_message: Guest access denied for store associate exception.
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: When a plan must evaluate both a content-based constraint (e.g., handbook
+    contains exception) and a security constraint, order the decision branches so
+    that the content check is evaluated first; if the content is missing, route to
+    the unsupported outcome without evaluating security.
+  created: '2026-06-22'
+  deactivated_reason: r013's guidance to skip security evaluation when content is
+    missing is unsafe and caused this failure. Superseded by new rule requiring security
+    evaluation always.
+  id: r013
+  reasoning: The plan evaluated the security branch first, leading to OUTCOME_DENIED_SECURITY
+    even though the handbook did not contain the exception. The grader expected OUTCOME_NONE_UNSUPPORTED
+    because the handbook lacked the exception. The decision order must prioritize
+    the content check to correctly route unsupported requests before applying security
+    rules.
+  status: inactive
+  surface: ir
+- agents_md_anchor: '# security'
+  content: Always include a decision branch that evaluates each security constraint's
+    deny_when condition; if the condition holds, route to the security denial outcome,
+    regardless of other checks.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r014
+  reasoning: 'ERROR: verify: I3: security constraint ''# security'' deny_when holds
+    but outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY. The PlanIR only
+    checked handbook content and defaulted to unsupported, ignoring the security constraint
+    entirely. Existing rule r013 advised ordering content before security and skipping
+    security if content missing, which directly caused this failure. The plan must
+    always evaluate security constraints; if deny_when holds, the outcome must be
+    the security denial outcome.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'When a plan includes an Exec /bin/id to determine the actor''s role for
+    a security constraint, always follow it with a compute step that extracts the
+    role using a regex (e.g., ''roles: (\w+)'') and binds it to a ref like $actor_role;
+    use that ref in decision branches instead of $identity.kind.'
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r015
+  reasoning: 'verify: I3: security constraint ''# security'' deny_when holds but outcome
+    is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY. Observed /bin/id output:
+    ''user: cust_041\nroles: customer'', so identity.kind should be ''customer'',
+    not ''guest''. The interpreter likely misbound identity.kind from pre-phase facts,
+    causing the decision branch to miss the security denial. The plan must explicitly
+    extract the role from the Exec output to ensure correct evaluation.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 3
+  date: '2026-06-22'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t36

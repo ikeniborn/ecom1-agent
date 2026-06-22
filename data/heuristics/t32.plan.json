@@ -1,0 +1,93 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT pv.product_sku, pv.record_path\nFROM product_variants pv\nWHERE pv.product_name = 'Makita Heavy Duty DDF IX7-HSM Chainsaw'\n  AND pv.brand = 'Makita'\n  AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'power source' AND pvp.property_value_text = 'corded')\n  AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'bar length' AND pvp.property_value_text = '20 cm')\n  AND NOT EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key IN ('GPS tracking', 'built-in GPS', 'gps tracking'))"
+      },
+      "bind": "sql_output"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_output",
+      "format": "auto_delim",
+      "into": "matching_products",
+      "columns": [
+        {
+          "into": "sku",
+          "candidates": [
+            "sku",
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$matching_products"
+      ],
+      "into": "first_match"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_match",
+        "sku"
+      ],
+      "into": "sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_match",
+        "record_path"
+      ],
+      "into": "product_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$matching_products",
+          "rhs": null,
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "<NO> {sku}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$answer.product_record_path"
+        }
+      ]
+    },
+    "not_found": {
+      "message": "Product not found or has GPS tracking",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

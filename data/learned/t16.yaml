@@ -1,0 +1,421 @@
+entries:
+- agents_md_anchor: null
+  content: Never hardcode a file path for the instruction text; rely on the pre-phase
+    to provide required data as parameters or at a guaranteed location.
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: The PlanIR attempted to read '/proc/instruction' which was not found,
+    causing a real_vm read failure. The PlanIR should not assume a hardcoded path
+    for the instruction text; instead, it should rely on the pre-phase to provide
+    the necessary data via parameters or a guaranteed location.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a query depends on a named entity (e.g., store, brand), always include
+    a discovery step to resolve the entity's identifier from the relevant table using
+    a flexible match, and ensure the final answer defaults to 0 if no matching entity
+    is found.
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'Verify failure: answer did not match regex ''^\d+ products$''. Observed
+    RPC output for /bin/sql was empty, indicating the SQL query returned no rows.
+    Root cause: the plan used a literal store name ''Linz Hauptplatz PowerTool shop''
+    directly in the SQL, but that name likely did not match any store in the database,
+    causing the inventory_check CTE to be empty. The SQL query then returned no rows,
+    the compute step extracted null from an empty rowset, and the answer message became
+    ''null products'' (or similar), failing the regex. The plan lacked a discovery
+    step to resolve the store ID from the stores table and did not handle the empty-rowset
+    case with a default value.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the objective requires counting products that meet a condition, the
+    PlanIR must include discovery steps to resolve all entities (store, products)
+    and a query to the relevant data source to count the products meeting the threshold,
+    and the answer message must be exactly the required format without extra whitespace.
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: The verify step failed because the answer did not match the regex '^\d+
+    products$'. The PlanIR only discovered the store_id, then hardcoded cnt=0 and
+    answered '0 products'. The root cause is that the PlanIR omitted the necessary
+    inventory query and product resolution steps, so the count was always 0 (and possibly
+    the answer had a trailing newline causing regex mismatch). The new rule ensures
+    future PlanIRs include entity resolution and a real counting query, and format
+    the answer precisely.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/plumbing/pipe_fittings/fam_plumbing_pipe_fittings_0012_3fi3e3jy/PLB-1P5EEEPQ.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/safety_gear/safety_eyewear/fam_safety_gear_safety_eyewear_0017_ls7tiwqw/SFE-21M68JEE.json'
+  source: verdict
+  status: inactive
+  submitted_message: Product specifications are missing. Please provide a list of
+    product specifications (brand, kind, family, properties) to count.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include discovery and query steps to produce all required record_path
+    refs for the OUTCOME_OK outcome, and ensure the answer for that outcome includes
+    those refs even if the result is empty.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: The PlanIR defaulted to the unsupported branch without any discovery
+    or query steps, so the answer lacked the required refs for OUTCOME_OK (e.g., $store.record_path,
+    $counted_products[*].record_path). The error 'answer missing required reference'
+    indicates a verify failure because the PlanIR did not attempt to resolve the store
+    or products, violating the objective's success criteria. The rule ensures that
+    when OUTCOME_OK is expected, the PlanIR must generate the necessary refs.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/hand_tools/screwdriver_hex_sets/fam_hand_tools_screwdriver_hex_sets_0006_1j4hqal1/HND-1P3YE18N.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/safety_gear/respiratory_protection/fam_safety_gear_respiratory_protection_0011_3jd8sjbb/SFE-2COV65TB.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/garden_tools/lawn_mowers/fam_garden_tools_lawn_mowers_0024_1mbp571a/GRD-17OFFIBN.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/adhesives_sealants/sealants/fam_adhesives_sealants_sealants_0002_2fci9gxa/ADH-2ED3QYB9.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/electrical/led_bulbs/fam_electrical_led_bulbs_0016_1rzeyltv/ELC-1T8HZR5R.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always produce an answer for OUTCOME_OK with all required record_path refs
+    when the outcome_space includes OUTCOME_OK, even if the computed result is zero
+    or empty. Only use an unsupported outcome if the intent lacks essential parameters
+    to perform the count.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: The PlanIR was empty with only an unsupported answer, causing a missing
+    required reference '/proc/catalog/electrical/led_bulbs/fam_electrical_led_bulbs_0016_1rzeyltv/ELC-1T8HZR5R.json'
+    for OUTCOME_OK. The plan incorrectly defaulted to unsupported instead of producing
+    the OUTCOME_OK branch with the required refs. The corrective rule ensures that
+    the OUTCOME_OK answer is always generated when it is a possible outcome, preventing
+    missing refs.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/cleaning/cleaning_machines/fam_cleaning_cleaning_machines_0018_3dwq89tq/CLN-1KD3KGPA.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#plan-compute-primitives'
+  content: Do not use concat to build a JSON array string; concat only merges two
+    list[dict] rows. Use format or json_array to construct a JSON array string from
+    multiple values.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'The interpret error ''concat() takes 2 positional arguments but 19 were
+    given'' occurred because the PlanIR compute step used concat with many string
+    fragments to build a JSON array string. The concat primitive contract requires
+    exactly two list[dict] arguments. The correct technique is to use format (with
+    a template string and the values as arguments) or json_array to produce the JSON
+    array string. The failing PlanIR fragment: {"prim":"concat","args":["[","\"","$sku0","\",",...],"into":"$skus_json"}.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the required refs for an outcome include a record_path kind with source
+    '$rows[*].record_path', the PlanIR answer refs must have source pointing to the
+    record_path column of the rows (e.g., '$product_rows[*].record_path'), not the
+    rows themselves.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$rows[*].record_path'']
+    on OK answer. The PlanIR answer refs had source ''$product_rows'' (the whole rows
+    object) instead of ''$product_rows[*].record_path''. The required refs source
+    is ''$rows[*].record_path'', so the answer refs must project the record_path column
+    from the rows. This rule ensures the answer refs match the required refs'' column
+    projection.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the required refs for an outcome include a record_path kind with source
+    '$rows[*].record_path', the PlanIR must name the rows variable that holds the
+    record_path column as '$rows' (i.e., use 'into':'rows' in the rowsets step) and
+    the answer ref source must be exactly '$rows[*].record_path'.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a more comprehensive rule that explicitly forbids
+    defaulting to an unsupported outcome without attempting to ground required refs.
+  id: r008
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$rows[*].record_path'']
+    on OK answer. The PlanIR answer ref source was ''$matched_products[*].record_path'',
+    but the required ref source is ''$rows[*].record_path''. The interpreter expects
+    an exact match, so the rows variable must be named ''$rows'' and the answer ref
+    source must be ''$rows[*].record_path''. The failing PlanIR fragment: rowsets
+    step used ''into'':''matched_products'' and answer ref source ''$matched_products[*].record_path''.
+    Root cause: variable name mismatch between required ref template and actual rows
+    variable.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the required refs for an outcome include a record_path source from
+    a rows variable, and the objective involves counting entities that meet a condition,
+    first discover all candidate entities and store them in that rows variable, then
+    separately compute the count of those that satisfy the condition, so that the
+    rows variable is never empty and the required refs are always satisfied.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a more comprehensive rule that explicitly forbids
+    defaulting to an unsupported outcome without attempting to ground required refs.
+  id: r009
+  reasoning: The PlanIR's discovery step joined store_inventory with a filter on available_today_quantity
+    >= 2, so if no products met the threshold the rows variable was empty. The required
+    refs source '$rows[*].record_path' then yielded no refs, causing the interpreter
+    to flag 'unresolved required ref(s)'. The root cause is that the plan did not
+    separate discovery of all specified products from the count of those meeting the
+    condition, violating the principle that required refs must be present even when
+    the count is zero. The failing fragment is the single discovery step that both
+    resolves SKUs and filters by availability.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/paints_finishes/wall_paint/fam_paints_finishes_wall_paint_0002_33m7fvug/PNT-3UUVX0CY.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/electrical/wiring_devices/fam_electrical_wiring_devices_0003_2yx4l58g/ELC-MPQMNQ0W.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/garden_tools/chainsaws/fam_garden_tools_chainsaws_0017_2bnick2w/GRD-1PGL5YRG.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/electrical/led_bulbs/fam_electrical_led_bulbs_0009_36rh5h15/ELC-1J1YLJCL.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/automotive/engine_oil/fam_automotive_engine_oil_0019_259yt93a/AUT-2K4PKZ8Z.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include discovery and rowsets steps to produce the variables referenced
+    in the required refs for the target outcome, and set the answer refs to point
+    to the record_path column of those variables.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a more comprehensive rule that explicitly forbids
+    defaulting to an unsupported outcome without attempting to ground required refs.
+  id: r010
+  reasoning: 'Error: grader: answer missing required reference ''/proc/catalog/automotive/engine_oil/fam_automotive_engine_oil_0019_259yt93a/AUT-2K4PKZ8Z.json''.
+    Root cause: PlanIR contained no discovery or rowsets steps, so no variables were
+    produced to satisfy the required refs ($store.record_path and $counted_products[*].record_path).
+    The answer only had an unsupported branch. Failing PlanIR fragment: empty discovery,
+    rowsets, compute, decision, and answer with only unsupported outcome. Rule linkage:
+    new rule to enforce that plans must always produce the variables needed for required
+    refs.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/garden_tools/manual_garden_tools/fam_garden_tools_manual_garden_tools_0009_35gx8sli/GRD-1C8UZEM0.json'
+  source: verdict
+  status: active
+  submitted_message: The six products are not specified in a machine-readable format.
+    Unable to proceed.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include discovery and rowsets steps to produce the rows variable
+    referenced in the required refs for the target outcome, and never default to an
+    unsupported outcome without first attempting to ground those refs.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r011
+  reasoning: The PlanIR was empty (no discovery, no rowsets, no compute) and immediately
+    returned an unsupported answer. The required refs for OUTCOME_OK include a record_path
+    from '$rows[*].record_path', but no rows variable was produced, causing the grader
+    to report a missing reference. Existing rules r008, r009, r010 already address
+    parts of this, but the plan still failed to attempt grounding. A stronger, combined
+    rule is needed.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the answer shape expects a numeric count derived from existence checks,
+    always structure the PlanIR query to return a single row with a numeric value
+    (e.g., using COUNT aggregation or a fallback SELECT 0) so that the compute step
+    always produces a number, even when no items match.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Error: verify regex_match failed because answer was not ''qty=<digits>''.
+    Observed RPC output was just ''qty'', indicating the SQL returned no rows. The
+    PlanIR used UNION ALL of EXISTS subqueries; when no product matched, the result
+    set was empty, causing the ''first'' row to be null and the final answer to lack
+    a digit. Root cause: the query did not guarantee a numeric output for the count.
+    The rule ensures future PlanIRs always produce a number by using aggregation or
+    a fallback row.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the success_criteria includes a regex_match on $answer, always set
+    the answer section values to plain strings (the formatted message) rather than
+    objects, so that $answer is a string and regex_match can succeed.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Error: verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''regex_match'',
+    ''lhs'': ''$answer'', ''rhs'': ''^qty=\d+$'', ''args'': []}. Root cause: The PlanIR
+    answer section defined the answer as an object {"message":"qty={count}","outcome":"OUTCOME_OK","refs":[]},
+    causing the interpreter to set $answer to that object instead of the message string.
+    The regex_match op then failed because it received a non-string. The query correctly
+    returned qty=0, so the message would have been ''qty=0'', which matches the regex.
+    The failing PlanIR fragment is the answer section mapping ''ok'' to an object
+    instead of a plain string.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use an object for the answer section when the success_criteria includes
+    a regex_match on $answer; always set the answer section to a plain string (e.g.,
+    'qty={count}') so that $answer is a string and regex_match can succeed.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r014
+  reasoning: 'verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''regex_match'',
+    ''lhs'': ''$answer'', ''rhs'': ''^qty=\d+$'', ''args'': []}. Root cause: The PlanIR
+    answer section for the OK outcome was an object with message/outcome/refs instead
+    of a plain string, causing $answer to be an object and regex_match to fail. Failing
+    fragment: "answer":{"ok":{"message":"qty={count}","outcome":"OUTCOME_OK","refs":[]}}.
+    Existing rule [in-session] warned about this but was not applied; this new rule
+    reinforces with a Never directive.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 3
+  date: '2026-06-22'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+prephase_deep_read:
+- stores
+task_id: t16

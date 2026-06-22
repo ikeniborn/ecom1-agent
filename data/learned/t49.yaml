@@ -1,0 +1,416 @@
+entries:
+- agents_md_anchor: null
+  content: When extracting a scalar value from a rowset that may be empty (e.g., a
+    SQL COUNT that returns no rows due to query error), always include a compute step
+    that defaults to 0 if the rowset is empty, using a conditional or a fallback primitive.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: The verification step failed because $answer.total was not a number (likely
+    null). The observed RPC output for the SQL query was empty, indicating the query
+    produced no stdout. The PlanIR extracted the first row from an empty rowset, resulting
+    in null, which then failed the >=0 check. The root cause is that the PlanIR did
+    not handle an empty rowset gracefully. A fallback to 0 would satisfy the success
+    criteria even if the query fails or returns no rows.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not pass a default value as a third argument to the get primitive; get
+    accepts exactly two arguments (object, key). To provide a fallback value, use
+    a conditional or a separate compute step.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'Error: ''compute step ''get'' failed: <lambda>() takes 2 positional
+    arguments but 3 were given. CONTRACT: get(obj, key)''. The PlanIR compute step
+    used ''get'' with three arguments: ''$first_row'', ''total'', and 0. The get primitive
+    only supports two arguments. The third argument (0) was intended as a default,
+    but get does not accept defaults. The existing rule already advises using conditionals
+    or fallback primitives for empty rowsets, but this specific misuse of get''s signature
+    needs a direct prohibition.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#plan-phase'
+  content: When planning to query a database, do not hardcode a file path; first use
+    a discovery step (e.g., list directory contents or search for known filenames)
+    to locate the actual database file, and only then bind the verified path to a
+    Stat or Exec call.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: 'Error: ''real_vm: stat failed: not found''. The PlanIR hardcoded the
+    path ''/catalog/catalogue.db'' in a Stat discovery step, but that file does not
+    exist on the real VM. The root cause is assuming a fixed database location without
+    verification. The failing fragment: {"rpc":"Stat","args":{"path":"/catalog/catalogue.db"},"bind":"db_stat"}.
+    The rule instructs the PLAN phase to always discover the actual file path before
+    binding it to a Stat or Exec call.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a discovery step (e.g., reading a policy note) provides a specific
+    field name or identifier for a query, always use that field in the query; do not
+    assume a generic column name.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''ge'', ''lhs'':
+    ''$answer.count'', ''rhs'': 0, ''args'': []}. The PlanIR used ''category = \''Metal
+    and Concrete Paint\'''' in the SQL query, but the policy note explicitly stated
+    ''product_kind_id'' as the field and ''metal_concrete_paint'' as the value. The
+    observed RPC output from the Read step contained that information, yet the plan
+    did not use it. The root cause is a planning error: the query was built with a
+    hardcoded column name instead of the discovered field name, leading to an empty
+    or invalid result and a missing count value.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#plan-phase'
+  content: Always include in the answer object all fields referenced by success_criteria,
+    even if the message skeleton also uses them. The answer object must contain the
+    actual computed values, not just a pre-formatted message string.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: 'verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''ge'', ''lhs'':
+    ''$answer.count'', ''rhs'': 0, ''args'': []}. The script''s answer branches only
+    provided a ''message'' string (e.g., ''<COUNT: 0>'') but did not include a ''count''
+    field in the answer object. Because $answer.count was missing, the success criteria
+    check failed. The answer object must contain all fields referenced by success_criteria,
+    not just a formatted message.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a required policy document specifies a database file path, always
+    include a compute step to extract that path from the document content and bind
+    it to a variable; use that variable in subsequent Stat/Exec calls instead of hardcoding
+    a path.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'Error: ''real_vm: stat failed: not found''. The PlanIR hardcoded ''/catalog/catalogue.db''
+    for the Stat call, but the actual database file was not at that location. The
+    policy doc likely contained the correct path, but the PlanIR did not extract it.
+    This violates r003 (do not hardcode paths; discover them). The root cause is a
+    missing extraction step after reading the policy doc. The corrective rule instructs
+    the PLAN phase to always parse the database path from the policy document content
+    and bind it, rather than assuming a default path.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not pass a predicate as a second argument to the any_true primitive;
+    any_true expects only a list. To test for existence of rows matching a condition,
+    first use a filter step to produce a filtered list, then apply any_true to that
+    filtered list.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: 'The interpret error ''any_true failed: <lambda>() takes 1 positional
+    argument but 2 were given'' occurred because the PlanIR compute step ''any_true''
+    was called with two arguments: a list and a predicate object. The interpreter''s
+    any_true implementation expects a single list argument. The failing PlanIR fragment:
+    {"prim":"any_true","args":["$schema_rows",{"op":"eq","lhs":"$row.table_name","rhs":"products"}],"into":"has_products"}.
+    The root cause is an incorrect assumption about the any_true primitive''s signature.
+    The rule instructs the PLAN phase to avoid this pattern and instead use a separate
+    filter step before any_true.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use a Find step to locate a database file when a required policy
+    document specifies the file path; instead, after reading the document, use a compute
+    step to extract the path and bind it to a variable, then use that variable in
+    the Exec step.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a general rule that covers both discovery RPCs
+    and hardcoding.
+  id: r008
+  reasoning: 'Error: real_vm: find failed: not found. The PlanIR used a Find step
+    for *.db under /catalog, which returned nothing. The required policy document
+    likely contains the exact database file path, but the PlanIR did not extract it.
+    The existing in-session rule already advises extracting the path, but the PlanIR
+    ignored it. This new rule explicitly prohibits the Find step in such cases to
+    prevent grounding failures.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use a List RPC to discover a database file path when a required policy
+    document already specifies the path; instead, extract the path directly from the
+    document content using a compute step (e.g., regex or string extraction) and bind
+    it to a variable for use in Exec.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a general rule that covers both discovery RPCs
+    and hardcoding.
+  id: r009
+  reasoning: 'The plan attempted to list ''/catalog'' to find the database file name,
+    but the directory does not exist (real_vm: list failed: not found). The required
+    policy document likely contains the exact database file path, so the plan should
+    have extracted it directly from the document content rather than using a List
+    RPC. The existing in-session rule advises extracting the path from the doc, but
+    the plan still used List; this new rule explicitly forbids that pattern.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: Unable to count Respiratory Protection products.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always extract the database file path from a required policy document using
+    a compute step; never use a Find or List RPC to discover it, and never hardcode
+    the path in an Exec step.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a more specific rule that requires parsing the
+    policy document into a rowset before extracting the path, covering both the prohibition
+    of hardcoding and the rowset-based extraction method.
+  id: r010
+  reasoning: 'The PlanIR hardcoded the database path ''/catalog/products.db'' and
+    ignored the policy document content. The required policy document likely specifies
+    the correct path and possibly the query details. The outcome was OUTCOME_NONE_UNSUPPORTED
+    because the hardcoded path or query failed, resulting in an empty value. Existing
+    rules r008 and r009 prohibit using Find/List to discover the path, but they didn''t
+    explicitly forbid hardcoding. This new rule generalizes: always extract the path
+    from the document, never hardcode.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#plan-concat-arity'
+  content: When using the concat primitive, provide exactly two arguments; to concatenate
+    more than two strings, chain multiple concat steps.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'The compute step ''concat'' failed because it was given three arguments
+    (a string, a ref, and another string), but the concat primitive expects exactly
+    two arguments. To build a SQL query with a variable in the middle, use two concat
+    steps: first concat the prefix with the variable, then concat that result with
+    the suffix.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract file paths from policy documents using a compute step that
+    reads the document as a rowset and selects the appropriate column; do not use
+    custom extractors that may return non-rowset data.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a more specific rule that requires parsing the
+    policy document into a rowset before extracting the path, covering both the prohibition
+    of hardcoding and the rowset-based extraction method.
+  id: r012
+  reasoning: The error 'bad argument type for built-in operation' occurred because
+    the PlanIR used a custom extractor 'fuzzy_sku_receipt' on the policy document,
+    which likely returned non-rowset data, causing the subsequent `column` primitive
+    to produce a non-list value, which then caused `first` or `Exec` to fail with
+    a type error. The plan should have extracted the database path directly from the
+    policy document's table using a compute step with `column` on the document's rowset,
+    not via a custom extractor designed for receipts.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always extract the database file path from a required policy document by
+    first parsing the document content into a rowset (using Read and a rowset step
+    with format auto_delim), then using a compute step to select the path column;
+    never hardcode the path in an Exec step.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r013
+  reasoning: The PlanIR hardcoded '/catalog/products.db' in the Exec step, ignoring
+    the required policy document content. This caused the interpreter to produce OUTCOME_NONE_CLARIFICATION
+    instead of OUTCOME_OK, likely because the database could not be found or the required
+    ref was not properly grounded. Existing rule r010 prohibits hardcoding, but the
+    script also failed to parse the policy document into a rowset to extract the path,
+    violating r012. The new rule enforces rowset parsing and compute-based extraction,
+    preventing hardcoded assumptions.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always parse the output of /bin/id into a rowset and compute the identity
+    kind explicitly; never bind the raw output directly to identity when a security
+    constraint depends on identity.kind.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r014
+  reasoning: The plan bound the raw /bin/id output to 'identity' without parsing.
+    The security constraint 'security.md' deny_when evaluated $identity.kind as 'guest'
+    (likely defaulting to 'guest' when field missing), causing a false deny. Observed
+    /bin/id output shows user emp_011, not guest. The plan must parse the output into
+    a rowset and compute kind from the user field.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 2
+  date: '2026-06-22'
+  outcome: OUTCOME_DENIED_SECURITY
+  status: failure
+prephase_deep_read:
+- database_schema
+task_id: t49

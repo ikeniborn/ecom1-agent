@@ -1,0 +1,137 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "caller_identity"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT record_path, discount_percent, discount_issuer_employee_id FROM shopping_baskets WHERE basket_id = 'basket_053';"
+      },
+      "bind": "basket_query_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "caller_identity",
+      "format": "json",
+      "into": "identity_dict",
+      "columns": []
+    },
+    {
+      "from_": "basket_query_result",
+      "format": "auto_delim",
+      "into": "basket_rows",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "discount_percent",
+          "candidates": [
+            "discount_percent"
+          ]
+        },
+        {
+          "into": "discount_issuer_employee_id",
+          "candidates": [
+            "discount_issuer_employee_id"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "get",
+      "args": [
+        "$identity_dict",
+        "kind"
+      ],
+      "into": "caller_kind"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$identity_dict",
+        "employee_id"
+      ],
+      "into": "employee_id"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$basket_rows"
+      ],
+      "into": "basket"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "ne",
+          "lhs": "$caller_kind",
+          "rhs": "employee",
+          "args": []
+        },
+        "label": "deny"
+      }
+    ],
+    "default_label": "allow"
+  },
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "UPDATE shopping_baskets SET discount_percent = 10, discount_reason_code = 'service_recovery', discount_issuer_employee_id = :employee_id WHERE basket_id = 'basket_053';",
+        "args": [
+          "--param",
+          "employee_id=$employee_id"
+        ]
+      },
+      "bind": null,
+      "guard_label": "allow",
+      "outcome_from_exit": null
+    }
+  ],
+  "answer": {
+    "deny": {
+      "message": "Discount application denied: caller is not an employee.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        }
+      ]
+    },
+    "allow": {
+      "message": "Discount of 10% applied to basket basket_053.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$basket.record_path"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

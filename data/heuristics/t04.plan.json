@@ -4,21 +4,39 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT pv.product_sku, pv.product_name, pv.record_path\nFROM product_variants pv\nJOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id\nJOIN product_families pf ON pv.product_family_id = pf.product_family_id\nJOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'voltage' AND pvp1.property_value_text = '12 V'\nJOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'battery platform' AND pvp2.property_value_text = '12v-system'\nJOIN product_variant_properties pvp3 ON pv.product_sku = pvp3.product_sku AND pvp3.property_key = 'kit contents' AND pvp3.property_value_text = 'two battery kit'\nWHERE pk.product_kind_name = 'Cordless Drill Driver'\n  AND pf.product_family_name = 'Festool Brushless SYS 1XD-LGR Cordless Drill Driver'\n  AND pv.brand = 'Festool';"
+        "stdin": "WITH cleaner_key AS (\n  SELECT property_key FROM product_variant_properties\n  WHERE property_key LIKE '%cleaner%' AND property_value_text = 'interior cleaner'\n  LIMIT 1\n)\nSELECT * FROM (\n  SELECT pv.product_sku, pv.record_path, pv.brand, pf.product_family_name, pv.product_name,\n         (SELECT property_value_text FROM product_variant_properties pvp2\n          WHERE pvp2.product_sku = pv.product_sku AND pvp2.property_key = (SELECT property_key FROM cleaner_key)\n          LIMIT 1) AS cleaner_type\n  FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  WHERE pv.brand = 'Mellerud' AND pf.product_family_name = 'Mellerud Eco MEL 1AA-TXA Cleaning Liquid'\n) sub\nWHERE cleaner_type = 'interior cleaner';"
       },
-      "bind": "sql_result"
+      "bind": "raw_sql_output"
     }
   ],
   "rowsets": [
     {
-      "from_": "sql_result",
+      "from_": "raw_sql_output",
       "format": "auto_delim",
-      "into": "rows",
+      "into": "catalogue_rows",
       "columns": [
         {
           "into": "product_sku",
           "candidates": [
             "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "brand",
+          "candidates": [
+            "brand"
+          ]
+        },
+        {
+          "into": "product_family_name",
+          "candidates": [
+            "product_family_name"
           ]
         },
         {
@@ -28,9 +46,9 @@
           ]
         },
         {
-          "into": "record_path",
+          "into": "cleaner_type",
           "candidates": [
-            "record_path"
+            "cleaner_type"
           ]
         }
       ]
@@ -40,25 +58,41 @@
     {
       "prim": "count",
       "args": [
-        "$rows"
+        "$catalogue_rows"
       ],
-      "into": "count"
+      "into": "match_count"
     },
     {
       "prim": "first",
       "args": [
-        "$rows"
+        "$catalogue_rows"
       ],
-      "into": "row"
+      "into": "record"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$record",
+        "product_name"
+      ],
+      "into": "product_name"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$record",
+        "product_sku"
+      ],
+      "into": "product_sku"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "gt",
-          "lhs": "$count",
-          "rhs": 0,
+          "op": "nonempty",
+          "lhs": "$record.record_path",
+          "rhs": null,
           "args": []
         },
         "label": "found"
@@ -69,18 +103,18 @@
   "ops": [],
   "answer": {
     "found": {
-      "message": "Product {product_name} (SKU: {product_sku}) found in catalog.",
+      "message": "The product is in the catalogue: {product_name} (SKU: {product_sku}).",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
           "path": null,
-          "source": "$row.record_path"
+          "source": "$record.record_path"
         }
       ]
     },
     "not_found": {
-      "message": "No matching product found.",
+      "message": "The product is not in the catalogue.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

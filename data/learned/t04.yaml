@@ -1,6 +1,304 @@
+entries:
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: No matching product found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When filtering product variants by property values, always first discover
+    the actual stored values for the target property keys via a separate query, then
+    use those exact values in the main join.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED. The
+    PlanIR''s SQL query used exact string matches for property values (''12 V'', ''12v-system'',
+    ''two battery kit'') but returned no rows, indicating the stored values differ
+    (e.g., ''12V'', ''12V System'', ''2 Battery Kit''). The root cause is that the
+    PlanIR assumed the literal values from the intent match the database exactly.
+    A corrective rule: add a pre-discovery step to query distinct property_value_text
+    for the required property_keys, then use those retrieved values in the main query,
+    ensuring the filter matches the actual stored data.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: No store currently has the  in stock.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always filter discovered property values to match the target values specified
+    in the objective before using them to query variants.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: The plan's compute section used 'first' on the discovered property rows,
+    arbitrarily selecting the first value for each property key (e.g., trap_type might
+    be 'bottle' instead of 'siphon'). This caused the variant query to use wrong values,
+    yielding no matching variant and triggering OUTCOME_NONE_UNSUPPORTED. The rule
+    ensures the correct desired values are used after discovery.
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#plan-phase-rowsets'
+  content: Always define a rowset for any Exec RPC whose output will be used in compute
+    steps, and reference the rowset variable instead of the raw RPC bind.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: The compute step 'first' failed because $product_inventory was bound
+    to the raw ExecResponse object, which is not subscriptable. The PlanIR omitted
+    a rowset to parse the SQL stdout into a list of records. The fix is to add a rowset
+    for the second RPC and use that rowset variable in the compute step.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: Sorry, we don't carry that specific product.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always verify that table and column names used in SQL queries exactly match
+    those discovered in the pre-phase deep-read; if the pre-phase did not surface
+    the schema, first execute a discovery query to list tables and their columns before
+    constructing the main query.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a more specific rule that also integrates pre-phase
+    deep-read requests to prevent missing schema.
+  id: r004
+  reasoning: The cycle failed with grader outcome OUTCOME_NONE_CLARIFICATION, which
+    is not defined in the plan's answer block. This indicates the plan execution likely
+    aborted due to an RPC error (e.g., SQL syntax or missing table/column) before
+    reaching the answer phase. The PlanIR used hardcoded table names like 'product_variants',
+    'product_kinds', 'product_variant_properties' without confirming they exist in
+    the actual database. If the real schema uses different names (singular vs plural,
+    different casing), the SQL would fail, causing the system to default to a clarification
+    outcome. The new rule enforces schema alignment with pre-phase discoveries, preventing
+    such grounding failures.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: We do not carry the Metabo 125 grinder body in regular or flat
+    variant.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: No, we do not carry that product.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: If the pre-phase deep-read does not include the schema of database tables
+    referenced in SQL queries, the plan must first execute a discovery query to list
+    all tables and their columns, and then use only those exact names in subsequent
+    queries; alternatively, request the missing tables in the LEARN phase's prephase_deep_read.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r005
+  reasoning: The plan produced OUTCOME_NONE_CLARIFICATION instead of the expected
+    OUTCOME_OK or defined OUTCOME_NONE_UNSUPPORTED. This indicates the SQL query likely
+    failed due to incorrect table or column names (e.g., 'product_variants', 'product_kinds',
+    'product_variant_properties') that were not verified against the actual database
+    schema. The pre-phase deep-read did not surface these tables, so the plan assumed
+    names without discovery. Existing rule r004 already warns about this, but the
+    plan did not apply it. The corrective rule reinforces the need for schema verification
+    and ties it to pre-phase deep-read coverage.
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: No product variant found matching the specified criteria.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When querying product variants by property values, always first discover
+    the exact property key names used in the database (e.g., by querying the product_variant_properties
+    table) and use those exact names in the query.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r006
+  reasoning: The plan used SQL with EXISTS subqueries referencing property keys 'anchor
+    type', 'diameter', 'length' but the actual property keys in the database may differ
+    (e.g., 'anchor_type', 'diameter_mm', 'length_mm'). The query returned no rows,
+    causing the decision to fall through to the default branch and produce OUTCOME_NONE_UNSUPPORTED.
+    The plan should have first discovered the exact property key names from the product_variant_properties
+    table before constructing the query. This rule ensures that property key names
+    are grounded in the actual schema.
+  status: active
+  surface: ir
+- agents_md_anchor: '#plan-phase'
+  content: When using filter_rows in a compute step, always express the predicate
+    as a list with the operation as the first element (e.g., ['and', ['contains_any',
+    '$row.property_key', ['cleaner']], ['eq', '$row.cleaner_type', 'interior cleaner']]),
+    never as a dict with 'op' and 'args' keys.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'The interpreter failed on compute step ''filter_rows'' with error: ''dict''
+    object has no attribute ''op''. The PlanIR passed a dict {''op'':''and'',''args'':[...]}
+    as the predicate, but the interpreter expects a predicate object with an .op attribute,
+    not a dict. The correct PlanIR format for predicates is a list where the first
+    element is the operation string. The failing fragment: {"prim":"filter_rows","args":["$rows",{"op":"and","args":[{"op":"contains_any","lhs":"$row.property_key","rhs":["cleaner"]},{"op":"eq","lhs":"$row.cleaner_type","rhs":"interior
+    cleaner"}]}],"into":"matching_rows"}. This rule ensures predicates are lists,
+    preventing the dict attribute error.'
+  status: active
+  surface: ir
 last_run:
-  cycles_used: 1
-  date: '2026-06-21'
-  outcome: OUTCOME_NONE_UNSUPPORTED
-  status: failure
+  cycles_used: 2
+  date: '2026-06-22'
+  outcome: OUTCOME_OK
+  status: success
+prephase_deep_read:
+- product_kinds
+- product_variants
+- product_variant_properties
 task_id: t04

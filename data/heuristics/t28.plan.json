@@ -1,0 +1,141 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "policy_security"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/discounts.md"
+      },
+      "bind": "policy_discounts"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "identity_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH store AS (\n  SELECT store_id, record_path FROM stores WHERE store_name = 'PowerTool Graz Jakomini'\n),\nmanager AS (\n  SELECT e.employee_id, e.record_path FROM employee_accounts e\n  JOIN store s ON e.store_id = s.store_id\n  WHERE e.employee_display_name = 'Tobias Hartmann' AND e.job_title = 'manager'\n),\nbasket AS (\n  SELECT record_path FROM shopping_baskets WHERE basket_id = 'basket_037'\n)\nSELECT s.record_path AS store_record_path,\n       m.record_path AS manager_record_path,\n       b.record_path AS basket_record_path\nFROM store s\nLEFT JOIN manager m ON 1=1\nLEFT JOIN basket b ON 1=1;"
+      },
+      "bind": "lookup_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "identity_raw",
+      "format": "json",
+      "into": "identity",
+      "columns": []
+    },
+    {
+      "from_": "lookup_raw",
+      "format": "auto_delim",
+      "into": "lookup_rows",
+      "columns": [
+        {
+          "into": "store_record_path",
+          "candidates": [
+            "store_record_path"
+          ]
+        },
+        {
+          "into": "manager_record_path",
+          "candidates": [
+            "manager_record_path"
+          ]
+        },
+        {
+          "into": "basket_record_path",
+          "candidates": [
+            "basket_record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "column",
+      "args": [
+        "$lookup_rows",
+        "store_record_path"
+      ],
+      "into": "store_record_path"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$lookup_rows",
+        "manager_record_path"
+      ],
+      "into": "manager_record_path"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$lookup_rows",
+        "basket_record_path"
+      ],
+      "into": "basket_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$identity.kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "denied"
+      }
+    ],
+    "default_label": "denied"
+  },
+  "ops": [],
+  "answer": {
+    "denied": {
+      "message": "Confirmed Tobias Hartmann is manager at PowerTool Graz Jakomini. Cannot apply 5% service_recovery discount to basket_037: guest identity not authorized.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store_record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$manager_record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$basket_record_path"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

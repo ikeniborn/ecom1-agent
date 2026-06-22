@@ -4,7 +4,8 @@ entries:
     a string. Use a compute step to extract the numeric value and set the answer message
     to that number directly.
   created: '2026-06-21'
-  deactivated_reason: null
+  deactivated_reason: Superseded by more explicit rule requiring variable reference,
+    not string template.
   id: r001
   reasoning: 'The verify step failed with ''success_criteria[OUTCOME_OK][0] failed:
     {''op'': ''ge'', ''lhs'': ''$answer'', ''rhs'': 0, ''args'': []}'' despite the
@@ -14,11 +15,300 @@ entries:
     between the answer shape and the message type. The corrective rule ensures that
     when the answer shape is ''%d'', the answer message is a number, not a string
     interpolation.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When using auto_delim format to parse SQL output into rowsets, ensure that
+    the field names used in subsequent compute steps (e.g., 'get') exactly match the
+    'into' column names defined in the rowsets mapping.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'The verify step failed because the answer message was not a number >=0.
+    Observed SQL output was ''cnt 0'', and the PlanIR rowsets mapping used ''into'':''cnt''.
+    However, the compute step used ''get'':[''$first_row'',''count''], referencing
+    a non-existent field ''count''. This mismatch caused the answer to be empty, failing
+    the success criteria. The root cause is a PlanIR shape bug: inconsistent field
+    naming between rowsets and compute.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always set the answer message to a numeric value directly, not a string
+    template, when the answer shape is '%d'. Use a compute step to extract the numeric
+    value and assign it to the answer message without any formatting.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: The verify step failed because the answer message was a string '6' instead
+    of a number. The PlanIR used a string template '{count}' for the answer message,
+    which the interpreter did not convert to a numeric value. The existing rule r001
+    was present but not correctly applied; the new rule explicitly prohibits string
+    templates and requires direct numeric assignment.
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#get'
+  content: 'Always provide two arguments to the ''get'' primitive: the object and
+    the key, not a combined dot-separated path.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'The interpret error ''missing 1 required positional argument: ''key''''
+    occurred because the compute step ''get'' was called with a single argument ''$stat_policy.path''
+    (dot notation). The ''get'' primitive expects two separate arguments: the object
+    and the key. The correct call is ''get'' with args [''$stat_policy'', ''path''].
+    The second ''get'' step has the same issue but was not reached. This rule ensures
+    future PlanIR uses the correct two-argument form.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the answer shape is '%d', the answer message must be a variable reference
+    (e.g., '$count_val'), not a string template (e.g., '{count_val}').
+  created: '2026-06-22'
+  deactivated_reason: r005 is specific to '%d' answer shape; the new rule generalizes
+    to any variable reference shape.
+  id: r005
+  reasoning: 'verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''ge'', ''lhs'':
+    ''$answer'', ''rhs'': 0, ''args'': []}. The answer message was ''{count_val}''
+    which is a string template, not a numeric value. The compute step correctly extracted
+    cnt into count_val, but the answer message used a string template, causing the
+    answer to be a string. The existing rule r001 and in-session rule were not precise
+    enough; they said ''set the answer message to that number directly'' but the plan
+    used a template. The new rule explicitly requires a variable reference (e.g.,
+    ''$count_val'') to ensure the answer is numeric.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a numeric value is extracted from a rowset and will be used in success
+    criteria, Always cast it to the appropriate numeric type (e.g., int) using a compute
+    step before assigning to the variable.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'Error: verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''ge'',
+    ''lhs'': ''$count'', ''rhs'': 0, ''args'': []}. Observed RPC output: ''cnt\n2'',
+    so SQL returned 2. PlanIR compute step: ''get'' from first row into ''count''
+    without casting. The rowset parsing likely produced a string ''2'', causing the
+    numeric comparison (ge) to fail because string vs int is invalid or false. Root
+    cause: missing type cast from string to int before using $count in success criteria.
+    Failing PlanIR fragment: compute step ''get'' into ''count'' without subsequent
+    cast.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/catalogue-addenda/2024-07-17-reporting-work-trousers.md'
+  source: verdict
+  status: inactive
+  submitted_message: '27'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always use a variable reference (e.g., '$count_val') as the answer message
+    when the answer shape is a variable reference, not a string template (e.g., '{count_val}').
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r007
+  reasoning: The PlanIR answer message used '{count_val}' (a string template) instead
+    of '$count_val' (a variable reference). The answer shape is '$count_val', so the
+    message must be a variable reference. This mismatch caused the outcome to be OUTCOME_NONE_CLARIFICATION
+    instead of OUTCOME_OK. Existing rule r005 only covers '%d' shape, so it is deactivated
+    in favor of this more general rule.
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v014
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/ops-policy-notes/catalogue-count-wood-stain-oil-vienna-2024-07-17.md'
+  source: verdict
+  status: active
+  submitted_message: $count
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include all required references in the answer block's 'refs' list,
+    including any documents read during the pre-phase that are relevant to the answer.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'The grader reported: ''answer missing required reference ''/docs/ops-policy-notes/catalogue-count-wood-stain-oil-vienna-2024-07-17.md''''.
+    The script code''s answer block had an empty ''refs'' list. The required reference
+    likely corresponds to a policy note that should have been included. To prevent
+    this, the PLAN phase must ensure that any documents read during the pre-phase
+    that are relevant to the answer are included as references in the answer block''s
+    ''refs'' list.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always assign the final computed value to the variable name specified in
+    the TOOL_PLAN params (e.g., 'count'), and use that variable in the answer message
+    and success criteria.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''ge'', ''lhs'':
+    ''$count'', ''rhs'': 0, ''args'': []}. The SQL returned cnt=1, but the script
+    bound the result to ''count_val'' instead of ''count''. The TOOL_PLAN params define
+    the variable name as ''count'', so success criteria referenced $count, which was
+    undefined. The failing PlanIR fragment: compute step ''to_number'' into ''count_val'',
+    and answer message using count_val, while success criteria uses $count. No existing
+    rule prevents this variable-name mismatch.'
   status: active
   surface: ir
 last_run:
   cycles_used: 2
-  date: '2026-06-21'
-  outcome: OUTCOME_NONE_CLARIFICATION
-  status: failure
+  date: '2026-06-22'
+  outcome: OUTCOME_OK
+  status: success
+prephase_deep_read:
+- /docs/ops-policy-notes/catalogue-count-wood-stain-oil-vienna-2024-07-17.md
 task_id: t10

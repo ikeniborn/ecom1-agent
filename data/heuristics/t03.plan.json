@@ -4,71 +4,46 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH matching AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  WHERE pv.brand = 'Osram'\n    AND pk.product_kind_name = 'LED Bulb'\n    AND pf.product_family_name = 'Osram Eco Classic 3PW-R88 LED Bulb'\n    AND EXISTS (SELECT 1 FROM product_variant_properties vp1 WHERE vp1.product_sku = pv.product_sku AND vp1.property_key = 'Wattage' AND vp1.property_value_text = '15 W')\n    AND EXISTS (SELECT 1 FROM product_variant_properties vp2 WHERE vp2.product_sku = pv.product_sku AND vp2.property_key = 'Luminous Flux' AND vp2.property_value_text = '806 lm')\n)\nSELECT COUNT(*) AS cnt, (SELECT record_path FROM matching LIMIT 1) AS sample_path FROM matching;"
+        "stdin": "SELECT pv.product_sku, pv.product_name, pv.record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand = :brand AND (pv.series = :line OR pf.product_family_name = :line) AND pvp.property_key = 'tool type' AND pvp.property_value_text = :tool_type;"
       },
-      "bind": "matching_data"
+      "bind": "raw_sql_output"
     }
   ],
   "rowsets": [
     {
-      "from_": "matching_data",
+      "from_": "raw_sql_output",
       "format": "auto_delim",
-      "into": "matching_rows",
+      "into": "rows",
       "columns": [
         {
-          "into": "cnt",
+          "into": "product_sku",
           "candidates": [
-            "cnt"
+            "product_sku"
           ]
         },
         {
-          "into": "sample_path",
+          "into": "product_name",
           "candidates": [
-            "sample_path"
+            "product_name"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
           ]
         }
       ]
     }
   ],
-  "compute": [
-    {
-      "prim": "first",
-      "args": [
-        "$matching_rows"
-      ],
-      "into": "first_row"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$first_row",
-        "cnt"
-      ],
-      "into": "cnt_str"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$cnt_str"
-      ],
-      "into": "matching_count"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$first_row",
-        "sample_path"
-      ],
-      "into": "matching_product_record_path"
-    }
-  ],
+  "compute": [],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "gt",
-          "lhs": "$matching_count",
-          "rhs": 0,
+          "op": "nonempty",
+          "lhs": "$rows",
+          "rhs": null,
           "args": []
         },
         "label": "found"
@@ -79,18 +54,18 @@
   "ops": [],
   "answer": {
     "found": {
-      "message": "The product was found in the catalogue.",
+      "message": "The product {product_name} (SKU: {product_sku}) is in the catalogue.",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
           "path": null,
-          "source": "$matching_product_record_path"
+          "source": "$rows.0.record_path"
         }
       ]
     },
     "not_found": {
-      "message": "The product was not found in the catalogue.",
+      "message": "No matching product found.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

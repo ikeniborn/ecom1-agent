@@ -1,0 +1,69 @@
+{
+  "objective": "Verify whether the product catalogue contains a Castrol Automotive Cleaner from the 'Castrol Workshop MAGNATEC 213-NWR Automotive Cleaner' line with cleaner type 'brake cleaner' and volumes 4000 ml and 250 ml, as claimed by a support note.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "brand": "Castrol",
+    "product_name_search": "Castrol Workshop MAGNATEC 213-NWR Automotive Cleaner",
+    "cleaner_type": "brake cleaner",
+    "volume_4000": 4000,
+    "volume_250": 250,
+    "matching_variants": "query product_variants where LOWER(brand) = LOWER(:brand) AND LOWER(product_name) LIKE LOWER('%' || :product_name_search || '%')",
+    "has_cleaner_type": "check if any variant in $matching_variants has a property in product_variant_properties with key 'cleaner_type' and value_text = :cleaner_type",
+    "has_volume_4000": "check if any variant in $matching_variants has a property with key 'volume' and value_number = :volume_4000 and also satisfies has_cleaner_type",
+    "has_volume_250": "check if any variant in $matching_variants has a property with key 'volume' and value_number = :volume_250 and also satisfies has_cleaner_type",
+    "base_variant": "first variant from $matching_variants (if any)",
+    "verified_sku": "the variant(s) that satisfy both cleaner_type and volume conditions"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$matching_variants",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$has_cleaner_type",
+        "rhs": true,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$has_volume_4000",
+        "rhs": true,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$has_volume_250",
+        "rhs": true,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "SKU: {sku} - {status}"
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$verified_sku.record_path"
+      }
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$base_variant.record_path"
+      }
+    ]
+  }
+}

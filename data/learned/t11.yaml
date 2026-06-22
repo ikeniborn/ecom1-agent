@@ -1,0 +1,304 @@
+entries:
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: Literal answer rule is not a technique; superseded by new PLAN
+    rule that prevents adding extraneous filters.
+  id: v001
+  score: 0.0
+  score_detail:
+  - Answer should be "<COUNT:11>"
+  source: verdict
+  status: inactive
+  submitted_message: <COUNT:0>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/current-updates/catalogue-counting-2024-07-17-wall-paint-graz.md
+- agents_md_anchor: null
+  content: When constructing SQL for a count, only include tables and conditions explicitly
+    mentioned in the objective's count_method; ignore extraneous details from policy
+    docs.
+  created: '2026-06-22'
+  deactivated_reason: Rule r001 instructs to ignore policy docs, which caused incorrect
+    count; superseded by new rule that requires reading and applying policy doc constraints.
+  id: r001
+  reasoning: 'The PlanIR SQL added a join to store_inventory and a filter for ''Graz
+    PowerTool'' store, which reduced the count. The objective''s count_method only
+    requires product_kinds and product_variants. The policy doc likely contained the
+    correct count (11) but the script overrode it with a filtered query. The error
+    ''grader: Answer should be "<COUNT:11>"'' indicates the answer was not 11.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - Answer should be "<COUNT:9>"
+  source: verdict
+  status: inactive
+  submitted_message: <COUNT:20>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/current-updates/catalogue-counting-2024-07-17-wiper-blades-linz.md
+- agents_md_anchor: null
+  content: When a required policy doc is present, always read it and apply its counting
+    rules to the SQL query.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by new rule that explicitly requires reading the
+    policy doc and including it in answer refs.
+  id: r002
+  reasoning: The PlanIR executed a SQL query that counted product variants with product_kind_id
+    for 'Wiper Blade' but returned a count different from 9. The required policy doc
+    likely contains additional counting constraints (e.g., only active products, or
+    specific catalogue version) that were ignored. Existing rule r001 explicitly instructs
+    to ignore policy docs, which caused the failure. The new rule will require reading
+    and applying policy doc constraints when constructing SQL for a count.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a required policy doc is present, always add a discovery step to read
+    it and include its content in the answer refs for the outcome.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION. Root
+    cause: PlanIR answer for ''ok'' had empty refs, but required_refs for OUTCOME_OK
+    includes a policy_doc. Interpreter likely rejected the outcome due to missing
+    refs, falling back to clarification. The PlanIR omitted reading the policy doc
+    and didn''t include it in the answer refs. Existing rule r002 says to read and
+    apply counting rules, but didn''t enforce ref inclusion, so it was insufficient.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - Answer should be "[QTY:14]"
+  source: verdict
+  status: inactive
+  submitted_message: '[QTY:0]'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/policy-updates/2024-07-17-catalogue-reporting-anchors-plugs-vienna.md
+- agents_md_anchor: null
+  content: When extracting a single numeric count from SQL output, use format 'regex'
+    with a pattern like '(\d+)' to capture the number directly, avoiding auto_delim
+    parsing failures that can leave the answer unbound.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'Error: verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''ge'',
+    ''lhs'': ''$answer'', ''rhs'': 0, ''args'': []}. Observed SQL output: ''cnt\n0''.
+    The PlanIR used rowsets with format ''auto_delim'' and column candidates [''cnt'']
+    to extract the count, but the answer was not bound correctly (likely remained
+    as literal ''{count_result}''), causing verification to fail. The root cause is
+    the rowsets extraction step: the auto_delim format may not reliably parse a simple
+    header+value output, leaving the count_result variable undefined. A regex extraction
+    directly captures the numeric value, ensuring the answer is a number and passes
+    the >=0 check.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a required ref is a file read, always add a decision branch that checks
+    if the bound content is non-empty; if empty, produce OUTCOME_NONE_UNSUPPORTED.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r005
+  reasoning: The plan produced OUTCOME_NONE_CLARIFICATION instead of OUTCOME_OK. The
+    answer for 'ok' required a ref from reading '/docs/policy-updates/2024-07-17-catalogue-reporting-anchors-plugs-vienna.md'.
+    If the file read failed (empty/null bind), the ref source would be missing, causing
+    the outcome to fallback to OUTCOME_NONE_CLARIFICATION. The plan lacked a decision
+    branch to check the file content and produce OUTCOME_NONE_UNSUPPORTED when empty.
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - Answer should be "7"
+  source: verdict
+  status: active
+  submitted_message: '0'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/policy-updates/2024-07-17-catalogue-reporting-compressors-extractors-linz.md
+- agents_md_anchor: null
+  content: When a policy document defines product kind mappings, always extract the
+    exact product_kind_id values from the document and use them in a simple COUNT
+    query on the product_variants table, avoiding hardcoded guesses and unnecessary
+    joins to store_inventory or stores unless the objective explicitly requires inventory
+    constraints.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r006
+  reasoning: The error 'Answer should be 7' indicates the PlanIR produced an incorrect
+    count. The script hardcoded product_kind_id = 'compressors_extractors' and joined
+    store_inventory/stores with filters, which likely excluded valid products or used
+    a non-existent ID. The policy doc should be parsed to extract the actual product_kind_id
+    values for Compressor and Dust Extractor, then a simple COUNT on product_variants
+    with those IDs should be performed. The script's unnecessary store/inventory joins
+    and guessed ID caused the failure.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When using the result of a Read RPC in string operations like contains_any,
+    first extract the text content from the ReadResponse object using a compute step
+    with prim 'extract' and field 'content'.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'The error ''Protocol message ReadResponse has no "work_jackets" field.''
+    occurred because the decision branch applied contains_any directly to the $policy_doc
+    ref, which is a ReadResponse object, not a plain string. The contains_any primitive
+    likely tried to access a field named ''work_jackets'' on the object, which doesn''t
+    exist. The root cause is that the PlanIR did not extract the text content from
+    the ReadResponse before performing string operations. The failing PlanIR fragment
+    is the decision branch: ''when: {op: contains_any, lhs: $policy_doc, rhs: ["work_jackets"]}''.
+    The new rule ensures that the content field is extracted first, making string
+    operations valid.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 1
+  date: '2026-06-22'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+prephase_deep_read:
+- /docs/policy-updates/2024-07-17-catalogue-reporting-anchors-plugs-vienna.md
+task_id: t11

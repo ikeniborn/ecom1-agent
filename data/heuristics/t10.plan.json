@@ -1,0 +1,69 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/catalogue-addenda/2025-10-08-reporting-bins-organizers-vienna.md"
+      },
+      "bind": "policy_doc_content"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT COUNT(DISTINCT pv.product_sku) AS cnt FROM product_variants pv JOIN store_inventory si ON pv.product_sku = si.product_sku JOIN stores s ON si.store_id = s.store_id WHERE pv.product_kind_id = 'bins_organizers' AND s.city = 'Vienna' AND s.is_open = 1 AND si.available_today_quantity > 0;"
+      },
+      "bind": "sql_output"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_output",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "cnt",
+          "candidates": [
+            "cnt"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$rows.0.cnt"
+      ],
+      "into": "cnt_raw"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$cnt_raw"
+      ],
+      "into": "count"
+    }
+  ],
+  "decision": {
+    "branches": [],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "<COUNT:{count}>",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/catalogue-addenda/2025-10-08-reporting-bins-organizers-vienna.md",
+          "source": "$policy_doc_content"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

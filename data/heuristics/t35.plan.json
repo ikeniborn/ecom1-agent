@@ -1,0 +1,324 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "id_output"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_doc"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/payments/3ds.md"
+      },
+      "bind": "three_ds_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT record_path, customer_id, payment_status, three_ds_status, three_ds_attempts, three_ds_max_attempts, basket_id FROM payment_transactions WHERE payment_id = 'pay_009';"
+      },
+      "bind": "payment_sql_output"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "id_output",
+      "format": "json",
+      "into": "identity_rowset",
+      "columns": [
+        {
+          "into": "kind",
+          "candidates": [
+            "kind"
+          ]
+        },
+        {
+          "into": "customer_id",
+          "candidates": [
+            "customer_id"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "payment_sql_output",
+      "format": "auto_delim",
+      "into": "payment_rowset",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "customer_id",
+          "candidates": [
+            "customer_id"
+          ]
+        },
+        {
+          "into": "payment_status",
+          "candidates": [
+            "payment_status"
+          ]
+        },
+        {
+          "into": "three_ds_status",
+          "candidates": [
+            "three_ds_status"
+          ]
+        },
+        {
+          "into": "three_ds_attempts",
+          "candidates": [
+            "three_ds_attempts"
+          ]
+        },
+        {
+          "into": "three_ds_max_attempts",
+          "candidates": [
+            "three_ds_max_attempts"
+          ]
+        },
+        {
+          "into": "basket_id",
+          "candidates": [
+            "basket_id"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        [
+          "pay_009"
+        ]
+      ],
+      "into": "payment_id"
+    },
+    {
+      "prim": "first",
+      "args": [
+        [
+          "basket_209"
+        ]
+      ],
+      "into": "basket_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$identity_rowset",
+        0
+      ],
+      "into": "identity_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$identity_row",
+        "kind"
+      ],
+      "into": "identity_kind"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$identity_row",
+        "customer_id"
+      ],
+      "into": "identity_customer_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_rowset",
+        0
+      ],
+      "into": "payment_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_row",
+        "record_path"
+      ],
+      "into": "payment_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_row",
+        "customer_id"
+      ],
+      "into": "payment_customer_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_row",
+        "payment_status"
+      ],
+      "into": "payment_status"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_row",
+        "three_ds_status"
+      ],
+      "into": "three_ds_status"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_row",
+        "three_ds_attempts"
+      ],
+      "into": "three_ds_attempts"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_row",
+        "three_ds_max_attempts"
+      ],
+      "into": "three_ds_max_attempts"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_row",
+        "basket_id"
+      ],
+      "into": "payment_basket_id"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$identity_kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "deny_guest"
+      },
+      {
+        "when": {
+          "op": "isnull",
+          "lhs": "$identity_kind",
+          "rhs": null,
+          "args": []
+        },
+        "label": "deny_identity_missing"
+      },
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "eq",
+              "lhs": "$identity_kind",
+              "rhs": "customer",
+              "args": []
+            },
+            {
+              "op": "ne",
+              "lhs": "$payment_customer_id",
+              "rhs": "$identity_customer_id",
+              "args": []
+            }
+          ]
+        },
+        "label": "deny_ownership"
+      }
+    ],
+    "default_label": "eligible"
+  },
+  "ops": [],
+  "answer": {
+    "deny_guest": {
+      "message": "3DS recovery for payment {payment_id}: denied - guest users are not authorized.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$payment_record_path"
+        }
+      ]
+    },
+    "deny_identity_missing": {
+      "message": "3DS recovery for payment {payment_id}: denied - identity missing.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$payment_record_path"
+        }
+      ]
+    },
+    "deny_ownership": {
+      "message": "3DS recovery for payment {payment_id}: denied - customer does not own this payment.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$payment_record_path"
+        }
+      ]
+    },
+    "eligible": {
+      "message": "3DS recovery for payment {payment_id}: eligible for recovery.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/payments/3ds.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$payment_record_path"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

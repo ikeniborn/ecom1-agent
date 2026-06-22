@@ -1,0 +1,59 @@
+{
+  "objective": "Identify the single fraudulent payment record from archived payments, citing each record, but deny access if the caller is a guest.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "fraud_archived_payments": "retrieve payment_transactions where is_archived_basket_reference = 1 and payment_status = 'fraud'"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY"
+  ],
+  "constraints": [
+    {
+      "anchor": "#security",
+      "rule": "Guest access to payment_transactions is denied per security.md",
+      "security": true,
+      "deny_when": {
+        "op": "eq",
+        "lhs": "$_facts.identity.kind",
+        "rhs": "guest",
+        "args": []
+      }
+    }
+  ],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "eq",
+        "lhs": "$count",
+        "rhs": 1,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$rows.0.record_path",
+        "rhs": null,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "Found {count} fraudulent payment record(s): {record_paths}"
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$rows.0.record_path"
+      }
+    ],
+    "OUTCOME_DENIED_SECURITY": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/security.md",
+        "source": null
+      }
+    ]
+  }
+}

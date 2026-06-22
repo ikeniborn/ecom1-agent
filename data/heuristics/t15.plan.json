@@ -1,0 +1,64 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH store AS (\n  SELECT store_id FROM stores WHERE city = 'Ljubljana' AND store_name LIKE '%central%' AND store_name LIKE '%hardware%'\n)\nSELECT COUNT(*) AS count FROM (\n  SELECT 1 FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  JOIN store_inventory si ON si.product_sku = pv.product_sku AND si.store_id = (SELECT store_id FROM store)\n  WHERE pf.brand = 'Wavin'\n    AND pf.product_family_name = 'Wavin Professional Tigris 31G-M1A Drain Trap and Siphon'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'trap type' AND pvp.property_value_text = 'drain trap')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'diameter' AND pvp.property_value_text = '25 mm')\n    AND si.available_today_quantity >= 1\n  LIMIT 1\n  UNION ALL\n  SELECT 1 FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  JOIN store_inventory si ON si.product_sku = pv.product_sku AND si.store_id = (SELECT store_id FROM store)\n  WHERE pf.brand = 'Castrol'\n    AND pf.product_family_name = 'Castrol All Season GTX 3PP-ZPA Engine Oil'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'volume' AND pvp.property_value_text = '250 ml')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'viscosity' AND pvp.property_value_text = '5W-40')\n    AND si.available_today_quantity >= 1\n  LIMIT 1\n  UNION ALL\n  SELECT 1 FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  JOIN store_inventory si ON si.product_sku = pv.product_sku AND si.store_id = (SELECT store_id FROM store)\n  WHERE pf.brand = 'Osram'\n    AND pf.product_family_name = 'Osram Eco Classic 3PW-R88 LED Bulb'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'wattage' AND pvp.property_value_text = '15 W')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'luminous flux' AND pvp.property_value_text = '806 lm')\n    AND si.available_today_quantity >= 1\n  LIMIT 1\n  UNION ALL\n  SELECT 1 FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  JOIN store_inventory si ON si.product_sku = pv.product_sku AND si.store_id = (SELECT store_id FROM store)\n  WHERE pf.brand = 'Bosch'\n    AND pf.product_family_name = 'Bosch Workshop GWS 17A-FAQ Automotive Charger and Bulb'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'product type' AND pvp.property_value_text = 'battery charger')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'voltage' AND pvp.property_value_text = '24 V')\n    AND si.available_today_quantity >= 1\n  LIMIT 1\n  UNION ALL\n  SELECT 1 FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  JOIN store_inventory si ON si.product_sku = pv.product_sku AND si.store_id = (SELECT store_id FROM store)\n  WHERE pf.brand = 'Legrand'\n    AND pf.product_family_name = 'Legrand Valena Plexo 2UK-M0J Wiring Device'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'device type' AND pvp.property_value_text = 'work light')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'color family' AND pvp.property_value_text = 'Gray')\n    AND si.available_today_quantity >= 1\n  LIMIT 1\n  UNION ALL\n  SELECT 1 FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  JOIN store_inventory si ON si.product_sku = pv.product_sku AND si.store_id = (SELECT store_id FROM store)\n  WHERE pf.brand = 'Giacomini'\n    AND pf.product_family_name = 'Giacomini R Series R 1PA-6JD Valve and Connector'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'connector type' AND pvp.property_value_text = 'ball valve')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'diameter' AND pvp.property_value_text = '32 mm')\n    AND si.available_today_quantity >= 1\n  LIMIT 1\n) sub;"
+      },
+      "bind": "sql_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_result",
+      "format": "auto_delim",
+      "into": "parsed",
+      "columns": [
+        {
+          "into": "count",
+          "candidates": [
+            "count"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$parsed"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$first_row",
+        "count"
+      ],
+      "into": "count_str"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$count_str"
+      ],
+      "into": "count"
+    }
+  ],
+  "decision": {
+    "branches": [],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "result {count}",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

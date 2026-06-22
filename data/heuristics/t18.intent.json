@@ -1,0 +1,48 @@
+{
+  "objective": "Compute the total available today quantity of a specific Geberit Mapress Silent IC5-GU6 Valve and Connector (ball valve type) across all Vienna stores, including stores with zero availability, and report the count with citations of the product and every Vienna store record.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "product_sku": "discover from product_variants and product_variant_properties: brand='Geberit', series='Mapress Silent', model='IC5-GU6', product_name containing 'Valve and Connector', and a property with key='connector_type' value='ball valve' (case-insensitive, whitespace-trimmed)",
+    "vienna_store_ids": "list of store_id from stores where city='Vienna' (case-insensitive, whitespace-trimmed)",
+    "total_available": "sum of available_today_quantity from store_inventory for the discovered product_sku across all vienna_store_ids, using COALESCE or LEFT JOIN to treat missing inventory rows as 0",
+    "product_record_path": "record_path of the discovered product variant",
+    "store_record_paths": "list of record_path from stores where city='Vienna' (case-insensitive, whitespace-trimmed)"
+  },
+  "outcome_space": [
+    "OUTCOME_OK"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "ge",
+        "lhs": "$total_available",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$product_sku",
+        "rhs": null,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "count: {total_available}"
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$store_record_paths"
+      }
+    ]
+  }
+}

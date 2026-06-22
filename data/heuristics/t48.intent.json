@@ -1,0 +1,36 @@
+{
+  "objective": "Identify archived payment rows that belong to fraud incidents from the TSV file and compute the total fraudulent payment amount in EUR, citing each fraud row.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "fraud_column": "lookup from TSV header: column name that indicates fraud (e.g., 'is_fraud', 'fraud_flag') with truthy value (e.g., '1', 'true')",
+    "amount_column": "lookup from TSV header: column name for payment amount in cents (e.g., 'amount_cents')",
+    "row_id_column": "lookup from TSV header: column name for row identifier (e.g., 'RowID', 'id')"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "regex_match",
+        "lhs": "$answer.message",
+        "rhs": "^EUR \\d+\\.\\d{2}$",
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "EUR {total_euros}.{total_cents_two_digits}"
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "for each fraud row, construct '/archive/payment_batch_export_ELRhniWLDW.tsv#row=' + $row.RowID"
+      }
+    ]
+  }
+}

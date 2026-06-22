@@ -1,0 +1,239 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT product_sku, record_path, brand, product_name, properties FROM product_variants WHERE LOWER(brand) = LOWER(:brand) AND LOWER(product_name) LIKE LOWER('%' || :product_name_search || '%');"
+      },
+      "bind": "matching_variants_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT (EXISTS (SELECT 1 FROM product_variant_properties pvp JOIN product_variants pv ON pvp.product_sku = pv.product_sku WHERE LOWER(pv.brand) = LOWER(:brand) AND LOWER(pv.product_name) LIKE LOWER('%' || :product_name_search || '%') AND pvp.property_key = 'cleaner_type' AND pvp.property_value_text = :cleaner_type)) AS has_cleaner_type, (EXISTS (SELECT 1 FROM product_variant_properties pvp JOIN product_variants pv ON pvp.product_sku = pv.product_sku WHERE LOWER(pv.brand) = LOWER(:brand) AND LOWER(pv.product_name) LIKE LOWER('%' || :product_name_search || '%') AND pvp.property_key = 'volume' AND pvp.property_value_number = :volume_4000 AND pvp.product_sku IN (SELECT pvp2.product_sku FROM product_variant_properties pvp2 WHERE pvp2.property_key = 'cleaner_type' AND pvp2.property_value_text = :cleaner_type))) AS has_volume_4000, (EXISTS (SELECT 1 FROM product_variant_properties pvp JOIN product_variants pv ON pvp.product_sku = pv.product_sku WHERE LOWER(pv.brand) = LOWER(:brand) AND LOWER(pv.product_name) LIKE LOWER('%' || :product_name_search || '%') AND pvp.property_key = 'volume' AND pvp.property_value_number = :volume_250 AND pvp.product_sku IN (SELECT pvp2.product_sku FROM product_variant_properties pvp2 WHERE pvp2.property_key = 'cleaner_type' AND pvp2.property_value_text = :cleaner_type))) AS has_volume_250;"
+      },
+      "bind": "conditions_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'cleaner_type' AND pvp1.property_value_text = :cleaner_type JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'volume' AND (pvp2.property_value_number = :volume_4000 OR pvp2.property_value_number = :volume_250) WHERE LOWER(pv.brand) = LOWER(:brand) AND LOWER(pv.product_name) LIKE LOWER('%' || :product_name_search || '%');"
+      },
+      "bind": "verified_sku_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "matching_variants_raw",
+      "format": "auto_delim",
+      "into": "matching_variants",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "brand",
+          "candidates": [
+            "brand"
+          ]
+        },
+        {
+          "into": "product_name",
+          "candidates": [
+            "product_name"
+          ]
+        },
+        {
+          "into": "properties",
+          "candidates": [
+            "properties"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "conditions_raw",
+      "format": "auto_delim",
+      "into": "conditions",
+      "columns": [
+        {
+          "into": "has_cleaner_type",
+          "candidates": [
+            "has_cleaner_type"
+          ]
+        },
+        {
+          "into": "has_volume_4000",
+          "candidates": [
+            "has_volume_4000"
+          ]
+        },
+        {
+          "into": "has_volume_250",
+          "candidates": [
+            "has_volume_250"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "verified_sku_raw",
+      "format": "auto_delim",
+      "into": "verified_sku_list",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$matching_variants"
+      ],
+      "into": "base_variant"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$conditions"
+      ],
+      "into": "condition_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$condition_row",
+        "has_cleaner_type"
+      ],
+      "into": "has_cleaner_type"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$condition_row",
+        "has_volume_4000"
+      ],
+      "into": "has_volume_4000"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$condition_row",
+        "has_volume_250"
+      ],
+      "into": "has_volume_250"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$verified_sku_list"
+      ],
+      "into": "verified_sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$verified_sku",
+        "product_sku"
+      ],
+      "into": "verified_sku_str"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$base_variant",
+        "product_sku"
+      ],
+      "into": "base_sku_str"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$matching_variants",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$has_cleaner_type",
+              "rhs": true,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$has_volume_4000",
+              "rhs": true,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$has_volume_250",
+              "rhs": true,
+              "args": []
+            }
+          ]
+        },
+        "label": "ok"
+      }
+    ],
+    "default_label": "unsupported"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "SKU: {verified_sku_str} - verified",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$verified_sku.record_path"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "SKU: {base_sku_str} - not found",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$base_variant.record_path"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

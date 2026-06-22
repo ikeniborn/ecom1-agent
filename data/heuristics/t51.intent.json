@@ -1,0 +1,44 @@
+{
+  "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt from /uploads/ would, if sold today, differ by no more than 1 EUR from the original total price on the receipt.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "receipt_file": "the file in /uploads/ that is the old receipt (method: list files in /uploads/ and identify the receipt file)",
+    "receipt_products": "list of (product_sku, quantity) extracted from the receipt file",
+    "old_total_euros": "total price excluding VAT as stated on the receipt, in EUR",
+    "current_prices": "for each product_sku in receipt_products, look up price_cents from product_variants table",
+    "new_total_euros": "sum over receipt_products of (current price_cents * quantity) / 100",
+    "difference_euros": "absolute difference between old_total_euros and new_total_euros"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_DIFFERENCE_EXCEEDS",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "le",
+        "lhs": "$difference_euros",
+        "rhs": 1,
+        "args": []
+      }
+    ],
+    "OUTCOME_DIFFERENCE_EXCEEDS": [
+      {
+        "op": "gt",
+        "lhs": "$difference_euros",
+        "rhs": 1,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "The total price difference is {difference_euros} EUR, which is {comparison_result} the 1 EUR threshold."
+  },
+  "required_refs": {
+    "OUTCOME_OK": [],
+    "OUTCOME_DIFFERENCE_EXCEEDS": [],
+    "OUTCOME_NONE_UNSUPPORTED": []
+  }
+}

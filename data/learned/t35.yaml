@@ -1,0 +1,416 @@
+entries:
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Access denied: guest users cannot perform payment operations.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: Always include discovery steps for all policy documents and record fields
+    referenced in the objective's params and required_refs, and extract eligibility
+    criteria before constructing the decision tree. When the objective defines a primary
+    outcome with eligibility criteria and a fallback unsupported outcome, structure
+    the decision to first check security constraints, then evaluate eligibility, and
+    default to the unsupported outcome if eligibility fails.
+  created: '2026-06-22'
+  deactivated_reason: r001 did not enforce security-first ordering before null checks;
+    the new rule strictly supersedes it by requiring security DENIED branches to be
+    placed before any non-DENIED branch, including null checks.
+  id: r001
+  reasoning: The plan only read /docs/security.md and the payment's record_path, ignoring
+    the 3DS policy and the payment's 3DS status/attempts. The decision tree had a
+    single branch for guest access and defaulted to OUTCOME_DENIED_SECURITY, causing
+    it to always return that outcome. The grader expected OUTCOME_NONE_UNSUPPORTED,
+    indicating the payment is not eligible for 3DS recovery. The plan must read /docs/payments/3ds.md,
+    extract eligible_recovery_statuses, and check the payment's three_ds_status and
+    attempts to determine eligibility. The decision should first check security, then
+    eligibility for OUTCOME_OK, and fall back to OUTCOME_NONE_UNSUPPORTED if not eligible.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always place security-first DENIED branches as the very first branch in
+    the decision tree, before any null checks or eligibility checks, to ensure security
+    constraints are evaluated first.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'Error: ''interpret: security-first violation: a DENIED_SECURITY branch
+    follows a non-DENIED branch in the decision tree''. Root cause: the PlanIR decision
+    tree ordered the null-check ''unsupported'' branch before the ''denied_security''
+    branch, violating the security-first constraint. The existing rule r001 said to
+    check security first but did not explicitly require it before null checks, so
+    it was insufficient. The new rule clarifies that security DENIED branches must
+    be the absolute first branch.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use concat with a single argument; concat requires two list[dict]
+    rowsets. To bind a literal value, use the param directly in the decision or answer,
+    not a compute step.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: 'The PlanIR compute step {"prim":"concat","args":["pay_013"],"into":"payment_id"}
+    fails because concat expects two list[dict] rowsets (a and b), but only one string
+    literal is provided. The interpreter raises ''missing 1 required positional argument:
+    b''. The payment_id is already a param and should be referenced directly in the
+    decision and answer without a compute step. Similarly, eligible_3ds_status should
+    be extracted from the policy doc, not hardcoded via concat.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: inactive
+  submitted_message: '3DS recovery for payment pay_013: . Status: .'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /docs/payments/3ds.md
+- agents_md_anchor: null
+  content: Always include a reference to the security policy document in the answer
+    refs for any OUTCOME_DENIED_SECURITY branch.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'The grader reported missing required reference ''/docs/security.md''
+    for the denied_security answer. The PlanIR''s answer refs for that branch only
+    included /docs/payments/3ds.md and the record_path, but the security constraint
+    requires a reference to the security policy document that defines the constraint.
+    The script had read /docs/security.md but did not include it in the answer refs.
+    Root cause: answer refs incomplete for security outcome.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include an explicit catch-all branch as the last branch in the decision
+    tree, using a condition that always evaluates to true (e.g., {'op':'true'}), and
+    label it with the desired outcome label, instead of relying on the default_label
+    field.
+  created: '2026-06-22'
+  deactivated_reason: r005 recommended using {'op':'true'} for catch-all branches,
+    which is not a valid predicate op and caused a PlanIR validation error.
+  id: r005
+  reasoning: The grader expected OUTCOME_NONE_UNSUPPORTED but the interpreter returned
+    OUTCOME_NONE_CLARIFICATION. The PlanIR's decision tree had a default_label 'unsupported'
+    and an answer entry for 'unsupported' mapping to OUTCOME_NONE_UNSUPPORTED, yet
+    the interpreter did not use it. This indicates the interpreter's default_label
+    handling is unreliable; it likely requires an explicit branch to avoid falling
+    into a clarification state. The failing fragment is the decision tree's reliance
+    on default_label instead of a final catch-all branch.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: '3DS recovery for payment pay_023 in basket basket_223: denied:
+    guest access'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: inactive
+  submitted_message: '3DS recovery for payment : unsupported.'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /docs/payments/3ds.md
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always parse /bin/id output using text operations (e.g., split, regex)
+    to extract 'kind' and 'customer_id', because /bin/id returns plain text lines,
+    not JSON.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'The script used format ''json'' to parse /bin/id output, which is plain
+    text ''user: cust_092\nroles: customer''. This caused identity_parsed to be empty,
+    leading to null identity.kind and identity.customer_id. The security branch condition
+    evaluated to false (since null != ''guest'' and null != ''customer''), so the
+    script took the eligibility branch and produced OUTCOME_NONE_UNSUPPORTED. The
+    verifier detected that the security constraint''s deny_when held (likely because
+    it treated null identity as ''guest''), expecting OUTCOME_DENIED_SECURITY. Root
+    cause: incorrect rowsets format for /bin/id.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always implement the full deny_when logic from security constraints in
+    the decision tree. When a constraint checks identity kind and customer_id mismatch,
+    parse /bin/id output to extract both 'kind' and 'customer_id', fetch the payment
+    record's customer_id, and include a branch that routes to OUTCOME_DENIED_SECURITY
+    if the identity is a customer with a non-matching customer_id.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: 'Error: verify: I3: security constraint ''/docs/security.md#payment-actions''
+    deny_when holds but outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY.
+    Root cause: The PlanIR decision tree only checked for a guest identity via regex
+    on /bin/id output, and defaulted to unsupported. It did not extract customer_id,
+    did not fetch the payment''s customer_id, and omitted the branch for customer_id
+    mismatch required by the security constraint''s deny_when. The existing in-session
+    rule about parsing /bin/id was not applied to implement the full logic. This rule
+    ensures future PlanIRs include all denial conditions.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never set default_label to null or None. If you need a default outcome,
+    use an explicit catch-all branch with condition {'op':'true'} and label it with
+    the desired outcome string, as per r005. This ensures the decision node always
+    has a valid string label and avoids validation errors.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: 'PlanIR validation error: ''decision.default_label Input should be a
+    valid string [type=string_type, input_value=None, input_type=NoneType]''. The
+    generated PlanIR had a decision node with default_label set to None, which violates
+    the schema. The existing rule r005 advises using an explicit catch-all branch
+    instead of relying on default_label, but the script still produced a null default_label.
+    This new rule explicitly forbids null default_label and reinforces the use of
+    an explicit branch.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always implement a catch-all branch in a decision node using a condition
+    that always evaluates to true, such as {'op':'eq','lhs':1,'rhs':1}, instead of
+    {'op':'true'} which is not a valid predicate op.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: 'PlanIR validation failed with ''unknown predicate op ''true'''' on branch
+    6. Root cause: existing rule r005 recommended using {''op'':''true''} for catch-all
+    branches, but the PlanIR schema does not accept that op. The correct approach
+    is to use a condition that always evaluates to true, e.g., {''op'':''eq'',''lhs'':1,''rhs'':1}.
+    This rule replaces r005.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a security constraint references identity facts (e.g., $_facts.identity.kind,
+    $_facts.identity.customer_id), include a discovery step to run /bin/id and parse
+    the output to extract kind and customer_id, and bind them to variables used in
+    the decision tree.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: 'Error: verify: I3: security constraint ''/docs/security.md#payment-actions''
+    deny_when holds but outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY.
+    Root cause: The PlanIR lacked a discovery step to run /bin/id and extract identity
+    facts. The decision tree used $identity.kind and $identity.customer_id, but these
+    variables were never bound, causing the security branches to evaluate to false.
+    The eligibility branch then matched (three_ds_status was null, so ''not in_set''
+    was true), leading to the wrong outcome. The interpreter correctly evaluated the
+    security constraint using actual identity facts, but the decision tree could not
+    route to DENIED_SECURITY because the identity variables were missing. The rule
+    ensures that any security constraint depending on identity facts triggers a discovery
+    step to populate those variables.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include a discovery step to run /bin/id and parse its output to
+    populate $_facts.identity.kind and $_facts.identity.customer_id before evaluating
+    any security constraint that references identity facts.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Error: real_vm: bad argument type for built-in operation. Root cause:
+    PlanIR decision branch references $_facts.identity.kind but no discovery step
+    runs /bin/id to bind it, causing a type error when the VM evaluates the eq predicate.
+    Failing fragment: decision branch with when: {op: eq, lhs: $_facts.identity.kind,
+    rhs: guest}. Existing in-session rule advised parsing /bin/id but was not applied;
+    this rule makes it mandatory and explicit.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When identity discovery is required, always include a fallback decision
+    branch that checks for missing or null identity fields (e.g., kind is null) and
+    routes to the appropriate denial outcome (e.g., unsupported) to prevent the interpreter
+    from falling back to a clarification outcome.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r012
+  reasoning: The grader expected OUTCOME_NONE_UNSUPPORTED but the interpreter produced
+    OUTCOME_NONE_CLARIFICATION. The PlanIR's decision tree assumes identity_data will
+    always contain 'kind' and 'customer_id', but if /bin/id output is missing or malformed,
+    the compute steps fail and the interpreter falls back to clarification. The decision
+    tree lacks a branch to handle missing identity facts, so the interpreter cannot
+    reach the 'unsupported' label. The corrective rule ensures the PlanIR explicitly
+    checks for null/missing identity fields and routes to a defined outcome, avoiding
+    the fallback.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always use the ''get'' primitive with exactly two arguments: the object
+    and the key. To extract a field from a rowset, first retrieve the row by index
+    using ''get(rowset, index)'', then retrieve the field using ''get(row, field_name)''.
+    Do not pass a dotted path as a single argument.'
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'The interpreter failed on compute step ''get'' with error: ''<lambda>()
+    missing 1 required positional argument: ''key'' CONTRACT: get(obj, key)''. The
+    PlanIR provided a single argument ''$id_rows.0.kind'', but ''get'' requires two
+    separate arguments: the object and the key. The root cause is an incorrect assumption
+    that ''get'' can accept a dotted path. The fix is to chain two ''get'' calls:
+    one to retrieve the row by index, and another to retrieve the field. This rule
+    ensures future PlanIRs use the correct two-argument form.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 2
+  date: '2026-06-22'
+  outcome: OUTCOME_DENIED_SECURITY
+  status: failure
+prephase_deep_read:
+- payments
+task_id: t35

@@ -1,0 +1,458 @@
+entries:
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Access denied: guests cannot access /archive.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: When a security constraint specifies deny conditions, always include an
+    allow branch or set the default label to 'allow' so that requests not meeting
+    the deny condition are permitted.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: The PlanIR decision block contains only a single branch that labels 'deny'
+    when the guest-and-path-not-allowed condition is true, and the default_label is
+    also 'deny'. This causes every request to be denied, even when the identity is
+    not a guest or the path is allowed. The grader expected OUTCOME_OK but got OUTCOME_DENIED_SECURITY
+    because the plan never produces an allow outcome. The fix is to structure the
+    decision so that the deny condition triggers a deny branch, and the default (or
+    an explicit allow branch) triggers the normal processing.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always strip leading and trailing whitespace from string values extracted
+    from rowsets before using them in answer messages, to ensure they match strict
+    regex patterns.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: The verify error was regex mismatch on $answer.msg against '^EUR \d+\.\d{2}$'.
+    The PlanIR extracted the formatted string from the SQL output via a rowset and
+    used it directly in the answer message. SQL output often includes a trailing newline,
+    which would cause the regex to fail. The plan lacked a trim step. No other failure
+    indicators were present; the decision branch was 'ok', so the string was non-empty
+    but contained whitespace.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always specify the predicate in filter_rows as a list with the operation
+    name as the first element (e.g., ["in_set", "$row.column", ["val1", "val2"]])
+    rather than a dict, because the implementation accesses the operation via attribute
+    lookup.
+  created: '2026-06-22'
+  deactivated_reason: r003 incorrectly advises using a list for the predicate, which
+    causes 'list' object has no attribute 'op' error; the correct form is a dict with
+    an 'op' key.
+  id: r003
+  reasoning: The error 'dict' object has no attribute 'op' indicates that the filter_rows
+    primitive attempted to access .op on the predicate dict, but dicts have keys,
+    not attributes. The PlanIR used {"op":"in_set",...} as the predicate. The correct
+    format is a list where the first element is the operation name, which can be accessed
+    as an attribute or index. This is a PlanIR shape bug.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: No fraud rows found in archive.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: '#discovery'
+  content: When the objective references a file path, use a discovery step to read
+    the file content (e.g., Exec with cat or a read RPC) and then parse it as delimited
+    text, rather than assuming a database table.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: The plan attempted to query a TSV file using SQL via /bin/sql, which
+    is not a valid approach for a flat file. The SQL query likely returned nothing,
+    causing the decision to fall to the default 'no_fraud' branch and produce OUTCOME_NONE_UNSUPPORTED.
+    The correct approach is to read the file content and parse it as a delimited rowset,
+    then filter rows based on the fraud indicator column.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: No fraud rule found in security policy.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When the objective instructs to find a column indicating a condition (e.g.,
+    fraud) from a delimited file, use a discovery step to read the file's header and
+    inspect column names for keywords, then use that column in filtering; do not assume
+    external policy documents or database tables.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: The plan produced OUTCOME_NONE_UNSUPPORTED because its decision branches
+    relied on regex matching against /docs/security.md, which either didn't exist
+    or didn't contain the expected patterns. The objective explicitly instructs to
+    read the TSV file and find a column indicating fraud (e.g., 'is_fraud', 'fraud_flag')
+    by inspecting the file itself. The plan instead used an external policy document
+    and assumed a 'payment_transactions' table, violating the method. The root cause
+    is a PLAN design that bypasses direct file inspection for fraud indicator columns.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using filter_rows, specify the predicate as a dict with an ''op''
+    key (e.g., {"op": "in_set", "args": ["$row.fraud_flag", ["true", "1", "yes", "fraud",
+    "incident", "TRUE", "YES"]]}) rather than a list.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'interpret: compute step ''filter_rows'' failed: ''list'' object has
+    no attribute ''op''. The PlanIR predicate was a list ["in_set", "$row.fraud_flag",
+    [...]] but the interpreter expects a dict with an ''op'' attribute. Existing rule
+    r003 incorrectly advises to use a list; it must be deactivated and replaced with
+    this dict-based rule.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the answer_shape requires a ref of kind 'record_path', the plan must
+    include a discovery step to identify the column in the source file that contains
+    the record path (e.g., by reading the header and matching keywords like 'path',
+    'file', 'record', or 'id'), and then use that column name in the rowsets step
+    and subsequent refs; do not assume a column named 'record_path' exists.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: The plan assumed a column named 'record_path' exists in the TSV, but
+    the file likely had a different column name (e.g., 'file_path', 'id'). The required
+    ref '$fraud_rows[*].record_path' was unresolved because the rowset did not contain
+    a column with that exact name. The plan should have first discovered the actual
+    column name from the header and used it.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use concat to build strings; concat is for merging rowsets (list[dict]
+    rows). Use a string formatting primitive (e.g., 'format') to build SQL queries
+    or other string templates.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: 'Error: ''concat'' failed because it received 9 string arguments instead
+    of 2 rowset arguments. The PlanIR used concat to assemble SQL query strings (agg_query,
+    agg_script, rec_query, rec_script) by concatenating many string fragments. The
+    concat primitive''s contract is to merge two rowsets (list[dict] rows), not to
+    concatenate strings. The root cause is misuse of concat for string building. The
+    failing PlanIR fragment: compute steps with prim ''concat'' and multiple string
+    args. No existing rule covers this.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always specify the predicate in filter_rows as a list with the operation
+    name as the first element (e.g., ["in_set", "$row.column", ["val1", "val2"]])
+    rather than a dict, because the implementation accesses the operation via attribute
+    lookup.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: 'Error: ''dict'' object has no attribute ''op'' when using filter_rows
+    with a dict predicate {"op":"in_set",...}. The implementation expects a list (e.g.,
+    ["in_set", ...]) and accesses the operation via attribute lookup, which fails
+    on a dict. The in-session rule that recommended a dict is incorrect and caused
+    this failure. r003 already correctly specifies the list format.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always specify the predicate in filter_rows as a dict with an ''op'' key
+    (e.g., {"op": "in_set", "args": ["$row.column", ["val1", "val2"]]}) rather than
+    a list, because the implementation accesses the operation via attribute lookup.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: 'Error: interpret: compute step ''filter_rows'' failed: ''list'' object
+    has no attribute ''op''. The PlanIR used a list predicate ["in_set", "$row.fraud_flag",
+    ["true","1","yes","fraud","incident","TRUE","YES"]], but the implementation expects
+    a dict with an ''op'' key. Root cause: incorrect predicate shape. Existing rule
+    r003 advises the opposite (list form), which is now proven wrong and must be deactivated.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When creating a rowset from a JSON source, always specify the columns you
+    will reference in the 'columns' field, using the column names as they appear in
+    the JSON objects, to ensure the interpreter can resolve refs to those columns.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r011
+  reasoning: The error 'unresolved required ref(s) ["$fraud_rows[*].record_path"]'
+    occurred because the PlanIR defined a rowset 'fraud_rows' from a JSON source but
+    left the 'columns' field empty ([]). The interpreter could not resolve the column
+    'record_path' from that rowset. The SQL query correctly extracted 'record_path'
+    and 'amount' into a JSON array, but the rowset definition must explicitly declare
+    the columns to make them available for refs and compute steps.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#plan-phase-rowsets'
+  content: When an Exec RPC returns a single scalar value (e.g., a formatted total)
+    and you need to use it as the answer message, use format 'single' in the rowset
+    definition to capture the entire output as one column, rather than 'auto_delim'
+    which may fail to parse a single line without headers.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r012
+  reasoning: The verify step failed because the answer message did not match the regex
+    '^EUR \d+\.\d{2}$'. The plan used an Exec RPC to compute the total via SQL and
+    bind the output to 'raw_total'. The rowset definition used format 'auto_delim'
+    with a column mapping expecting a 'formatted' column. However, the SQL output
+    is a single scalar value (e.g., 'EUR 123.45') without a header row. The 'auto_delim'
+    format likely failed to parse this as a delimited file, resulting in an empty
+    rowset and an empty message. The fix is to use format 'single' to capture the
+    entire output as a single column, or to use 'raw' and reference the output directly.
+    This rule ensures the plan phase selects the correct rowset format for scalar
+    Exec outputs.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using format 'single' to capture a scalar output from an Exec RPC,
+    always set the column mapping's candidates to ['value'] because the interpreter
+    names the single column 'value'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r013
+  reasoning: 'The verify step failed because the answer message did not match the
+    required regex ''^EUR \d+\.\d{2}$''. The PlanIR attempted to bind the total from
+    the SQL output using a rowset with format ''single'' and column mapping candidates:
+    [''total'']. However, the interpreter likely names the single column ''value''
+    by default, so the binding to ''total_str'' failed, leaving the message empty
+    or malformed. The observed RPC outputs are empty, but the error pattern indicates
+    a column name mismatch. The existing in-session rule only advises using format
+    ''single'', not the correct column name.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a SQL query filters on a column, always first verify the column exists
+    in the source data by reading the header and checking column names; if the column
+    is missing, branch to an unsupported outcome rather than executing the query.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r014
+  reasoning: The verify error indicates the answer message did not match the expected
+    EUR amount regex. The observed RPC outputs show the archive file header was read
+    but contains no 'is_fraud' column. The PlanIR executed a SQL query filtering on
+    'is_fraud = true', which likely failed because the column does not exist, causing
+    the Exec RPC to return an error message. That error message was then captured
+    as the total_msg, failing the regex. The plan should have included a step to parse
+    the header, check for the required column, and branch to an unsupported outcome
+    if missing.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: Fraud indicator column not found in archive file.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a plan needs to filter rows based on a column in a TSV/CSV file, always
+    first read the header, parse column names, and use a decision branch to check
+    for the required column; if missing, branch to unsupported, otherwise proceed
+    with filtering and computation.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r015
+  reasoning: The plan read the header but did not parse it or check for the fraud
+    indicator column; it immediately defaulted to unsupported. The plan must include
+    a decision branch that checks the header for the required column and proceeds
+    to filter and compute if present.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a Read RPC output is used in a decision branch or any string operation,
+    always first extract the 'content' field with a get primitive, because the bound
+    variable is a ReadResponse protobuf, not a plain string.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r016
+  reasoning: 'The error ''real_vm: Protocol message ReadResponse has no ''three_ds_status''
+    field.'' occurred because the plan used the bound variable ''header_line'' (a
+    ReadResponse protobuf) directly in a ''contains_any'' decision branch, causing
+    the interpreter to attempt field access on the message. The failing fragment is
+    the decision branch: ''when'': {''op'':''and'', ... ''args'':[{''op'':''contains_any'',''lhs'':''$header_line'',''rhs'':[''three_ds_status'',...]},
+    ...]}. The correct approach is to first extract the ''content'' field from the
+    ReadResponse. This rule ensures that string operations are applied to the content
+    string, not the protobuf.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a plan's decision branches to an unsupported outcome, always set the
+    decision's default_label to the exact outcome label (e.g., 'OUTCOME_NONE_UNSUPPORTED')
+    and use that label as the key in the answer block, not a custom branch label.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r017
+  reasoning: 'Error: grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION.
+    Root cause: The PlanIR decision default_label was ''unsupported'' (a custom branch
+    label) instead of the outcome label ''OUTCOME_NONE_UNSUPPORTED'', and the answer
+    block key was ''unsupported'' rather than the outcome label. The plan interpreter
+    could not resolve the outcome and defaulted to OUTCOME_NONE_CLARIFICATION. Failing
+    fragment: decision.default_label = ''unsupported'', answer block key ''unsupported''.
+    This rule ensures future plans use the exact outcome label for default_label and
+    answer key.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 1
+  date: '2026-06-22'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t48

@@ -1,31 +1,24 @@
 {
   "discovery": [
     {
-      "rpc": "Read",
-      "args": {
-        "path": "/docs/ops-policy-notes/catalogue-count-nuts-bolts-washers-vienna-2025-06-22.md"
-      },
-      "bind": "policy_text"
-    },
-    {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT COUNT(DISTINCT pv.product_sku) AS count FROM product_variants pv JOIN store_inventory si ON pv.product_sku = si.product_sku JOIN stores s ON si.store_id = s.store_id WHERE pv.product_kind_id = 'nuts_bolts_washers' AND s.city = 'Vienna' AND s.is_open = 1 AND si.available_today_quantity > 0;"
+        "stdin": "SELECT COUNT(*) AS cnt FROM product_variants WHERE product_kind_id = 'nuts_bolts_washers';"
       },
-      "bind": "sql_raw"
+      "bind": "sql_output"
     }
   ],
   "rowsets": [
     {
-      "from_": "sql_raw",
+      "from_": "sql_output",
       "format": "auto_delim",
       "into": "rows",
       "columns": [
         {
-          "into": "count",
+          "into": "cnt",
           "candidates": [
-            "count"
+            "cnt"
           ]
         }
       ]
@@ -33,17 +26,10 @@
   ],
   "compute": [
     {
-      "prim": "column",
+      "prim": "get",
       "args": [
-        "$rows",
-        "count"
-      ],
-      "into": "counts"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$counts"
+        "$rows.0",
+        "cnt"
       ],
       "into": "count"
     }
@@ -55,12 +41,12 @@
   "ops": [],
   "answer": {
     "ok": {
-      "message": "COUNT:{count}",
+      "message": "[QTY:{count}]",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "policy_doc",
-          "path": "/docs/ops-policy-notes/catalogue-count-nuts-bolts-washers-vienna-2025-06-22.md",
+          "path": "/docs/current-updates/catalogue-counting-2025-06-22-nuts-bolts-washers.md",
           "source": null
         }
       ]

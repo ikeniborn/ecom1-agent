@@ -1,0 +1,106 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "identity_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT record_path FROM shopping_baskets WHERE basket_id = 'basket_244';"
+      },
+      "bind": "basket_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "identity_raw",
+      "format": "json",
+      "into": "identity",
+      "columns": []
+    },
+    {
+      "from_": "basket_raw",
+      "format": "auto_delim",
+      "into": "basket_list",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$basket_list"
+      ],
+      "into": "basket"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "basket_244"
+      ],
+      "into": "basket_id"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "OUTCOME_DENIED_SECURITY"
+      ],
+      "into": "outcome"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$identity.kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "denied"
+      },
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$identity.kind",
+          "rhs": null,
+          "args": []
+        },
+        "label": "denied"
+      }
+    ],
+    "default_label": "denied"
+  },
+  "ops": [],
+  "answer": {
+    "denied": {
+      "message": "Checkout recovery for basket {basket_id}: {outcome}.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$basket.record_path"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

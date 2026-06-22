@@ -1,6 +1,360 @@
+entries:
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: NOT_FOUND
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When the objective specifies a literal response token (e.g., '<NO>'), the
+    answer message must use that exact token, not a plain word like 'NO'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: 'Error: ''grader: Answer should contain \''<NO>\''''. Root cause: The
+    PlanIR''s found_base_only branch answer message was ''NO {all_rows.0.product_sku}''
+    instead of ''<NO> {all_rows.0.product_sku}''. The objective explicitly requires
+    responding with ''<NO>'' and the product SKU when the base product exists but
+    the claim is absent. The answer_shape skeleton ''{status} {sku}'' is generic;
+    the literal ''<NO>'' must be used exactly as specified.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: Product not found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When the answer message contains placeholders (e.g., {sku}), always include
+    a corresponding ref in the answer branch to supply the value, ensuring the interpreter
+    can render the message correctly.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'Error: grader: Answer should contain ''<NO>''. The PlanIR''s claim_absent
+    branch sets message ''<NO> - Checked SKU: {sku}'' but only provides a ref for
+    record_path, not for sku. The interpreter likely failed to substitute {sku}, causing
+    the final answer to lack ''<NO>'' (possibly an error message). The root cause
+    is missing sku ref in the answer block. The new rule ensures all message placeholders
+    are backed by refs.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: 'Product not found (SKU: )'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When the objective specifies a literal response token (e.g., '<NO>'), the
+    answer message for any outcome that is not the desired outcome must include that
+    token.
+  created: '2026-06-22'
+  deactivated_reason: r003 only required the literal token for non-desired outcomes,
+    but the answer_shape skeleton must be used for the reached outcome regardless
+    of desired status. This new rule supersedes it.
+  id: r003
+  reasoning: 'Grader error: ''Answer should contain ''<NO>''''. The plan''s claim_absent
+    answer message was ''Product does not match (SKU: {sku})'' without the required
+    token. The objective''s answer shape uses a {result} placeholder, which must be
+    filled with the token for negative outcomes. The existing rule r001 already states
+    the token must be used, but the plan did not apply it; this rule explicitly ties
+    the token to non-OK outcomes to prevent recurrence.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use 'eq' as a compute primitive; equality comparisons should be
+    performed in decision branches using the 'eq' operator.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'The interpret error ''compute step eq failed: eq'' indicates the interpreter
+    does not support ''eq'' as a compute primitive. The Plan used compute steps with
+    prim ''eq'' to check cleaner_type and volume equality, but the interpreter rejected
+    it. Decision branches already use ''eq'' operator successfully, so equality checks
+    must be moved there.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a discovery step may return zero rows, always include a decision branch
+    that checks for empty rowset and maps to an outcome that does not require nonempty
+    refs from that rowset.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: 'ERROR: verify: success_criteria[OUTCOME_NONE_UNSUPPORTED][0] failed:
+    {''op'': ''nonempty'', ''lhs'': ''$product.sku'', ''rhs'': None, ''args'': []}.
+    OBSERVED_RPC_OUTPUTS show only column headers, no data rows, meaning the SQL query
+    returned zero rows. The PlanIR discovery step binds the result to ''raw_product'',
+    then ''first'' computes ''$product'' from an empty rowset, making ''$product.sku''
+    empty. The decision tree''s second branch checks nonempty sku but the default
+    label is also ''unsupported'', so the empty-rowset case falls through to the unsupported
+    outcome, which requires nonempty sku in success_criteria. The plan lacks a branch
+    for the empty-rowset case, causing a mismatch between the decision path and the
+    outcome''s required refs.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: '<NO> (SKU: N/A)'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - no answer provided
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: ''
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: '#answer-generation'
+  content: When the answer_shape specifies a literal token, the answer message for
+    the reached outcome must be generated by substituting variables into that skeleton,
+    not by using a different literal string.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'The grader error ''Answer should contain ''<NO>'''' occurred because
+    the OK branch answer message was ''YES, SKU: {sku}'' instead of the required skeleton
+    ''<NO> (SKU: {sku})''. The answer_shape skeleton applies to the outcome that is
+    reached, regardless of label. The existing rule r003 only mandates the token for
+    non-desired outcomes, which is insufficient when the skeleton itself contains
+    the token for the desired outcome. This rule ensures the answer message always
+    matches the skeleton.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required ref source is '$row.<column>', the answer ref must use
+    that exact source and the rowset must include a column named '<column>' bound
+    from discovery; do not extract the column into a separate variable and use that
+    variable as the ref source.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''$row.record_path'']
+    on OK answer''. The intent spec requires ref source ''$row.record_path''. The
+    PlanIR compute step extracted record_path into a variable ''record_path'' and
+    the answer ref used source ''$record_path'', which does not match the required
+    source. The rowset already has a column ''record_path'' bound from the SQL output,
+    so the answer ref should directly use ''$row.record_path'' without an intermediate
+    compute step. The mismatch caused the interpreter to fail to resolve the ref.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: Product found but properties are present.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When the answer_shape includes a msg_skeleton, every answer branch that
+    can provide the required variables must use that skeleton to format the message,
+    even if the branch leads to an outcome other than the primary success outcome.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: 'Error: grader: Answer should contain ''<NO>''. Root cause: The PlanIR''s
+    ''properties_present'' branch used a custom literal message ''Product found but
+    properties are present.'' instead of the answer_shape skeleton ''<NO> {sku}'',
+    so when the product existed with both properties present the answer lacked ''<NO>''
+    and failed the grader. Failing fragment: answer.properties_present.message. Existing
+    rule r006 states the skeleton must be used for the reached outcome, but the planner
+    did not apply it to this branch; the new rule clarifies that all branches with
+    resolvable variables must use the skeleton.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never pass a default value as a third argument to the 'get' primitive;
+    it only accepts two arguments (object, key). If a default is needed, use the 'get_or_default'
+    primitive instead.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'The error ''compute step ''get'' failed: <lambda>() takes 2 positional
+    arguments but 3 were given'' indicates the PlanIR compute step `{"prim":"get","args":["$first_row","product_sku",""],"into":"sku"}`
+    supplied three arguments to the ''get'' primitive, violating its contract of exactly
+    two arguments (object, key). The empty string was intended as a default, but ''get''
+    does not support defaults. The correct primitive for a default is ''get_or_default''.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When using the sql tool, always pass the SQL query as a command-line argument
+    (e.g., -c or --query) rather than via stdin, unless the tool's documentation explicitly
+    states that it reads SQL from stdin.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'interpret: sql returned usage banner — SQL not delivered via stdin.
+    Root cause: PlanIR discovery step used Exec RPC with stdin field to pass SQL,
+    but the sql tool did not receive it, likely because it expects SQL as a command-line
+    argument. Failing PlanIR fragment: discovery step with stdin containing SQL. No
+    existing rule covers sql invocation method.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a compute step uses 'nonempty' on a value that may be NULL from a
+    discovery step (e.g., a SQL subquery result), ensure the value is never NULL by
+    either wrapping the SQL subquery with COALESCE(..., '') to return an empty string
+    for missing properties, or by using 'get_or_default' to extract the column with
+    a default empty string before calling 'nonempty'.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'The error ''interpret: compute step ''nonempty'' failed: ''nonempty''''
+    occurred because the ''nonempty'' primitive was called on a NULL value. The SQL
+    subqueries in the discovery step return NULL when the property is not found, and
+    the ''nonempty'' primitive cannot handle NULL. The failing PlanIR fragment: compute
+    steps with ''nonempty'' on $has_bolt, $has_threaded_rod, $has_diameter, which
+    were bound directly from subquery results that may be NULL. No existing rule covers
+    NULL handling for ''nonempty''.'
+  status: active
+  surface: ir
 last_run:
-  cycles_used: 1
-  date: '2026-06-21'
+  cycles_used: 4
+  date: '2026-06-22'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t05

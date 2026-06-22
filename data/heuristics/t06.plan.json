@@ -4,14 +4,14 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT pv.product_sku, pv.record_path, (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'size' AND pvp.property_value_text = 'M') > 0 AS has_size_M, (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'size' AND pvp.property_value_text = 'S') > 0 AS has_size_S FROM product_variants pv WHERE pv.brand = 'Portwest' AND (pv.series = 'PW3 DX 3TU-ST2' OR pv.model = 'Work Gloves' OR pv.product_name LIKE '%PW3 DX 3TU-ST2 Work Gloves%') LIMIT 1;"
+        "stdin": "WITH required_skus AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  WHERE pv.brand = 'Sika'\n    AND pv.product_name LIKE '%Sika 28T-UV8 Sealant%'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'sealant type' AND pvp.property_value_text = 'hybrid sealant')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'color family' AND pvp.property_value_text = 'Gray')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'volume' AND pvp.property_value_text = '300 ml')\n)\nSELECT r.product_sku, r.record_path,\n       CASE WHEN extra.product_sku IS NOT NULL THEN 1 ELSE 0 END AS has_extra_volume\nFROM required_skus r\nLEFT JOIN product_variant_properties extra ON extra.product_sku = r.product_sku AND extra.property_key = 'volume' AND extra.property_value_text = '310 ml';"
       },
-      "bind": "query_result"
+      "bind": "sql_result"
     }
   ],
   "rowsets": [
     {
-      "from_": "$query_result",
+      "from_": "sql_result",
       "format": "auto_delim",
       "into": "rows",
       "columns": [
@@ -28,21 +28,22 @@
           ]
         },
         {
-          "into": "has_size_M",
+          "into": "has_extra_volume",
           "candidates": [
-            "has_size_M"
-          ]
-        },
-        {
-          "into": "has_size_S",
-          "candidates": [
-            "has_size_S"
+            "has_extra_volume"
           ]
         }
       ]
     }
   ],
   "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$rows"
+      ],
+      "into": "row_count"
+    },
     {
       "prim": "first",
       "args": [
@@ -51,7 +52,7 @@
       "into": "row"
     },
     {
-      "prim": "get",
+      "prim": "column",
       "args": [
         "$row",
         "product_sku"
@@ -59,86 +60,57 @@
       "into": "sku"
     },
     {
-      "prim": "get",
+      "prim": "column",
       "args": [
         "$row",
-        "record_path"
+        "has_extra_volume"
       ],
-      "into": "record_path"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$row",
-        "has_size_M"
-      ],
-      "into": "has_M"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$row",
-        "has_size_S"
-      ],
-      "into": "has_S"
+      "into": "extra_claim_present"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "and",
-          "lhs": null,
-          "rhs": null,
-          "args": [
-            {
-              "op": "eq",
-              "lhs": "$has_M",
-              "rhs": 1,
-              "args": []
-            },
-            {
-              "op": "eq",
-              "lhs": "$has_S",
-              "rhs": 1,
-              "args": []
-            }
-          ]
+          "op": "eq",
+          "lhs": "$row_count",
+          "rhs": 0,
+          "args": []
         },
-        "label": "sizes_present"
+        "label": "not_found"
       },
       {
         "when": {
-          "op": "nonempty",
-          "lhs": "$sku",
-          "rhs": null,
+          "op": "eq",
+          "lhs": "$extra_claim_present",
+          "rhs": 1,
           "args": []
         },
-        "label": "size_absent"
+        "label": "extra_claim_present"
       }
     ],
-    "default_label": "not_found"
+    "default_label": "extra_claim_absent"
   },
   "ops": [],
   "answer": {
-    "size_absent": {
-      "message": "<NO> for SKU {sku}",
+    "extra_claim_absent": {
+      "message": "<NO> (SKU: {sku})",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
           "path": null,
-          "source": "$record_path"
+          "source": "$row.record_path"
         }
       ]
     },
-    "sizes_present": {
-      "message": "Product exists and both sizes M and S are present.",
+    "not_found": {
+      "message": "Product not found",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     },
-    "not_found": {
-      "message": "No matching product found.",
+    "extra_claim_present": {
+      "message": "Extra volume claim 310 ml exists",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

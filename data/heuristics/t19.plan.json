@@ -1,0 +1,138 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH product AS (SELECT product_sku, record_path FROM product_variants WHERE brand = 'Raaco' AND series = 'Raaco Stackable Assorter 20C-L8E Storage Bin and Organizer' AND product_name = 'Storage Bin and Organizer' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'storage_type' AND property_value_text = 'storage bin') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'color_family' AND property_value_text = 'Red') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'volume' AND property_value_text = '3 l')) SELECT product_sku, record_path, (SELECT COALESCE(SUM(si.available_today_quantity), 0) FROM stores vs LEFT JOIN store_inventory si ON vs.store_id = si.store_id AND si.product_sku = product.product_sku WHERE vs.city = 'Vienna') AS total_count FROM product;"
+      },
+      "bind": "$product_and_count_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT store_id, record_path FROM stores WHERE city = 'Vienna';"
+      },
+      "bind": "$stores_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "$product_and_count_raw",
+      "format": "auto_delim",
+      "into": "$product_and_count_rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "total_count",
+          "candidates": [
+            "total_count"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "$stores_raw",
+      "format": "auto_delim",
+      "into": "$stores_rows",
+      "columns": [
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$product_and_count_rows"
+      ],
+      "into": "$product_and_count_first"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_and_count_first",
+        "record_path"
+      ],
+      "into": "$product.record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_and_count_first",
+        "total_count"
+      ],
+      "into": "$total_count"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$stores_rows",
+        "record_path"
+      ],
+      "into": "$stores"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$product_and_count_rows",
+          "rhs": null,
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
+    "default_label": "no_product"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "count: {total_count}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$stores"
+        }
+      ]
+    },
+    "no_product": {
+      "message": "Product not found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

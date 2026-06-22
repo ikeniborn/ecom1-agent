@@ -1,12 +1,13 @@
 {
-  "objective": "Determine if a product variant with brand 'Fiskars', product kind 'Chainsaw', product family 'Fiskars Battery X 1CD-A3X Chainsaw', and property 'power source' = 'petrol' exists in the catalogue.",
+  "objective": "Determine whether the specified product (Metal and Concrete Paint from Helios, in the Helios Professional Helios 29A-FTE Metal and Concrete Paint line, with product type metal paint and color family White) exists in the catalogue.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "brand": "Fiskars",
-    "product_kind_name": "Chainsaw",
-    "product_family_name": "Fiskars Battery X 1CD-A3X Chainsaw",
-    "property_key": "power source",
-    "property_value": "petrol"
+    "product_name": "Metal and Concrete Paint",
+    "brand": "Helios",
+    "product_kind_name": "metal paint",
+    "color_family": "White",
+    "product_family_line": "Helios Professional Helios 29A-FTE Metal and Concrete Paint",
+    "product_family_lookup_method": "Two-step discovery: first query product_families with LIKE '%Helios Professional Helios 29A-FTE Metal and Concrete Paint%' to retrieve the exact product_family_name, then use that exact name in the join with product_variants."
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -17,21 +18,27 @@
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$matching_product",
+        "lhs": "$answer.record_path",
         "rhs": null,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$answer.found",
+        "rhs": true,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Product {status} in catalogue."
+    "msg_skeleton": "Product {status}: {product_name} (SKU: {sku})"
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$matching_product.record_path"
+        "source": "$product.record_path"
       }
     ]
   }

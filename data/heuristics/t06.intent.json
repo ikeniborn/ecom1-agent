@@ -1,40 +1,35 @@
 {
-  "objective": "Verify whether the product catalogue contains a Portwest PW3 DX 3TU-ST2 Work Gloves item with both size M and size S properties, and if the base product exists but the size claim is absent, answer <NO> with the checked SKU.",
+  "objective": "Verify whether the product 'Sika Professional Sika 28T-UV8 Sealant' with sealant type hybrid sealant, color family Gray, and volume 300 ml exists in the catalogue, and if it does, check whether the catalogue also claims volume 310 ml; if the extra claim is absent, answer <NO> with the product SKU.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_search": "SQL query on product_variants: brand = 'Portwest' AND (series = 'PW3 DX 3TU-ST2' OR model = 'Work Gloves' OR product_name LIKE '%PW3 DX 3TU-ST2 Work Gloves%')",
-    "size_check": "For the found SKU, check product_variant_properties for property_key = 'size' with property_value_text IN ('M', 'S') and verify both are present"
+    "product_search": "Find product_variant where brand = 'Sika' and product_name contains 'Sika 28T-UV8 Sealant', and has product_variant_properties with key 'sealant type' = 'hybrid sealant', key 'color family' = 'Gray', key 'volume' = '300 ml'",
+    "extra_claim_check": "For the found SKU, check if there exists a product_variant_property with key 'volume' and value '310 ml'"
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_NONE_UNSUPPORTED"
+    "OUTCOME_NONE_UNSUPPORTED",
+    "OUTCOME_NONE_CLARIFICATION"
   ],
   "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "nonempty",
-        "lhs": "$answer.sku",
-        "rhs": null,
-        "args": []
-      },
-      {
-        "op": "startswith",
-        "lhs": "$answer",
-        "rhs": "<NO>",
+        "op": "regex_match",
+        "lhs": "$answer.msg",
+        "rhs": "^<NO> \\(SKU: .+\\)$",
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "<NO> for SKU {sku}"
+    "msg_skeleton": "<NO> (SKU: {sku})"
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product.record_path"
+        "source": "$row.record_path"
       }
     ]
   }

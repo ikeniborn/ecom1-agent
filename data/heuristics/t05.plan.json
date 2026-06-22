@@ -4,24 +4,16 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH product AS ( SELECT product_sku, record_path FROM product_variants WHERE brand = 'Heco' AND product_name = 'Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw' ), props AS ( SELECT p.product_sku, MAX(CASE WHEN property_key = 'screw_type' THEN property_value_text END) AS screw_type, MAX(CASE WHEN property_key = 'diameter_mm' THEN property_value_text END) AS diameter_mm, MAX(CASE WHEN property_key = 'pack_count' THEN property_value_text END) AS pack_count FROM product_variant_properties p JOIN product ON p.product_sku = product.product_sku GROUP BY p.product_sku ) SELECT product.product_sku, product.record_path FROM product JOIN props ON product.product_sku = props.product_sku WHERE props.screw_type = 'wood screw' AND props.diameter_mm = '3' AND props.pack_count = '100 pcs';"
+        "stdin": "SELECT pv.product_sku, pv.record_path, (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ((pvp.property_key = 'fastener_type' AND pvp.property_value_text IN ('bolt', 'threaded rod')) OR (pvp.property_key = 'diameter' AND pvp.property_value_text = '8 mm'))) AS property_count FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'HECO 3DW-64B' AND pv.product_name LIKE '%Nut Bolt and Washer%';"
       },
-      "bind": "$matching_query"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT product_sku, record_path FROM product_variants WHERE brand = 'Heco' AND product_name = 'Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw';"
-      },
-      "bind": "$all_query"
+      "bind": "product_rows"
     }
   ],
   "rowsets": [
     {
-      "from_": "$matching_query",
+      "from_": "product_rows",
       "format": "auto_delim",
-      "into": "$matching_rows",
+      "into": "product_rows_parsed",
       "columns": [
         {
           "into": "product_sku",
@@ -34,81 +26,163 @@
           "candidates": [
             "record_path"
           ]
-        }
-      ]
-    },
-    {
-      "from_": "$all_query",
-      "format": "auto_delim",
-      "into": "$all_rows",
-      "columns": [
-        {
-          "into": "product_sku",
-          "candidates": [
-            "product_sku"
-          ]
         },
         {
-          "into": "record_path",
+          "into": "property_count",
           "candidates": [
-            "record_path"
+            "property_count"
           ]
         }
       ]
     }
   ],
-  "compute": [],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$product_rows_parsed"
+      ],
+      "into": "row_count"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_rows_parsed",
+        "property_count"
+      ],
+      "into": "property_counts"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$property_counts"
+      ],
+      "into": "property_count"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_rows_parsed",
+        "product_sku"
+      ],
+      "into": "skus"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$skus"
+      ],
+      "into": "sku"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_rows_parsed",
+        "record_path"
+      ],
+      "into": "record_paths"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$record_paths"
+      ],
+      "into": "record_path"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$product_rows_parsed"
+      ],
+      "into": "row"
+    }
+  ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "nonempty",
-          "lhs": "$matching_rows",
-          "rhs": null,
+          "op": "eq",
+          "lhs": "$row_count",
+          "rhs": 0,
           "args": []
         },
-        "label": "found_match"
+        "label": "no_product"
       },
       {
         "when": {
-          "op": "nonempty",
-          "lhs": "$all_rows",
+          "op": "and",
+          "lhs": null,
           "rhs": null,
-          "args": []
+          "args": [
+            {
+              "op": "gt",
+              "lhs": "$row_count",
+              "rhs": 0,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$property_count",
+              "rhs": 3,
+              "args": []
+            }
+          ]
         },
-        "label": "found_base_only"
+        "label": "found_with_props"
+      },
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "gt",
+              "lhs": "$row_count",
+              "rhs": 0,
+              "args": []
+            },
+            {
+              "op": "lt",
+              "lhs": "$property_count",
+              "rhs": 3,
+              "args": []
+            }
+          ]
+        },
+        "label": "found_without_props"
       }
     ],
-    "default_label": "not_found"
+    "default_label": "no_product"
   },
   "ops": [],
   "answer": {
-    "found_match": {
-      "message": "YES {matching_rows.0.product_sku}",
-      "outcome": "OUTCOME_OK",
-      "refs": [
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$matching_rows.0.record_path"
-        }
-      ]
-    },
-    "found_base_only": {
-      "message": "NO {all_rows.0.product_sku}",
-      "outcome": "OUTCOME_OK",
-      "refs": [
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$all_rows.0.record_path"
-        }
-      ]
-    },
-    "not_found": {
-      "message": "NOT_FOUND",
+    "no_product": {
+      "message": "Product not found in catalogue.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
+    },
+    "found_with_props": {
+      "message": "YES (SKU: {sku})",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$row.record_path"
+        }
+      ]
+    },
+    "found_without_props": {
+      "message": "NO (SKU: {sku})",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$row.record_path"
+        }
+      ]
     }
   },
   "custom_extract": []

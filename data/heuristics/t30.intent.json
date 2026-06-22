@@ -1,0 +1,60 @@
+{
+  "objective": "Restart the 3-D Secure recovery flow for basket basket_202 and payment pay_002.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "basket_id": "basket_202",
+    "payment_id": "pay_002"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY"
+  ],
+  "constraints": [
+    {
+      "anchor": "#security",
+      "rule": "Access to payment data requires authentication (see /docs/security.md)",
+      "security": true,
+      "deny_when": {
+        "op": "eq",
+        "lhs": "$_facts.identity.kind",
+        "rhs": "guest",
+        "args": []
+      }
+    }
+  ],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$payment_id",
+        "rhs": null,
+        "args": []
+      }
+    ],
+    "OUTCOME_DENIED_SECURITY": []
+  },
+  "answer_shape": {
+    "msg_skeleton": "3DS recovery request for payment {payment_id}: {status}"
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/payments/3ds.md",
+        "source": null
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$payment.record_path"
+      }
+    ],
+    "OUTCOME_DENIED_SECURITY": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/security.md",
+        "source": null
+      }
+    ]
+  }
+}

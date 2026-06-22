@@ -1,0 +1,58 @@
+{
+  "objective": "Compute the total available_today_quantity of a specific product across all stores in Graz, including stores with zero availability.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "product_sku": "lookup from product_variants via product_family where brand='Heco', series='Heco Zinc Plated', model='HECO 3DW-64B', product_family_name='Nut Bolt and Washer', and property key='fastener type' value='threaded rod'",
+    "stores": "all stores where city='Graz'"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "ge",
+        "lhs": "$count",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$product_record_path",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$store_record_paths",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$store_record_paths.length",
+        "rhs": "$num_stores_in_graz",
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "count: {count}"
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_variant.record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$store_record_paths"
+      }
+    ]
+  }
+}

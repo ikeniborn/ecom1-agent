@@ -1,0 +1,71 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/current-updates/catalogue-counting-2021-08-09-lawn-mowers-fam-garden-tools-lawn-mowers-0015-3kzwpfd3.md"
+      },
+      "bind": "policy_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT COUNT(*) AS cnt FROM product_variants WHERE product_kind_id = 'lawn_mowers' AND product_family_id != 'fam_garden_tools_lawn_mowers_0015_3kzwpfd3';"
+      },
+      "bind": "sql_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_raw",
+      "format": "auto_delim",
+      "into": "sql_rows",
+      "columns": [
+        {
+          "into": "cnt",
+          "candidates": [
+            "cnt",
+            "COUNT(*)"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "column",
+      "args": [
+        "$sql_rows",
+        "cnt"
+      ],
+      "into": "cnt_str"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$cnt_str"
+      ],
+      "into": "count"
+    }
+  ],
+  "decision": {
+    "branches": [],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "<COUNT:{count}>",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/current-updates/catalogue-counting-2021-08-09-lawn-mowers-fam-garden-tools-lawn-mowers-0015-3kzwpfd3.md",
+          "source": null
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

@@ -1,0 +1,91 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT record_path FROM payment_transactions WHERE is_archived_basket_reference = 1 AND payment_status = 'fraud';"
+      },
+      "bind": "raw_payments"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_payments",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$rows"
+      ],
+      "into": "count"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$rows",
+        "record_path"
+      ],
+      "into": "record_paths_list"
+    },
+    {
+      "prim": "concat",
+      "args": [
+        "$record_paths_list",
+        ", "
+      ],
+      "into": "record_paths"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$_facts.identity.kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "deny"
+      }
+    ],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "deny": {
+      "message": "Access denied: guest users are not permitted to view payment transactions. See /docs/security.md.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        "$security_doc"
+      ]
+    },
+    "ok": {
+      "message": "Found {count} fraudulent payment record(s): {record_paths}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        "$rows.0.record_path"
+      ]
+    }
+  },
+  "custom_extract": []
+}

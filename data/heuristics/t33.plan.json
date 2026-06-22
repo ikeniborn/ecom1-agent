@@ -1,0 +1,141 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT pv.product_sku, pv.record_path, (SELECT COALESCE(SUM(si.available_today_quantity), 0) FROM store_inventory si WHERE si.product_sku = pv.product_sku AND si.store_id IN (SELECT store_id FROM stores WHERE city = 'Vienna')) AS total_available FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id WHERE pf.brand = 'Black+Decker' AND pf.product_family_name = 'Black+Decker Home GTC 3PT-1Y9 Cordless Drill Driver' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'voltage' AND pvp.property_value_text = '20 V') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'battery platform' AND pvp.property_value_text = '20v-system') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'kit contents' AND pvp.property_value_text = 'starter kit');"
+      },
+      "bind": "product_inventory_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT store_id, record_path FROM stores WHERE city = 'Vienna';"
+      },
+      "bind": "stores_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "product_inventory_raw",
+      "format": "auto_delim",
+      "into": "product_inventory_rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "total_available",
+          "candidates": [
+            "total_available"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "stores_raw",
+      "format": "auto_delim",
+      "into": "stores_rows",
+      "columns": [
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$product_inventory_rows"
+      ],
+      "into": "product_count"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$product_inventory_rows"
+      ],
+      "into": "product"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product",
+        "total_available"
+      ],
+      "into": "count"
+    },
+    {
+      "prim": "count",
+      "args": [
+        "$stores_rows"
+      ],
+      "into": "stores_count"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "or",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "eq",
+              "lhs": "$product_count",
+              "rhs": 0,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$stores_count",
+              "rhs": 0,
+              "args": []
+            }
+          ]
+        },
+        "label": "unsupported"
+      }
+    ],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "unsupported": {
+      "message": "Unable to determine total available quantity: product or stores not found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "ok": {
+      "message": "Count: {count}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        "$product.record_path",
+        "$stores"
+      ]
+    }
+  },
+  "custom_extract": []
+}

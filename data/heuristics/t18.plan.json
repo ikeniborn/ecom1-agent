@@ -1,0 +1,81 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH vienna_stores AS (\n  SELECT store_id, record_path\n  FROM stores\n  WHERE LOWER(TRIM(city)) = 'vienna'\n)\nSELECT\n  vs.store_id,\n  vs.record_path,\n  COALESCE(si.available_today_quantity, 0) AS available_today_quantity\nFROM vienna_stores vs\nLEFT JOIN store_inventory si ON si.store_id = vs.store_id AND si.product_sku = 'G-MP-IC5-GU6-BV'\nORDER BY vs.store_id;"
+      },
+      "bind": "inventory_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "inventory_raw",
+      "format": "auto_delim",
+      "into": "inventory_rows",
+      "columns": [
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "available_today_quantity",
+          "candidates": [
+            "available_today_quantity"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "sum_col",
+      "args": [
+        "$inventory_rows",
+        "available_today_quantity"
+      ],
+      "into": "total_available"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$inventory_rows",
+        "record_path"
+      ],
+      "into": "store_record_paths"
+    }
+  ],
+  "decision": {
+    "branches": [],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "count: {total_available}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store_record_paths"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

@@ -1,6 +1,302 @@
+entries:
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: Superseded by new rule that addresses the root cause of the
+    mismatch.
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: The product was not found in the catalogue.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When constructing a query to match entities by multiple attributes, first
+    verify the exact attribute keys and value formats in the database to avoid mismatches.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: The SQL query assumed exact property keys 'Wattage' and 'Luminous Flux'
+    and exact value strings '15 W' and '806 lm', but the database may store them differently
+    (e.g., 'Wattage (W)', '15W', 'Luminous Flux (lm)', '806lm'). The query returned
+    0 rows, leading to OUTCOME_NONE_UNSUPPORTED. The plan should first explore the
+    product_variant_properties table to discover the actual keys and value formats
+    for the given property names, then use those in the matching query.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the plan's required refs specify a source path like '$row.record_path',
+    the answer ref must use that exact source path. If the rowset is bound to a plural
+    name, set a variable named 'row' to the first row via a compute step, then reference
+    '$row.record_path' in the answer ref.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'The error ''interpret: unresolved required ref(s) ["$row.record_path"]
+    on OK answer'' indicates the answer ref source ''$record_path'' does not match
+    the required ref source ''$row.record_path'' from the plan. The script computed
+    a variable ''$record_path'' from the first row, but the plan expects a ref sourced
+    from ''$row.record_path''. The fix is to bind the first row to a variable named
+    ''row'' and use ''$row.record_path'' as the answer ref source, or directly set
+    ''$row.record_path'' as the source.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: The specified product is not found in the catalogue.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When discovering property keys for filtering, avoid using LIKE patterns
+    on property values to infer keys; instead, first retrieve all properties for a
+    known entity of the same type and brand to see the exact key names and value formats,
+    then use those exact keys and values in the main query.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED. Root
+    cause: The discovery step used LIKE patterns on property_value_text to find wattage
+    and luminous flux keys, but the actual key names or value formats for the target
+    product likely differed (e.g., numeric value without unit, or key not containing
+    ''watt''). This caused the EXISTS subqueries to fail, returning zero rows. Failing
+    PlanIR fragment: the discovery step with ''WHERE (property_value_text LIKE ''%6%W%''
+    OR property_value_number = 6) AND (property_key LIKE ''%watt%'' OR property_key
+    LIKE ''%power%'')''. The new rule ensures future plans first inspect all properties
+    of a similar product to get exact keys and value representations, avoiding mismatches.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: Dewalt DCF887 impact driver not found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always ensure that decision branch conditions accessing row attributes
+    (e.g., $row.brand) are guarded by a prior check that the rowset is nonempty and
+    the row variable is defined, to prevent evaluation errors that lead to unintended
+    outcomes.
+  created: '2026-06-22'
+  deactivated_reason: r004 warned about guarding but did not specify safe evaluation
+    order; new rule provides a concrete safe pattern using nested branches.
+  id: r004
+  reasoning: 'The error ''grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION''
+    indicates the interpreter produced an outcome not defined in the script. The script''s
+    decision branch condition uses an ''and'' with nonempty($rows) and eq($row.brand,
+    ''Dewalt'') and eq($row.model, ''DCF887''). If $rows is empty, $row (computed
+    as first($rows)) is undefined, causing the eq checks to fail with an evaluation
+    error. The interpreter likely defaults to a clarification outcome when condition
+    evaluation fails, bypassing the script''s default ''unsupported'' branch. The
+    root cause is that the condition accesses $row attributes without ensuring $row
+    is defined in all evaluation paths. The PlanIR should be restructured to avoid
+    evaluating attribute conditions on a potentially undefined row.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using concat to build a message string, always ensure every argument
+    is a string. If a column is numeric (e.g., price_cents), cast it to text in the
+    SQL query (CAST(price_cents AS TEXT) or price_cents::text) so the rowset column
+    is already a string.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: ''real_vm: bad argument type for built-in operation''. Root cause:
+    the concat compute step received a non-string argument ($row.price_cents, an integer)
+    causing a type error. Failing PlanIR fragment: compute step {"prim":"concat","args":["Brand:
+    ","$row.brand",", Series: ","$row.series",", Model: ","$row.model",", Price: ","$row.price_cents","
+    ","$row.price_currency"],"into":"product_details"}. The rule ensures all concat
+    arguments are strings by casting numeric columns in SQL.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: No Milwaukee FID3 bare tool or big pack kit products found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always use nested decision branches when checking rowset nonempty and then
+    a specific row attribute, instead of combining them in a single 'and' condition,
+    to prevent evaluation errors on empty rowsets.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION.
+    Root cause: The decision branch condition used ''and'' with two nonempty checks:
+    first on $rows, second on $rows.0.product_sku. When $rows was empty, the interpreter
+    likely evaluated the second check anyway, causing an error that defaulted to OUTCOME_NONE_CLARIFICATION
+    instead of the intended OUTCOME_NONE_UNSUPPORTED. Failing PlanIR fragment: decision.branches[0].when.
+    Rule linkage: r004 warns about guarding but does not enforce safe evaluation order;
+    the attempted guard failed due to non-short-circuit evaluation.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'query' field for SQL discovery steps in PlanIR, not 'stdin'.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'The PlanIR validation error: ''Extra inputs are not permitted'' for
+    ''discovery.0.stdin'' indicates that the discovery step incorrectly used ''stdin''
+    to hold a SQL query. The correct field for SQL queries in PlanIR discovery steps
+    is ''query''. The failing PlanIR fragment is the discovery step with stdin containing
+    the SQL.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: No product variant found matching the criteria.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
   cycles_used: 1
-  date: '2026-06-21'
+  date: '2026-06-22'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t03

@@ -1,0 +1,128 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/checkout.md"
+      },
+      "bind": "checkout_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH newest_basket AS (\n  SELECT basket_id, record_path, store_id\n  FROM shopping_baskets\n  WHERE customer_id = '{$_facts.identity.customer_id}' AND basket_status = 'open'\n  ORDER BY basket_created_at DESC\n  LIMIT 1\n),\nbasket_lines AS (\n  SELECT sbi.product_sku, sbi.requested_quantity\n  FROM shopping_basket_items sbi\n  JOIN newest_basket nb ON sbi.basket_id = nb.basket_id\n),\ninventory_check AS (\n  SELECT bl.product_sku, bl.requested_quantity, si.available_today_quantity\n  FROM basket_lines bl\n  JOIN store_inventory si ON si.store_id = (SELECT store_id FROM newest_basket) AND si.product_sku = bl.product_sku\n),\nready_flag AS (\n  SELECT CASE WHEN COUNT(*) = 0 THEN 1 ELSE 0 END AS ready\n  FROM inventory_check\n  WHERE requested_quantity > available_today_quantity\n)\nSELECT nb.basket_id, nb.record_path, rf.ready\nFROM newest_basket nb, ready_flag rf;"
+      },
+      "bind": "basket_query_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "basket_query_result",
+      "format": "auto_delim",
+      "into": "basket_rows",
+      "columns": [
+        {
+          "into": "basket_id",
+          "candidates": [
+            "basket_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "ready",
+          "candidates": [
+            "ready"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$basket_rows"
+      ],
+      "into": "basket_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_row",
+        "basket_id"
+      ],
+      "into": "basket_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_row",
+        "record_path"
+      ],
+      "into": "basket_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_row",
+        "ready"
+      ],
+      "into": "ready"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$_facts.identity.kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "unsupported"
+      },
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$ready",
+          "rhs": 1,
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
+    "default_label": "unsupported"
+  },
+  "ops": [],
+  "answer": {
+    "unsupported": {
+      "message": "Checkout is not supported for guest accounts.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/checkout.md",
+          "source": "$checkout_policy"
+        }
+      ]
+    },
+    "ok": {
+      "message": "Checkout successful for basket {basket_id}.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$basket_record_path"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

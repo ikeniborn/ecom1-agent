@@ -1,0 +1,482 @@
+entries:
+- agents_md_anchor: null
+  content: Do not use dotted paths as the source for required refs; use a variable
+    that directly holds the record_path, such as one bound by a 'get' primitive.
+  created: '2026-06-21'
+  deactivated_reason: The rule forbidding dotted paths as source for required refs
+    conflicts with TOOL_PLAN required_refs that use dotted paths; the new rule requires
+    exact conformance to the required_refs source.
+  id: r001
+  reasoning: The interpret error 'unresolved required ref(s) ['$product.record_path']'
+    occurred because the answer ref used a dotted path '$product.record_path' while
+    the compute step had already extracted the record_path into a variable '$product_record_path'.
+    The interpreter could not resolve the dotted path as a ref source. The fix is
+    to use the variable '$product_record_path' as the ref source.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using filter_rows, provide exactly two arguments: the rows variable
+    and a predicate function (e.g., lambda row: row[''column''] == value). Do not
+    pass column name and value as separate arguments.'
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'The interpret phase failed with: ''filter_rows() takes 2 positional
+    arguments but 3 were given''. The PlanIR compute step used filter_rows with three
+    arguments: [''$combined_rows'', ''row_type'', ''store'']. The contract states
+    filter_rows(rows, pred) expects a list of rows and a predicate. The error indicates
+    the PlanIR incorrectly split the condition into column name and value. The fix
+    is to use a predicate function as the second argument.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using the ''get'' primitive, always provide exactly two arguments:
+    the object and the key string. Do not pass a dotted path as a single argument.'
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: 'The error ''get() missing 1 required positional argument: ''key''''
+    occurred because the PlanIR compute step used ''get'' with a single argument ''$product.record_path''.
+    The ''get'' primitive expects two arguments: the object and the key. The correct
+    usage is ''get'' with args [''$product'', ''record_path'']. Additionally, the
+    step ''get'' with args [''$stores''] is also incorrect; it should use ''column''
+    or direct rowset binding, but the primary failure is the missing key argument.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When an Exec RPC uses bind 'rows', the result is an ExecResponse object;
+    use a custom_extract step to extract the 'rows' field before using it in compute
+    steps.
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable. The compute step
+    ''first'' tried to index into $rows, which was the raw ExecResponse from the discovery
+    RPC (bind ''rows''). The PlanIR must first extract the actual rows list from the
+    ExecResponse (e.g., via custom_extract with path ''rows'') before passing to compute
+    primitives. The failing fragment: {"prim":"first","args":["$rows"],"into":"product"}.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using Exec RPC with bind, the result is an ExecResponse object; to
+    parse its stdout into rows, first use a custom_extract step to extract the stdout
+    string, then use rowsets on that string.
+  created: '2026-06-21'
+  deactivated_reason: Superseded by a more direct 'Never' rule that combines the stdout
+    extraction requirement and adds a guard for empty rowsets.
+  id: r005
+  reasoning: 'Error: interpret: compute step ''filter_rows'' failed: ''str'' object
+    has no attribute ''op'' CONTRACT: filter_rows(rows, pred): first arg must be list[dict]
+    rows. The PlanIR used Exec with bind ''combined_raw'', then rowsets with from_
+    ''combined_raw'' directly. The Exec RPC returned an ExecResponse object, not a
+    raw string, so rowsets could not parse it, leaving ''combined_rows'' as a string.
+    The filter_rows step then received a string instead of a list of dicts. Root cause:
+    missing extraction of stdout from ExecResponse before rowsets. Failing fragment:
+    rowsets step using from_ ''combined_raw'' without prior custom_extract.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the TOOL_PLAN's required_refs specify a source, the answer refs must
+    use that exact source string, and the script must ensure a variable with that
+    exact name exists (e.g., by using a 'get' primitive that extracts the record_path
+    into a variable with the dotted name, such as 'product.record_path').
+  created: '2026-06-21'
+  deactivated_reason: r006's example used 'product.record_path' without the required
+    $ prefix, causing the exact-name requirement to be misinterpreted. This new rule
+    supersedes it with explicit handling of $ and rowset expressions.
+  id: r006
+  reasoning: The error 'unresolved required ref(s) ["$product.record_path"]' indicates
+    the interpreter tried to resolve the required ref source from TOOL_PLAN (which
+    is "$product.record_path") but found no such variable. The script used "$product_record_path"
+    instead, violating the required ref's source. The existing rule forbids dotted
+    paths as source for required refs, but the TOOL_PLAN's required_refs themselves
+    use a dotted path, so the script must conform to that exact source.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When using Exec RPC with bind, place the custom_extract step to extract
+    stdout immediately after the discovery step, before any rowsets step that references
+    the extracted variable.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by a more direct 'Never' rule that combines the stdout
+    extraction requirement and adds a guard for empty rowsets.
+  id: r007
+  reasoning: The script placed the custom_extract step at the end, after the answer
+    block. The rowsets step referenced '$combined_stdout' before it was created, causing
+    the interpreter to fail with 'custom_extract 'extract_stdout' failed'. The existing
+    rule r005 already says 'first use a custom_extract step to extract the stdout
+    string, then use rowsets on that string', but the script violated it. This new
+    rule makes the ordering explicit to prevent future misplacement.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: 'Unable to compute total: product or stores not found.'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Never use rowsets directly on an Exec RPC bind variable; always extract
+    stdout via custom_extract first. When extracting a value from a potentially empty
+    rowset, always check nonempty before using 'get'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: The script used rowsets on $product_query.stdout, but product_query is
+    an Exec RPC with bind, so its result is an ExecResponse object, not a string.
+    This caused rowsets to fail, leading to empty or invalid product_rows. The subsequent
+    'get' on $product_rows.0 then failed, and the interpreter produced OUTCOME_NONE_CLARIFICATION
+    instead of a defined outcome. Additionally, even with correct stdout extraction,
+    the script's compute step assumes product_rows is nonempty; if the product is
+    not found, the 'get' would still fail before the decision branches can check emptiness.
+    The existing rules r005 and r007 describe the custom_extract requirement but were
+    not followed; a stronger 'Never' rule is needed, and the empty-rowset guard is
+    added.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always use the exact required ref source string (including leading $ and
+    any brackets) as the variable name when setting it via compute. For a scalar ref
+    like $product.record_path, set into: ''$product.record_path''. For a rowset expression
+    like $vienna_stores[*].record_path, use a get primitive to extract the column
+    list into a variable with that exact name.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: 'Interpret error: unresolved required ref(s) [''$product.record_path'',
+    ''$vienna_stores[*].record_path'']. The script set variable ''product.record_path''
+    (missing $) and did not create a variable for ''$vienna_stores[*].record_path''.
+    Required refs must be matched by variables with the exact source string, including
+    $ and brackets. r006''s example omitted the $, leading to this mismatch. The new
+    rule corrects this by enforcing exact string matching and specifying the get primitive
+    for rowset expressions.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that required refs are set to a non-null value before the
+    answer step, even if the source rowset is empty. For scalar refs like $product.record_path,
+    use coalesce(get(first($rows), 'record_path'), '') to set the variable. For rowset
+    refs like $vienna_stores[*].record_path, if the rowset is empty, set the variable
+    to an empty list using a literal array; otherwise use column.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: The error 'unresolved required ref(s) ["$product.record_path", "$vienna_stores[*].record_path"]'
+    occurred because the compute steps that set these variables did not produce a
+    value when the source rowsets were empty. The product query returned no rows,
+    so 'first' returned null, and 'get' on null did not set $product.record_path.
+    Similarly, the Vienna stores query may have returned no rows, and 'column' on
+    an empty rowset may not have set the variable. The plan must guarantee these refs
+    are always defined for the OK outcome.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using the filter_rows primitive, always pass exactly two arguments:
+    the rows variable and a predicate object (e.g., {"op": "eq", "lhs": "row_type",
+    "rhs": "product"}) rather than expanding the predicate into multiple positional
+    arguments.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r011
+  reasoning: 'Error: ''interpret: compute step ''filter_rows'' failed: _filter_rows()
+    takes 2 positional arguments but 4 were given''. The failing PlanIR fragment:
+    compute step ''filter_rows'' with args ["$combined","eq","row_type","product"].
+    The contract states filter_rows(rows, pred) expects a single predicate argument,
+    not a function name plus its arguments. The root cause is incorrect argument packing
+    for the filter_rows primitive. This rule instructs the PLAN phase to always pack
+    the predicate as a single object argument.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include all required refs from the TOOL_PLAN in the answer's refs
+    array, using the exact source strings specified in the required_refs section.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r012
+  reasoning: The interpret phase failed with 'unresolved required ref(s) ["$product.record_path",
+    "$vienna_stores[*].record_path"] on OK answer'. The PlanIR script correctly computed
+    variables with those names, but the answer section had an empty refs array ("refs":[]).
+    The required refs must be explicitly listed in the answer's refs field to satisfy
+    the required_refs constraint. The root cause is a missing answer refs declaration.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When extracting a required ref from a rowset, always handle the case where
+    the rowset is empty. For scalar refs like $product.record_path, use coalesce(get(first($rows),
+    ''column''), '''') to ensure the variable is set to an empty string rather than
+    null. For rowset refs like $vienna_stores[*].record_path, use a conditional: if
+    the rowset is empty, set the variable to an empty list using a literal array;
+    otherwise use column.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r013
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$product.record_path'',
+    ''$vienna_stores[*].record_path''] on OK answer. Root cause: the compute steps
+    set these refs using ''get'' and ''column'' without handling empty rowsets. When
+    product_rows or vienna_rows were empty, the variables were set to null (or not
+    set), causing the interpreter to treat them as unresolved. The failing PlanIR
+    fragment: compute steps {"prim":"get","args":["$product","record_path"],"into":"$product.record_path"}
+    and {"prim":"column","args":["$vienna_rows","record_path"],"into":"$vienna_stores[*].record_path"}.
+    The new rule mandates coalesce and conditional logic to guarantee non-null values,
+    preventing unresolved refs.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that required refs of kind 'record_path' are set to a non-empty
+    string; if the source rowset is empty, do not set the variable to empty string
+    (which is invalid) — instead, branch to a different outcome or guarantee the record
+    is found. For rowset refs, if the source rowset is empty, set the variable to
+    an empty list using a literal array; otherwise use column.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r014
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$product.record_path'',
+    ''$vienna_stores[*].record_path''] on OK answer. Root cause: The script set $product.record_path
+    to an empty string (from empty product rowset) which is not a valid record_path,
+    and set $vienna_stores[*].record_path via column on an empty rowset, likely resulting
+    in null. The existing in-session rule suggested using coalesce to empty string,
+    which is invalid for record_path refs. The new rule mandates non-empty strings
+    for scalar record_path refs and empty list for rowset refs when source is empty.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Unable to compute total: required data missing.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When constructing decision branches, never nest a logical operator inside
+    a 'not' op; instead, use a single top-level op (e.g., 'and', 'or', 'nonempty')
+    and place the desired outcome in the default branch or use a direct op that matches
+    the condition.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r015
+  reasoning: 'The interpreter failed to evaluate the decision condition ''not'' with
+    nested ''and'', resulting in OUTCOME_NONE_CLARIFICATION instead of the expected
+    branch. The PlanIR used ''op'': ''not'' with args containing an ''and'' op, which
+    is unsupported. The rule ensures decision conditions are simple and directly evaluable.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Product not found or no stores in Graz.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always use case-insensitive and whitespace-trimmed comparisons in SQL discovery
+    steps when matching text values, to avoid false negatives.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r016
+  reasoning: The plan produced OUTCOME_NONE_UNSUPPORTED because the product lookup
+    SQL returned zero rows, likely due to a case mismatch in the EXISTS subquery (e.g.,
+    'gray' vs 'Gray'). The decision branch correctly triggered unsupported when product_count=0,
+    but the grader expected OK, indicating the product exists. The root cause is a
+    fragile text comparison in the discovery SQL. The rule enforces robust matching
+    (LOWER/TRIM) in all future plans.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always provide two arguments to the sum_col primitive: the rows reference
+    (e.g., ''$inventory_rows'') and the column name string (e.g., ''available_today_quantity'').
+    Do not pass a single column reference.'
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r017
+  reasoning: 'Error: ''interpret: compute step ''sum_col'' failed: _sum_col() missing
+    1 required positional argument: ''col''''. The PlanIR compute step for sum_col
+    had args: [''$inventory_rows.available_today_quantity''], which is a single column
+    reference. The contract requires two arguments: rows (list of dicts) and col (string).
+    The correct args should be [''$inventory_rows'', ''available_today_quantity''].
+    This rule ensures the primitive is called with the proper number and type of arguments.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When using LIKE to match a text column in a discovery SQL step, always
+    apply LOWER(TRIM(...)) to both the column and the pattern to ensure case-insensitive
+    and whitespace-trimmed matching.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r018
+  reasoning: The error 'unresolved required ref(s) ['$product_record_path']' occurred
+    because the product discovery SQL returned no rows, causing product_record_path
+    to be set to an empty string. The SQL used LIKE '%Valve and Connector%' without
+    LOWER/TRIM on the product_name column, which likely caused a case/whitespace mismatch.
+    The PlanIR did not handle the empty rowset case, but the root cause is the SQL
+    not matching the product. The new rule ensures robust text matching in discovery
+    steps.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-22'
+  outcome: OUTCOME_OK
+  status: success
+prephase_deep_read:
+- product_variant_properties
+task_id: t18

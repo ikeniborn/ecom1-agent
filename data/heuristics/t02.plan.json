@@ -4,17 +4,16 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": "{\"query\": \"SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand = :brand AND pk.product_kind_name = :product_kind_name AND pf.product_family_name = :product_family_name AND pvp.property_key = :property_key AND pvp.property_value_text = :property_value LIMIT 1\", \"params\": {\"brand\": \"Fiskars\", \"product_kind_name\": \"Chainsaw\", \"product_family_name\": \"Fiskars Battery X 1CD-A3X Chainsaw\", \"property_key\": \"power source\", \"property_value\": \"petrol\"}}"
+        "stdin": "SELECT pv.product_sku, pv.record_path, pv.product_name FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id JOIN product_variant_properties vp ON pv.product_sku = vp.product_sku WHERE pf.product_family_name = (SELECT product_family_name FROM product_families WHERE product_family_name LIKE '%Helios Professional Helios 29A-FTE Metal and Concrete Paint%') AND pv.brand = 'Helios' AND pk.product_kind_name = 'metal paint' AND vp.property_key = 'color_family' AND vp.property_value_text = 'White';"
       },
-      "bind": "matching_rows_raw"
+      "bind": "product_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "matching_rows_raw",
+      "from_": "product_raw",
       "format": "auto_delim",
-      "into": "matching_rows",
+      "into": "product_rows",
       "columns": [
         {
           "into": "product_sku",
@@ -27,25 +26,23 @@
           "candidates": [
             "record_path"
           ]
+        },
+        {
+          "into": "product_name",
+          "candidates": [
+            "product_name"
+          ]
         }
       ]
     }
   ],
-  "compute": [
-    {
-      "prim": "first",
-      "args": [
-        "$matching_rows"
-      ],
-      "into": "matching_product"
-    }
-  ],
+  "compute": [],
   "decision": {
     "branches": [
       {
         "when": {
           "op": "nonempty",
-          "lhs": "$matching_product",
+          "lhs": "$product_rows",
           "rhs": null,
           "args": []
         },
@@ -57,18 +54,18 @@
   "ops": [],
   "answer": {
     "found": {
-      "message": "Product found in catalogue.",
+      "message": "Product found: {product_rows.0.product_name} (SKU: {product_rows.0.product_sku})",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
           "path": null,
-          "source": "$matching_product.record_path"
+          "source": "$product_rows.0.record_path"
         }
       ]
     },
     "not_found": {
-      "message": "Product not found in catalogue.",
+      "message": "Product not found: Metal and Concrete Paint (SKU: N/A)",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

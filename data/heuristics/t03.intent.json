@@ -1,12 +1,11 @@
 {
-  "objective": "Determine whether a product variant matching the specified brand, kind, family, and property values exists in the catalogue.",
+  "objective": "Determine whether the product catalog contains a Karcher product from the 'Karcher Professional FC 33Z-7OP Trimmer and Blower' line with tool type 'pressure sprayer'.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "brand": "Osram",
-    "product_kind_name": "LED Bulb",
-    "product_family_name": "Osram Eco Classic 3PW-R88 LED Bulb",
-    "property_wattage": "15 W",
-    "property_luminous_flux": "806 lm"
+    "brand": "Karcher",
+    "line": "Karcher Professional FC 33Z-7OP Trimmer and Blower",
+    "tool_type": "pressure sprayer",
+    "lookup_method": "Search product_variants joined with product_variant_properties for a product where brand = $brand, (series = $line OR product_family_name = $line), and there exists a property with key 'tool type' and value $tool_type."
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -16,22 +15,22 @@
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "gt",
-        "lhs": "$matching_count",
-        "rhs": 0,
+        "op": "nonempty",
+        "lhs": "$rows.0.product_sku",
+        "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "The product {status} found in the catalogue."
+    "msg_skeleton": "The product {product_name} (SKU: {product_sku}) is in the catalogue."
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$matching_product.record_path"
+        "source": "$row.record_path"
       }
     ]
   }

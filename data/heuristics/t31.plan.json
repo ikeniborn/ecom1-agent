@@ -1,0 +1,63 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "id_raw"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "policy_doc"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "id_raw",
+      "format": "json",
+      "into": "id_parsed",
+      "columns": [
+        {
+          "into": "kind",
+          "candidates": [
+            "kind"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$id_parsed.0.kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "deny"
+      }
+    ],
+    "default_label": "deny"
+  },
+  "ops": [],
+  "answer": {
+    "deny": {
+      "message": "Action denied: guest users are not permitted to perform payment operations.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": "$policy_doc"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

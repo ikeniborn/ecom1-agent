@@ -1,0 +1,513 @@
+entries:
+- agents_md_anchor: null
+  content: Always extract stdout from ExecResponse and parse it into a rowset before
+    using list primitives like first.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable. Root cause: compute
+    step ''first'' received $price_result, which is the raw ExecResponse from the
+    SQL Exec RPC, not a list of rows. The PlanIR must first extract the stdout (e.g.,
+    $price_result.stdout) and parse it (e.g., json_parse) into a rowset before applying
+    list primitives. Failing PlanIR fragment: {"prim":"first","args":["$price_result"],"into":"price_row"}.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always call filter_rows with exactly two arguments: the rowset (list of
+    dicts) and a predicate dict. The predicate must be a single expression (e.g.,
+    {"op":"in","lhs":"$row.product_sku","rhs":"$sku_list"}), not a column name and
+    a list passed as separate arguments.'
+  created: '2026-06-22'
+  deactivated_reason: r002 incorrectly advises using a predicate dict, which causes
+    'dict' object has no attribute 'op' error; the interpreter requires an expression
+    object with .op attribute.
+  id: r002
+  reasoning: 'interpret: compute step ''filter_rows'' failed: _filter_rows() takes
+    2 positional arguments but 3 were given. CONTRACT: filter_rows(rows, pred): first
+    arg must be list[dict] rows. The failing PlanIR fragment: {"prim":"filter_rows","args":["$all_products","product_sku","$sku_list"],"into":"matching_products"}.
+    The primitive was incorrectly invoked with three arguments (rowset, column name,
+    list) instead of two (rowset, predicate).'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not nest 'args' inside the Exec args object; provide path, args (list),
+    and stdin (string) as direct keys.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: 'Error: ''interpret: sql returned usage banner — SQL not delivered via
+    stdin''. Root cause: The Exec RPC step in PlanIR had a nested ''args'' key inside
+    the args object, causing the interpreter to ignore the ''stdin'' field. The SQL
+    query was not passed to the tool. Failing fragment: {"rpc":"Exec","args":{"path":"/bin/sql","stdin":"$sql_query","args":[...]}}.
+    The correct structure is flat: {"rpc":"Exec","args":{"path":"/bin/sql","args":[...],"stdin":"$sql_query"}}.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using Exec to run a SQL query that references external data, embed
+    the data directly into the stdin SQL script (e.g., via string concatenation in
+    a prior compute step) rather than passing it as a command-line argument, because
+    the SQL interpreter does not bind command-line arguments to query parameters.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'Error: ''real_vm: bad argument type for built-in operation''. Root cause:
+    The PlanIR passed the receipt text as a command-line argument to /bin/sql (args:
+    [''$receipt_text'']), while the SQL script on stdin used a named parameter '':receipt_text''
+    that the SQLite CLI cannot resolve from command-line arguments. The SQL query
+    likely failed, producing non-tabular output, causing the rowset parser to return
+    a non-list value, which then caused the ''first'' primitive to fail with a bad
+    argument type. Failing PlanIR fragment: Exec RPC with args: [''$receipt_text'']
+    and stdin containing '':receipt_text'' placeholder. The rule ensures data is embedded
+    in stdin to avoid parameter binding failures.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Do not use the 'concat' primitive to build SQL strings; it expects two
+    rowset arguments. Use a string concatenation primitive (e.g., 'str_concat') that
+    takes multiple string arguments and returns a single string.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() takes 2
+    positional arguments but 3 were given. CONTRACT: concat(a, b): both args must
+    be list[dict] rows (parse Exec output via rowsets first). The failing PlanIR compute
+    step: {"prim":"concat","args":[".headers off\nSELECT CASE WHEN ","$difference_eur","
+    <= 3.0 THEN ''True'' ELSE ''False'' END;"],"into":"within_3_sql"}. The ''concat''
+    primitive is designed to concatenate two rowsets (list[dict]), not strings. The
+    step attempted to concatenate three string fragments to form a SQL query, which
+    violates the primitive''s contract. The correct approach is to use a string concatenation
+    primitive (e.g., ''str_concat'') that accepts multiple string arguments and produces
+    a single string, then pass that string as stdin to Exec.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'expr' primitive to construct the predicate for filter_rows,
+    rather than passing a plain dict.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'The error ''interpret: compute step ''filter_rows'' failed: ''dict''
+    object has no attribute ''op'''' occurred because the PlanIR passed a plain dict
+    {"op":"in_set","lhs":"$row.product_sku","rhs":"$sku_list"} as the predicate. The
+    interpreter expects the predicate to be an expression object with an .op attribute,
+    not a dict. The existing rule r002 incorrectly advises using a predicate dict,
+    which is incompatible with the interpreter''s implementation. Deactivating r002
+    and providing a rule to use the ''expr'' primitive to create the required expression
+    object.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use the 'custom_extract' primitive; it is not supported. Instead,
+    use standard primitives like 'regex' and 'split' to parse unstructured text into
+    rowsets, then use 'column' to project fields.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: 'Error: ''interpret: compute step ''custom_extract'' failed: ''custom_extract''''.
+    The PlanIR attempted to use a custom_extract named ''fuzzy_sku_receipt'' to parse
+    the receipt text, but the interpreter does not recognize this primitive. Root
+    cause: reliance on an undefined custom extraction function. Failing PlanIR fragment:
+    compute step with prim ''custom_extract''. Rule instructs to avoid custom_extract
+    and instead compose parsing from available primitives.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that the first argument to filter_rows is a list of dicts;
+    if the source binding (e.g., from an Exec RPC) might be a single dict, wrap it
+    in a list using the 'list' primitive before passing to filter_rows.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: 'Error: ''interpret: compute step ''filter_rows'' failed: ''filter_rows''
+    expects list[dict]; use ''get'' for a single row''. Root cause: The binding $all_variants
+    from the Exec RPC is a single dict (likely because the query returned a single
+    row or the Exec output is a single row object), not a list of dicts. Failing PlanIR
+    fragment: compute step {"prim":"filter_rows","args":["$all_variants",{"op":"in","lhs":"$row.product_sku","rhs":"$old_skus"}],"into":"current_items"}.
+    Rule linkage: This new rule ensures the rowset is a list before filter_rows is
+    called, preventing the type mismatch.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always wrap the result of any Exec RPC that runs a SQL query in a list
+    using the 'list' primitive before using it as a rowset, because SQL queries may
+    return a single row as a dict.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: 'Error: interpret: compute step ''filter_rows'' failed: ''filter_rows''
+    expects list[dict]; use ''get'' for a single row. Root cause: The Exec RPC binding
+    $all_products (from ''SELECT product_sku, price_cents FROM product_variants;'')
+    returned a single dict instead of a list of dicts, so filter_rows received a non-list
+    first argument. The existing [in-session] rule ''Always ensure that the first
+    argument to filter_rows is a list of dicts; if the source binding might be a single
+    dict, wrap it in a list using the ''list'' primitive'' was not applied. This new
+    rule makes the wrapping unconditional for all Exec SQL results to prevent recurrence.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/uploads/receipt_ocr_hCw22WF3.txt'
+  source: verdict
+  status: inactive
+  submitted_message: The total price difference is 0 EUR, which is within the 3 EUR
+    threshold.
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include the path of any file read during discovery as a reference
+    in the answer block.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: The plan read the receipt file from '/uploads/receipt_ocr_hCw22WF3.txt'
+    but the answer block contained no references. The grader flagged this as a missing
+    required reference. The rule ensures that any file path used in a Read RPC is
+    explicitly listed in the answer's refs, preventing similar omissions.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always use the ''get'' primitive with exactly two arguments: the object
+    and the key (as a string or integer index). Never pass a dotted path as a single
+    argument.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r011
+  reasoning: 'The compute step ''get'' failed with: <lambda>() missing 1 required
+    positional argument: ''key''. The PlanIR used ''get'' with a single argument ''$receipt_data.total_excl_vat_cents'',
+    but the contract requires get(obj, key). The correct call should be get($receipt_data,
+    ''total_excl_vat_cents''). This rule prevents future misuse of the ''get'' primitive.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a plan uses a file discovered by Find as input to an Exec RPC that
+    imports it into SQL, always include a prior Read RPC step to inspect the file's
+    content and determine its column layout, so the SQL query can be constructed to
+    match the actual format.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r012
+  reasoning: 'verify: success_criteria[OUTCOME_OK][0] failed: {''op'': ''nonempty'',
+    ''lhs'': ''$difference_cents'', ''rhs'': None, ''args'': []}. The plan produced
+    OUTCOME_NONE_CLARIFICATION because $difference_cents was empty, causing the decision
+    condition to fail. Root cause: the Exec RPC imported the receipt file with hardcoded
+    column assumptions (c1, c2, c3) without first inspecting the file''s actual structure.
+    The SQL import likely failed or returned no rows, leaving all computed refs empty.
+    Failing PlanIR fragment: the Exec RPC that directly runs .import --csv --skip
+    1 ''$receipt_candidates.0.path'' receipt without a prior Read to verify the format.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always verify that a file path obtained from a Find RPC points to a file
+    (not a directory) before using it in a Read RPC, by checking the item's 'kind'
+    field or using a filter step, because Find may return directories with matching
+    names.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r013
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. The PlanIR used Find
+    to locate ''receipt*'' files in /uploads, then immediately read the first result''s
+    path. The Read failed because the path pointed to a directory, not a file. The
+    Find RPC may have returned a directory whose name matched the pattern, despite
+    the ''kind'' filter. The plan lacked a verification step to ensure the selected
+    item was a file before reading. The new rule instructs the planner to always guard
+    against this by checking the item''s type after Find, preventing such failures.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include a Read RPC step to inspect the content of any file discovered
+    by Find before using it in SQL or other processing, to determine its format and
+    structure.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r014
+  reasoning: The plan used a file discovered by Find directly in an SQL query with
+    json_extract(readfile(...), '$.payment_id'), assuming the file is a JSON with
+    a payment_id field. The Exec RPC likely failed or returned empty because the file
+    format was different. The verify step failed because $difference_cents was empty.
+    The root cause is missing a Read step to inspect the file content. The in-session
+    rule already advises this, but it was not followed. Formalizing as a rule will
+    enforce it.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using List or Find to discover files, always filter the results to
+    include only entries where 'kind' is 'file' before using the path in a Read RPC,
+    because directories will cause a read failure.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r015
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. The plan used List
+    on /uploads, bound to ''upload_list'', then used ''first_entry.path'' directly
+    in a Read RPC without checking if the entry was a file. The first entry was a
+    directory, causing the Read to fail. The plan must filter the list to only file
+    entries before selecting the first one.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always structure each discovery step as an object with a single 'rpc' key,
+    whose value is a dict containing 'prim' (string), 'args' (a dict of named parameters),
+    and 'into' (string). Never place 'prim', 'args', or 'into' directly at the step
+    level.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r016
+  reasoning: 'PlanIR validation failed with 16 errors: each step object was missing
+    the required ''rpc'' field, and instead had ''prim'', ''args'', ''into'' as top-level
+    keys. Additionally, ''args'' was a list instead of a dict. The correct PlanIR
+    schema requires each step to be {"rpc": {"prim": "...", "args": {...}, "into":
+    "..."}}. The contract error for filter_rows is a consequence of the malformed
+    args. Root cause: incorrect PlanIR structure emitted by the PLAN phase.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that any file path used in a Read RPC is bound in a prior
+    discovery step, not a compute step. Prefer using a Find RPC to directly obtain
+    the file path, as it returns absolute paths that can be immediately used in a
+    subsequent Read RPC.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r017
+  reasoning: 'Error: real_vm: read failed: invalid path: path must be absolute: "discover
+    by listing files in /uploads/ directory and selecting the receipt file". Root
+    cause: The PlanIR placed a Read RPC in discovery that referenced $receipt_file_path,
+    but that variable was only bound in a later compute step (via filter_rows and
+    get on the List output). Because compute runs after discovery, the variable was
+    unbound at Read time, causing the VM to fall back to the param value, which is
+    a task description, not a path. The failing PlanIR fragment: discovery step {"rpc":"Read","args":{"path":"$receipt_file_path"},...}
+    and compute steps that set receipt_file_path after discovery. The corrective technique
+    is to use a Find RPC to directly locate the receipt file and obtain its absolute
+    path, then reference that path in the Read RPC, ensuring the variable is bound
+    in a prior discovery step.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always ensure that any rowset produced by a custom_extract is defined before
+    the compute section that references it. If the PlanIR structure requires custom_extract
+    after compute, do not reference such rowsets in compute; instead, parse the data
+    using a rowsets step or restructure the plan to avoid forward references.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r018
+  reasoning: The plan returned OUTCOME_NONE_CLARIFICATION because compute steps referenced
+    $receipt_items, which was only defined in the custom_extract 'fuzzy_sku_receipt'
+    placed after the compute section. The interpreter processes compute before custom_extract,
+    causing a missing variable error and fallback to an undefined outcome. The rule
+    prevents forward references to custom_extract outputs in compute.
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: active
+  submitted_message: The file path  is not in the allowed set. Access denied.
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: Never apply the catalog path constraint to files in /uploads/; that constraint
+    is only for catalog data. When the instruction specifies a receipt file in /uploads/,
+    read it directly using a Read RPC on the given path.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r019
+  reasoning: 'The plan applied the catalog path constraint (allowed set: /PROD, /docs/...,
+    etc.) to the receipt file path, which is in /uploads/. Since /uploads/ is not
+    in the allowed set, the decision branch triggered OUTCOME_DENIED_SECURITY. The
+    constraint is only for catalog data, not for user-provided receipt files. The
+    plan should have directly read the receipt file from /uploads/ without checking
+    it against the catalog allowed set. The plan also lacked any discovery steps to
+    read the receipt file, which is needed to extract items. This rule ensures future
+    plans exempt /uploads/ files from the catalog constraint and include a Read RPC
+    for the receipt.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'When the instruction says ''the single file in /uploads/'' or similar,
+    use a Find RPC with a pattern like ''*'' to locate the file, and bind the result.
+    Then use the bound path directly in a Read RPC. Do not use a List RPC to list
+    the directory and then extract a path, as List may return directory entries or
+    require additional filtering, leading to a ''read failed: is a directory'' error.'
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r020
+  reasoning: 'ERROR: real_vm: read failed: is a directory. The PlanIR used a List
+    RPC on /uploads, then attempted to read the first entry''s path via $receipt_path.0.path,
+    but that path resolved to a directory, not a file. The instruction required reading
+    the single file in /uploads. The correct PLAN technique is to use a Find RPC to
+    locate the file (e.g., with pattern ''*'') and bind the result, then Read that
+    bound path. Existing rule r017 already prefers Find over List, but this error
+    indicates a need for a more explicit rule for directory-to-file discovery.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 1
+  date: '2026-06-22'
+  outcome: OUTCOME_DENIED_SECURITY
+  status: failure
+prephase_deep_read:
+- /uploads
+task_id: t53

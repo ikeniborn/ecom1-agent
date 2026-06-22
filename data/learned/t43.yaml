@@ -1,0 +1,266 @@
+entries:
+- agents_md_anchor: null
+  content: When a discovery RPC returns unstructured text, use a compute step to extract
+    the required fact fields before decision.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: 'Error: verify: I3: security constraint ''#security authentication''
+    deny_when holds but outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY.
+    Observed RPC output: ''user: cust_011\nroles: customer''. The PlanIR discovery
+    binds raw text to ''identity'' without parsing. The constraint check likely defaulted
+    identity.kind to ''guest'' (deny_when true), but the decision branch compared
+    the raw string to ''guest'' (false), leading to default ''unsupported'' outcome.
+    Root cause: missing compute step to extract identity.kind from unstructured RPC
+    output, causing mismatch between constraint evaluation and decision branching.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Refund request denied: guest accounts are not authorized to
+    perform refunds.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: Always include a discovery step to verify the caller's identity kind before
+    using it in a decision branch.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: Grader expected OUTCOME_NONE_UNSUPPORTED but script produced OUTCOME_DENIED_SECURITY.
+    The script's decision branch relied on $_facts.identity.kind without any discovery
+    step to ground that fact. The pre-phase likely set identity.kind incorrectly,
+    causing the branch to trigger when it should not have. The root cause is missing
+    discovery for authorization verification.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a parameter value is a literal string, use a compute step with prim
+    'literal' to bind it; never use 'concat' for a single literal.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'The interpret error ''concat: missing 1 required positional argument:
+    b'' occurred because the plan used concat with a single string argument ''pay_005''.
+    The concat primitive requires two list[dict] rows arguments. The intended operation
+    was to bind the literal payment_id to a variable for the answer template. The
+    correct primitive is ''literal'', which takes a single string and produces a row
+    with that value. This rule prevents misuse of concat for literal binding.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use a rowset with format 'json' on discovery RPC output that is
+    not valid JSON; instead, use a compute step to extract the required fields.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'ERROR: verify: I3: security constraint ''/docs/security.md#customer-ownership''
+    deny_when holds but outcome is ''OUTCOME_NONE_UNSUPPORTED''. Root cause: The PlanIR
+    used a rowset with format ''json'' to parse the output of /bin/id, which returns
+    unstructured text (e.g., ''user: cust_014\nroles: customer''). This caused the
+    identity kind extraction to fail, leading to a null value that did not match the
+    ''guest'' branch, defaulting to ''unsupported''. The constraint check, however,
+    correctly identified the caller as a guest (likely from raw output), triggering
+    the deny condition. The existing rule r001 advises using a compute step for unstructured
+    text, but the script used a rowset instead. This new rule explicitly forbids using
+    ''json'' rowset format on non-JSON output.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - no answer provided
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: ''
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: 'Refund request denied: Guest callers are not authorized to initiate
+    refunds per security policy.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: active
+  submitted_message: 'Refund request denied: unauthenticated guest'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: When a decision tree includes a branch for a deny_when condition, also
+    include a branch for the opposite condition leading to an outcome that permits
+    the action; do not use a default label that always denies.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r005
+  reasoning: Grader expected OUTCOME_OK but plan produced OUTCOME_DENIED_SECURITY.
+    The plan's decision tree had only a branch for identity.kind eq 'guest' leading
+    to denied, and a default label also denied. Thus, even for authenticated users,
+    the outcome was denied. The plan must include a branch for the false case (non-guest)
+    leading to a permissive outcome (e.g., OUTCOME_OK).
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 0
+  date: '2026-06-22'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t43

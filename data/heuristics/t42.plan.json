@@ -1,0 +1,217 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "identity_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT store_id, record_path FROM shopping_baskets WHERE basket_id = 'basket_076';"
+      },
+      "bind": "basket_raw"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/discounts.md"
+      },
+      "bind": "discounts_policy"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_policy"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/policy-updates/discount-delegation-2021-08-09-powertool-bratislava-stare-mesto.md"
+      },
+      "bind": "delegation_policy"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "identity_raw",
+      "format": "json",
+      "into": "identity",
+      "columns": [
+        {
+          "into": "kind",
+          "candidates": [
+            "kind"
+          ]
+        },
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "roles",
+          "candidates": [
+            "roles"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "basket_raw",
+      "format": "auto_delim",
+      "into": "basket",
+      "columns": [
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "get",
+      "args": [
+        "$basket.0",
+        "store_id"
+      ],
+      "into": "basket_store_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket.0",
+        "record_path"
+      ],
+      "into": "basket_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "or",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "ne",
+              "lhs": "$identity.0.kind",
+              "rhs": "employee",
+              "args": []
+            },
+            {
+              "op": "and",
+              "lhs": null,
+              "rhs": null,
+              "args": [
+                {
+                  "op": "eq",
+                  "lhs": "$identity.0.kind",
+                  "rhs": "employee",
+                  "args": []
+                },
+                {
+                  "op": "or",
+                  "lhs": null,
+                  "rhs": null,
+                  "args": [
+                    {
+                      "op": "ne",
+                      "lhs": "$identity.0.store_id",
+                      "rhs": "$basket_store_id",
+                      "args": []
+                    },
+                    {
+                      "op": "not",
+                      "lhs": null,
+                      "rhs": null,
+                      "args": [
+                        {
+                          "op": "contains_any",
+                          "lhs": "$identity.0.roles",
+                          "rhs": [
+                            "discount_manager"
+                          ],
+                          "args": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "label": "denied"
+      }
+    ],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "denied": {
+      "message": "Discount application denied: caller is not an authorized employee.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
+        },
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "policy_doc",
+          "path": "/docs/policy-updates/discount-delegation-2021-08-09-powertool-bratislava-stare-mesto.md",
+          "source": null
+        }
+      ]
+    },
+    "ok": {
+      "message": "Discount applied to basket basket_076.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
+        },
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "policy_doc",
+          "path": "/docs/policy-updates/discount-delegation-2021-08-09-powertool-bratislava-stare-mesto.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$basket_record_path"
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

@@ -1,0 +1,306 @@
+entries:
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: Product not found in catalogue.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: '#plan-phase'
+  content: When a plan requires filtering by a specific value from a table, ensure
+    the pre-phase deep-reads that table to obtain the exact value.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: 'Grader error: expected OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED. Root
+    cause: product discovery SQL returned no rows, likely because the literal product_family_name
+    ''Loctite Threadlocker EA 3UJ-5ML Adhesive and Glue'' did not exactly match the
+    database value. The failing PlanIR fragment is the WHERE clause on product_families.product_family_name.
+    The pre-phase did not surface the actual family name, so the plan used the instruction''s
+    literal, causing a mismatch. The new rule ensures future plans deep-read the source
+    table to obtain exact values before constructing filters.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use stdin to pass SQL to the sql binary in an Exec RPC; instead pass
+    the SQL as a command-line argument using -c or --command.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'Error: ''interpret: sql returned usage banner — SQL not delivered via
+    stdin''. The PlanIR discovery step used Exec with args: {path:''/bin/sql'', stdin:''...'',
+    args:[''--set'',...]}. The sql binary did not receive the SQL on stdin, causing
+    a usage banner. Root cause: Exec RPC does not support stdin delivery for sql;
+    the SQL must be passed as a command-line argument. Failing PlanIR fragment: the
+    first Exec call with ''stdin'' key. Rule linkage: new rule to correct Exec usage
+    for sql.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: No product or stores found
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When using 'first' to extract a single row from a rowset, always ensure
+    the rowset is nonempty before referencing its fields, or use a decision branch
+    that checks the rowset length directly.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: The plan's compute step used 'first' on $product_rows without checking
+    if the rowset was empty. The SQL query (which violated r002 by using stdin) likely
+    returned no rows, causing $product to be null. The decision condition then referenced
+    $product.record_path, which failed and led the interpreter to produce OUTCOME_NONE_CLARIFICATION
+    instead of the expected OUTCOME_OK or even the defined OUTCOME_NONE_UNSUPPORTED.
+    The plan must guard against empty rowsets when extracting a single row.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using filter_rows in a compute step, the predicate must be a string
+    expression (e.g., 'row.record_path == row.record_path'), not a dict.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'The interpret step failed with "''dict'' object has no attribute ''op''"
+    because the predicate for filter_rows was provided as a dict. The interpreter
+    expects a string expression that can be evaluated against each row. The failing
+    PlanIR fragment: compute step ''filter_rows'' with args [''$store_rows'', {''op'':''eq'',''lhs'':''$row.record_path'',''rhs'':''$row.record_path''}].
+    Additionally, the filter was redundant (always true), so it could be omitted entirely,
+    but the rule addresses the predicate format.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: Product not found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: Product not found or no inventory data available.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Product not found
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always separate product discovery and inventory aggregation into distinct
+    discovery steps, and base the product-existence decision solely on the product
+    discovery result, not on a combined rowset.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: 'Error: grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED.
+    Root cause: The PlanIR''s discovery step used a single SQL query that combined
+    product lookup and inventory retrieval via UNION ALL; when the product lookup
+    subquery returned no rows (likely due to query misconstruction), the entire rowset
+    was empty, causing the decision branch ''no_product'' to trigger and produce OUTCOME_NONE_UNSUPPORTED,
+    even though the product exists. Failing PlanIR fragment: the discovery step with
+    the combined SQL and the decision branch that checks row_count == 0. This rule
+    ensures future cycles independently verify product existence before aggregating
+    inventory, preventing false ''not found'' outcomes.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using Exec to run a command that reads SQL or other input from stdin,
+    always provide the stdin content as a top-level 'stdin' field in the Exec args
+    object, not inside the 'args' array.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r006
+  reasoning: The error 'sql returned usage banner — SQL not delivered via stdin' indicates
+    that the SQL command did not receive the stdin content. The PlanIR placed the
+    stdin string inside the 'args' object alongside 'path' and 'args', but the Exec
+    RPC likely expects 'stdin' as a separate top-level field. The rule corrects this
+    structural mistake for future PlanIR generation.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When using Exec to run a command that reads from stdin, always pass the
+    stdin content as a string element in the 'args' array, not as a top-level 'stdin'
+    field.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r007
+  reasoning: The PlanIR used 'stdin' as a top-level field in the Exec args object,
+    but the interpreter did not recognize it and thus did not deliver the SQL to the
+    command, causing sql to print its usage banner. The error was 'sql returned usage
+    banner — SQL not delivered via stdin'. The correct method is to include the stdin
+    content as a string in the 'args' array.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always provide the ''args'' field of a discovery step as a dictionary
+    (e.g., {"command": "/bin/sql", "stdin": "SELECT ..."}) rather than a list, because
+    the PlanIR schema expects a dict for args.'
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'PlanIR validation failed: discovery.0.args, discovery.1.args, discovery.2.args
+    were lists (e.g., [''/bin/sql'', ''SELECT ...'']) but the schema requires a dict.
+    The failing PlanIR used list-style args for Exec-like discovery steps, causing
+    a type error. The rule instructs the PLAN phase to always emit args as a dict.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-22'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+prephase_deep_read:
+- product_families
+task_id: t33

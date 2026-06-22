@@ -1,0 +1,117 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/archive/payment_batch_export_ELRhniWLDW.tsv"
+      },
+      "bind": "tsv_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "tsv_raw",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "fraud_flag",
+          "candidates": [
+            "is_fraud",
+            "fraud_flag",
+            "fraud"
+          ]
+        },
+        {
+          "into": "amount_cents",
+          "candidates": [
+            "amount_cents",
+            "amount",
+            "payment_amount_cents"
+          ]
+        },
+        {
+          "into": "row_id",
+          "candidates": [
+            "RowID",
+            "id",
+            "row_id"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "column",
+      "args": [
+        "$rows",
+        "fraud_flag"
+      ],
+      "into": "fraud_col"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$rows",
+        "amount_cents"
+      ],
+      "into": "amount_col"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$rows",
+        "row_id"
+      ],
+      "into": "row_id_col"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$fraud_col",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$amount_col",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$row_id_col",
+              "rhs": null,
+              "args": []
+            }
+          ]
+        },
+        "label": "unsupported_refs"
+      }
+    ],
+    "default_label": "missing_columns"
+  },
+  "ops": [],
+  "answer": {
+    "missing_columns": {
+      "message": "Required columns (fraud flag, amount, row ID) not found in the TSV file.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "unsupported_refs": {
+      "message": "Unable to generate per-row record paths due to missing element-wise string concatenation primitive.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

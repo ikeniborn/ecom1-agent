@@ -1,0 +1,390 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/checkout.md"
+      },
+      "bind": "checkout_policy_doc"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_policy_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": ".mode tabs\nSELECT hex(randomblob(16)) AS payment_id;"
+      },
+      "bind": "raw_payment_id"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": ".mode tabs\nSELECT b.basket_status, b.store_id, b.record_path AS basket_record_path, c.customer_id, c.record_path AS customer_record_path, (SELECT SUM(pv.price_cents * bi.requested_quantity) FROM shopping_basket_items bi JOIN product_variants pv ON bi.product_sku = pv.product_sku WHERE bi.basket_id = 'basket_010') AS total_amount_cents, (SELECT COUNT(*) FROM payment_transactions WHERE basket_id = 'basket_010' AND payment_status = 'completed') AS existing_completed_payments, (SELECT COUNT(*) FROM shopping_basket_items bi WHERE bi.basket_id = 'basket_010' AND NOT EXISTS (SELECT 1 FROM store_inventory si WHERE si.store_id = b.store_id AND si.product_sku = bi.product_sku AND si.available_today_quantity >= bi.requested_quantity)) AS out_of_stock_items, s.latitude AS store_latitude, s.longitude AS store_longitude FROM shopping_baskets b JOIN customer_accounts c ON b.customer_id = c.customer_id JOIN stores s ON b.store_id = s.store_id WHERE b.basket_id = 'basket_010' AND c.customer_id = 'cust_070';"
+      },
+      "bind": "raw_check_data"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_payment_id",
+      "format": "auto_delim",
+      "into": "payment_id_rowset",
+      "columns": [
+        {
+          "into": "payment_id",
+          "candidates": [
+            "payment_id"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "raw_check_data",
+      "format": "auto_delim",
+      "into": "check_data",
+      "columns": [
+        {
+          "into": "basket_status",
+          "candidates": [
+            "basket_status"
+          ]
+        },
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "basket_record_path",
+          "candidates": [
+            "basket_record_path"
+          ]
+        },
+        {
+          "into": "customer_id",
+          "candidates": [
+            "customer_id"
+          ]
+        },
+        {
+          "into": "customer_record_path",
+          "candidates": [
+            "customer_record_path"
+          ]
+        },
+        {
+          "into": "total_amount_cents",
+          "candidates": [
+            "total_amount_cents"
+          ]
+        },
+        {
+          "into": "existing_completed_payments",
+          "candidates": [
+            "existing_completed_payments"
+          ]
+        },
+        {
+          "into": "out_of_stock_items",
+          "candidates": [
+            "out_of_stock_items"
+          ]
+        },
+        {
+          "into": "store_latitude",
+          "candidates": [
+            "store_latitude"
+          ]
+        },
+        {
+          "into": "store_longitude",
+          "candidates": [
+            "store_longitude"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$payment_id_rowset"
+      ],
+      "into": "payment_id_dict"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_id_dict",
+        "payment_id"
+      ],
+      "into": "payment_id"
+    },
+    {
+      "prim": "count",
+      "args": [
+        "$check_data"
+      ],
+      "into": "check_data_count"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$check_data",
+        "basket_status"
+      ],
+      "into": "basket_status_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$basket_status_list"
+      ],
+      "into": "basket_status"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$check_data",
+        "existing_completed_payments"
+      ],
+      "into": "existing_completed_payments_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$existing_completed_payments_list"
+      ],
+      "into": "existing_completed_payments"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$existing_completed_payments"
+      ],
+      "into": "existing_completed_payments_num"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$check_data",
+        "out_of_stock_items"
+      ],
+      "into": "out_of_stock_items_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$out_of_stock_items_list"
+      ],
+      "into": "out_of_stock_items"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$out_of_stock_items"
+      ],
+      "into": "out_of_stock_items_num"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$check_data",
+        "total_amount_cents"
+      ],
+      "into": "total_amount_cents_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$total_amount_cents_list"
+      ],
+      "into": "total_amount_cents"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$total_amount_cents"
+      ],
+      "into": "total_amount_cents_num"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$check_data",
+        "store_id"
+      ],
+      "into": "store_id_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$store_id_list"
+      ],
+      "into": "store_id"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$check_data",
+        "store_latitude"
+      ],
+      "into": "store_latitude_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$store_latitude_list"
+      ],
+      "into": "store_latitude"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$store_latitude"
+      ],
+      "into": "store_latitude_num"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$check_data",
+        "store_longitude"
+      ],
+      "into": "store_longitude_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$store_longitude_list"
+      ],
+      "into": "store_longitude"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$store_longitude"
+      ],
+      "into": "store_longitude_num"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$check_data",
+        "customer_record_path"
+      ],
+      "into": "customer_record_path_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$customer_record_path_list"
+      ],
+      "into": "customer_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$check_data_count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "denied"
+      },
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$basket_status",
+          "rhs": "completed",
+          "args": []
+        },
+        "label": "denied"
+      },
+      {
+        "when": {
+          "op": "gt",
+          "lhs": "$existing_completed_payments_num",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "denied"
+      },
+      {
+        "when": {
+          "op": "gt",
+          "lhs": "$out_of_stock_items_num",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "denied"
+      }
+    ],
+    "default_label": "ok"
+  },
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "args": [],
+        "stdin": "BEGIN TRANSACTION; INSERT INTO payment_transactions (payment_id, record_path, basket_id, is_archived_basket_reference, customer_id, store_id, payment_amount_cents, payment_currency, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude, three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts) VALUES ('$payment_id', '$payment.record_path', 'basket_010', 0, 'cust_070', '$store_id', $total_amount_cents_num, 'USD', 'completed', datetime('now'), 'disabled', 'disabled', $store_latitude_num, $store_longitude_num, NULL, NULL, 0, 0); UPDATE shopping_baskets SET basket_status = 'completed' WHERE basket_id = 'basket_010'; COMMIT;"
+      },
+      "bind": null,
+      "guard_label": "ok",
+      "outcome_from_exit": null
+    },
+    {
+      "rpc": "Write",
+      "args": {
+        "path": "$payment.record_path",
+        "content": "$payment_record_json_str"
+      },
+      "bind": null,
+      "guard_label": "ok",
+      "outcome_from_exit": null
+    }
+  ],
+  "answer": {
+    "ok": {
+      "message": "Checkout completed for basket {basket_id}. Payment ID: {payment_id}.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/checkout.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$payment.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$customer.record_path"
+        }
+      ]
+    },
+    "denied": {
+      "message": "Checkout denied for basket {basket_id}. Reason: security policy violation.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

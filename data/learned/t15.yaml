@@ -1,0 +1,446 @@
+entries:
+- agents_md_anchor: null
+  content: When the task requires resolving multiple items from a specification, use
+    discovery steps to query the relevant tables for each item, extract the identifier
+    column into a rowset, and then use concat to merge the identifier rowsets before
+    using them in a subsequent query. Do not call concat with a single literal list;
+    always provide two rowsets as arguments.
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: 'The PlanIR omitted discovery steps to resolve product SKUs from the
+    instruction. The concat step was called with a single empty list literal, violating
+    the concat contract (requires two list[dict] rowsets). The inventory query referenced
+    :skus_json, which was never populated. Root cause: missing product lookup steps.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include a decision block in the PlanIR after discovery steps, even
+    if the outcome is unconditional.
+  created: '2026-06-21'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'PlanIR validation failed: ''decision'' field missing. The generated
+    PlanIR had only discovery steps but no decision block, which is required. The
+    rule ensures the PlanIR always contains a decision block.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When success criteria reference $answer.<field>, ensure the PlanIR's answer
+    block includes a data field with that field set to the computed value, or use
+    a compute step that sets answer.data.<field>.
+  created: '2026-06-21'
+  deactivated_reason: Superseded by new rule that explicitly requires the answer block
+    to include a 'data' object when success criteria reference $answer.data.<field>.
+  id: r003
+  reasoning: The verify step failed because $answer.count was undefined. The PlanIR
+    only set a compute variable 'count' to 0 but did not bind it to the answer's data.
+    The answer block only had a message. The success criteria expected $answer.count
+    to be a number. The rule ensures the answer object contains the required data
+    fields for verification.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When success criteria reference $answer.<field>, the PlanIR must set answer.data.<field>
+    to the computed value, either via a compute step that sets answer.data.<field>
+    or by including a data field in the answer block.
+  created: '2026-06-21'
+  deactivated_reason: r004 is superseded by the new rule, which clarifies that the
+    answer block must include a 'data' object when success criteria reference $answer.data.<field>,
+    not just rely on a compute step.
+  id: r004
+  reasoning: 'The verify error: success_criteria[OUTCOME_OK][0] failed because it
+    expected $answer.count but the answer block only had a message template with {count}
+    and no data field. The compute step set a variable ''count'' but did not map it
+    to answer.data.count. The PlanIR must ensure that any field referenced in success
+    criteria is present in the answer''s data object.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/safety_gear/safety_eyewear/SFE-20VRQDTK.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When success criteria reference $answer.data.<field>, the PlanIR's answer
+    block must include a 'data' object containing that field set to the computed value.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: The verify step failed because success_criteria[OUTCOME_OK][0] expected
+    $answer.data.count >= 0, but the answer block lacked a 'data' field, causing the
+    reference to be undefined. The compute step set answer.data.count, but the answer
+    block did not include a data object, so the final answer structure did not contain
+    the required field. The SQL query returned count 0, which would satisfy the criteria
+    if properly included.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When success criteria reference $answer.data.<field>, the PlanIR answer
+    block must include a 'data' object (even if empty) so that compute steps can set
+    its fields.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: The verify step failed because $answer.data.count was undefined. The
+    SQL query returned 0, which satisfies the 'ge 0' condition, but the answer block
+    lacked a 'data' object. The compute step 'first' attempted to set answer.data.count,
+    but without a pre-existing 'data' object in the answer block, the field was not
+    created, causing the verification to fail. The existing rule r004 allowed either
+    a compute step or a data field, but the compute step alone was insufficient; the
+    answer block must explicitly include a 'data' object.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When success criteria reference $answer.data.<field>, the PlanIR answer
+    block for that outcome must include a 'data' object with that field set to the
+    computed value, not rely on a separate compute step to set answer.data.<field>.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: The PlanIR answer block for OUTCOME_OK lacked a 'data' object, causing
+    the success criteria check on $answer.data.count to fail because the field was
+    not present in the final answer. The existing in-session rule required a data
+    object but was not followed. A new rule will enforce that the answer block directly
+    includes the data object with the computed field.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/workwear/work_trousers/WRK-1FUAJN0R.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/automotive/wiper_blades/AUT-25XUYTY1.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/workwear/work_tops/WRK-UJ5VWQY8.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/electrical/led_bulbs/ELC-Z0FN9Y4H.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/adhesives_sealants/sealants/ADH-1DAOL3FS.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When required refs specify source paths like $store.record_path or $products.N.record_path,
+    the PlanIR must bind those exact dotted variable paths in compute steps and use
+    them in the answer block's refs, not simplified names.
+  created: '2026-06-22'
+  deactivated_reason: r008 required binding flat variables with dotted names, which
+    caused interpret failure; superseded by r009 and the new rule.
+  id: r008
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$products.0.record_path'', ...]. The PlanIR answer block used refs with source
+    ''$store_path'' and ''$prod0_path'', but the required refs demanded ''$store.record_path''
+    and ''$products.0.record_path''. The compute steps bound the simpler names, so
+    the interpreter could not resolve the required refs. Root cause: mismatch between
+    variable paths in answer refs and the required refs'' source paths. Failing PlanIR
+    fragment: answer.ok.refs with source ''$store_path'', ''$prod0_path'', etc.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When required refs use dotted source paths (e.g., $store.record_path),
+    the PlanIR must set the parent variable as an object containing the leaf field,
+    not as a flat variable with the dotted name.
+  created: '2026-06-22'
+  deactivated_reason: r009 instructs to set parent as object, which prevents the interpreter
+    from resolving dotted required refs; superseded by the new rule that requires
+    flat variables with dotted names.
+  id: r009
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$products.0.record_path'', ...]. Root cause: The PlanIR compute steps set flat
+    variables like ''$store_path'' and ''$products.0.record_path'' (literal dotted
+    names), but the interpreter resolves dotted source paths by navigating nested
+    variables. It expected a ''$store'' object with a ''record_path'' field and a
+    ''$products'' array of objects each with ''record_path''. Because those parent
+    variables were never set, all required refs were unresolved. The in-session rule
+    that advised binding exact dotted variable paths as flat names is incorrect and
+    led to this failure.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/storage/tool_boxes_bags/STO-3I0LEXPF.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When required refs use dotted source paths (e.g., $product_0.record_path),
+    the PlanIR must bind a flat variable with that exact dotted name by extracting
+    the leaf field from the parent object, and use that variable in the answer refs.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$product_0.record_path'',
+    ...] on OK answer. The PlanIR set parent objects (e.g., product_0) and used dotted
+    refs in the answer block, but the interpreter could not resolve them. The interpreter
+    expects flat variables with the exact dotted name (e.g., a variable literally
+    named ''$product_0.record_path'') to satisfy required refs. Existing rule r009
+    (set parent as object) contradicts this requirement and caused the failure. Rule
+    r008 already hints at binding the exact dotted path, but was not followed. This
+    new rule clarifies the correct technique and supersedes r009.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When required refs use dotted source paths (e.g., $store.record_path),
+    the PlanIR must set the parent variable as an object containing the leaf field
+    (e.g., set $store as an object with a record_path property), and use the dotted
+    path in the answer refs. Do not set a flat variable with the dotted name.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r011
+  reasoning: The interpret phase failed with 'unresolved required ref(s)' for all
+    dotted refs. The PlanIR set flat variables named '$store.record_path' etc. via
+    compute steps, but the interpret phase expects the parent object to exist so that
+    dotted refs resolve as property access. Existing rule r009 correctly mandates
+    setting the parent object, but the PlanIR followed the contradictory in-session
+    rule. Deactivating r008 which incorrectly required flat dotted variable names.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/workwear/work_jackets/WRK-301ZUBQ8.json'
+  source: verdict
+  status: inactive
+  submitted_message: Could not find all required products or store.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v010
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/hand_tools/hammers_measuring_cutting/HND-2DMZESWB.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v011
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/automotive/wiper_blades/AUT-1D9YGR4A.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v012
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/safety_gear/respiratory_protection/SFE-KVHBOQJS.json'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v013
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
+  id: v014
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Do not extract required refs by hardcoded index from a rowset that may
+    be incomplete before confirming the rowset contains all expected items; instead,
+    check a completeness flag or count first, and only perform the extractions if
+    the flag indicates all items are present, or move the extractions into the decision
+    branch's ops to avoid triggering clarification when items are missing.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r012
+  reasoning: The PlanIR unconditionally extracts $product_0.record_path through $product_5.record_path
+    from $product_rows by index (0..5) in the global compute block. If the SQL query
+    returns fewer than 6 product rows (some products not matched), accessing a missing
+    index fails, causing the interpreter to abort with OUTCOME_NONE_CLARIFICATION
+    before reaching the decision block. The decision block correctly checks $all_found
+    to branch to 'unsupported' when not all products are found, but the extraction
+    failure prevents reaching that logic. The fix is to guard the extractions behind
+    the completeness check or move them into the 'ok' branch's ops.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-22'
+  id: v015
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/automotive/chargers_bulbs/AUT-OUBI8TMR.json'
+  source: verdict
+  status: active
+  submitted_message: result 0
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include all required references in the answer refs by extracting
+    the necessary record paths from the data and adding them to the answer's refs
+    list.
+  created: '2026-06-22'
+  deactivated_reason: Superseded by more specific rule that mandates exact source
+    paths and inclusion in answer refs.
+  id: r013
+  reasoning: 'Error: ''grader: answer missing required reference ''/proc/catalog/automotive/chargers_bulbs/AUT-OUBI8TMR.json''''.
+    The PlanIR answer section had no refs, but the grader expected a specific record
+    path. Root cause: the PlanIR did not extract and include the required reference.
+    The rule ensures future plans will populate answer refs when required_refs are
+    non-empty.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required ref uses a dotted source path (e.g., $store.record_path),
+    the PlanIR must ensure that the object assigned to the parent variable has a property
+    whose name exactly matches the leaf field (e.g., 'record_path'). If the data source
+    provides a column with a different name, alias it in the SQL query or rename it
+    in a compute step.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r014
+  reasoning: 'Error: interpret: unresolved required refs [''$store.record_path'']
+    on OK answer. Root cause: The SQL query aliased the store''s record_path column
+    as ''store_record_path'', but the answer ref expected the leaf field ''record_path''.
+    The PlanIR set $store as the first row of the rowset, so $store had a property
+    ''store_record_path'' instead of ''record_path'', causing the dotted ref to fail.
+    Existing rule r011 correctly requires using an object with the leaf field, but
+    did not enforce exact naming alignment between the column alias and the required
+    ref''s leaf name. The failing PlanIR fragment: SQL alias ''store_record_path''
+    and answer ref source ''$store.record_path''.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'When a required ref uses a dotted source path that depends on a lookup
+    that may return no rows (e.g., a store query), always ensure the parent variable
+    is set to a fallback object containing the required leaf property (e.g., { record_path:
+    null }) so the ref resolves even when the lookup fails. Use a decision branch
+    or a compute default to provide this fallback before the answer step.'
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r015
+  reasoning: 'The error ''interpret: unresolved required ref(s) [''$store.record_path'']
+    on OK answer'' indicates the interpreter could not resolve the path $store.record_path,
+    most likely because the store lookup returned no rows, leaving $store null or
+    undefined. The PlanIR''s SQL returns a row with NULL record_path when the store
+    is missing, but the interpreter''s first() may still produce a null $store, or
+    the required ref resolution treats a null parent as unresolvable. The fix is to
+    guarantee $store is always an object with a record_path property, e.g., by adding
+    a decision branch that sets $store to { record_path: null } when the store is
+    not found, so the ref resolves to null rather than failing.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the intent spec defines required refs for an outcome, the PlanIR must
+    include those refs in the answer step's refs list, using the exact source paths
+    specified. Do not omit them.
+  created: '2026-06-22'
+  deactivated_reason: null
+  id: r016
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'']
+    on OK answer. Root cause: The PlanIR answer step''s refs list is empty, so the
+    required ref $store.record_path is missing. The PlanIR correctly set $store as
+    an object with a record_path property, but failed to add the ref to the answer.
+    Existing rule r013 covers this generally but was not followed; a more explicit
+    rule is needed to enforce inclusion of exact source paths.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 3
+  date: '2026-06-22'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t15
