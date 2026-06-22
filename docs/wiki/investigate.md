@@ -42,9 +42,7 @@ When it returns `None` the loop calls `router` (the free router). When `ECOM_INV
 
 ## Sufficiency gate
 
-`sufficient(intent, env, data_paths=None, probed=None)` is the loop's stop condition. It returns True when every `required_ref` for `intent.desired_outcome` is groundable from `env` (a `None` from `ref.grounded(env)` means PLAN produces this ref, e.g. `record_path`, and the investigator skips it). No required refs → trivially sufficient. See [[interpreter#Answer-ref assembly]] for how `required_refs` drives ref enforcement downstream.
-
-The `data_paths`/`probed` parameters are retained on the signature but are vestigial: `investigate()` always calls `sufficient(intent, brief.env)` (no data paths), so the data clause is inert. The seed-data-path probe feature was removed in Phase 0.
+`sufficient(intent, env)` is the loop's stop condition. It returns True when every `required_ref` for `intent.desired_outcome` is groundable from `env` (a `None` from `ref.grounded(env)` means PLAN produces this ref, e.g. `record_path`, and the investigator skips it). No required refs → trivially sufficient. See [[interpreter#Answer-ref assembly]] for how `required_refs` drives ref enforcement downstream.
 
 ## router and digest (LLM steps)
 
