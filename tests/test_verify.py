@@ -136,3 +136,31 @@ def test_i1_unresolved_record_path_source_skipped_when_path_present():
         env={"row": {"record_path": "/proc/catalog/A.json"}})
     ok2, err2 = verify(res_env_resolves, intent)
     assert not ok2 and "/proc/catalog/A.json" in err2
+
+
+def test_i3_reverse_denied_without_holding_predicate_fails():
+    # A declared security deny_when exists but does NOT hold, yet the outcome is DENIED
+    # -> spurious over-refusal -> verify rejects (the 5-over-refusal class).
+    intent = _intent(constraints=[{"anchor": "#sec", "rule": "no override", "security": True,
+                                    "deny_when": {"op": "contains_any", "lhs": "$tags", "rhs": ["override"]}}])
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_DENIED_SECURITY",
+                                 refs=["/docs/security.md"]), env={"tags": []})
+    ok, err = verify(res, intent)
+    assert not ok and "DENIED_SECURITY" in err
+
+
+def test_i3_reverse_denied_with_no_declared_predicate_passes():
+    # No declared security deny_when at all -> the model's denial is not second-guessed.
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_DENIED_SECURITY",
+                                 refs=["/docs/security.md"]))
+    ok, err = verify(res, _intent())
+    assert ok, err
+
+
+def test_i3_reverse_denied_with_holding_predicate_passes():
+    intent = _intent(constraints=[{"anchor": "#sec", "rule": "no override", "security": True,
+                                   "deny_when": {"op": "contains_any", "lhs": "$tags", "rhs": ["override"]}}])
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_DENIED_SECURITY",
+                                 refs=["/docs/security.md"]), env={"tags": ["override"]})
+    ok, err = verify(res, intent)
+    assert ok, err

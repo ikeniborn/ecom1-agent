@@ -14,6 +14,14 @@ def verify(result: InterpretResult, intent: IntentSpec) -> tuple[bool, str]:
     env = dict(result.env)
     env["answer"] = {"message": ans.message, "outcome": ans.outcome, "refs": list(ans.refs)}
 
+    # Phase 2: bind /bin/id identity for parity with decide.py's deny_when env so the
+    # consistency re-check evaluates the same predicates the decision layer did.
+    _facts = env.get("_facts")
+    _ident = getattr(_facts, "identity", None)
+    if _ident is None and isinstance(_facts, dict):
+        _ident = _facts.get("identity")
+    env["identity"] = _ident or {}
+
     # I2: outcome within the declared space
     if ans.outcome not in intent.outcome_space:
         return False, f"I2: outcome {ans.outcome!r} not in outcome_space {intent.outcome_space!r}"
@@ -36,6 +44,17 @@ def verify(result: InterpretResult, intent: IntentSpec) -> tuple[bool, str]:
             if ans.outcome != "OUTCOME_DENIED_SECURITY":
                 return False, (f"I3: security constraint {c.anchor!r} deny_when holds "
                                f"but outcome is {ans.outcome!r}, not DENIED_SECURITY")
+
+    # I3 reverse: a DENIED_SECURITY outcome must be justified by a declared security
+    # deny_when that holds. When the intent declares security deny_when predicates and
+    # NONE hold, the denial is a spurious over-refusal -> fail. When NO security
+    # deny_when is declared, the model's denial is not second-guessed (the predicate
+    # machinery is simply not in play).
+    if ans.outcome == "OUTCOME_DENIED_SECURITY":
+        _sec = [c for c in intent.constraints if c.security and c.deny_when is not None]
+        if _sec and not any(evaluate(c.deny_when, env) for c in _sec):
+            return False, ("I3: outcome DENIED_SECURITY but no declared security "
+                           "deny_when predicate holds (spurious over-refusal)")
 
     # success_criteria: only the criteria for the chosen outcome must hold.
     # A valid negative outcome (e.g. OUTCOME_NONE_UNSUPPORTED) with no criteria
