@@ -81,3 +81,19 @@ def _merge_constraint_refs(base: list, c: Constraint, env: dict) -> list:
         if v and v not in out:
             out.append(v)
     return out
+
+
+def unsupported_or_clarify(intent: IntentSpec, env: dict) -> str | None:
+    """Deterministic negative-outcome split. Terminal-state conditions
+    (unsupported_when) outrank genuine ambiguity (clarify_when). Returns an outcome
+    only if it is in the declared outcome_space, else None."""
+    space = intent.outcome_space or []
+    for c in intent.constraints:
+        if _holds(getattr(c, "unsupported_when", None), env):
+            if "OUTCOME_NONE_UNSUPPORTED" in space:
+                return "OUTCOME_NONE_UNSUPPORTED"
+    for c in intent.constraints:
+        if _holds(getattr(c, "clarify_when", None), env):
+            if "OUTCOME_NONE_CLARIFICATION" in space:
+                return "OUTCOME_NONE_CLARIFICATION"
+    return None

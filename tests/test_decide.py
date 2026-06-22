@@ -121,3 +121,39 @@ def test_merge_constraint_refs_drops_unresolved_record_source():
     c = Constraint(anchor="#s", rule="r", security=True, refs=[
         {"kind": "record_path", "source": "$missing"}])
     assert _merge_constraint_refs([], c, {}) == []
+
+
+from agent.decide import unsupported_or_clarify
+
+
+def test_unsupported_when_maps_to_unsupported():
+    intent = _intent(constraints=[{
+        "anchor": "#paid", "rule": "already paid", "security": False,
+        "unsupported_when": {"op": "eq", "lhs": "$state", "rhs": "paid"}}])
+    assert unsupported_or_clarify(intent, {"state": "paid"}) == "OUTCOME_NONE_UNSUPPORTED"
+
+
+def test_clarify_when_maps_to_clarification():
+    intent = _intent(constraints=[{
+        "anchor": "#amb", "rule": "amount only", "security": False,
+        "clarify_when": {"op": "isnull", "lhs": "$basket"}}])
+    assert unsupported_or_clarify(intent, {"basket": None}) == "OUTCOME_NONE_CLARIFICATION"
+
+
+def test_unsupported_outranks_clarify():
+    intent = _intent(constraints=[
+        {"anchor": "#paid", "rule": "paid", "unsupported_when": {"op": "eq", "lhs": "$state", "rhs": "paid"}},
+        {"anchor": "#amb", "rule": "amb", "clarify_when": {"op": "isnull", "lhs": "$basket"}}])
+    assert unsupported_or_clarify(intent, {"state": "paid", "basket": None}) == "OUTCOME_NONE_UNSUPPORTED"
+
+
+def test_outcome_gated_by_space():
+    # unsupported_when holds but OUTCOME_NONE_UNSUPPORTED is not in the space -> None.
+    intent = _intent(outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+                     constraints=[{"anchor": "#p", "rule": "p",
+                                   "unsupported_when": {"op": "eq", "lhs": "$state", "rhs": "paid"}}])
+    assert unsupported_or_clarify(intent, {"state": "paid"}) is None
+
+
+def test_no_predicate_returns_none():
+    assert unsupported_or_clarify(_intent(), {"state": "open"}) is None
