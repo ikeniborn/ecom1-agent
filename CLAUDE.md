@@ -44,11 +44,7 @@ Copy `.env.example` → `.env` (single source for config AND credentials; gitign
 | `ECOM_ORACLE_FLOOR` | Minimum cosine similarity for a retrieved atom to be injected; below-floor atoms discarded (default 0.5) |
 | `ECOM_MODEL_RANK` | Model for stage-2 re-rank; falls back to `ECOM_MODEL` |
 | `ECOM_ORACLE_RANK_ENABLED` | `0` → skip LLM re-rank, use cosine top-k (default 1) |
-| `ECOM_ORACLE_DISTILL` | `1` → auto-distill a candidate atom after a successful cycle (default 0) |
-| `ECOM_ORACLE_VALIDATE_INLINE` | **P0.** `1` (default) → when `ECOM_ORACLE_DISTILL=1`, grader-validate each distilled atom inline and promote on improvement. This fires **live grader round-trips during a run** (a fresh StartRun per atom). Set `0` to suppress: distill writes a `candidate` atom and skips promotion (cheap bulk mode; promote offline later). No effect unless `ECOM_ORACLE_DISTILL=1`. |
 | `ECOM_ORACLE_DEDUP_COSINE` | Cosine ≥ this ⇒ two atoms are duplicates (default 0.92). Used by `oracle.prune()` (collapse near-duplicate active atoms; drop unvalidated candidates) and `add_candidate` dedup-on-insert (anti-rebloat). Lower → more aggressive collapse. |
-| `ECOM_HARNESS_DISTILL` | `1` → after an F1-class compute contract failure, distill a `candidate` lint check-spec into `data/harness/checks.yaml` (LLM, reason tier). Default `0` (no cost). Candidates are enforced **warn-only** by `lint` until promoted. |
-| `ECOM_HARNESS_VALIDATE_INLINE` | `1` (default) → when `ECOM_HARNESS_DISTILL=1`, a freshly distilled candidate check is validated inline (`harness_validate.validate_check_via_grader`: must flag the failing plan ∧ must NOT flag the last known-good plan) and promoted (`candidate`→`active`) on success. `0` → leave it a warn-only candidate for an offline promote. Only meaningful when `ECOM_HARNESS_DISTILL=1`. |
 | `ECOM_PREPHASE_PATH_LITERALS` | Cap on path literals extracted from the instruction text (default 3); learned deep-read paths are probed in addition |
 | `ECOM_PREPHASE_LISTING_BYTES` | Byte cap on a rendered dir listing; overflow → `… +N skipped` (default 4096) |
 | `ECOM_PREPHASE_SAMPLE_ROWS` | `LIMIT` per sampled table — Tier-2 (default 3) |
@@ -57,7 +53,6 @@ Copy `.env.example` → `.env` (single source for config AND credentials; gitign
 | `ECOM_INVESTIGATE_MAX_STEPS` | Step budget for the investigator ReAct loop (default 6). |
 | `ECOM_INVESTIGATE_ORACLE_K` | Oracle atoms retrieved per investigator step, scoped to the step goal (default 2). |
 | `ECOM_MODEL_INVESTIGATE` | Per-phase model override for INVESTIGATE (defaults to its tier → `ECOM_MODEL_FAST`). Router/digest steps run on the FAST tier and escalate to REASON on a deterministic stall. |
-| `ECOM_INVESTIGATE_DATA_PATHS` | `1` → INVESTIGATE probes seed data-paths (instruction absolute-path literals ∪ learned `prephase_deep_read` paths) into `brief.env["data_paths"]` before stopping; `sufficient()` then requires every seed probed (or step budget). Default `0` → no seed, no probe, pre-feature behaviour. Emits an `investigate_stop` trace record either way for A/B measurement. |
 
 Credentials (`ECOM_ANTHROPIC_API_KEY`, `ECOM_OPENROUTER_API_KEY`, `ECOM_OLLAMA_API_KEY`, `ECOM_BITGN_API_KEY`) live in `.env` (single source; gitignored). There is no separate `.secrets` file. The agent reads `ECOM_`-prefixed keys ONLY — a stray system `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` can never leak into a call.
 
@@ -79,14 +74,12 @@ There is **one** pipeline: the deterministic Plan-IR interpreter. Per task — I
      - **lint** — `interpreter.lint_security_first(plan)` (no LLM). On `PlanError`/`InterpretError` → `_ilearn` → next cycle.
      - **plan-signature short-circuit** — `_plan_signature(plan)` over discovery+ops (SQL normalised, other args verbatim); identical to prior cycle → break with CLARIFICATION (no-progress guard).
      - **interpret** — `interpreter.interpret(plan, intent, vm, facts)` (no LLM) executes the plan against the VM. `InterpretError` → `_ilearn` → retry (break if a mutation landed); a real-VM `Exception` → `_ilearn`, then retry only when the plan is read-only AND the error is retryable (`_is_retryable_vm_error`), else break.
-     - **verify** — `verify.verify(result, intent)` (no LLM, deterministic) checks `success_criteria`/refs. Pass → `vm.answer(...)` once, `_persist_artifacts`, optional distill→validate→promote, return. Fail → `_ilearn` (with observed RPC outputs) → next cycle (break if a mutation landed).
+     - **verify** — `verify.verify(result, intent)` (no LLM, deterministic) checks `success_criteria`/refs. Pass → `vm.answer(...)` once, `_persist_artifacts`, return. Fail → `_ilearn` (with observed RPC outputs) → next cycle (break if a mutation landed).
    - On loop exhaust / no-progress → terminal `OUTCOME_NONE_CLARIFICATION`.
    - On success — pipeline persists `data/heuristics/{tid}.intent.json` AND `data/heuristics/{tid}.plan.json`. Both are consumed by `pipeline.learn_from_grader` between training cycles to distil grader feedback into a LEARN rule without re-running INTENT/PLAN.
 3. `learned_store.py` — `load_entries(tid)` (active only, single surface), `apply_learn_diff(tid, LearnConsolidateOutput)`, `save_last_run(tid, status, outcome, cycles_used)`.
 
 `vm.answer` is called **exactly once** per task (the success path or one terminal CLARIFICATION).
-
-**Distill → validate → promote** (success path, `ECOM_ORACLE_DISTILL=1`): `oracle.distill(...)` generalizes the working plan into a `candidate` atom; when `ECOM_ORACLE_VALIDATE_INLINE=1` (default), `oracle_validate.validate_atom_via_grader` re-runs the task against the live grader and `oracle.promote(...)` on improvement. `ECOM_ORACLE_VALIDATE_INLINE=0` leaves the atom a candidate for an offline promote.
 
 **Training mode** (`TRAIN_MAX_CYCLES > 1`): `main.py` wraps the StartRun/SubmitRun pass in an outer loop. After each SubmitRun, tasks with `score < 1.0` get `pipeline.learn_from_grader(task_id, score_detail)` — loads the persisted `IntentSpec` + `PlanIR` and runs the same IR-framed `_learn_consolidate_text` LEARN call used in-pipeline. Next cycle a fresh StartRun targets only failing tasks; non-targets get `EndTrial` immediately. Successive cycles' trace files are named `{tid}.c{N}.jsonl`.
 

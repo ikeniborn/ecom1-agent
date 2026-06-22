@@ -18,7 +18,7 @@ Key env vars (authoritative table is the root `../CLAUDE.md`):
 - `ECOM_MODEL` — primary LLM (e.g. `anthropic/claude-sonnet-4-6`)
 - `ECOM_MODEL_REASON` / `ECOM_MODEL_FAST` — model tiers (see routing below)
 - `ECOM_INTERPRETER_MAX_STEPS` — interpreter cycle ceiling (default 6)
-- `ECOM_INVESTIGATE_ENABLED` / `ECOM_INVESTIGATE_MAX_STEPS` / `ECOM_INVESTIGATE_ORACLE_K` / `ECOM_MODEL_INVESTIGATE` / `ECOM_INVESTIGATE_DATA_PATHS` — INVESTIGATE phase controls (see root `../CLAUDE.md`)
+- `ECOM_INVESTIGATE_ENABLED` / `ECOM_INVESTIGATE_MAX_STEPS` / `ECOM_INVESTIGATE_ORACLE_K` / `ECOM_MODEL_INVESTIGATE` — INVESTIGATE phase controls (see root `../CLAUDE.md`)
 
 ## Agent Package Architecture
 
@@ -62,8 +62,8 @@ deterministic Plan-IR interpreter.
      error is retryable (`_is_retryable_vm_error`), else break.
    - **verify** (`verify.py:verify(result, intent)`) — no LLM, deterministic. Checks
      `success_criteria` and required refs.
-     - Pass → `vm.answer(...)` once, `_persist_artifacts(intent, plan)`, optional
-       distill→validate→promote, return success metrics.
+     - Pass → `vm.answer(...)` once, `_persist_artifacts(intent, plan)`,
+       return success metrics.
      - Fail → `_ilearn(prev_error + observed RPC outputs)` → next cycle (break if a mutation
        landed).
 4. Loop exhaust / no-progress → terminal `OUTCOME_NONE_CLARIFICATION`.
