@@ -50,3 +50,34 @@ def has_protected_action(intent: IntentSpec, result=None) -> bool:
     if result is not None and getattr(result, "mutation_landed", False):
         return True
     return any(getattr(c, "protected_action", False) for c in intent.constraints)
+
+
+def security_deny(intent: IntentSpec, env: dict, protected: bool) -> Constraint | None:
+    """First security constraint whose deny_when holds, else None. A constraint marked
+    requires_protected_action is skipped unless `protected` (the injection blast-radius
+    gate). Predicate failures -> not-holding (never raises)."""
+    for c in intent.constraints:
+        if not (c.security and c.deny_when is not None):
+            continue
+        if getattr(c, "requires_protected_action", False) and not protected:
+            continue
+        if _holds(c.deny_when, env):
+            return c
+    return None
+
+
+def _merge_constraint_refs(base: list, c: Constraint, env: dict) -> list:
+    """Append a deciding constraint's anchored refs (RefSpec) to base, deduped.
+    policy_doc -> literal path; record_path -> resolve($source, env) when it lands."""
+    out = list(base)
+    for r in getattr(c, "refs", []) or []:
+        if r.kind == "policy_doc" and r.path:
+            v = r.path
+        elif r.kind == "record_path":
+            rv = resolve(r.source, env)
+            v = str(rv) if rv not in (None, "") else None
+        else:
+            v = None
+        if v and v not in out:
+            out.append(v)
+    return out
