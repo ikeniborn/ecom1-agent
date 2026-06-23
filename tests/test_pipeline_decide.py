@@ -131,6 +131,80 @@ def test_t38_cure_identity_only_deny_gated_loop_runs_ok():
     assert m["cycles_used"] >= 1   # loop ran; preflight did NOT short-circuit at cycles=0
 
 
+def test_preflight_defers_record_citing_checkout_then_loop_denies():
+    # T3 regression: when required_refs["OUTCOME_DENIED_SECURITY"] contains a record_path
+    # RefSpec, security_preflight must DEFER (return None) so the loop runs and the basket
+    # record is discovered before the denial is issued.
+    # Verifies: cycles_used >= 1 (loop ran), outcome == OUTCOME_DENIED_SECURITY,
+    # basket record path in answer_refs, no mutation on vm.
+    _BASKET_PATH = "/proc/baskets/basket_139.json"
+    intent = json.dumps({
+        "objective": "checkout", "desired_outcome": "deny", "params": {},
+        "outcome_space": ["OUTCOME_OK", "OUTCOME_DENIED_SECURITY", "OUTCOME_NONE_UNSUPPORTED"],
+        "constraints": [{"anchor": "#co", "rule": "guests cannot checkout",
+                         "security": True, "protected_action": True,
+                         "deny_when": {"op": "ne", "lhs": "$_facts.identity.kind",
+                                       "rhs": "customer"}}],
+        "success_criteria": {},
+        "answer_shape": {},
+        "required_refs": {
+            "OUTCOME_DENIED_SECURITY": [
+                {"kind": "policy_doc", "path": "/docs/checkout.md"},
+                {"kind": "record_path", "source": "$basket.record_path"},
+            ],
+        },
+    })
+    # PLAN: read-only discovery of the basket, then deny.
+    # The basket query returns one row with record_path; compute first binds $basket.
+    plan = json.dumps({
+        "discovery": [{"rpc": "Exec",
+                       "args": {"path": "/bin/sql",
+                                "stdin": "SELECT record_path FROM shopping_baskets LIMIT 1"},
+                       "bind": "raw"}],
+        "rowsets": [{"from": "raw", "format": "auto_delim", "into": "rows", "columns": []}],
+        "compute": [{"prim": "first", "args": ["$rows"], "into": "basket"}],
+        "decision": {
+            "branches": [{"when": {"op": "ne", "lhs": "$_facts.identity.kind", "rhs": "customer"},
+                          "label": "deny"}],
+            "default_label": "ok",
+        },
+        "ops": [],
+        "answer": {
+            "deny": {"message": "Denied: guests cannot checkout.",
+                     "outcome": "OUTCOME_DENIED_SECURITY",
+                     "refs": ["$basket.record_path", "/docs/checkout.md"]},
+            "ok": {"message": "OK", "outcome": "OUTCOME_OK", "refs": []},
+        },
+        "custom_extract": [],
+    })
+    vm = MagicMock()
+    # Discovery exec returns one basket row with record_path column.
+    vm.exec.return_value = {"stdout": f"record_path\n{_BASKET_PATH}"}
+    facts = {"identity": {"kind": "guest"}}
+    # LLM sequence: INTENT + one PLAN. Preflight MUST defer (record_path in required_refs),
+    # so PLAN is called; if PLAN is never called the deny short-circuited wrongly.
+    with patch("agent.pipeline.call_llm_raw", side_effect=_seq(intent, plan)):
+        m = run_pipeline(vm, instruction="checkout my basket", task_id="t_t50_defer",
+                         agents_md_text="A", facts=facts)
+    vm.answer.assert_called_once()
+    # Preflight deferred -> loop ran (cycles_used >= 1, NOT cycles=0).
+    assert m["cycles_used"] >= 1, (
+        f"Expected loop to run (cycles >= 1) but got cycles_used={m['cycles_used']}. "
+        "security_preflight should have deferred due to record_path in required_refs."
+    )
+    assert m["outcome"] == "OUTCOME_DENIED_SECURITY"
+    # The basket record path must appear in the answer refs.
+    assert _BASKET_PATH in m.get("answer_refs", []), (
+        f"Expected {_BASKET_PATH!r} in answer_refs={m.get('answer_refs')}. "
+        "decide_outcome should resolve $basket.record_path from the bound env."
+    )
+    # /docs/checkout.md must also be cited (policy_doc required_ref).
+    assert "/docs/checkout.md" in m.get("answer_refs", [])
+    # No mutation: the checkout op is guarded behind the allow branch only.
+    vm.write.assert_not_called()
+    vm.delete.assert_not_called()
+
+
 def test_t50_protected_action_preflight_deny_with_required_ref():
     # t50 path: guest identity + protected_action-marked constraint ->
     # has_protected_action(intent, None) = True -> NOT gated -> security_deny fires ->

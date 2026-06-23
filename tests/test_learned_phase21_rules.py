@@ -25,6 +25,17 @@ def test_t50_g001_active_and_method_shaped():
     content = g.get("content") or ""
     assert "checkout" in content.lower()
     assert "protected_action" in content
+    # resolve-before-deny: must mention read-only discovery before the denial
+    assert (
+        "resolve-before-deny" in content.lower()
+        or "read-only" in content.lower()
+        or "read only" in content.lower()
+    ), "g001 must mention read-only/resolve-before-deny discovery pattern"
+    # basket record ref in denial required_refs
+    assert "record_path" in content, "g001 must mention record_path RefSpec in denial refs"
+    assert (
+        "basket" in content.lower()
+    ), "g001 must mention basket record in the denial"
 
 
 def test_t38_g001_is_no_answer_value():
