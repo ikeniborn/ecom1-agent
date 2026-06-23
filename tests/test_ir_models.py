@@ -223,3 +223,43 @@ def test_constraint_back_compatible_minimal_shape():
 def test_constraint_still_rejects_unknown_key():
     with pytest.raises(ValidationError):
         Constraint(anchor="#a", rule="r", bogus_field=1)
+
+
+# --- Task 1: AnswerShape typed-shape declaration fields ---
+
+from agent.ir_models import AnswerShape
+
+
+def test_answer_shape_accepts_typed_fields():
+    s = AnswerShape(msg_skeleton="EUR {amt}", kind="money",
+                    columns=["sku", "qty"], rows_from="rows")
+    assert s.kind == "money"
+    assert s.columns == ["sku", "qty"]
+    assert s.rows_from == "rows"
+
+
+def test_answer_shape_back_compatible_minimal_shape():
+    # The legacy shape (only msg_skeleton) still validates with safe defaults.
+    s = AnswerShape(msg_skeleton="count: {count}")
+    assert s.kind == ""
+    assert s.columns == []
+    assert s.rows_from == ""
+
+
+def test_answer_shape_default_empty():
+    s = AnswerShape()
+    assert s.msg_skeleton == "" and s.kind == "" and s.columns == [] and s.rows_from == ""
+
+
+def test_answer_shape_rejects_unknown_key():
+    with pytest.raises(ValidationError):
+        AnswerShape(msg_skeleton="x", bogus=1)
+
+
+def test_intent_with_persisted_answer_shape_still_loads():
+    # A persisted intent.json carries only msg_skeleton — must still validate.
+    intent = IntentSpec(objective="o", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK"], constraints=[],
+                        success_criteria={}, answer_shape={"msg_skeleton": "qty=%d"},
+                        required_refs={})
+    assert intent.answer_shape.kind == ""
