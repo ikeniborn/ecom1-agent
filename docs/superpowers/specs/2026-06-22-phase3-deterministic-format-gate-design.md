@@ -1,7 +1,7 @@
 ---
 review:
-  spec_hash: f9ae40e6efa6d116
-  last_run: 2026-06-22
+  spec_hash: 66967c9869af9c8c
+  last_run: 2026-06-23
   phases:
     structure:    { status: passed }
     coverage:     { status: passed }
@@ -12,7 +12,7 @@ review:
       phase: clarity
       severity: WARNING
       section: Design
-      section_hash: null
+      section_hash: 7176f94a126e53c9
       text: >-
         Count format has no resolution source/DoD. Goal states the pattern as
         `count: %d`, but Design says count → "substitute into the task's exact
@@ -24,11 +24,24 @@ review:
       phase: clarity
       severity: INFO
       section: Error handling
-      section_hash: null
+      section_hash: 51517873fea52204
       text: >-
         Term "Best-effort" is vague-flagged but self-defined on the same line
         ("never raises: a formatting failure returns the original message"), so DoD
         is present. INFO only.
+      verdict: open
+      verdict_at: null
+    - id: F-003
+      phase: coverage
+      severity: WARNING
+      section: Design
+      section_hash: 7176f94a126e53c9
+      text: >-
+        Untethered requirement: Design item 1 lists a `table/quote -> exact TSV per
+        answer_shape` formatter, but table/quote is not among the Goal's enumerated
+        patterns (money/boolean/count/AGENTS.MD tokens), has no motivating evidence,
+        no Testing coverage, and is absent from Success criteria. Extra requirement
+        not tied to a stated task.
       verdict: open
       verdict_at: null
 chain:
