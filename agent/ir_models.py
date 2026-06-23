@@ -62,6 +62,9 @@ class Constraint(BaseModel):
 class AnswerShape(BaseModel):
     model_config = ConfigDict(extra="forbid")
     msg_skeleton: str = ""
+    kind: str = ""            # "" -> format gate infers (money/boolean/count); else explicit
+    columns: list[str] = []   # TSV column order for kind in {"table","quote"}
+    rows_from: str = ""       # env binding name holding the row list for table/quote
 
 
 class RefSpec(BaseModel):
