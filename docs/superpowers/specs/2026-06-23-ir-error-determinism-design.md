@@ -2,7 +2,7 @@
 chain:
   intent: docs/superpowers/intents/2026-06-23-ir-error-determinism-intent.md
 review:
-  spec_hash: 4c0ed7bb505ae420
+  spec_hash: 0acea807872811e2
   last_run: 2026-06-23
   phases:
     structure:    { status: passed }
@@ -15,7 +15,7 @@ review:
       phase: consistency
       severity: INFO
       section: "B — deterministic error/terminal outcome from `outcome_space` (`agent/pipeline.py`)"
-      section_hash: c6bc47a0e6727d31
+      section_hash: 1a3489a1a85dcd28
       text: >-
         §B opening sentence lists both pipeline.py:321 (INTENT hard-stop) and
         pipeline.py:493 (loop-exhaust/break) among the terminal sites the hardcoded
@@ -140,11 +140,16 @@ which may be out-of-space for the task. (The INTENT hard-stop at pipeline.py:321
   declares neither negative (defensive; preserves today's behaviour for such tasks).
   (The INTENT hard-stop at pipeline.py:321 fires before INTENT is available → keep its
   literal `OUTCOME_NONE_CLARIFICATION`; B applies only where `intent` exists.)
-- **Mid-loop unrecoverable step error with cycle budget left:** if `outcome_space` contains
-  a valid negative, the terminal answer uses it (per above). If it contains NO negative at
-  all, do not answer an out-of-space outcome — route to `_ilearn` and retry (give the model
-  a chance to widen the space / handle the error) until the budget exhausts. This is the
-  intent's "refuse→iLEARN if no valid negative".
+- **Break decisions are unchanged; B touches only the terminal outcome.** Every hard break
+  (mutation landed, the `stuck_on_same_error` / identical-plan anti-loop guards, a
+  non-retryable VM error on a mutating plan, the empty-plan streak) MUST break — overriding
+  it to keep retrying would defeat mutation-safety and the anti-loop guards. `_ilearn`
+  already fires before each such break, so the model still gets its learnable signal without
+  changing the break decision. At loop exhaust the pipeline must answer once: it emits the
+  precedence-selected negative when the space declares one, else the defensive
+  `OUTCOME_NONE_CLARIFICATION` floor. A space that declares no `NONE_*` outcome cannot
+  express "I could not" — that is an INTENT under-specification, not a pipeline choice; the
+  floor is the honest terminal there.
 
 ## Error handling
 
@@ -166,10 +171,13 @@ which may be out-of-space for the task. (The INTENT hard-stop at pipeline.py:321
   fails I1 on OUTCOME_OK, OUTCOME_DENIED_SECURITY, and OUTCOME_NONE_UNSUPPORTED; a resolved
   record_path passes; an outcome with no declared required ref passes; a resolvable
   `policy_doc`-only outcome passes.
-- `tests/test_pipeline_*.py` (B): `negative_outcome_by_precedence` returns UNSUPPORTED when
-  both present, CLARIFICATION when only it is present, `None` when neither; a terminal break
-  with `outcome_space` lacking CLARIFICATION yields a valid in-space negative; an
-  unrecoverable error with no negative in space drives iLEARN (not an out-of-space answer).
+- `tests/test_pipeline_outcome.py` (B unit): `negative_outcome_by_precedence` returns
+  UNSUPPORTED when both present, CLARIFICATION when only it is present, `None` when neither
+  (and for an empty/None space).
+- `tests/test_pipeline_*.py` (B integration): a `run_pipeline` run that exhausts the loop
+  (every PLAN cycle fails verify) on a task whose `outcome_space` lists UNSUPPORTED but not
+  CLARIFICATION ends by answering `OUTCOME_NONE_UNSUPPORTED` (the in-space negative), not the
+  hardcoded CLARIFICATION.
 - Regression: full `pytest tests/ -q` green (the 159 determinism tests included).
 - Real validation: benchmark run on `t01 t10 t38 t50`; assert t01/t50 outcome shift (or a
   precise evidenced upstream explanation), t38 unchanged (impossible-leg), t10 no regression.
