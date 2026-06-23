@@ -51,7 +51,12 @@ class Constraint(BaseModel):
     anchor: str
     rule: str
     security: bool = False
-    deny_when: PredExpr | None = None   # I3: evaluated True => deny (security only)
+    deny_when: PredExpr | None = None        # security deny predicate (verify I3 / decide.security_deny)
+    requires_protected_action: bool = False  # blast-radius gate: this deny fires only when a protected action is in play
+    protected_action: bool = False           # marks this constraint as guarding a protected action (checkout/refund/discount/...)
+    unsupported_when: PredExpr | None = None  # terminal-state holds -> OUTCOME_NONE_UNSUPPORTED (decide)
+    clarify_when: PredExpr | None = None      # genuine ambiguity holds -> OUTCOME_NONE_CLARIFICATION (decide)
+    refs: list["RefSpec"] = []               # anchored refs cited when this constraint decides the outcome
 
 
 class AnswerShape(BaseModel):
@@ -93,6 +98,9 @@ class RefSpec(BaseModel):
     def read_target(self) -> "str | None":
         """The path a read-only investigator should read to ground this ref, else None."""
         return self.path if self.kind == "policy_doc" else None
+
+
+Constraint.model_rebuild()   # resolve the forward ref `refs: list["RefSpec"]`
 
 
 class IntentSpec(BaseModel):

@@ -136,3 +136,90 @@ def test_i1_unresolved_record_path_source_skipped_when_path_present():
         env={"row": {"record_path": "/proc/catalog/A.json"}})
     ok2, err2 = verify(res_env_resolves, intent)
     assert not ok2 and "/proc/catalog/A.json" in err2
+
+
+def test_i3_reverse_denied_without_holding_predicate_fails():
+    # A declared security deny_when exists but does NOT hold, yet the outcome is DENIED
+    # -> spurious over-refusal -> verify rejects (the 5-over-refusal class).
+    intent = _intent(constraints=[{"anchor": "#sec", "rule": "no override", "security": True,
+                                    "deny_when": {"op": "contains_any", "lhs": "$tags", "rhs": ["override"]}}])
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_DENIED_SECURITY",
+                                 refs=["/docs/security.md"]), env={"tags": []})
+    ok, err = verify(res, intent)
+    assert not ok and "DENIED_SECURITY" in err
+
+
+def test_i3_reverse_denied_with_no_declared_predicate_passes():
+    # No declared security deny_when at all -> the model's denial is not second-guessed.
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_DENIED_SECURITY",
+                                 refs=["/docs/security.md"]))
+    ok, err = verify(res, _intent())
+    assert ok, err
+
+
+def test_i3_reverse_denied_with_holding_predicate_passes():
+    intent = _intent(constraints=[{"anchor": "#sec", "rule": "no override", "security": True,
+                                   "deny_when": {"op": "contains_any", "lhs": "$tags", "rhs": ["override"]}}])
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_DENIED_SECURITY",
+                                 refs=["/docs/security.md"]), env={"tags": ["override"]})
+    ok, err = verify(res, intent)
+    assert ok, err
+
+
+# ── T2: identity-only gate (decide/verify parity) ────────────────────────────
+
+_IDENTITY_DENY = {
+    "anchor": "#id-sec", "rule": "guests denied", "security": True,
+    "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"},
+}
+_IDENTITY_DENY_PROTECTED = dict(_IDENTITY_DENY, protected_action=True)
+
+# verify builds env["identity"] from result.env["_facts"]["identity"]; pass via _facts.
+_GUEST_ENV = {"_facts": {"identity": {"kind": "guest"}}}
+
+
+def test_i3_forward_identity_only_deny_gated_passes():
+    """Gated identity-only deny holds, outcome=OUTCOME_OK, no protected marker → PASS.
+
+    Pre-T2: verify's forward I3 demands DENIED_SECURITY and REJECTS the OK.
+    Post-T2: the gate skips this constraint → OK accepted.
+    """
+    intent = _intent(constraints=[_IDENTITY_DENY])
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]),
+                  env=_GUEST_ENV)
+    ok, err = verify(res, intent)
+    assert ok, f"Expected PASS (gated identity-only deny); got err={err!r}"
+
+
+def test_i3_forward_identity_only_deny_enforced_when_protected():
+    """Same deny but protected_action=True → gate OFF → verify still demands DENIED."""
+    intent = _intent(constraints=[_IDENTITY_DENY_PROTECTED])
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]),
+                  env=_GUEST_ENV)
+    ok, err = verify(res, intent)
+    assert not ok and "security" in err.lower(), \
+        f"Expected FAIL (protected, gate OFF); got ok={ok} err={err!r}"
+
+
+def test_i3_reverse_identity_only_deny_gated_spurious_over_refusal():
+    """Outcome=DENIED_SECURITY justified ONLY by a gated identity-only deny (not protected).
+
+    The gated constraint must NOT count as valid justification → verify FAILS (spurious
+    over-refusal).
+    """
+    intent = _intent(constraints=[_IDENTITY_DENY])
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_DENIED_SECURITY",
+                                 refs=["/docs/security.md"]), env=_GUEST_ENV)
+    ok, err = verify(res, intent)
+    assert not ok and "DENIED_SECURITY" in err, \
+        f"Expected FAIL (spurious over-refusal); got ok={ok} err={err!r}"
+
+
+def test_i3_reverse_identity_only_deny_protected_passes():
+    """DENIED_SECURITY justified by an identity-only deny on a protected_action=True
+    constraint (protected=True) → gate OFF → PASS."""
+    intent = _intent(constraints=[_IDENTITY_DENY_PROTECTED])
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_DENIED_SECURITY",
+                                 refs=["/docs/security.md"]), env=_GUEST_ENV)
+    ok, err = verify(res, intent)
+    assert ok, f"Expected PASS (protected, gate OFF); got err={err!r}"

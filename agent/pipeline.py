@@ -284,6 +284,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     from .reason import IntentError, PlanEmptyError, PlanError, run_intent, run_plan
     from .verify import verify
     from .grounding import ground_refs
+    from .decide import decide_outcome, security_preflight
 
     # Surface collapse (D5): PLAN sees all active rules; the grader-feedback
     # training-mode bug self-heals because learn_from_grader writes the same store.
@@ -319,6 +320,20 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         answer_once("INTENT failed", "OUTCOME_NONE_CLARIFICATION", [])
         return {"cycles_used": 0, "outcome": "OUTCOME_NONE_CLARIFICATION",
                 "status": "failure", "input_tokens": total_in, "output_tokens": total_out}
+
+    # Security preflight (Phase 2): a deterministic terminal deny BEFORE any plan runs,
+    # driven by IntentSpec security constraints + /bin/id identity (never PLAN's choice).
+    # Identity/facts-based deny_when can fire here; plan-derived predicates resolve to
+    # None pre-loop and simply do not hold. Runs before INVESTIGATE so a clear deny does
+    # not spend the ReAct budget.
+    pre = security_preflight(intent, vm, facts)
+    if pre is not None:
+        _outcome, _msg, _refs = pre
+        save_last_run(task_id, "failure", _outcome, 0)
+        answer_once(_msg, _outcome, _refs)
+        return {"cycles_used": 0, "outcome": _outcome, "status": "failure",
+                "input_tokens": total_in, "output_tokens": total_out,
+                "answer_message": _msg, "answer_refs": _refs}
 
     # INVESTIGATE (read-only ReAct) — build a compact brief the PLAN consumes in place
     # of the front-loaded facts dump. Skipped (oracle dumped eagerly above) when off.
@@ -436,6 +451,12 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         _docs_read = (brief.env.get("docs_read") if brief is not None else None) or []
         result.captured.refs = ground_refs(intent, result.captured, result, vm,
                                             instruction, docs_read=_docs_read)
+        # Phase 2: deterministic outcome decision (security deny / unsupported / clarify
+        # / anti-give-up OK) overwrites the PLAN-authored outcome BEFORE verify, which
+        # then becomes the consistency gate rather than the place outcomes are born.
+        _decided_outcome, _decided_refs = decide_outcome(intent, result, vm, facts)
+        result.captured.outcome = _decided_outcome
+        result.captured.refs = _decided_refs
         ok, verr = verify(result, intent)
         log_gate_auto("VERIFY", ok, "" if ok else verr)
         if ok:

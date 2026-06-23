@@ -1,21 +1,24 @@
 entries:
 - agents_md_anchor: null
-  content: Do not use the concat primitive to build SQL query strings; concat is only for merging rowsets.
-    Instead, construct the SQL query using a string template with variable substitution directly in the
-    Exec step's stdin field, or use a dedicated string-formatting primitive if available.
+  content: Do not use the concat primitive to build SQL query strings; concat is only
+    for merging rowsets. Instead, construct the SQL query using a string template
+    with variable substitution directly in the Exec step's stdin field, or use a dedicated
+    string-formatting primitive if available.
   created: '2026-06-22'
   deactivated_reason: null
   id: r007
-  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes 2 positional arguments
-    but 3 were given. CONTRACT: concat(a, b): both args must be list[dict] rows (parse Exec output via
-    rowsets first)''. Root cause: PlanIR used concat primitive with three string arguments to assemble
-    a SQL query, violating the primitive''s contract. Failing fragment: compute step {"prim":"concat","args":["SELECT
-    basket_id, record_path, basket_status, store_id FROM shopping_baskets WHERE customer_id = ''","$cid","''
-    AND basket_status = ''open'' ORDER BY basket_created_at DESC LIMIT 1"],"into":"basket_sql"}. The concat
-    primitive is designed to merge rowsets, not strings. The plan should instead embed the variable directly
-    in the Exec stdin using a template (e.g., stdin: "SELECT ... WHERE customer_id = ''$cid'' AND ...")
-    or use a string-formatting primitive if the toolset provides one. This rule prevents future misuse
-    of concat for string assembly.'
+  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes
+    2 positional arguments but 3 were given. CONTRACT: concat(a, b): both args must
+    be list[dict] rows (parse Exec output via rowsets first)''. Root cause: PlanIR
+    used concat primitive with three string arguments to assemble a SQL query, violating
+    the primitive''s contract. Failing fragment: compute step {"prim":"concat","args":["SELECT
+    basket_id, record_path, basket_status, store_id FROM shopping_baskets WHERE customer_id
+    = ''","$cid","'' AND basket_status = ''open'' ORDER BY basket_created_at DESC
+    LIMIT 1"],"into":"basket_sql"}. The concat primitive is designed to merge rowsets,
+    not strings. The plan should instead embed the variable directly in the Exec stdin
+    using a template (e.g., stdin: "SELECT ... WHERE customer_id = ''$cid'' AND ...")
+    or use a string-formatting primitive if the toolset provides one. This rule prevents
+    future misuse of concat for string assembly.'
   status: active
   surface: ir
 - agents_md_anchor: null
@@ -24,48 +27,97 @@ entries:
   created: '2026-06-22'
   deactivated_reason: null
   id: r008
-  reasoning: 'verify: I3: security constraint ''#security-guest-checkout-denied'' deny_when holds but
-    outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY. The PlanIR included a discovery step
-    to run /bin/id and bind it as ''identity'', then used $identity.kind in the decision branch. The pre-phase
-    already resolved identity.kind as ''guest'', but the PlanIR''s re-resolution returned ''customer''
-    (or the branch used the wrong source). The security constraint requires that when identity.kind is
-    ''guest'', the outcome must be DENIED_SECURITY. The PlanIR''s decision branch used $identity.kind
-    (from its own discovery) instead of $_facts.identity.kind, causing the branch to not fire and default
-    to OUTCOME_NONE_UNSUPPORTED, violating the constraint. The PlanIR must not re-resolve identity; it
-    must use the pre-resolved $_facts.identity.kind directly.'
+  reasoning: 'verify: I3: security constraint ''#security-guest-checkout-denied''
+    deny_when holds but outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY.
+    The PlanIR included a discovery step to run /bin/id and bind it as ''identity'',
+    then used $identity.kind in the decision branch. The pre-phase already resolved
+    identity.kind as ''guest'', but the PlanIR''s re-resolution returned ''customer''
+    (or the branch used the wrong source). The security constraint requires that when
+    identity.kind is ''guest'', the outcome must be DENIED_SECURITY. The PlanIR''s
+    decision branch used $identity.kind (from its own discovery) instead of $_facts.identity.kind,
+    causing the branch to not fire and default to OUTCOME_NONE_UNSUPPORTED, violating
+    the constraint. The PlanIR must not re-resolve identity; it must use the pre-resolved
+    $_facts.identity.kind directly.'
   status: active
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/baskets/basket_152.json'
   source: verdict
-  status: active
-  submitted_message: Checkout cannot be performed because you are not authenticated as a customer.
+  status: inactive
+  submitted_message: Checkout cannot be performed because you are not authenticated
+    as a customer.
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
   - /docs/checkout.md
 - agents_md_anchor: null
-  content: Always include a reference to the primary discovered record (the one matching the objective's
-    target entity) in the answer's refs array, even if the answer shape does not explicitly require it.
+  content: Always include a reference to the primary discovered record (the one matching
+    the objective's target entity) in the answer's refs array, even if the answer
+    shape does not explicitly require it.
   created: '2026-06-22'
   deactivated_reason: null
   id: r009
   reasoning: 'The grader reported: ''answer missing required reference ''/proc/baskets/basket_152.json''''.
-    The PlanIR discovered the newest open basket and placed a record ref with path ''$newest_open_basket_path''
-    in the answer''s refs array for both outcome branches. However, the interpreter likely omitted this
-    ref because the answer shape only specified a message skeleton and did not mandate any refs beyond
-    the policy docs. The root cause is that the PlanIR assumed the interpreter would include the refs,
-    but the interpreter only includes what the answer shape explicitly requires. The corrective rule ensures
-    that discovered record refs are always included in the answer, regardless of the answer shape.'
+    The PlanIR discovered the newest open basket and placed a record ref with path
+    ''$newest_open_basket_path'' in the answer''s refs array for both outcome branches.
+    However, the interpreter likely omitted this ref because the answer shape only
+    specified a message skeleton and did not mandate any refs beyond the policy docs.
+    The root cause is that the PlanIR assumed the interpreter would include the refs,
+    but the interpreter only includes what the answer shape explicitly requires. The
+    corrective rule ensures that discovered record refs are always included in the
+    answer, regardless of the answer shape.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-23'
+  deactivated_reason: null
+  id: v016
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/checkout.md'
+  source: verdict
+  status: active
+  submitted_message: 'Denied by security policy: Guest identities are not authorized
+    to access customer-specific resources, including baskets.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
+- agents_md_anchor: null
+  content: 'A checkout / basket submission is a PROTECTED MUTATION that requires
+    resolve-before-deny: (1) Do a READ-ONLY discovery of the most-recent basket FIRST
+    (e.g. SELECT basket_id, record_path FROM shopping_baskets WHERE ... ORDER BY ...
+    DESC LIMIT 1), bind the result, compute the basket dict via a ''first'' step, and
+    guard the actual checkout mutation op behind the allow branch only so it never
+    executes on the deny path. (2) Mark the guarding security constraint with
+    protected_action: true AND declare a record_path RefSpec
+    ({"kind":"record_path","source":"$basket.record_path"}) in
+    required_refs["OUTCOME_DENIED_SECURITY"] alongside the checkout policy doc — the
+    record_path entry defers the preflight so the loop runs and decide_outcome resolves
+    $basket.record_path from the bound env post-discovery. (3) Declare the checkout
+    policy doc (e.g. /docs/checkout.md) in required_refs["OUTCOME_DENIED_SECURITY"]
+    so the denial cites it.'
+  created: '2026-06-23'
+  deactivated_reason: null
+  id: g001
+  pinned: true
+  reasoning: The grader requires both the checkout policy doc and the discovered basket
+    record path in the denial refs. A preflight-only deny fires before the loop so
+    the basket record_path is never resolved. The fix is resolve-before-deny — run a
+    read-only basket discovery first, then let decide_outcome re-issue the denial
+    post-discovery with the basket record grounded. The record_path RefSpec in
+    required_refs["OUTCOME_DENIED_SECURITY"] defers the preflight (security_preflight
+    returns None when any required ref is a record_path), the loop runs, the plan binds
+    $basket, and decide_outcome resolves $basket.record_path from the bound env.
   status: active
   surface: ir
 last_run:
-  cycles_used: 1
-  date: '2026-06-22'
-  outcome: OUTCOME_NONE_UNSUPPORTED
+  cycles_used: 0
+  date: '2026-06-23'
+  outcome: OUTCOME_DENIED_SECURITY
   status: failure
 task_id: t50

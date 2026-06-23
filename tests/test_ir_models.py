@@ -187,3 +187,39 @@ def test_refspec_record_path_not_investigator_groundable():
     assert r.env_key() is None
     assert r.grounded({}) is None
     assert r.read_target() is None
+
+
+# --- Task 1: Constraint decision fields ---
+
+from agent.ir_models import Constraint
+
+
+def test_constraint_accepts_new_decision_fields():
+    c = Constraint(
+        anchor="#sec", rule="no override", security=True,
+        deny_when={"op": "nonempty", "lhs": "$flags"},
+        requires_protected_action=True, protected_action=True,
+        unsupported_when={"op": "eq", "lhs": "$state", "rhs": "paid"},
+        clarify_when={"op": "isnull", "lhs": "$amount"},
+        refs=[{"kind": "policy_doc", "path": "/docs/security.md"}],
+    )
+    assert c.requires_protected_action is True
+    assert c.protected_action is True
+    assert c.unsupported_when.op == "eq"
+    assert c.clarify_when.op == "isnull"
+    assert c.refs[0].kind == "policy_doc"
+
+
+def test_constraint_back_compatible_minimal_shape():
+    # The legacy shape (no new fields) still validates with safe defaults.
+    c = Constraint(anchor="#a", rule="r")
+    assert c.requires_protected_action is False
+    assert c.protected_action is False
+    assert c.unsupported_when is None
+    assert c.clarify_when is None
+    assert c.refs == []
+
+
+def test_constraint_still_rejects_unknown_key():
+    with pytest.raises(ValidationError):
+        Constraint(anchor="#a", rule="r", bogus_field=1)
