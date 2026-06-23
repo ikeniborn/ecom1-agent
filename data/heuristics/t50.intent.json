@@ -1,45 +1,112 @@
 {
-  "objective": "Checkout the newest open basket for the caller's account, if the caller is a customer and the basket is ready today; otherwise, indicate the operation is unsupported.",
-  "desired_outcome": "OUTCOME_NONE_UNSUPPORTED",
+  "objective": "Checkout the newest open basket for the caller's account, if it is ready today.",
+  "desired_outcome": "OUTCOME_NONE_CLARIFICATION",
   "params": {
-    "customer_id": "$_facts.identity.customer_id",
-    "basket": "newest open basket for that customer_id from shopping_baskets where basket_status = 'open' order by basket_created_at desc limit 1"
+    "customer_id": "resolved from $_facts.identity if kind is customer, else null",
+    "basket": "most recent open basket for $customer_id from shopping_baskets where customer_id = $customer_id and basket_status = 'open' order by basket_created_at desc limit 1"
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_NONE_UNSUPPORTED"
+    "OUTCOME_DENIED_SECURITY",
+    "OUTCOME_NONE_CLARIFICATION"
   ],
-  "constraints": [],
+  "constraints": [
+    {
+      "anchor": "# security.md customer-ownership",
+      "rule": "A customer may only access or modify their own records.",
+      "security": true,
+      "deny_when": {
+        "op": "and",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "eq",
+            "lhs": "$_facts.identity.kind",
+            "rhs": "customer",
+            "args": []
+          },
+          {
+            "op": "ne",
+            "lhs": "$basket.customer_id",
+            "rhs": "$_facts.identity.customer_id",
+            "args": []
+          }
+        ]
+      },
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    },
+    {
+      "anchor": "/docs/checkout.md",
+      "rule": "Checkout is a protected mutation; must resolve basket before deny.",
+      "security": true,
+      "deny_when": {
+        "op": "ne",
+        "lhs": "$basket.basket_status",
+        "rhs": "open",
+        "args": []
+      },
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    }
+  ],
   "success_criteria": {
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$answer.basket_id",
+        "lhs": "$payment.payment_id",
         "rhs": null,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$basket.basket_status",
+        "rhs": "checked_out",
         "args": []
       }
     ],
-    "OUTCOME_NONE_UNSUPPORTED": [
-      {
-        "op": "eq",
-        "lhs": "$_facts.identity.kind",
-        "rhs": "guest",
-        "args": []
-      }
-    ]
+    "OUTCOME_DENIED_SECURITY": [],
+    "OUTCOME_NONE_CLARIFICATION": []
   },
   "answer_shape": {
-    "msg_skeleton": "Checkout result: {message}"
+    "msg_skeleton": "Unable to checkout: guest identity cannot have an account. Please log in as a customer.",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/checkout.md",
+        "source": null
+      },
       {
         "kind": "record_path",
         "path": null,
         "source": "$basket.record_path"
       }
     ],
-    "OUTCOME_NONE_UNSUPPORTED": [
+    "OUTCOME_DENIED_SECURITY": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/checkout.md",
+        "source": null
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$basket.record_path"
+      }
+    ],
+    "OUTCOME_NONE_CLARIFICATION": [
       {
         "kind": "policy_doc",
         "path": "/docs/checkout.md",

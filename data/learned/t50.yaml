@@ -75,31 +75,30 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-23'
-  deactivated_reason: null
+  deactivated_reason: superseded by newer verdict
   id: v016
   score: 0.0
   score_detail:
   - answer missing required reference '/docs/checkout.md'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Denied by security policy: Guest identities are not authorized
     to access customer-specific resources, including baskets.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: 'A checkout / basket submission is a PROTECTED MUTATION that requires
-    resolve-before-deny: (1) Do a READ-ONLY discovery of the most-recent basket FIRST
-    (e.g. SELECT basket_id, record_path FROM shopping_baskets WHERE ... ORDER BY ...
-    DESC LIMIT 1), bind the result, compute the basket dict via a ''first'' step, and
-    guard the actual checkout mutation op behind the allow branch only so it never
-    executes on the deny path. (2) Mark the guarding security constraint with
-    protected_action: true AND declare a record_path RefSpec
-    ({"kind":"record_path","source":"$basket.record_path"}) in
-    required_refs["OUTCOME_DENIED_SECURITY"] alongside the checkout policy doc — the
-    record_path entry defers the preflight so the loop runs and decide_outcome resolves
-    $basket.record_path from the bound env post-discovery. (3) Declare the checkout
-    policy doc (e.g. /docs/checkout.md) in required_refs["OUTCOME_DENIED_SECURITY"]
+  content: 'A checkout / basket submission is a PROTECTED MUTATION that requires resolve-before-deny:
+    (1) Do a READ-ONLY discovery of the most-recent basket FIRST (e.g. SELECT basket_id,
+    record_path FROM shopping_baskets WHERE ... ORDER BY ... DESC LIMIT 1), bind the
+    result, compute the basket dict via a ''first'' step, and guard the actual checkout
+    mutation op behind the allow branch only so it never executes on the deny path.
+    (2) Mark the guarding security constraint with protected_action: true AND declare
+    a record_path RefSpec ({"kind":"record_path","source":"$basket.record_path"})
+    in required_refs["OUTCOME_DENIED_SECURITY"] alongside the checkout policy doc
+    — the record_path entry defers the preflight so the loop runs and decide_outcome
+    resolves $basket.record_path from the bound env post-discovery. (3) Declare the
+    checkout policy doc (e.g. /docs/checkout.md) in required_refs["OUTCOME_DENIED_SECURITY"]
     so the denial cites it.'
   created: '2026-06-23'
   deactivated_reason: null
@@ -107,16 +106,30 @@ entries:
   pinned: true
   reasoning: The grader requires both the checkout policy doc and the discovered basket
     record path in the denial refs. A preflight-only deny fires before the loop so
-    the basket record_path is never resolved. The fix is resolve-before-deny — run a
-    read-only basket discovery first, then let decide_outcome re-issue the denial
-    post-discovery with the basket record grounded. The record_path RefSpec in
-    required_refs["OUTCOME_DENIED_SECURITY"] defers the preflight (security_preflight
-    returns None when any required ref is a record_path), the loop runs, the plan binds
-    $basket, and decide_outcome resolves $basket.record_path from the bound env.
+    the basket record_path is never resolved. The fix is resolve-before-deny — run
+    a read-only basket discovery first, then let decide_outcome re-issue the denial
+    post-discovery with the basket record grounded. The record_path RefSpec in required_refs["OUTCOME_DENIED_SECURITY"]
+    defers the preflight (security_preflight returns None when any required ref is
+    a record_path), the loop runs, the plan binds $basket, and decide_outcome resolves
+    $basket.record_path from the bound env.
   status: active
   surface: ir
+- content: null
+  created: '2026-06-23'
+  id: v017
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/baskets/basket_019.json'
+  source: verdict
+  status: active
+  submitted_message: 'Unable to checkout: guest identity cannot have an account. Please
+    log in as a customer.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/checkout.md
+  - /docs/security.md
 last_run:
-  cycles_used: 0
+  cycles_used: 1
   date: '2026-06-23'
   outcome: OUTCOME_DENIED_SECURITY
   status: failure

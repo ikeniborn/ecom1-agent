@@ -3,29 +3,29 @@
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/catalogue-addenda/2025-10-08-reporting-bins-organizers-vienna.md"
+        "path": "/docs/current-updates/catalogue-counting-2025-10-08-cleaning-liquids-linz.md"
       },
-      "bind": "policy_doc_content"
+      "bind": "policy_doc"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT COUNT(DISTINCT pv.product_sku) AS cnt FROM product_variants pv JOIN store_inventory si ON pv.product_sku = si.product_sku JOIN stores s ON si.store_id = s.store_id WHERE pv.product_kind_id = 'bins_organizers' AND s.city = 'Vienna' AND s.is_open = 1 AND si.available_today_quantity > 0;"
+        "stdin": "WITH cleaning_liquid_kind AS (\n  SELECT product_kind_id FROM product_kinds WHERE product_kind_name = 'Cleaning Liquid'\n),\ncleaning_liquid_skus AS (\n  SELECT pv.product_sku FROM product_variants pv JOIN cleaning_liquid_kind clk ON pv.product_kind_id = clk.product_kind_id\n),\nopen_linz_stores AS (\n  SELECT store_id FROM stores WHERE city = 'Linz' AND is_open = 1\n),\neligible_inventory AS (\n  SELECT si.product_sku FROM store_inventory si\n  JOIN cleaning_liquid_skus cls ON si.product_sku = cls.product_sku\n  JOIN open_linz_stores ols ON si.store_id = ols.store_id\n  WHERE si.available_today_quantity > 0\n)\nSELECT COUNT(DISTINCT product_sku) AS count_val FROM eligible_inventory;"
       },
-      "bind": "sql_output"
+      "bind": "sql_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "sql_output",
+      "from_": "sql_raw",
       "format": "auto_delim",
-      "into": "rows",
+      "into": "sql_rows",
       "columns": [
         {
-          "into": "cnt",
+          "into": "count_val",
           "candidates": [
-            "cnt"
+            "count_val"
           ]
         }
       ]
@@ -35,16 +35,17 @@
     {
       "prim": "first",
       "args": [
-        "$rows.0.cnt"
+        "$sql_rows"
       ],
-      "into": "cnt_raw"
+      "into": "first_row"
     },
     {
-      "prim": "to_number",
+      "prim": "get",
       "args": [
-        "$cnt_raw"
+        "$first_row",
+        "count_val"
       ],
-      "into": "count"
+      "into": "qty"
     }
   ],
   "decision": {
@@ -54,13 +55,13 @@
   "ops": [],
   "answer": {
     "ok": {
-      "message": "<COUNT:{count}>",
+      "message": "[QTY:{qty}]",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "policy_doc",
-          "path": "/docs/catalogue-addenda/2025-10-08-reporting-bins-organizers-vienna.md",
-          "source": "$policy_doc_content"
+          "path": "/docs/current-updates/catalogue-counting-2025-10-08-cleaning-liquids-linz.md",
+          "source": "$policy_doc"
         }
       ]
     }

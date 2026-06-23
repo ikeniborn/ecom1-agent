@@ -5,45 +5,68 @@
       "args": {
         "path": "/docs/payments/3ds.md"
       },
-      "bind": "$policy_3ds"
+      "bind": "policy_3ds"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "policy_security"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/checkout.md"
+      },
+      "bind": "policy_checkout"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH fraudulent_candidates AS (\n  SELECT pt.record_path, pt.is_archived_basket_reference, pt.customer_id, pt.payment_id\n  FROM payment_transactions pt\n  JOIN shopping_baskets sb ON pt.basket_id = sb.basket_id\n  WHERE pt.is_archived_basket_reference = 1\n    AND sb.basket_status = 'checked_out'\n    AND pt.payment_status = 'requires_3ds_action'\n    AND pt.three_ds_status = 'recoverable'\n    AND pt.three_ds_attempts < pt.three_ds_max_attempts\n)\nSELECT * FROM fraudulent_candidates;"
+        "stdin": "SELECT DISTINCT payment_status, three_ds_status FROM payment_transactions WHERE is_archived_basket_reference = 1;"
       },
-      "bind": "$raw_rows"
+      "bind": "archived_statuses_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT record_path FROM payment_transactions WHERE is_archived_basket_reference = 1 AND (payment_status = 'fraud' OR three_ds_status = 'failed');"
+      },
+      "bind": "fraud_records_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "$raw_rows",
+      "from_": "archived_statuses_raw",
       "format": "auto_delim",
-      "into": "$rows",
+      "into": "archived_statuses",
+      "columns": [
+        {
+          "into": "payment_status",
+          "candidates": [
+            "payment_status"
+          ]
+        },
+        {
+          "into": "three_ds_status",
+          "candidates": [
+            "three_ds_status"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "fraud_records_raw",
+      "format": "auto_delim",
+      "into": "record",
       "columns": [
         {
           "into": "record_path",
           "candidates": [
             "record_path"
-          ]
-        },
-        {
-          "into": "is_archived_basket_reference",
-          "candidates": [
-            "is_archived_basket_reference"
-          ]
-        },
-        {
-          "into": "customer_id",
-          "candidates": [
-            "customer_id"
-          ]
-        },
-        {
-          "into": "payment_id",
-          "candidates": [
-            "payment_id"
           ]
         }
       ]
@@ -53,100 +76,54 @@
     {
       "prim": "count",
       "args": [
-        "$rows"
+        "$record"
       ],
-      "into": "$count"
+      "into": "count"
     },
     {
       "prim": "column",
       "args": [
-        "$rows",
+        "$record",
         "record_path"
       ],
-      "into": "$record_paths_list"
+      "into": "record_path_list"
     },
     {
       "prim": "concat",
       "args": [
-        "$record_paths_list",
+        "$record_path_list",
         ", "
       ],
-      "into": "$record_paths"
+      "into": "record_paths"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "and",
-          "lhs": null,
-          "rhs": null,
-          "args": [
-            {
-              "op": "eq",
-              "lhs": "$_facts.identity.kind",
-              "rhs": "customer",
-              "args": []
-            },
-            {
-              "op": "ne",
-              "lhs": "$rows.0.customer_id",
-              "rhs": "$_facts.identity.customer_id",
-              "args": []
-            }
-          ]
-        },
-        "label": "deny_security"
-      },
-      {
-        "when": {
-          "op": "and",
-          "lhs": null,
-          "rhs": null,
-          "args": [
-            {
-              "op": "nonempty",
-              "lhs": "$rows.0.record_path",
-              "rhs": null,
-              "args": []
-            },
-            {
-              "op": "eq",
-              "lhs": "$rows.0.is_archived_basket_reference",
-              "rhs": 1,
-              "args": []
-            },
-            {
-              "op": "eq",
-              "lhs": "$count",
-              "rhs": 1,
-              "args": []
-            }
-          ]
+          "op": "ge",
+          "lhs": "$count",
+          "rhs": 1,
+          "args": []
         },
         "label": "ok"
       }
     ],
-    "default_label": "not_found"
+    "default_label": "none_unsupported"
   },
   "ops": [],
   "answer": {
-    "deny_security": {
-      "message": "Access denied: you do not own this payment record.",
-      "outcome": "OUTCOME_DENIED_SECURITY",
-      "refs": []
-    },
     "ok": {
-      "message": "Identified {count} fraudulent payment record(s): {record_paths}",
+      "message": "Identified {count} fraudulent archived payment records: {record_paths}",
       "outcome": "OUTCOME_OK",
       "refs": [
         "$policy_3ds",
-        "$rows.0.record_path"
+        "$record"
       ]
     },
-    "not_found": {
-      "message": "No fraudulent payment record found.",
-      "outcome": "OUTCOME_DENIED_SECURITY",
+    "none_unsupported": {
+      "message": "No fraudulent archived payment records found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }
   },

@@ -1,65 +1,35 @@
 {
-  "objective": "Identify the single fraudulent payment record from archived payments as indicated by the fraud review.",
+  "objective": "Identify all archived payment records that are fraudulent according to the fraud criteria in the payments/3DS policy, and cite each record's path.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "fraud_criteria": "derived from /docs/payments/3ds.md policy",
-    "archived_payments": "payment_transactions with is_archived_basket_reference = 1",
-    "fraudulent_payment": "the single payment_transactions record that is archived and meets fraud criteria per /docs/payments/3ds.md"
+    "fraud_identification_method": "Discover distinct payment_status and three_ds_status for archived payments (is_archived_basket_reference=1), then read /docs/payments/3ds.md for criteria that flag a payment as fraudulent, and select rows matching those criteria. Apply customer-ownership filter only if requester is a customer (here guest, so no filter)."
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_DENIED_SECURITY"
+    "OUTCOME_NONE_UNSUPPORTED"
   ],
-  "constraints": [
-    {
-      "anchor": "#security-customer-ownership",
-      "rule": "A customer may only access their own payment records.",
-      "security": true,
-      "deny_when": {
-        "op": "and",
-        "lhs": null,
-        "rhs": null,
-        "args": [
-          {
-            "op": "eq",
-            "lhs": "$_facts.identity.kind",
-            "rhs": "customer",
-            "args": []
-          },
-          {
-            "op": "ne",
-            "lhs": "$record.customer_id",
-            "rhs": "$_facts.identity.customer_id",
-            "args": []
-          }
-        ]
-      }
-    }
-  ],
+  "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
+        "op": "ge",
+        "lhs": "$answer.count",
+        "rhs": 1,
+        "args": []
+      },
+      {
         "op": "nonempty",
-        "lhs": "$rows.0.record_path",
+        "lhs": "$answer.record_paths",
         "rhs": null,
-        "args": []
-      },
-      {
-        "op": "eq",
-        "lhs": "$rows.0.is_archived_basket_reference",
-        "rhs": 1,
-        "args": []
-      },
-      {
-        "op": "eq",
-        "lhs": "$count",
-        "rhs": 1,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Identified {count} fraudulent payment record(s): {record_paths}"
+    "msg_skeleton": "Identified {count} fraudulent archived payment records: {record_paths}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
@@ -71,8 +41,9 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$rows.0.record_path"
+        "source": "$record.record_path"
       }
-    ]
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": []
   }
 }

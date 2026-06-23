@@ -74,7 +74,7 @@ entries:
   content: Do not use concat to set a literal string value; use a literal step or
     bind the string directly. Concat requires two list[dict] arguments.
   created: '2026-06-22'
-  deactivated_reason: 'superseded by pinned fuzzy-match method rule (cap)'
+  deactivated_reason: superseded by pinned fuzzy-match method rule (cap)
   id: r010
   reasoning: 'The PlanIR compute step ''concat'' was called with a single string argument
     ''Nut Bolt and Washer'', but concat expects two list[dict] arguments (rowsets).
@@ -84,41 +84,53 @@ entries:
   status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: "To answer ‘do you carry product X’, resolve the product using\
-    \ NORMALIZED / case-insensitive tokenized matching (ILIKE on the key tokens of\
-    \ brand + kind + descriptive attributes) on the product catalogue table —\
-    \ do NOT use exact full-string `series =` equality. Structure the plan to first\
-    \ discover candidate rows (a ‘first’ step with fuzzy/ILIKE filters),\
-    \ then get the sku/name/record_path from the matched record (a ‘get’\
-    \ or field-extract step). Return OUTCOME_NONE_UNSUPPORTED only when the product\
-    \ is genuinely absent after normalized fuzzy matching, not because an exact-match\
-    \ query returned zero rows."
+  content: To answer ‘do you carry product X’, resolve the product using NORMALIZED
+    / case-insensitive tokenized matching (ILIKE on the key tokens of brand + kind
+    + descriptive attributes) on the product catalogue table — do NOT use exact full-string
+    `series =` equality. Structure the plan to first discover candidate rows (a ‘first’
+    step with fuzzy/ILIKE filters), then get the sku/name/record_path from the matched
+    record (a ‘get’ or field-extract step). Return OUTCOME_NONE_UNSUPPORTED only when
+    the product is genuinely absent after normalized fuzzy matching, not because an
+    exact-match query returned zero rows.
   created: '2026-06-23'
   deactivated_reason: null
   id: g001
   pinned: true
-  reasoning: 'Task t01 failed repeatedly because PLAN used exact WHERE series = ''<full
-    descriptive string>'' which returned 0 rows even though the product exists. The
+  reasoning: Task t01 failed repeatedly because PLAN used exact WHERE series = '<full
+    descriptive string>' which returned 0 rows even though the product exists. The
     correct approach is to normalize and tokenize the product name, then match via
     ILIKE on individual tokens (brand, kind, key attributes). This pinned method rule
     ensures PLAN always uses fuzzy/tokenized matching and never falls back to exact-string
-    equality for catalogue existence checks.'
+    equality for catalogue existence checks.
   status: active
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v017
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
-  status: active
+  status: inactive
   submitted_message: The product  is not in the catalogue.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-23'
+  id: v018
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: We do not carry the Heco TopFix GTU-YPJ Wood and Drywall Screw
+    with drywall screw type.
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 last_run:
   cycles_used: 1
-  date: '2026-06-22'
-  outcome: OUTCOME_OK
-  status: success
+  date: '2026-06-23'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
 task_id: t01

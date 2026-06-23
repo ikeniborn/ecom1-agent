@@ -1,15 +1,44 @@
 {
-  "objective": "count rows",
+  "objective": "Determine whether the store carries the Heco TopFix GTU-YPJ Wood and Drywall Screw with screw type drywall screw.",
   "desired_outcome": "OUTCOME_OK",
-  "params": {},
+  "params": {
+    "product_lookup_method": "Use normalized case-insensitive tokenized matching (ILIKE) on product_variants: brand ILIKE '%Heco%', series ILIKE '%TopFix%', model ILIKE '%GTU-YPJ%', product_name ILIKE '%Wood%Drywall%Screw%', and join product_variant_properties to check property_key = 'screw type' and property_value_text ILIKE '%drywall screw%'. Return the first matching product_sku and record_path."
+  },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_NONE_CLARIFICATION"
+    "OUTCOME_NONE_UNSUPPORTED"
   ],
   "constraints": [],
-  "success_criteria": {},
-  "answer_shape": {
-    "msg_skeleton": ""
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$record.product_sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$record.record_path",
+        "rhs": null,
+        "args": []
+      }
+    ]
   },
-  "required_refs": {}
+  "answer_shape": {
+    "msg_skeleton": "We carry {product_name} (SKU: {product_sku}).",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$record.record_path"
+      }
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": []
+  }
 }
