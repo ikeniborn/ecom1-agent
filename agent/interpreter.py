@@ -286,6 +286,24 @@ def lint_security_first(plan: PlanIR) -> None:
         )
 
 
+_PATH_ARG_KEYS = ("path", "root")
+
+
+def lint_paths_absolute(plan: PlanIR) -> None:
+    """A1: a literal relative `path`/`root` in any step is a malformed plan — raise so the
+    pipeline routes to iLEARN with a precise message instead of dead-ending at the VM's
+    'must be absolute' error. Only literal args are checked; a $ref is resolved from env
+    at runtime and is not lintable here. Mirrors repair_sql_stdin's step iteration."""
+    for st in list(plan.discovery) + list(plan.ops):
+        for key in _PATH_ARG_KEYS:
+            v = st.args.get(key)
+            if isinstance(v, str) and v and not v.startswith("$") and not v.startswith("/"):
+                raise InterpretError(
+                    f"step '{st.rpc}' arg '{key}': path must be absolute "
+                    f"(got {v!r}); use an absolute path under /proc, /docs, /bin, ..."
+                )
+
+
 def repair_sql_stdin(plan: PlanIR) -> PlanIR:
     """Deterministic pre-lint repair (F3): deliver /bin/sql SQL on stdin (the reliable
     channel) instead of args (nondeterministic — intermittently yields the usage banner).
@@ -332,6 +350,7 @@ def lint(plan: PlanIR) -> None:
 
 def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResult:
     lint_security_first(plan)
+    lint_paths_absolute(plan)
     from .trace import set_step_type
     set_step_type("INTERPRET")
     env: dict = dict(intent.params or {})

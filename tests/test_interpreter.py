@@ -499,3 +499,51 @@ def test_fill_slots_brace_slot_regression():
 def test_fill_slots_mixed_slot_regression():
     """Mixed prose + brace slot still renders correctly."""
     assert _fill_slots("you have {n} items", {"n": 2}) == "you have 2 items"
+
+
+def test_lint_paths_absolute_rejects_relative_list_path():
+    import pytest
+    from agent.interpreter import InterpretError, lint_paths_absolute
+    from agent.ir_models import PlanIR, Step
+    plan = PlanIR(discovery=[Step(rpc="List", args={"path": "."})],
+                  decision={"branches": [], "default_label": "d"},
+                  answer={"d": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}})
+    with pytest.raises(InterpretError) as ei:
+        lint_paths_absolute(plan)
+    assert "absolute" in str(ei.value) and "List" in str(ei.value)
+
+
+def test_lint_paths_absolute_rejects_relative_find_root():
+    import pytest
+    from agent.interpreter import InterpretError, lint_paths_absolute
+    from agent.ir_models import PlanIR, Step
+    plan = PlanIR(discovery=[Step(rpc="Find", args={"root": "docs", "name": "*.md"})],
+                  decision={"branches": [], "default_label": "d"},
+                  answer={"d": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}})
+    with pytest.raises(InterpretError) as ei:
+        lint_paths_absolute(plan)
+    assert "root" in str(ei.value)
+
+
+def test_lint_paths_absolute_allows_absolute_and_dollar_ref():
+    from agent.interpreter import lint_paths_absolute
+    from agent.ir_models import PlanIR, Step
+    plan = PlanIR(
+        discovery=[Step(rpc="Read", args={"path": "/proc/catalog/A.json"}),
+                   Step(rpc="Stat", args={"path": "$bound_path"})],
+        decision={"branches": [], "default_label": "d"},
+        answer={"d": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}})
+    assert lint_paths_absolute(plan) is None   # no raise: absolute literal + $ref skipped
+
+
+def test_interpret_rejects_relative_path_before_vm():
+    import pytest
+    from agent.interpreter import InterpretError, interpret
+    from agent.ir_models import PlanIR, Step
+    from agent.mock_vm_spy import MockVMSpy
+    plan = PlanIR(discovery=[Step(rpc="List", args={"path": "."})],
+                  decision={"branches": [], "default_label": "d"},
+                  answer={"d": {"message": "m", "outcome": "OUTCOME_OK", "refs": []}})
+    with pytest.raises(InterpretError) as ei:
+        interpret(plan, _INTENT, MockVMSpy({}), None)
+    assert "absolute" in str(ei.value)
