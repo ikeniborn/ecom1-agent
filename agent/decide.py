@@ -80,19 +80,21 @@ def has_protected_action(intent: IntentSpec, result=None) -> bool:
     return any(getattr(c, "protected_action", False) for c in intent.constraints)
 
 
-def security_deny(intent: IntentSpec, env: dict, protected: bool, gate_identity_only: bool = True) -> Constraint | None:
+def security_deny(intent: IntentSpec, env: dict, protected: bool) -> Constraint | None:
     """First security constraint whose deny_when holds, else None. A constraint marked
     requires_protected_action is skipped unless `protected` (the injection blast-radius
-    gate). When gate_identity_only is True (default), identity-only deny_when predicates
-    are further skipped unless `protected` (blocks spurious guest-check denials in the
-    post-interpret decide path). Set gate_identity_only=False for pre-loop preflight
-    where identity-only denials are always authoritative. Predicate failures -> not-holding (never raises)."""
+    gate). Identity-only deny_when predicates (referencing only $identity.* or
+    $_facts.identity.*) are also skipped unless `protected` — this gates spurious
+    guest-check denials on read-only tasks (the t38 over-refusal fix). A constraint with
+    protected_action=True makes has_protected_action(intent, None) return True, so preflight
+    can still fire a terminal identity-only deny for legitimately protected actions.
+    Predicate failures -> not-holding (never raises)."""
     for c in intent.constraints:
         if not (c.security and c.deny_when is not None):
             continue
         if getattr(c, "requires_protected_action", False) and not protected:
             continue
-        if gate_identity_only and _is_identity_only(c.deny_when) and not protected:
+        if _is_identity_only(c.deny_when) and not protected:
             continue
         if _holds(c.deny_when, env):
             return c
@@ -194,7 +196,7 @@ def security_preflight(intent: IntentSpec, vm, facts) -> tuple[str, str, list] |
     env["_facts"] = facts
     env["identity"] = identity_of(vm, facts)
     protected = has_protected_action(intent, None)
-    c = security_deny(intent, env, protected, gate_identity_only=False)
+    c = security_deny(intent, env, protected)
     if c is None:
         return None
     refs = _merge_constraint_refs([], c, env)

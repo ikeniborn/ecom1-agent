@@ -49,6 +49,7 @@ def test_preflight_denies_before_loop():
         "objective": "checkout", "desired_outcome": "deny", "params": {},
         "outcome_space": ["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
         "constraints": [{"anchor": "#g", "rule": "guests cannot checkout", "security": True,
+                         "protected_action": True,
                          "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}],
         "success_criteria": {}, "answer_shape": {}, "required_refs": {},
     })

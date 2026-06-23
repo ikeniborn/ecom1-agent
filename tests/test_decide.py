@@ -239,9 +239,12 @@ def test_decide_falls_back_to_plan_outcome():
 
 
 def test_preflight_terminal_deny_from_identity():
+    # protected_action=True makes has_protected_action(intent, None) return True -> identity-only
+    # deny fires even at preflight (the legitimate protected-action path).
     intent = _intent(
         outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
         constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
+                      "protected_action": True,
                       "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}])
     out = security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"}))
     assert out is not None
@@ -256,6 +259,23 @@ def test_preflight_none_when_no_deny():
         constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
                       "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}])
     assert security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "customer"})) is None
+
+
+def test_preflight_skips_unmarked_identity_only_deny():
+    # t38 cure: an identity-only deny without protected_action must NOT produce a terminal
+    # preflight deny on a read-only task.  has_protected_action(intent, None) returns False
+    # (no protected_action marker, no mutation) -> security_deny gates the identity-only
+    # constraint -> preflight returns None -> the loop runs (anti_give_up_ok can flip to OK).
+    intent = _intent(
+        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+        constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
+                      "deny_when": {"op": "eq", "lhs": "$_facts.identity.kind", "rhs": "guest"}}])
+    assert has_protected_action(intent, None) is False  # no bypass lever active
+    result = security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"}))
+    assert result is None, (
+        "preflight must NOT deny a read-only identity-only constraint; "
+        "loop must run so anti_give_up_ok can cure the over-refusal"
+    )
 
 
 def test_preflight_gated_deny_fires_from_marked_constraint():
