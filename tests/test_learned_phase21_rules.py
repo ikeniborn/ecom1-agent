@@ -58,3 +58,29 @@ def test_t50_g001_is_no_answer_value():
     # method rule must not contain task-specific basket ids or amounts
     assert not re.search(r"basket_\d+", content)
     assert "/proc/" not in content
+
+
+def test_t38_discover_first_rule():
+    """g002 must be active, pinned, discover-method shaped, and bake no answer values."""
+    entries = load_entries("t38")
+    g = next((e for e in entries if e.get("id") == "g002"), None)
+    assert g is not None, "g002 not found in t38 active entries"
+    assert g.get("status") == "active"
+    assert g.get("pinned") is True
+    assert g.get("surface") == "ir"
+    content = g.get("content") or ""
+    # must mention discovery method
+    assert re.search(r"DISTINCT|discover", content, re.IGNORECASE), \
+        "g002 must mention SELECT DISTINCT or discover"
+    # must mention payments or 3DS policy doc
+    assert re.search(r"3ds|payments", content, re.IGNORECASE), \
+        "g002 must reference the payments/3DS policy doc"
+    # must NOT bake answer values
+    assert not re.search(r"/proc/", content), "g002 must not contain /proc/ paths"
+    assert not re.search(r"basket_\d+", content), "g002 must not contain basket_N ids"
+    assert "'fraud'" not in content and "'fraudulent'" not in content, \
+        "g002 must not endorse guessing literal fraud/fraudulent status values"
+    assert "requires_3ds_action" not in content, \
+        "g002 must not recite requires_3ds_action answer value"
+    assert "recoverable" not in content, \
+        "g002 must not recite recoverable answer value"
