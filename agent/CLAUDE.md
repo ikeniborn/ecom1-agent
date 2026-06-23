@@ -64,7 +64,8 @@ deterministic Plan-IR interpreter.
    - **interpret** (`interpreter.py:interpret(plan, intent, vm, facts)`) — no LLM; runs the
      plan against the VM. `InterpretError` → `_ilearn` → retry (break if a mutation landed).
      A real-VM `Exception` → `_ilearn`, then retry only when the plan is read-only AND the
-     error is retryable (`_is_retryable_vm_error`), else break.
+     error is retryable (`_is_retryable_vm_error`), else break. `CapturedAnswer` also carries
+     the typed `value`/`rows` (resolved from `answer_shape`) for the format-gate to render from.
    - **ground-refs** (`grounding.py:ground_refs(...)`) — no LLM, best-effort (never raises).
      Re-derives the authoritative reference set from the VM + task text + computed answer and
      **overwrites** `result.captured.refs` before verify. Record refs: entity-token →
@@ -77,6 +78,12 @@ deterministic Plan-IR interpreter.
      `security_deny > unsupported_or_clarify > anti_give_up_ok > plan-outcome`, sourced
      from the frozen IntentSpec constraints + `/bin/id` identity. Runs BEFORE verify, so
      verify is a consistency gate, not where outcomes are born.
+   - **format-gate** (`format_gate.py:format_answer(message, intent, answer_shape, agents_md,
+     *, outcome, value, rows)`) — no LLM, best-effort. Overwrites `result.captured.message`
+     with the exact surface contract per `intent.answer_shape` (money → `format_eur`;
+     boolean → `<YES>`/`<NO>` or `/AGENTS.MD` tokens; count → skeleton format; table/quote →
+     TSV). Runs BEFORE verify so the format-class success_criteria regex passes on the
+     canonical string. Non-OK outcomes and free-text shapes pass through unchanged.
    - **verify** (`verify.py:verify(result, intent)`) — no LLM, deterministic. I1 is
      presence-based on **every** outcome (each resolved `required_refs[outcome]` value ⊆
      `answer.refs`, plus a `$`-ref guard). Checks
@@ -108,7 +115,8 @@ sees all active rules.
   deactivate_ids, deactivate_reason?, skip, skip_reason?, prephase_deep_read),
   `AnswerOutput` (message, outcome, grounding_refs).
 - `ir_models.py`: `IntentSpec` / `PlanIR` and their parts — `PredExpr`, `Constraint`,
-  `RefSpec`, `AnswerShape` (IntentSpec); `Step`, `RowSet`, `ComputeStep`, `DecisionTree`,
+  `RefSpec`, `AnswerShape` (IntentSpec; `msg_skeleton` + optional `kind`/`columns`/`rows_from`
+  for the format-gate); `Step`, `RowSet`, `ComputeStep`, `DecisionTree`,
   `GuardedOp`, `AnswerTemplateIR`, `CustomExtract` (PlanIR).
 
 **Model routing** (`llm.py`): two axes.
