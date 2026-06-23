@@ -406,3 +406,99 @@ def test_security_deny_non_identity_fires_regardless_of_protected():
     env = {"flags": ["override"], "identity": {"kind": "customer"}}
     c = security_deny(intent, env, protected=False)
     assert c is not None and c.anchor == "#s"
+
+
+# ---------------------------------------------------------------------------
+# _required_outcome_refs tests
+# ---------------------------------------------------------------------------
+
+from agent.decide import _required_outcome_refs
+
+
+def test_required_outcome_refs_policy_doc():
+    intent = _intent(required_refs={
+        "OUTCOME_DENIED_SECURITY": [{"kind": "policy_doc", "path": "/docs/checkout.md"}]})
+    assert _required_outcome_refs(intent, "OUTCOME_DENIED_SECURITY", {}) == ["/docs/checkout.md"]
+
+
+def test_required_outcome_refs_record_path_resolves():
+    intent = _intent(required_refs={
+        "OUTCOME_DENIED_SECURITY": [{"kind": "record_path", "source": "$row.path"}]})
+    assert _required_outcome_refs(intent, "OUTCOME_DENIED_SECURITY", {"row": {"path": "/proc/orders/o1.json"}}) \
+        == ["/proc/orders/o1.json"]
+
+
+def test_required_outcome_refs_record_path_unresolvable_dropped():
+    intent = _intent(required_refs={
+        "OUTCOME_DENIED_SECURITY": [{"kind": "record_path", "source": "$missing"}]})
+    assert _required_outcome_refs(intent, "OUTCOME_DENIED_SECURITY", {}) == []
+
+
+def test_required_outcome_refs_absent_outcome_empty():
+    assert _required_outcome_refs(_intent(), "OUTCOME_DENIED_SECURITY", {}) == []
+
+
+# ---------------------------------------------------------------------------
+# decide_outcome deny branch includes required_refs
+# ---------------------------------------------------------------------------
+
+
+def test_decide_deny_includes_required_refs_policy_doc():
+    # Non-identity deny ($flags) that fires + required_refs[DENIED_SECURITY] lists checkout.md
+    intent = _intent(
+        constraints=[{"anchor": "#s", "rule": "no override", "security": True,
+                      "deny_when": {"op": "contains_any", "lhs": "$flags", "rhs": ["override"]}}],
+        required_refs={"OUTCOME_DENIED_SECURITY": [{"kind": "policy_doc", "path": "/docs/checkout.md"}]})
+    res = _result(outcome="OUTCOME_OK", env={"flags": ["override"]}, message="x")
+    out, refs = decide_outcome(intent, res, MockVMSpy(fixtures={}), None)
+    assert out == "OUTCOME_DENIED_SECURITY"
+    assert "/docs/checkout.md" in refs
+    assert "/docs/security.md" in refs
+    assert refs.count("/docs/checkout.md") == 1  # no duplicates
+
+
+def test_decide_deny_required_refs_dedup_security_doc():
+    # If required_refs already lists security.md, it must appear exactly once.
+    intent = _intent(
+        constraints=[{"anchor": "#s", "rule": "no override", "security": True,
+                      "deny_when": {"op": "contains_any", "lhs": "$flags", "rhs": ["override"]}}],
+        required_refs={"OUTCOME_DENIED_SECURITY": [{"kind": "policy_doc", "path": "/docs/security.md"}]})
+    res = _result(outcome="OUTCOME_OK", env={"flags": ["override"]}, message="x")
+    out, refs = decide_outcome(intent, res, MockVMSpy(fixtures={}), None)
+    assert out == "OUTCOME_DENIED_SECURITY"
+    assert refs.count("/docs/security.md") == 1
+
+
+# ---------------------------------------------------------------------------
+# security_preflight includes required_refs
+# ---------------------------------------------------------------------------
+
+
+def test_preflight_includes_required_refs_policy_doc():
+    # protected_action=True → identity-only deny fires at preflight; required_refs cited.
+    intent = _intent(
+        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+        constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
+                      "protected_action": True,
+                      "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}],
+        required_refs={"OUTCOME_DENIED_SECURITY": [{"kind": "policy_doc", "path": "/docs/checkout.md"}]})
+    out = security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"}))
+    assert out is not None
+    outcome, msg, refs = out
+    assert outcome == "OUTCOME_DENIED_SECURITY"
+    assert "/docs/checkout.md" in refs
+    assert "/docs/security.md" in refs
+
+
+def test_preflight_required_refs_dedup_security_doc():
+    # required_refs lists security.md → appears exactly once.
+    intent = _intent(
+        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+        constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
+                      "protected_action": True,
+                      "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}],
+        required_refs={"OUTCOME_DENIED_SECURITY": [{"kind": "policy_doc", "path": "/docs/security.md"}]})
+    out = security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"}))
+    assert out is not None
+    _, _, refs = out
+    assert refs.count("/docs/security.md") == 1

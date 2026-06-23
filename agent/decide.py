@@ -118,6 +118,23 @@ def _merge_constraint_refs(base: list, c: Constraint, env: dict) -> list:
     return out
 
 
+def _required_outcome_refs(intent: IntentSpec, outcome: str, env: dict) -> list[str]:
+    """Resolve intent.required_refs[outcome] into concrete paths, deduped. Never raises.
+    policy_doc -> literal path; record_path -> resolve($source, env) when it lands."""
+    out: list[str] = []
+    for r in intent.required_refs.get(outcome, []) or []:
+        if r.kind == "policy_doc" and r.path:
+            v = r.path
+        elif r.kind == "record_path":
+            rv = resolve(r.source, env)
+            v = str(rv) if rv not in (None, "") else None
+        else:
+            v = None
+        if v and v not in out:
+            out.append(v)
+    return out
+
+
 def unsupported_or_clarify(intent: IntentSpec, env: dict) -> str | None:
     """Deterministic negative-outcome split. Terminal-state conditions
     (unsupported_when) outrank genuine ambiguity (clarify_when). Returns an outcome
@@ -174,6 +191,9 @@ def decide_outcome(intent: IntentSpec, result, vm, facts) -> tuple[str, list]:
     c = security_deny(intent, env, protected)
     if c is not None:
         refs = _merge_constraint_refs(base_refs, c, env)
+        for r in _required_outcome_refs(intent, "OUTCOME_DENIED_SECURITY", env):
+            if r not in refs:
+                refs.append(r)
         if SECURITY_POLICY_DOC not in refs:
             refs.append(SECURITY_POLICY_DOC)
         return "OUTCOME_DENIED_SECURITY", refs
@@ -200,6 +220,9 @@ def security_preflight(intent: IntentSpec, vm, facts) -> tuple[str, str, list] |
     if c is None:
         return None
     refs = _merge_constraint_refs([], c, env)
+    for r in _required_outcome_refs(intent, "OUTCOME_DENIED_SECURITY", env):
+        if r not in refs:
+            refs.append(r)
     if SECURITY_POLICY_DOC not in refs:
         refs.append(SECURITY_POLICY_DOC)
     return "OUTCOME_DENIED_SECURITY", f"Denied by security policy: {c.rule}", refs
