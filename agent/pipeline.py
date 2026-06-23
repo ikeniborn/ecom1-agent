@@ -285,6 +285,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     from .verify import verify
     from .grounding import ground_refs
     from .decide import decide_outcome, security_preflight
+    from .format_gate import format_answer
 
     # Surface collapse (D5): PLAN sees all active rules; the grader-feedback
     # training-mode bug self-heals because learn_from_grader writes the same store.
@@ -457,6 +458,14 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
         _decided_outcome, _decided_refs = decide_outcome(intent, result, vm, facts)
         result.captured.outcome = _decided_outcome
         result.captured.refs = _decided_refs
+        # Phase 3: deterministic output-format gate reshapes the OK-like message to its
+        # exact surface contract (EUR %d.%02d / <YES>|<NO> / count format / TSV) BEFORE
+        # verify, so the format-class success_criteria/grader checks see the canonical
+        # string. Best-effort: never raises; negative outcomes and free-text pass through.
+        result.captured.message = format_answer(
+            result.captured.message, intent, intent.answer_shape, agents_md_text,
+            outcome=result.captured.outcome,
+            value=result.captured.value, rows=result.captured.rows)
         ok, verr = verify(result, intent)
         log_gate_auto("VERIFY", ok, "" if ok else verr)
         if ok:
