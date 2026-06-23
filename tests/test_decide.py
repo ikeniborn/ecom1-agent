@@ -1,4 +1,4 @@
-from agent.decide import identity_of, has_protected_action, _holds
+from agent.decide import identity_of, has_protected_action, _holds, _is_identity_only
 from agent.ir_models import IntentSpec
 from agent.interpreter import InterpretResult, CapturedAnswer
 from agent.mock_vm_spy import MockVMSpy, fixture_key
@@ -290,3 +290,99 @@ def test_preflight_gated_deny_skipped_without_protected_marker():
     # Confirm the gate is False (no protected_action marker, no result mutation)
     assert has_protected_action(intent, None) is False
     assert security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"})) is None
+
+
+# ---------------------------------------------------------------------------
+# _is_identity_only tests
+# ---------------------------------------------------------------------------
+
+from agent.ir_models import PredExpr
+
+
+def test_is_identity_only_eq_identity_dot():
+    # (a) $identity.kind -> True (identity-rooted)
+    e = PredExpr(**{"op": "eq", "lhs": "$identity.kind", "rhs": "guest"})
+    assert _is_identity_only(e) is True
+
+
+def test_is_identity_only_facts_identity_dot():
+    # (b) $_facts.identity.kind -> True
+    e = PredExpr(**{"op": "eq", "lhs": "$_facts.identity.kind", "rhs": "guest"})
+    assert _is_identity_only(e) is True
+
+
+def test_is_identity_only_owner_mismatch_false():
+    # (c) AND with $record.customer_id (non-identity) -> False
+    e = PredExpr(**{
+        "op": "and",
+        "args": [
+            {"op": "eq", "lhs": "$_facts.identity.kind", "rhs": "customer"},
+            {"op": "ne", "lhs": "$record.customer_id", "rhs": "$_facts.identity.customer_id"},
+        ]
+    })
+    assert _is_identity_only(e) is False
+
+
+def test_is_identity_only_contains_any_flags_false():
+    # (d) $flags -> not identity-rooted -> False
+    e = PredExpr(**{"op": "contains_any", "lhs": "$flags", "rhs": ["override"]})
+    assert _is_identity_only(e) is False
+
+
+def test_is_identity_only_state_eq_false():
+    # (e) $state is not identity-rooted -> False
+    e = PredExpr(**{"op": "eq", "lhs": "$state", "rhs": "paid"})
+    assert _is_identity_only(e) is False
+
+
+def test_is_identity_only_all_identity_refs_true():
+    # (f) AND where both leaves are identity-rooted -> True
+    e = PredExpr(**{
+        "op": "and",
+        "args": [
+            {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"},
+            {"op": "ne", "lhs": "$_facts.identity.customer_id", "rhs": "x"},
+        ]
+    })
+    assert _is_identity_only(e) is True
+
+
+def test_is_identity_only_no_refs_false():
+    # An op with no $-refs at all (rhs is literal, lhs is also literal treated via op) -> False
+    # The simplest way: an eq with two literal strings (no $ prefix) has no refs
+    e = PredExpr(**{"op": "eq", "lhs": "paid", "rhs": "open"})
+    assert _is_identity_only(e) is False
+
+
+# ---------------------------------------------------------------------------
+# security_deny gating tests (identity-only deny fires only when protected)
+# ---------------------------------------------------------------------------
+
+
+def test_security_deny_identity_only_skipped_when_not_protected():
+    # identity-only deny_when (guest check) holds, but protected=False -> skipped (returns None)
+    intent = _intent(constraints=[{
+        "anchor": "#g", "rule": "guests not allowed", "security": True,
+        "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}])
+    env = {"identity": {"kind": "guest"}, "flags": []}
+    assert security_deny(intent, env, protected=False) is None
+
+
+def test_security_deny_identity_only_fires_when_protected():
+    # same constraint + protected=True -> fires
+    intent = _intent(constraints=[{
+        "anchor": "#g", "rule": "guests not allowed", "security": True,
+        "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}])
+    env = {"identity": {"kind": "guest"}, "flags": []}
+    c = security_deny(intent, env, protected=True)
+    assert c is not None and c.anchor == "#g"
+
+
+def test_security_deny_non_identity_fires_regardless_of_protected():
+    # A non-identity deny ($flags contains_any) holds + protected=False -> still fires (regression guard)
+    intent = _intent(constraints=[{
+        "anchor": "#s", "rule": "no override", "security": True,
+        "deny_when": {"op": "contains_any", "lhs": "$flags", "rhs": ["override"]}}])
+    env = {"flags": ["override"], "identity": {"kind": "customer"}}
+    c = security_deny(intent, env, protected=False)
+    assert c is not None and c.anchor == "#s"

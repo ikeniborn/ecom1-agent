@@ -24,6 +24,34 @@ def _holds(expr, env: dict) -> bool:
         print(f"[decide] predicate eval failed ({e}); treating as not-holding")
         return False
 
+def _is_identity_only(expr) -> bool:
+    """Return True iff every $-ref in expr is identity-rooted (and there is at least one)."""
+    refs: list[str] = []
+
+    def _collect(e) -> None:
+        if e is None:
+            return
+        for attr in ("lhs", "rhs"):
+            val = getattr(e, attr, None)
+            if isinstance(val, str) and val.startswith("$"):
+                refs.append(val)
+        for child in getattr(e, "args", None) or []:
+            _collect(child)
+
+    _collect(expr)
+    if not refs:
+        return False
+
+    def _is_identity_ref(ref: str) -> bool:
+        parts = ref.lstrip("$").split(".")
+        if parts[0] == "identity":
+            return True
+        if len(parts) >= 2 and parts[0] == "_facts" and parts[1] == "identity":
+            return True
+        return False
+
+    return all(_is_identity_ref(r) for r in refs)
+
 
 def identity_of(vm, facts) -> dict:
     """The VM identity (/bin/id), preferring the pre-phase-parsed facts.identity and
@@ -52,14 +80,19 @@ def has_protected_action(intent: IntentSpec, result=None) -> bool:
     return any(getattr(c, "protected_action", False) for c in intent.constraints)
 
 
-def security_deny(intent: IntentSpec, env: dict, protected: bool) -> Constraint | None:
+def security_deny(intent: IntentSpec, env: dict, protected: bool, gate_identity_only: bool = True) -> Constraint | None:
     """First security constraint whose deny_when holds, else None. A constraint marked
     requires_protected_action is skipped unless `protected` (the injection blast-radius
-    gate). Predicate failures -> not-holding (never raises)."""
+    gate). When gate_identity_only is True (default), identity-only deny_when predicates
+    are further skipped unless `protected` (blocks spurious guest-check denials in the
+    post-interpret decide path). Set gate_identity_only=False for pre-loop preflight
+    where identity-only denials are always authoritative. Predicate failures -> not-holding (never raises)."""
     for c in intent.constraints:
         if not (c.security and c.deny_when is not None):
             continue
         if getattr(c, "requires_protected_action", False) and not protected:
+            continue
+        if gate_identity_only and _is_identity_only(c.deny_when) and not protected:
             continue
         if _holds(c.deny_when, env):
             return c
@@ -161,7 +194,7 @@ def security_preflight(intent: IntentSpec, vm, facts) -> tuple[str, str, list] |
     env["_facts"] = facts
     env["identity"] = identity_of(vm, facts)
     protected = has_protected_action(intent, None)
-    c = security_deny(intent, env, protected)
+    c = security_deny(intent, env, protected, gate_identity_only=False)
     if c is None:
         return None
     refs = _merge_constraint_refs([], c, env)
