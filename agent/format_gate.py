@@ -81,3 +81,71 @@ def _canonicalize_bool(message: str, yes_tok: str, no_tok: str, skeleton: str) -
     tok = yes_tok if polarity else no_tok
     body = _strip_outcome_prefix(message).strip()
     return f"{tok} {body}".strip() if body else tok
+
+
+_INT_RE = re.compile(r"-?\d+")
+_NUM_RE = re.compile(r"-?\d+(?:\.\d+)?")
+_EUR_NUM_RE = re.compile(r"EUR\s*(-?\d+(?:\.\d+)?)", re.I)
+
+
+def _extract_int(text: str):
+    """First integer in the text, else None."""
+    m = _INT_RE.search(text or "")
+    return int(m.group(0)) if m else None
+
+
+def _extract_eur_number(text: str):
+    """A euro amount parsed from a message: the number adjacent to 'EUR' if present,
+    else the first number, else None."""
+    m = _EUR_NUM_RE.search(text or "")
+    if m:
+        return float(m.group(1))
+    m = _NUM_RE.search(text or "")
+    return float(m.group(0)) if m else None
+
+
+def _coerce_int(value, message: str):
+    """The integer a count answer should render: a carried int/integral-float value
+    (never a bool), else the first integer parsed from the message."""
+    if isinstance(value, bool):
+        value = None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return _extract_int(message)
+
+
+def _render_count(skeleton: str, n: int) -> str:
+    """Substitute the integer into the count contract (answer_shape.msg_skeleton): a
+    printf '%d' or a single '{slot}'. Ambiguous (multi-slot, no %d) -> '' (caller keeps
+    the original)."""
+    s = skeleton or ""
+    if "%d" in s:
+        return s.replace("%d", str(int(n)), 1)
+    slots = _SLOT_RE.findall(s)
+    if len(slots) == 1:
+        return s.replace("{" + slots[0] + "}", str(int(n)))
+    return ""
+
+
+def _cell(row, col: str) -> str:
+    v = row.get(col, "") if isinstance(row, dict) else getattr(row, col, "")
+    return "" if v is None else str(v)
+
+
+def _render_table(rows, columns) -> str:
+    """TSV with a header row. '' when rows or columns are empty (caller keeps original)."""
+    if not rows or not columns:
+        return ""
+    out = ["\t".join(columns)]
+    for r in rows:
+        out.append("\t".join(_cell(r, c) for c in columns))
+    return "\n".join(out)
+
+
+def _render_quote(rows, columns) -> str:
+    """TSV rows WITHOUT a header. '' when rows or columns are empty."""
+    if not rows or not columns:
+        return ""
+    return "\n".join("\t".join(_cell(r, c) for c in columns) for r in rows)

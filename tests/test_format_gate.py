@@ -1,5 +1,56 @@
-from agent.format_gate import format_eur, bool_tokens, _canonicalize_bool, _strip_outcome_prefix
+from agent.format_gate import (
+    format_eur, bool_tokens, _canonicalize_bool, _strip_outcome_prefix,
+    _render_count, _render_table, _render_quote,
+    _extract_int, _extract_eur_number, _coerce_int,
+)
 from agent.ir_models import AnswerShape
+
+
+def test_render_count_printf():
+    assert _render_count("qty=%d", 5) == "qty=5"
+    assert _render_count("<COUNT:%d>", 3) == "<COUNT:3>"
+    assert _render_count("Total: %d", 12) == "Total: 12"
+
+
+def test_render_count_single_slot():
+    assert _render_count("<COUNT:{count}>", 7) == "<COUNT:7>"
+    assert _render_count("count: {count}", 0) == "count: 0"
+
+
+def test_render_count_empty_when_ambiguous_multi_slot():
+    assert _render_count("{a} of {b}", 5) == ""
+
+
+def test_render_table_header_then_rows():
+    rows = [{"sku": "A", "qty": 2}, {"sku": "B", "qty": 5}]
+    assert _render_table(rows, ["sku", "qty"]) == "sku\tqty\nA\t2\nB\t5"
+
+
+def test_render_table_empty_when_no_columns_or_rows():
+    assert _render_table([{"a": 1}], []) == ""
+    assert _render_table([], ["a"]) == ""
+
+
+def test_render_quote_rows_only_no_header():
+    rows = [{"sku": "A", "qty": 2}]
+    assert _render_quote(rows, ["sku", "qty"]) == "A\t2"
+
+
+def test_extract_int_first_integer():
+    assert _extract_int("there are 5 items") == 5
+    assert _extract_int("<COUNT:42>") == 42
+    assert _extract_int("nothing here") is None
+
+
+def test_extract_eur_number_prefers_eur_adjacent():
+    assert _extract_eur_number("EUR 12.5") == 12.5
+
+
+def test_coerce_int_prefers_value_then_message():
+    assert _coerce_int(5, "ignored") == 5
+    assert _coerce_int(5.0, "ignored") == 5
+    assert _coerce_int(None, "qty=9") == 9
+    assert _coerce_int(True, "qty=9") == 9   # bool is not a count value -> fall to message
 
 
 def test_bool_tokens_default():
