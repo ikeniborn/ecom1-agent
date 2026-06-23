@@ -57,7 +57,10 @@ deterministic Plan-IR interpreter.
      — LLM call (reason tier), system prompt `plan.md` → `PlanIR`
      (discovery, rowsets, compute, decision, ops, answer, custom_extract).
    - **lint** (`interpreter.py:lint_security_first(plan)`) — no LLM. On `PlanError` /
-     `InterpretError` → `_ilearn` → next cycle.
+     `InterpretError` → `_ilearn` → next cycle. `interpret()` also runs
+     `lint_paths_absolute(plan)` immediately after: a literal relative `path`/`root` arg in
+     any discovery/ops step (non-`$ref`, non-`/`-prefixed) raises `InterpretError` → routed
+     to iLEARN instead of dead-ending at the VM's "must be absolute" error (A1).
    - **plan-signature short-circuit** — `_plan_signature(plan)` over discovery+ops (SQL
      whitespace/case-normalised, other step args verbatim); identical to the prior cycle →
      break with CLARIFICATION (no-progress guard).
@@ -86,13 +89,19 @@ deterministic Plan-IR interpreter.
      canonical string. Non-OK outcomes and free-text shapes pass through unchanged.
    - **verify** (`verify.py:verify(result, intent)`) — no LLM, deterministic. I1 is
      presence-based on **every** outcome (each resolved `required_refs[outcome]` value ⊆
-     `answer.refs`, plus a `$`-ref guard). Checks
-     `success_criteria` and required refs.
+     `answer.refs`, plus a `$`-ref guard). I1 also hard-fails (returns `(False, reason)`)
+     when a declared required `record_path` source did not resolve (`missing_src` non-empty)
+     on any outcome — the unresolved source is no longer silently discarded
+     (A2: "resolve-before-cite"). Checks `success_criteria` and required refs.
      - Pass → `vm.answer(...)` once, `_persist_artifacts(intent, plan)`,
        return success metrics.
      - Fail → `_ilearn(prev_error + observed RPC outputs)` → next cycle (break if a mutation
        landed).
-4. Loop exhaust / no-progress → terminal `OUTCOME_NONE_CLARIFICATION`.
+4. Loop exhaust / no-progress → terminal outcome selected from `intent.outcome_space` by
+   precedence via `negative_outcome_by_precedence` (e.g. `OUTCOME_NONE_UNSUPPORTED` outranks
+   `OUTCOME_NONE_CLARIFICATION`); falls back to the literal `OUTCOME_NONE_CLARIFICATION` only
+   when the space declares neither (B). The INTENT-None hard-stop is exempt (fires before
+   `intent` exists and always emits `OUTCOME_NONE_CLARIFICATION`).
 
 `vm.answer` is called **exactly once** per task. The quality gate is `verify()`
 (deterministic) — there is no LLM-graded answer check.
