@@ -14,6 +14,14 @@ import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 _SLOT_RE = re.compile(r"\{([^{}]+)\}")   # mirrors interpreter._SLOT_RE
+_BOOL_TOK_RE = re.compile(r"<\s*(?:YES|NO)\s*>", re.I)
+_AGENTS_YES_RE = re.compile(r"(?im)^\s*(?:yes[_ ]?token|affirmative)\s*[:=]\s*(\S+)")
+_AGENTS_NO_RE = re.compile(r"(?im)^\s*(?:no[_ ]?token|negative)\s*[:=]\s*(\S+)")
+_OUTCOME_PREFIX_RE = re.compile(r"^\s*OUTCOME_[A-Z_]+\s*[:\-]?\s*")
+
+# Polarity markers — conservative; ambiguous text yields no polarity (keep original).
+_YES_RE = re.compile(r"<\s*yes\s*>|\byes\b|\bin the catalogue\b|\bmatches\b|\bconfirmed\b", re.I)
+_NO_RE = re.compile(r"<\s*no\s*>|\bno\b|\bnot\b|\bcannot\b|\bno match\b|\bdenied\b|\bdoes not\b", re.I)
 
 
 def format_eur(value) -> str:
@@ -28,3 +36,48 @@ def format_eur(value) -> str:
         return ""
     d = d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return f"EUR {d:.2f}"
+
+
+def _strip_outcome_prefix(message: str) -> str:
+    """Strip a wrongly-prepended 'OUTCOME_*:' / 'OUTCOME_* -' prefix (normalize-only)."""
+    return _OUTCOME_PREFIX_RE.sub("", message or "", count=1)
+
+
+def bool_tokens(agents_md, answer_shape) -> tuple[str, str]:
+    """The tenant's (yes, no) tokens. Default '<YES>'/'<NO>'; a custom pair declared in
+    /AGENTS.MD ('yes_token: X' / 'no_token: Y') overrides. No per-task values."""
+    yes_tok, no_tok = "<YES>", "<NO>"
+    my = _AGENTS_YES_RE.search(agents_md or "")
+    mn = _AGENTS_NO_RE.search(agents_md or "")
+    if my:
+        yes_tok = my.group(1)
+    if mn:
+        no_tok = mn.group(1)
+    return yes_tok, no_tok
+
+
+def _polarity_from(text: str):
+    """True (affirmative) / False (negative) / None (ambiguous) from text markers."""
+    t = text or ""
+    yes, no = bool(_YES_RE.search(t)), bool(_NO_RE.search(t))
+    if yes and not no:
+        return True
+    if no and not yes:
+        return False
+    return None
+
+
+def _canonicalize_bool(message: str, yes_tok: str, no_tok: str, skeleton: str) -> str:
+    """Ensure the canonical yes/no token is present (additive, never destructive).
+    Returns '' when no change is warranted (token already present, or polarity cannot
+    be determined) so the caller keeps the original message."""
+    if yes_tok in (message or "") or no_tok in (message or ""):
+        return ""
+    polarity = _polarity_from(skeleton)
+    if polarity is None:
+        polarity = _polarity_from(message)
+    if polarity is None:
+        return ""
+    tok = yes_tok if polarity else no_tok
+    body = _strip_outcome_prefix(message).strip()
+    return f"{tok} {body}".strip() if body else tok
