@@ -502,3 +502,87 @@ def test_preflight_required_refs_dedup_security_doc():
     assert out is not None
     _, _, refs = out
     assert refs.count("/docs/security.md") == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — resolve-before-deny: preflight DEFER when record_path in required_refs
+# ---------------------------------------------------------------------------
+
+
+def test_preflight_defers_when_denied_security_requires_record_path():
+    # A security constraint with protected_action=True fires the identity-only deny at
+    # preflight. BUT required_refs["OUTCOME_DENIED_SECURITY"] includes a record_path RefSpec
+    # that can only resolve after the loop runs. Preflight must return None (defer), not a
+    # terminal tuple — the loop will run, discover the record, and decide_outcome will
+    # re-issue the deny with the grounded record ref.
+    intent = _intent(
+        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+        constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
+                      "protected_action": True,
+                      "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}],
+        required_refs={"OUTCOME_DENIED_SECURITY": [
+            {"kind": "policy_doc", "path": "/docs/checkout.md"},
+            {"kind": "record_path", "source": "$basket.record_path"},
+        ]})
+    result = security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"}))
+    assert result is None, (
+        "preflight must DEFER (return None) when required_refs[DENIED_SECURITY] has a "
+        "record_path; the record is only discoverable in the loop"
+    )
+
+
+def test_preflight_still_terminal_when_only_policy_docs():
+    # Same setup as above but required_refs has ONLY a policy_doc (no record_path).
+    # The defer guard must NOT fire — preflight returns a terminal deny tuple.
+    intent = _intent(
+        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+        constraints=[{"anchor": "#g", "rule": "guests not authorized", "security": True,
+                      "protected_action": True,
+                      "deny_when": {"op": "eq", "lhs": "$identity.kind", "rhs": "guest"}}],
+        required_refs={"OUTCOME_DENIED_SECURITY": [
+            {"kind": "policy_doc", "path": "/docs/checkout.md"},
+        ]})
+    result = security_preflight(intent, MockVMSpy(fixtures={}), _Facts({"kind": "guest"}))
+    assert result is not None, "preflight must be TERMINAL when only policy_docs are in required_refs"
+    outcome, msg, refs = result
+    assert outcome == "OUTCOME_DENIED_SECURITY"
+    assert "/docs/checkout.md" in refs
+    assert "/docs/security.md" in refs
+
+
+def test_decide_outcome_redenies_with_grounded_basket_ref():
+    # Simulate the post-loop path: the loop has run and bound basket.record_path in result.env.
+    # decide_outcome must re-issue OUTCOME_DENIED_SECURITY and include the resolved record path
+    # in the returned refs.
+    #
+    # _decision_env does: env = dict(result.env) + "identity" + "answer" keys.
+    # So result.env = {"basket": {"record_path": "/proc/baskets/basket_139.json"}} makes
+    # $basket.record_path resolvable in the post-loop env.
+    #
+    # The constraint uses $identity.kind to fire a deny. With MockVMSpy({}), identity_of
+    # returns {} (no /bin/id fixture), so $identity.kind is None.
+    # Instead, use a non-identity deny_when that fires from the basket env:
+    # "basket.status == 'guest_checkout'" — but simpler: use $basket.record_path nonempty
+    # so it fires whenever basket is bound (which it always is in the post-loop path).
+    intent = _intent(
+        outcome_space=["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+        constraints=[{
+            "anchor": "#g", "rule": "guest checkout not permitted", "security": True,
+            "protected_action": True,
+            "deny_when": {"op": "nonempty", "lhs": "$basket.record_path"},
+        }],
+        required_refs={"OUTCOME_DENIED_SECURITY": [
+            {"kind": "policy_doc", "path": "/docs/checkout.md"},
+            {"kind": "record_path", "source": "$basket.record_path"},
+        ]})
+    res = _result(
+        outcome="OUTCOME_OK",
+        env={"basket": {"record_path": "/proc/baskets/basket_139.json"}},
+        message="basket found",
+    )
+    out, refs = decide_outcome(intent, res, MockVMSpy(fixtures={}), None)
+    assert out == "OUTCOME_DENIED_SECURITY"
+    assert "/proc/baskets/basket_139.json" in refs, (
+        "decide_outcome must include the grounded record path from $basket.record_path"
+    )
+    assert "/docs/security.md" in refs

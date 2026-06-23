@@ -219,6 +219,10 @@ def security_preflight(intent: IntentSpec, vm, facts) -> tuple[str, str, list] |
     c = security_deny(intent, env, protected)
     if c is None:
         return None
+    if any(r.kind == "record_path"
+           for r in intent.required_refs.get("OUTCOME_DENIED_SECURITY", []) or []):
+        return None   # defer: this denial must cite a record discoverable only in the loop;
+                      # decide_outcome will re-issue it post-discovery with the record grounded.
     refs = _merge_constraint_refs([], c, env)
     for r in _required_outcome_refs(intent, "OUTCOME_DENIED_SECURITY", env):
         if r not in refs:
