@@ -104,6 +104,7 @@ def _resolve_args(args: dict, env: dict) -> dict:
 
 
 _SLOT_RE = _re.compile(r"\{([^{}]+)\}")
+_BARE_REF_RE = _re.compile(r"^\$[\w.]+$")
 
 
 def _render_slot(val) -> str:
@@ -118,6 +119,11 @@ def _render_slot(val) -> str:
 
 
 def _fill_slots(message: str, env: dict) -> str:
+    stripped = message.strip()
+    if _BARE_REF_RE.match(stripped):
+        v = resolve(stripped, env)
+        if v is not None:
+            return _render_slot(v)
     def repl(m):
         return _render_slot(resolve("$" + m.group(1), env))
     return _SLOT_RE.sub(repl, message)

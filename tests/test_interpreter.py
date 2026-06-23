@@ -463,3 +463,39 @@ def test_vmadapter_logs_vm_call_with_step_type(tmp_path):
     vm = next(r for r in recs if r["type"] == "vm_call")
     assert vm["rpc"] == "Read" and vm["step_type"] == "INTERPRET"
     assert vm["has_data"] is True and vm["duration_ms"] >= 0
+
+
+# ---------------------------------------------------------------------------
+# _fill_slots: bare $ref rendering (T1 Fix B)
+# ---------------------------------------------------------------------------
+from agent.interpreter import _fill_slots  # noqa: E402
+
+
+def test_fill_slots_bare_ref_integral_float():
+    """$count with float 3.0 → '3' (no trailing .0)."""
+    assert _fill_slots("$count", {"count": 3.0}) == "3"
+
+
+def test_fill_slots_bare_ref_plain_int():
+    """$count with int 3 → '3'."""
+    assert _fill_slots("$count", {"count": 3}) == "3"
+
+
+def test_fill_slots_bare_ref_unresolved():
+    """$missing with no env entry → falls through, stays literal."""
+    assert _fill_slots("$missing", {}) == "$missing"
+
+
+def test_fill_slots_bare_ref_not_matched_space():
+    """'$5 surcharge applies' has a space — not a bare ref, unchanged."""
+    assert _fill_slots("$5 surcharge applies", {}) == "$5 surcharge applies"
+
+
+def test_fill_slots_brace_slot_regression():
+    """{count} with float 3.0 → '3' (existing brace-slot path still works)."""
+    assert _fill_slots("{count}", {"count": 3.0}) == "3"
+
+
+def test_fill_slots_mixed_slot_regression():
+    """Mixed prose + brace slot still renders correctly."""
+    assert _fill_slots("you have {n} items", {"n": 2}) == "you have 2 items"
