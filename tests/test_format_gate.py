@@ -191,3 +191,92 @@ def test_outcome_regexes_reads_msg_and_message_lhs():
         {"op": "regex_match", "lhs": "$answer.msg", "rhs": "^<NO> .+$"},
         {"op": "nonempty", "lhs": "$answer.message"}]})
     assert _outcome_regexes(it, "OUTCOME_OK") == ["^<NO> .+$"]
+
+
+from agent.format_gate import format_answer, _is_preserved_outcome
+
+
+def _it(skeleton="", criteria=None, kind="", columns=None, rows_from=""):
+    return IntentSpec(
+        objective="o", desired_outcome="OUTCOME_OK", outcome_space=["OUTCOME_OK"],
+        constraints=[], success_criteria=criteria or {},
+        answer_shape={"msg_skeleton": skeleton, "kind": kind,
+                      "columns": columns or [], "rows_from": rows_from},
+        required_refs={})
+
+
+def test_money_reshaped_from_carried_value():
+    it = _it(skeleton="EUR {amt}")
+    out = format_answer("EUR 12.5", it, it.answer_shape, "", outcome="OUTCOME_OK", value=12.5)
+    assert out == "EUR 12.50"
+
+
+def test_money_reshaped_from_message_when_no_value():
+    it = _it(skeleton="EUR {amt}")
+    out = format_answer("EUR 0.5", it, it.answer_shape, "", outcome="OUTCOME_OK", value=None)
+    assert out == "EUR 0.50"
+
+
+def test_boolean_prepends_canonical_token():
+    it = _it(skeleton="<NO> (SKU: {sku})")
+    out = format_answer("SKU: ABC not found", it, it.answer_shape, "", outcome="OUTCOME_OK")
+    assert out == "<NO> SKU: ABC not found"
+
+
+def test_count_substitutes_carried_int():
+    it = _it(skeleton="qty=%d")
+    out = format_answer("qty=5", it, it.answer_shape, "", outcome="OUTCOME_OK", value=5)
+    assert out == "qty=5"
+    out2 = format_answer("there are 9", it, it.answer_shape, "", outcome="OUTCOME_OK", value=9)
+    assert out2 == "qty=9"
+
+
+def test_table_renders_tsv_from_rows():
+    it = _it(kind="table", columns=["sku", "qty"])
+    rows = [{"sku": "A", "qty": 2}, {"sku": "B", "qty": 5}]
+    out = format_answer("whatever the model said", it, it.answer_shape, "",
+                        outcome="OUTCOME_OK", rows=rows)
+    assert out == "sku\tqty\nA\t2\nB\t5"
+
+
+def test_preserved_outcome_passes_through():
+    it = _it(skeleton="EUR {amt}")
+    msg = "Access denied: guests cannot view payments."
+    assert format_answer(msg, it, it.answer_shape, "",
+                         outcome="OUTCOME_DENIED_SECURITY", value=12.5) == msg
+    assert format_answer(msg, it, it.answer_shape, "",
+                         outcome="OUTCOME_NONE_UNSUPPORTED", value=12.5) == msg
+
+
+def test_free_shape_passes_through_but_strips_outcome_prefix():
+    it = _it(skeleton="The product {name} is in the catalogue.")
+    assert format_answer("OUTCOME_OK: Product X is in the catalogue.", it, it.answer_shape, "",
+                         outcome="OUTCOME_OK") == "Product X is in the catalogue."
+
+
+def test_already_exact_left_untouched():
+    it = _it(skeleton="EUR {amt}",
+             criteria={"OUTCOME_OK": [{"op": "regex_match", "lhs": "$answer.message",
+                                       "rhs": r"^EUR \d+\.\d{2}$"}]})
+    assert format_answer("EUR 12.50", it, it.answer_shape, "",
+                         outcome="OUTCOME_OK", value=12.5) == "EUR 12.50"
+
+
+def test_failed_format_falls_back_to_original():
+    # money shape but an unparseable value AND no number in the message -> keep original.
+    it = _it(skeleton="EUR {amt}")
+    assert format_answer("amount unavailable", it, it.answer_shape, "",
+                         outcome="OUTCOME_OK", value="n/a") == "amount unavailable"
+
+
+def test_never_raises_on_garbage_inputs():
+    it = _it(skeleton="EUR {amt}")
+    # answer_shape=None forces an attribute error inside -> swallowed, original returned.
+    assert format_answer("EUR 1.5", it, None, "", outcome="OUTCOME_OK", value=1.5) == "EUR 1.5"
+
+
+def test_is_preserved_outcome():
+    assert _is_preserved_outcome("OUTCOME_DENIED_SECURITY") is True
+    assert _is_preserved_outcome("OUTCOME_NONE_CLARIFICATION") is True
+    assert _is_preserved_outcome("OUTCOME_OK") is False
+    assert _is_preserved_outcome("OUTCOME_DIFFERENCE_EXCEEDS") is False

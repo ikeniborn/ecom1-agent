@@ -200,3 +200,55 @@ def already_exact(message: str, intent, answer_shape, outcome: str) -> bool:
     the outcome (short-circuit: leave a correct surface untouched)."""
     rxs = _outcome_regexes(intent, outcome)
     return bool(rxs) and all(re.search(rx, message or "") for rx in rxs)
+
+
+def _is_preserved_outcome(outcome: str) -> bool:
+    """Negative/terminal outcomes whose message is never reshaped (spec: 'preserve
+    non-OK messages'). OK-like custom outcomes (e.g. OUTCOME_DIFFERENCE_EXCEEDS) are
+    formatted."""
+    o = outcome or ""
+    return o.startswith("OUTCOME_NONE") or "DENIED" in o
+
+
+def _format_for_shape(shape, message, intent, answer_shape, agents_md, value, rows) -> str:
+    skel = getattr(answer_shape, "msg_skeleton", "") or ""
+    if shape == "money":
+        num = value if isinstance(value, (int, float)) and not isinstance(value, bool) \
+            else _extract_eur_number(message)
+        return format_eur(num) if num is not None else ""
+    if shape == "boolean":
+        yes_tok, no_tok = bool_tokens(agents_md, answer_shape)
+        return _canonicalize_bool(message, yes_tok, no_tok, skel)
+    if shape == "count":
+        n = _coerce_int(value, message)
+        return _render_count(skel, n) if n is not None else ""
+    if shape == "table":
+        return _render_table(rows or [], list(getattr(answer_shape, "columns", []) or []))
+    if shape == "quote":
+        return _render_quote(rows or [], list(getattr(answer_shape, "columns", []) or []))
+    return ""
+
+
+def format_answer(message: str, intent, answer_shape, agents_md, *,
+                  outcome: str = "OUTCOME_OK", value=None, rows=None) -> str:
+    """Reshape an OK-like answer message into its exact surface contract. Best-effort:
+    a preserved (negative) outcome, a free-text shape, an already-exact message, or any
+    failure returns the message unchanged. Never raises.
+
+    The 4 positional params are the spec's signature; outcome/value/rows are keyword-only
+    additions (outcome gates the passthrough; value/rows are the interpreter-carried typed
+    data the gate renders from)."""
+    try:
+        if _is_preserved_outcome(outcome):
+            return message
+        cleaned = _strip_outcome_prefix(message)
+        if already_exact(cleaned, intent, answer_shape, outcome):
+            return cleaned
+        shape = detect_shape(intent, answer_shape, outcome, value)
+        if shape == "free":
+            return cleaned
+        out = _format_for_shape(shape, cleaned, intent, answer_shape, agents_md, value, rows)
+        return out or cleaned
+    except Exception as e:                       # never corrupt the answer
+        print(f"[format_gate] skipped ({e}); keeping original message")
+        return message
