@@ -1,4 +1,5 @@
 """Tests for Phase 2.1 pinned method-rules in t38 and t50 learned stores."""
+import re
 from agent.learned_store import load_entries
 
 
@@ -44,5 +45,5 @@ def test_t50_g001_is_no_answer_value():
     assert g is not None
     content = (g.get("content") or "").lower()
     # method rule must not contain task-specific basket ids or amounts
-    assert "basket_" not in content or "basket submission" in content
+    assert not re.search(r"basket_\d+", content)
     assert "/proc/" not in content
