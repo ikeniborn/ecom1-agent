@@ -36,7 +36,10 @@ def verify(result: InterpretResult, intent: IntentSpec) -> tuple[bool, str]:
     unresolved = [r for r in ans.refs if isinstance(r, str) and r.startswith("$")]
     if unresolved:
         return False, f"I1: unresolved refs {unresolved!r} on {ans.outcome} answer"
-    required_vals, _missing_src = _project_required_refs(intent, ans.outcome, env)
+    required_vals, missing_src = _project_required_refs(intent, ans.outcome, env)
+    if missing_src:
+        return False, (f"I1: required ref source(s) {missing_src!r} did not resolve on "
+                       f"{ans.outcome} answer (resolve-before-cite)")
     absent = [v for v in required_vals if v not in ans.refs]
     if absent:
         return False, (f"I1: required ref(s) {absent!r} absent from "
