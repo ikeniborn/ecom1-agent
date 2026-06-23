@@ -149,3 +149,54 @@ def _render_quote(rows, columns) -> str:
     if not rows or not columns:
         return ""
     return "\n".join("\t".join(_cell(r, c) for c in columns) for r in rows)
+
+
+_MONEY_SKELETON_RE = re.compile(r"^EUR\s+[\{\}\w.]+$")   # bare 'EUR <amount>' only
+_MONEY_REGEX_RE = re.compile(r"EUR\s*\\d")               # anchored EUR-cents success regex
+_COUNT_MARK_RE = re.compile(r"%d|<\s*COUNT|\[\s*QTY|<\s*QTY|qty\s*=|count\s*:", re.I)
+_COUNT_SLOT_ONLY_RE = re.compile(r"^\s*\{([^{}]+)\}\s*$")
+
+
+def _outcome_regexes(intent, outcome: str) -> list[str]:
+    """The regex_match patterns a verify success_criterion applies to the answer message
+    for `outcome` (lhs $answer.message or the legacy $answer.msg)."""
+    out: list[str] = []
+    for crit in (getattr(intent, "success_criteria", {}) or {}).get(outcome, []):
+        op = getattr(crit, "op", None)
+        lhs = getattr(crit, "lhs", None)
+        rhs = getattr(crit, "rhs", None)
+        if op == "regex_match" and lhs in ("$answer.message", "$answer.msg") and isinstance(rhs, str):
+            out.append(rhs)
+    return out
+
+
+def _is_count_slot_only(skeleton: str) -> bool:
+    m = _COUNT_SLOT_ONLY_RE.match(skeleton or "")
+    return bool(m and re.search(r"count|qty|total|num", m.group(1), re.I))
+
+
+def detect_shape(intent, answer_shape, outcome: str, value=None) -> str:
+    """The typed shape to reshape into: explicit answer_shape.kind wins; otherwise infer
+    from the skeleton + success_criteria regex. Returns one of
+    money/boolean/count/table/quote/free. Conservative — anything unrecognised is 'free'
+    (passthrough). Over-detecting money is the only unsafe case and is guarded by the
+    bare-EUR / anchored-regex signals."""
+    kind = (getattr(answer_shape, "kind", "") or "").strip().lower()
+    if kind in {"money", "boolean", "count", "table", "quote", "free"}:
+        return kind
+    skel = (getattr(answer_shape, "msg_skeleton", "") or "").strip()
+    rxs = _outcome_regexes(intent, outcome)
+    if _BOOL_TOK_RE.search(skel) or any(_BOOL_TOK_RE.search(rx) for rx in rxs):
+        return "boolean"
+    if _MONEY_SKELETON_RE.match(skel) or any(_MONEY_REGEX_RE.search(rx) for rx in rxs):
+        return "money"
+    if _COUNT_MARK_RE.search(skel) or _is_count_slot_only(skel):
+        return "count"
+    return "free"
+
+
+def already_exact(message: str, intent, answer_shape, outcome: str) -> bool:
+    """True when the message already satisfies every declared answer-message regex for
+    the outcome (short-circuit: leave a correct surface untouched)."""
+    rxs = _outcome_regexes(intent, outcome)
+    return bool(rxs) and all(re.search(rx, message or "") for rx in rxs)

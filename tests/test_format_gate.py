@@ -119,3 +119,75 @@ def test_format_eur_empty_on_unparseable():
 def test_format_eur_empty_on_negative():
     # negative euros are unexpected -> caller keeps the original message.
     assert format_eur(-3.2) == ""
+
+
+from agent.format_gate import detect_shape, already_exact, _outcome_regexes
+from agent.ir_models import IntentSpec, AnswerShape
+
+
+def _intent(skeleton="", criteria=None, kind="", columns=None, rows_from=""):
+    return IntentSpec(
+        objective="o", desired_outcome="OUTCOME_OK", outcome_space=["OUTCOME_OK"],
+        constraints=[], success_criteria=criteria or {},
+        answer_shape={"msg_skeleton": skeleton, "kind": kind,
+                      "columns": columns or [], "rows_from": rows_from},
+        required_refs={})
+
+
+def test_detect_explicit_kind_wins():
+    it = _intent(skeleton="anything", kind="table", columns=["a"])
+    assert detect_shape(it, it.answer_shape, "OUTCOME_OK") == "table"
+
+
+def test_detect_boolean_from_skeleton_token():
+    it = _intent(skeleton="<NO> (SKU: {sku})")
+    assert detect_shape(it, it.answer_shape, "OUTCOME_OK") == "boolean"
+
+
+def test_detect_money_from_bare_eur_skeleton():
+    it = _intent(skeleton="EUR {total_euros}.{total_cents_two_digits}")
+    assert detect_shape(it, it.answer_shape, "OUTCOME_OK") == "money"
+
+
+def test_detect_money_from_anchored_regex():
+    it = _intent(skeleton="{amount}",
+                 criteria={"OUTCOME_OK": [{"op": "regex_match", "lhs": "$answer.message",
+                                           "rhs": r"^EUR \d+\.\d{2}$"}]})
+    assert detect_shape(it, it.answer_shape, "OUTCOME_OK") == "money"
+
+
+def test_detect_money_does_not_fire_on_eur_prose():
+    # t51-class: EUR appears mid-prose -> NOT money (reshaping would corrupt the answer).
+    it = _intent(skeleton="The total price difference is {d} EUR, which is {c} the threshold.")
+    assert detect_shape(it, it.answer_shape, "OUTCOME_OK") == "free"
+
+
+def test_detect_count_printf_and_markers_and_count_slot():
+    assert detect_shape(_intent("qty=%d"), AnswerShape(msg_skeleton="qty=%d"), "OUTCOME_OK") == "count"
+    assert detect_shape(_intent("<COUNT:{count}>"), AnswerShape(msg_skeleton="<COUNT:{count}>"), "OUTCOME_OK") == "count"
+    assert detect_shape(_intent("count: {count}"), AnswerShape(msg_skeleton="count: {count}"), "OUTCOME_OK") == "count"
+    assert detect_shape(_intent("{count}"), AnswerShape(msg_skeleton="{count}"), "OUTCOME_OK") == "count"
+
+
+def test_detect_free_for_plain_prose():
+    it = _intent(skeleton="The product {name} (SKU: {sku}) is in the catalogue.")
+    assert detect_shape(it, it.answer_shape, "OUTCOME_OK") == "free"
+
+
+def test_already_exact_true_when_message_matches_required_regex():
+    it = _intent(criteria={"OUTCOME_OK": [{"op": "regex_match", "lhs": "$answer.message",
+                                           "rhs": r"^EUR \d+\.\d{2}$"}]})
+    assert already_exact("EUR 12.50", it, it.answer_shape, "OUTCOME_OK") is True
+    assert already_exact("EUR 12.5", it, it.answer_shape, "OUTCOME_OK") is False
+
+
+def test_already_exact_false_when_no_regex_declared():
+    it = _intent(skeleton="qty=%d")
+    assert already_exact("qty=5", it, it.answer_shape, "OUTCOME_OK") is False
+
+
+def test_outcome_regexes_reads_msg_and_message_lhs():
+    it = _intent(criteria={"OUTCOME_OK": [
+        {"op": "regex_match", "lhs": "$answer.msg", "rhs": "^<NO> .+$"},
+        {"op": "nonempty", "lhs": "$answer.message"}]})
+    assert _outcome_regexes(it, "OUTCOME_OK") == ["^<NO> .+$"]
