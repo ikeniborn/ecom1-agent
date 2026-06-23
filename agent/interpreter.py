@@ -40,6 +40,8 @@ class CapturedAnswer(BaseModel):
     message: str
     outcome: str
     refs: list[str] = []
+    value: Any = None          # primary typed value the format gate renders (money/count)
+    rows: list = []            # row list the format gate renders as TSV (table/quote)
 
 
 @dataclass
@@ -127,6 +129,47 @@ def _fill_slots(message: str, env: dict) -> str:
     def repl(m):
         return _render_slot(resolve("$" + m.group(1), env))
     return _SLOT_RE.sub(repl, message)
+
+
+def _as_number(v):
+    """A number for v (int/float kept; numeric string parsed; bool/other -> None)."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return v
+    try:
+        return float(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_answer_value(shape, env: dict):
+    """The single typed value the format gate renders. Resolve each {slot} in the
+    answer_shape skeleton against env; return the lone numeric one, else None (ambiguous
+    multi-number or non-numeric -> the gate parses the message instead). Never raises."""
+    try:
+        skel = getattr(shape, "msg_skeleton", "") or ""
+        nums = []
+        for name in _SLOT_RE.findall(skel):
+            n = _as_number(resolve("$" + name, env))
+            if n is not None:
+                nums.append(n)
+        return nums[0] if len(nums) == 1 else None
+    except Exception:
+        return None
+
+
+def _resolve_answer_rows(shape, env: dict) -> list:
+    """The row list for a table/quote answer: the env binding named by
+    answer_shape.rows_from, when it is a list. Empty otherwise. Never raises."""
+    try:
+        key = getattr(shape, "rows_from", "") or ""
+        if not key:
+            return []
+        v = resolve("$" + key, env)
+        return v if isinstance(v, list) else []
+    except Exception:
+        return []
 
 
 def _project_required_refs(intent: "IntentSpec", outcome: str, env: dict) -> tuple[list[str], list[str]]:
@@ -390,7 +433,12 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
         if r not in refs:
             refs.append(r)
     _trace_answer(message, outcome, refs)
-    captured = CapturedAnswer(message=message, outcome=outcome, refs=refs)
+    _shape = getattr(intent, "answer_shape", None)
+    captured = CapturedAnswer(
+        message=message, outcome=outcome, refs=refs,
+        value=_resolve_answer_value(_shape, env),
+        rows=_resolve_answer_rows(_shape, env),
+    )
     return InterpretResult(captured=captured, env=env, observations=observations,
                            sql_results=sql_results, mutation_landed=mutation_landed,
                            label=label)
