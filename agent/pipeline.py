@@ -1,4 +1,4 @@
-"""Plan-IR interpreter pipeline (INTENT → loop[PLAN → lint → interpret → verify → answer-once])."""
+"""Plan-IR interpreter pipeline (INTENT → loop[PLAN → interpret → verify → answer-once])."""
 from __future__ import annotations
 
 import os
@@ -284,13 +284,13 @@ def _make_answer_once(vm):
 # ---------------------------------------------------------------------------
 
 def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=None) -> dict:
-    """INTENT (frozen, retried) -> loop[ PLAN -> lint -> interpret -> verify ->
+    """INTENT (frozen, retried) -> loop[ PLAN -> interpret -> verify ->
     answer-once ] with LEARN between cycles. Mirrors the spec's error->LEARN table.
 
     Per-task pipeline; calls vm.answer exactly once before returning a metrics
     dict: {cycles_used, outcome, status, input_tokens, output_tokens, ...}.
     """
-    from .interpreter import InterpretError, interpret, lint, repair_sql_stdin
+    from .interpreter import InterpretError, interpret, repair_sql_stdin
     from .reason import IntentError, PlanEmptyError, PlanError, run_intent, run_plan
     from .verify import verify
     from .grounding import ground_refs
@@ -389,7 +389,6 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
                             token_out=tk, oracle_atoms=oracle_atoms,
                             observed=last_observed, brief_block=brief_block); _accum(tk)
             plan = repair_sql_stdin(plan)
-            lint(plan)
         except PlanEmptyError as e:
             # Empty PLAN body: nothing to learn from. Skip iLEARN (it would also
             # see no plan and emit no rule — a wasted LLM call) and retry cheaply;
