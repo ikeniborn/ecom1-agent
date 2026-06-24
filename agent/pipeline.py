@@ -313,8 +313,7 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
     _oracle = None
     try:
         _oracle = _new_oracle()
-        if not _investigate_on:
-            oracle_atoms = _oracle.retrieve(instruction)   # legacy whole-instruction dump
+        oracle_atoms = _oracle.retrieve(instruction)   # inject validated atoms into PLAN (both modes)
     except Exception:
         _oracle = None
 

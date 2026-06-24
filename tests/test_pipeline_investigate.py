@@ -98,3 +98,37 @@ def test_run_pipeline_disabled_skips_investigate(monkeypatch):
     pipeline.run_pipeline(MockVMSpy({}), instruction="x", task_id="tY",
                           agents_md_text="", facts=None)
     assert called["investigate"] is False
+
+
+def test_run_pipeline_injects_oracle_atoms_into_plan(monkeypatch):
+    """Regression: with INVESTIGATE on (default), the oracle's validated atoms
+    must still reach run_plan via oracle_atoms (the guard previously dropped them)."""
+    monkeypatch.setenv("ECOM_INVESTIGATE_ENABLED", "1")
+    captured = {}
+
+    class _FakeOracle:
+        def retrieve(self, task_text, *a, **k):
+            return ["ATOM-SENTINEL"]   # non-empty stand-in for a matched atom
+
+    monkeypatch.setattr(pipeline, "_new_oracle", lambda: _FakeOracle())
+    monkeypatch.setattr(pipeline, "investigate",
+                        lambda *a, **k: Brief())          # keep loop trivial
+    monkeypatch.setattr(pipeline, "load_entries", lambda tid: [])
+    monkeypatch.setattr(pipeline, "_ilearn", lambda *a, **k: None)
+
+    intent = IntentSpec(objective="x", desired_outcome="OUTCOME_OK",
+                        outcome_space=["OUTCOME_OK"], answer_shape={})
+    monkeypatch.setattr("agent.reason.run_intent",
+                        lambda facts, instruction, token_out=None, learn_ctx=None: intent)
+
+    def fake_run_plan(intent, facts, learn_ctx, prev_error, token_out=None,
+                      oracle_atoms=None, observed=None, brief_block=None):
+        captured["oracle_atoms"] = oracle_atoms
+        from agent.ir_models import PlanIR
+        return PlanIR(decision={"branches": [], "default_label": "ok"},
+                      answer={"ok": {"message": "done", "outcome": "OUTCOME_OK", "refs": []}})
+    monkeypatch.setattr("agent.reason.run_plan", fake_run_plan)
+
+    pipeline.run_pipeline(MockVMSpy({}), instruction="cite fraud payments",
+                          task_id="tZ", agents_md_text="", facts=None)
+    assert captured["oracle_atoms"] == ["ATOM-SENTINEL"]
