@@ -1,0 +1,41 @@
+entries:
+- agents_md_anchor: '#security'
+  content: Always run /bin/id before evaluating any security constraint that depends
+    on identity.kind, and use the bound result in the condition.
+  created: '2026-06-24'
+  deactivated_reason: Superseded by more precise rule that specifies field access
+    and operator usage.
+  id: r001
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The plan''s decision branch
+    used $_facts.identity.kind (unset/default) instead of first running /bin/id to
+    obtain the actual identity. The condition assumed ''guest'' without grounding,
+    causing a false positive denial. The plan must include a discovery step to run
+    /bin/id, bind the output (e.g., $identity), and then use $identity.kind in the
+    condition.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always reference the 'stdout' field of an ExecResponse (e.g., '$identity_raw.stdout')
+    when using exec output in a decision condition, and use the 'contains' operator
+    with a single string argument instead of 'contains_any' with a list.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''Protocol message ExecResponse has no "guest" field.'' Root
+    cause: The PlanIR decision branch used `$identity_raw` directly as the LHS of
+    a ''contains_any'' operator, but the ExecResponse is a structured message with
+    fields like ''stdout'', ''stderr'', etc. The VM attempted to access a field named
+    ''guest'' on the ExecResponse, which does not exist. The failing PlanIR fragment:
+    `{"op":"contains_any","lhs":"$identity_raw","rhs":["guest"]}`. The existing rule
+    (r001) says to ''use the bound result in the condition'' but does not specify
+    how to access the output content, leading to this malformed condition. The new
+    rule corrects the technique by mandating field access and appropriate operator.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 2
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t43

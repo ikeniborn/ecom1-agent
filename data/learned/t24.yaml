@@ -1,0 +1,65 @@
+entries:
+- agents_md_anchor: null
+  content: 'Always use structured PredExpr objects (e.g., {"ref": "$ref_name"}) for
+    ref arguments in decision branches, never bare strings.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: plan validation failed with ''Input should be a valid dictionary
+    or instance of PredExpr'' for args.0.args.0 and args.1.args.0, which received
+    bare strings ''$basket'' and ''$customer''. Root cause: the PlanIR generator emitted
+    raw ref strings where the schema expects a PredExpr dict (e.g., {"ref": "$basket"}).
+    The failing PlanIR fragment likely had "when": {"args": [{"args": ["$basket"]},
+    ...]}. This rule ensures the PLAN phase always wraps refs in proper PredExpr objects,
+    preventing validation errors.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always guard the 'first' primitive by first checking that the rowset is
+    nonempty using a compute step with prim 'nonempty', and branch accordingly to
+    handle missing data before calling 'first'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: interpret: compute step ''first'' failed: 0. The ''first'' primitive
+    was called on an empty sequence. The PlanIR attempts to extract the first row
+    from basket_rows without verifying that the SQL query returned any rows. The decision
+    branch later checks nonempty of $basket.record_path, but that variable is only
+    set after the failed compute step. The plan should have a guard: check nonempty
+    of basket_rows before calling first, and branch to a missing-basket path if empty.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the rows from an ExecResponse using the 'rows' primitive
+    before applying row-level primitives such as 'first' or 'column'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable when applying ''first''
+    to $basket_rows, $customer_rows, $inventory_check_rows. Root cause: PlanIR assumes
+    Exec RPC returns a list of rows, but the actual response is an ExecResponse object.
+    The ''first'' primitive expects a list, not an object. Failing PlanIR fragment:
+    compute steps using ''first'' on Exec RPC bindings. Rule linkage: This rule ensures
+    rows are extracted before row-level operations, preventing the type mismatch.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never read a file that is not listed in the plan's required_refs or constraints;
+    only read files that are guaranteed to exist or are explicitly required.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: real_vm: read failed: not found. The PlanIR includes a read for
+    /docs/security.md which is not in required_refs (only /docs/checkout.md is required).
+    This file likely does not exist, causing the read failure. The plan should only
+    read files that are necessary and known to exist. The decision branch checks for
+    nonempty data after reads, but the read failure itself is unhandled. The rule
+    prevents unnecessary reads that can cause VM errors.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t24

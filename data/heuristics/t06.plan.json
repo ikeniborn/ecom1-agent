@@ -1,0 +1,215 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH sku AS (SELECT product_sku, record_path FROM product_variants WHERE brand='Metabo' AND product_name LIKE '%Brushless BS 1OW-IK5%' LIMIT 1) SELECT sku.product_sku AS sku, sku.record_path AS record_path, MAX(CASE WHEN pv.property_key='voltage' AND pv.property_value_text='12 V' THEN 1 ELSE 0 END) AS has_voltage, MAX(CASE WHEN pv.property_key='battery platform' AND pv.property_value_text='12v-system' THEN 1 ELSE 0 END) AS has_battery_12v, MAX(CASE WHEN pv.property_key='kit contents' AND pv.property_value_text='starter kit' THEN 1 ELSE 0 END) AS has_kit_contents, MAX(CASE WHEN pv.property_key='battery platform' AND pv.property_value_text='18v-system' THEN 1 ELSE 0 END) AS has_battery_18v FROM sku LEFT JOIN product_variant_properties pv ON pv.product_sku = sku.product_sku GROUP BY sku.product_sku, sku.record_path;"
+      },
+      "bind": "product_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "product_raw",
+      "format": "auto_delim",
+      "into": "product_rows",
+      "columns": [
+        {
+          "into": "sku",
+          "candidates": [
+            "sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "has_voltage",
+          "candidates": [
+            "has_voltage"
+          ]
+        },
+        {
+          "into": "has_battery_12v",
+          "candidates": [
+            "has_battery_12v"
+          ]
+        },
+        {
+          "into": "has_kit_contents",
+          "candidates": [
+            "has_kit_contents"
+          ]
+        },
+        {
+          "into": "has_battery_18v",
+          "candidates": [
+            "has_battery_18v"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$product_rows"
+      ],
+      "into": "product_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "sku"
+      ],
+      "into": "product_sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "record_path"
+      ],
+      "into": "record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "has_voltage"
+      ],
+      "into": "has_voltage_str"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "has_battery_12v"
+      ],
+      "into": "has_battery_12v_str"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "has_kit_contents"
+      ],
+      "into": "has_kit_contents_str"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "has_battery_18v"
+      ],
+      "into": "has_battery_18v_str"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$has_voltage_str"
+      ],
+      "into": "voltage_ok"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$has_battery_12v_str"
+      ],
+      "into": "battery_12v_ok"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$has_kit_contents_str"
+      ],
+      "into": "kit_ok"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$has_battery_18v_str"
+      ],
+      "into": "battery_18v_ok"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "isnull",
+          "lhs": "$product_sku",
+          "rhs": null,
+          "args": []
+        },
+        "label": "product_not_found"
+      },
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "eq",
+              "lhs": "$voltage_ok",
+              "rhs": 1,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$battery_12v_ok",
+              "rhs": 1,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$kit_ok",
+              "rhs": 1,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$battery_18v_ok",
+              "rhs": 1,
+              "args": []
+            }
+          ]
+        },
+        "label": "all_ok"
+      }
+    ],
+    "default_label": "properties_missing"
+  },
+  "ops": [],
+  "answer": {
+    "product_not_found": {
+      "message": "Product not found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "all_ok": {
+      "message": "Yes, {sku} has all base properties and 18v-system.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$record_path"
+        }
+      ]
+    },
+    "properties_missing": {
+      "message": "No, {sku} does not have the claimed properties.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

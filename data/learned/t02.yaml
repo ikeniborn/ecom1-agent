@@ -1,0 +1,115 @@
+entries:
+- agents_md_anchor: null
+  content: Always include a rowsets step after an Exec RPC that returns tabular data,
+    binding the ExecResponse to a rowset before using compute primitives like first,
+    get, or count.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. Root cause: The PlanIR discovery step runs an Exec
+    RPC (SQL query) and binds the result to ''variant_result'', but the compute step
+    directly applies ''first'' to ''$variant_result''. The Exec RPC returns an ExecResponse
+    object, not a list of rows. The interpreter attempts to subscript the ExecResponse,
+    which fails. The fix requires adding a rowsets step to extract rows from the ExecResponse
+    into a named rowset (e.g., ''variant_rows''), then using ''first'' on that rowset.
+    The failing PlanIR fragment shows discovery with Exec RPC and compute first($variant_result)
+    with no rowsets. This rule ensures the PLAN phase always includes the necessary
+    rowsets extraction step.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that a rowsets step after an Exec RPC uses a format (e.g.,
+    'tsv' with header, 'csv' with header) that produces dicts with the expected column
+    keys, and verify the rowset is non-empty before using 'first' and 'get' to extract
+    values; otherwise, handle the empty case explicitly to avoid unresolved refs.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''$record_path''] on
+    OK answer''. The PlanIR uses Exec SQL returning one row, rowsets with ''auto_delim''
+    and columns mapping, then compute ''first'' and ''get'' to set $record_path. The
+    unresolved ref indicates the compute step did not assign $record_path, likely
+    because the rowset format did not produce dicts (e.g., auto_delim parsed as list
+    of lists), causing ''get'' to fail silently. The existing rule (always include
+    rowsets) was followed but insufficient; the format must guarantee dicts. Rule
+    ensures robust extraction and prevents unresolved refs.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that any variable referenced in an answer block's refs list
+    is defined in all code paths, including when a SQL query returns zero rows; use
+    a conditional compute step (e.g., if nonempty rows then first else null) to set
+    the variable to null when the rowset is empty, rather than relying on 'first'
+    and 'get' which may fail on an empty list.
+  created: '2026-06-24'
+  deactivated_reason: The new rule supersedes r003 by being more explicit about the
+    compute primitives and the necessity of a conditional check before extraction.
+  id: r003
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$record_path'''']
+    on OK answer''. The PlanIR uses a SQL query that may return zero rows if the product
+    variant does not exist. The compute step uses ''first'' and ''get'' on the rows
+    list; when the list is empty, ''first'' returns None and ''get'' on None may fail
+    or leave $record_path undefined. The decision branch''s ''no'' answer block requires
+    $record_path, but it is never set, causing the unresolved ref error. The existing
+    rule about handling empty rowsets was not followed; a conditional compute step
+    is needed to guarantee $record_path is always defined (even as null).'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the 'literal' compute primitive; instead, embed constant values
+    as columns in the SQL query's SELECT clause and extract them from the rowset using
+    'first' and 'get' compute primitives.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'The error ''interpret: compute step ''literal'' failed: ''literal''''
+    indicates the interpreter cannot process the ''literal'' primitive. The PlanIR
+    uses multiple literal steps to define constants (brand, series, product_name,
+    color_family, length) for the answer message. To avoid this failure, constants
+    should be included as columns in the SQL query result (e.g., SELECT ''Schneider
+    Electric'' AS brand, ...) so they are available in the rowset and can be extracted
+    with ''first'' and ''get'', which are known to work. This technique is task-agnostic
+    and avoids the failing primitive.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always use a conditional compute step to extract variables from a rowset
+    that may be empty: first check if the rowset is non-empty (e.g., using a ''count''
+    or ''nonempty'' primitive), then apply ''first'' and ''get'' only when non-empty,
+    otherwise set the variable to null. This ensures the variable is defined in all
+    code paths, even if only used in a branch that requires non-empty rows.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: The error 'unresolved required ref(s) ['$record_path'] on OK answer'
+    occurs because the PlanIR uses 'first' and 'get' compute primitives directly on
+    a rowset that may be empty (when the SQL query returns zero rows). The existing
+    rule r003 advises conditional compute but the script ignored it. The new rule
+    explicitly forbids direct use of 'first' and 'get' on a potentially empty rowset
+    and mandates a conditional check first.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always include a discovery step with a SQL query that selects the required
+    columns (including any columns needed for answer and refs) and filters based on
+    the provided parameters before using rowsets and compute steps; the rowsets step
+    must reference a data source that was defined by a prior discovery step.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$record_path''] on OK
+    answer. Root cause: The PlanIR script has no discovery step, so the rowset is
+    never populated; the rowsets step references ''sql_result'' which is undefined.
+    The script attempts to extract $record_path from a non-existent rowset, causing
+    the ref to be unresolved. The existing rules assume an Exec RPC exists but do
+    not enforce that a discovery step must precede rowsets. This rule ensures grounding
+    data is always retrieved before extraction.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 7
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t02

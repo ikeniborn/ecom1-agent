@@ -1,0 +1,125 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE store_name = 'PowerTool Salzburg Elisabeth-Vorstadt'), employee AS (SELECT e.employee_id, e.employee_display_name, e.employee_email, e.record_path FROM employee_accounts e WHERE e.employee_display_name = 'Marcel Bergmann' AND e.store_id = (SELECT store_id FROM store)), role AS (SELECT r.role_code FROM employee_role_assignments r WHERE r.employee_id = (SELECT employee_id FROM employee)) SELECT (SELECT store_id FROM store) as store_id, (SELECT employee_id FROM employee) as employee_id, (SELECT employee_email FROM employee) as employee_email, (SELECT record_path FROM employee) as employee_record_path, (SELECT COUNT(*) FROM role WHERE role_code LIKE '%manager%') > 0 as is_manager;"
+      },
+      "bind": "query_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "query_result",
+      "format": "auto_delim",
+      "into": "parsed_rows",
+      "columns": [
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "employee_id",
+          "candidates": [
+            "employee_id"
+          ]
+        },
+        {
+          "into": "employee_email",
+          "candidates": [
+            "employee_email"
+          ]
+        },
+        {
+          "into": "employee_record_path",
+          "candidates": [
+            "employee_record_path"
+          ]
+        },
+        {
+          "into": "is_manager",
+          "candidates": [
+            "is_manager"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$parsed_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "employee_email"
+      ],
+      "into": "employee_email"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "is_manager"
+      ],
+      "into": "is_manager"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "employee_record_path"
+      ],
+      "into": "employee_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$employee_email",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$is_manager",
+              "rhs": "t",
+              "args": []
+            }
+          ]
+        },
+        "label": "manager_found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "manager_found": {
+      "message": "Marcel Bergmann is the manager of PowerTool Salzburg Elisabeth-Vorstadt. Their email is {employee_email}.",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    },
+    "not_found": {
+      "message": "Could not confirm that Marcel Bergmann is the manager of PowerTool Salzburg Elisabeth-Vorstadt.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

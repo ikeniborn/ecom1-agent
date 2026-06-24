@@ -1,0 +1,100 @@
+{
+  "objective": "Determine whether the Festool Stackable SYS 3JJ-9LM Tool Box and Bag line includes a product variant that has both storage type 'parts case' and storage type 'tool bag' properties, and report the exact product record or a negative answer with the checked SKU.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "product_family_name": "exact match from product_families.product_family_name = 'Festool Stackable SYS 3JJ-9LM Tool Box and Bag'",
+    "product_sku": "lookup from product_variants WHERE product_family_id = (select product_family_id from product_families where product_family_name = $product_family_name) LIMIT 1",
+    "storage_type_properties": "lookup from product_variant_properties WHERE product_sku = $product_sku AND property_key = 'storage type'"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$product_sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "contains_any",
+        "lhs": "$storage_type_properties[*].property_value_text",
+        "rhs": [
+          "parts case"
+        ],
+        "args": []
+      },
+      {
+        "op": "contains_any",
+        "lhs": "$storage_type_properties[*].property_value_text",
+        "rhs": [
+          "tool bag"
+        ],
+        "args": []
+      }
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
+      {
+        "op": "nonempty",
+        "lhs": "$product_sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "not",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "and",
+            "lhs": null,
+            "rhs": null,
+            "args": [
+              {
+                "op": "contains_any",
+                "lhs": "$storage_type_properties[*].property_value_text",
+                "rhs": [
+                  "parts case"
+                ],
+                "args": []
+              },
+              {
+                "op": "contains_any",
+                "lhs": "$storage_type_properties[*].property_value_text",
+                "rhs": [
+                  "tool bag"
+                ],
+                "args": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "OUTCOME_OK: Product record: {record_path} | OUTCOME_NONE_UNSUPPORTED: <NO> SKU: {product_sku}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_variant.record_path"
+      }
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_sku"
+      }
+    ]
+  }
+}

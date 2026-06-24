@@ -1,0 +1,37 @@
+entries:
+- agents_md_anchor: null
+  content: Never read a directory path directly with a Read RPC; instead, list the
+    directory contents first and then read the appropriate file (e.g., the only .json
+    file) from the listing.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''real_vm: read failed: is a directory'' when reading $payment_info.record_path.
+    The record_path from payment_transactions is a directory, not a file. The PlanIR
+    attempted to read it directly, causing failure. The plan must first list the directory
+    to discover the actual record file (e.g., a .json file) and then read that file.
+    This rule prevents similar failures when record_path points to a directory.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the 'concat' primitive to create a scalar literal value; 'concat'
+    concatenates two list[dict] row sets. Instead, use the 'literal' primitive with
+    the value as a single argument.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: interpret compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. Root cause: PlanIR compute step used concat
+    with a single string argument ''basket_216'', but concat expects two list[dict]
+    arguments (row sets). The intent was to create a variable holding the literal
+    basket_id. The correct primitive is ''literal'' (or a direct value reference).
+    Failing fragment: {"prim":"concat","args":["basket_216"],"into":"basket_id"}.
+    Rule linkage: This rule prevents misuse of concat for scalar literals.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 3
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t27

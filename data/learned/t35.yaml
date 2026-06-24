@@ -1,0 +1,53 @@
+entries:
+- agents_md_anchor: null
+  content: Always validate that both arguments to the 'eq' primitive are defined and
+    non-null before calling 'eq', by using 'isnull' or 'coalesce' primitives to provide
+    a default value or by guarding the 'eq' with a conditional branch.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'The error ''interpret: compute step ''eq'' failed: ''eq'''' occurs because
+    the ''eq'' primitive received a null or undefined argument (likely ''$payment_status''
+    from a missing or null column). The PlanIR attempts to compare ''$payment_status''
+    to the string ''requires_3ds'' without first ensuring the value exists. The compute
+    step should include a null check or default value to prevent this failure.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always construct each element of a decision branch's 'when' predicate's
+    'args' as a valid PredExpr object (with 'ref', 'literal', 'op', etc. keys), never
+    as a bare string or a raw list.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: PlanIR validation failed because decision branch conditions used bare
+    strings (e.g., '$payment') and raw lists instead of proper PredExpr objects. The
+    PlanIR generator must emit structured PredExpr for all condition arguments to
+    satisfy the PlanIR schema.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always place the decision branch that leads to a DENIED_SECURITY outcome
+    as the first branch in the decision tree, before any branch that leads to a non-DENIED
+    outcome.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''interpret: security-first violation: a DENIED_SECURITY branch
+    follows a non-DENIED branch in the decision tree''. The PlanIR decision tree has
+    branches in order: not_found (non-DENIED), denied_security (DENIED_SECURITY),
+    eligible (non-DENIED), default unsupported (non-DENIED). This violates the security-first
+    principle that requires any branch that could result in a security denial to be
+    evaluated before any non-DENIED branch. Root cause: decision branch ordering did
+    not prioritize the security check. Failing PlanIR fragment: the ''decision'' object
+    with branches array. Rule linkage: the security constraint (anchor /docs/security.md)
+    with deny_when condition implies that the security check must be first to avoid
+    bypassing safety.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t35

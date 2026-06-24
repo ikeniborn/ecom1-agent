@@ -1,0 +1,55 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/checkout.md"
+      },
+      "bind": "checkout_doc"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "identity"
+    }
+  ],
+  "rowsets": [],
+  "compute": [],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$identity.kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "deny_security"
+      }
+    ],
+    "default_label": "unsupported"
+  },
+  "ops": [],
+  "answer": {
+    "deny_security": {
+      "message": "Checkout denied: guests are not allowed to checkout baskets.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
+    },
+    "unsupported": {
+      "message": "Checkout cannot be completed due to missing identity.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

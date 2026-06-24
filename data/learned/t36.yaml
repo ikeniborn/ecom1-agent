@@ -1,0 +1,25 @@
+entries:
+- agents_md_anchor: null
+  content: Always extract the text content from a ReadResponse (e.g., via a compute
+    primitive 'get' on the 'text' field) before using it in string operations like
+    contains_any.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''real_vm: Protocol message ReadResponse has no "does not authorize
+    basket checkout" field.'' Root cause: The PlanIR decision branch uses `$handbook_text`
+    (a raw ReadResponse object) directly in a `contains_any` operation. The VM interprets
+    the RHS list as field names on the protocol message, not as substring literals.
+    The fix is to extract the document''s text content into a string variable before
+    performing string matching. The failing PlanIR fragment is the decision condition:
+    `{"op":"contains_any","lhs":"$handbook_text","rhs":["does not authorize basket
+    checkout",...]}`. This rule ensures the PLAN phase always includes a text extraction
+    step after a Read RPC, preventing similar runtime errors.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 1
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t36

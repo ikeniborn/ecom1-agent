@@ -1,0 +1,4099 @@
+════════════════════════════════════════════════════════════════════════
+TASK t13  ·  model=deepseek-v4-flash:cloud
+  How many of these products have at least 1 items available in the central Innsbruck PowerTool shop today: the Wood and Drywall Screw from Heco in the Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw line that has screw type wood screw and diameter 6 mm,the Cleaning Liquid from Ajax in the Ajax Eco Classic 25C-DXE Cleaning Liquid line that has cleaner type degreaser,the Nut Bolt and Washer from Heco in the Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer line that has fastener type threaded rod,the Wood and Drywall Screw from Heco in the Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw line that has screw type wood screw and diameter 3 mm? Answer in exactly format "%d products" (no quotes)
+════════════════════════════════════════════════════════════════════════
+
+  · [Exec /bin/sql] -> sql
+      CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+      CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+      CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+      CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+      CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+      CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+      CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+      CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+      CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+      CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+      CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+      CREATE INDEX payment_transactions_status_idx ON paym… [+6147 chars]
+  · [Exec /bin/id] [MUTATED] -> user: anonymous
+      roles: GUEST
+  · [Tree /docs] -> <empty>
+═══ PRE-PHASE FACTS ═══
+docs_inventory (11):
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+gather_status: {"schema": "ok", "sample_rows": "skipped(slim)", "identity": "ok", "docs_inventory": "ok", "policies": "skipped(slim)", "catalogue_candidates": "skipped(slim)", "target_records": "skipped(slim)", "path_listings": "skipped(slim)"}
+identity: {"kind": "guest"}
+schema:
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(… [+5146 chars]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · RERANK · 4395ms · tokens 563/497 · OK
+┌ SYSTEM (7225865c)
+    You select which knowledge snippets are RELEVANT to a coding task. Return JSON {"keep": [ids]} listing only the ids whose content would help write the task's script, most relevant first.
+├ USER
+    TASK:
+    How many of these products have at least 1 items available in the central Innsbruck PowerTool shop today: the Wood and Drywall Screw from Heco in the Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw line that has screw type wood screw and diameter 6 mm,the Cleaning Liquid from Ajax in the Ajax Eco Classic 25C-DXE Cleaning Liquid line that has cleaner type degreaser,the Nut Bolt and Washer from Heco in the Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer line that has fastener type threaded rod,the Wood and Drywall Screw from Heco in the Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw line that has screw type wood screw and diameter 3 mm? Answer in exactly format "%d products" (no quotes)
+    
+    CANDIDATE KNOWLEDGE:
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    - count_available_products_by_category_and_location: Count distinct products of a given category that are available in a specific location with positive inventory and store open.
+    - count_products_by_kind: Count the number of catalogue products that belong to a specific product kind.
+    - product_available_quantity_city: Compute total available quantity of a product across stores in a city by matching product variant properties and store location.
+    - compute_total_available_quantity_across_stores: Compute total available quantity of a product across all stores in a given city, including stores with zero availability.
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    
+    Return at most 4 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["product_available_quantity_city", "compute_total_available_quantity_across_stores", "inventory_aggregation_handle_missing_product"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · INTENT · 35791ms · tokens 4109/3384 · OK
+┌ SYSTEM (e659f28e)
+    # PHASE: INTENT
+    
+    You receive pre-phase facts about the task and produce an IntentSpec —
+    a structured description of **what** must be done and **why**, not **how**.
+    Emit data, not code. The PLAN phase uses your output to decide the execution
+    strategy.
+    
+    ## Pre-phase facts you receive
+    
+    | Field | Content |
+    |-------|---------|
+    | `instruction` | Verbatim task request from the caller |
+    | `agents_md` | Full AGENTS.MD vault rules |
+    | `schema` | Table/column definitions from the runtime |
+    | `sample_rows` | Small row sample per table (method-grounded; values change each run) |
+    | `docs_inventory` | Paths of policy docs available under `/docs/` |
+    | `policies` | Verbatim content of relevant policy files |
+    | `identity` | Output of `/bin/id` — caller role, store, issuer; includes a structural `kind`: `customer` \| `employee` \| `guest` |
+    | `target_records` | Any specific records named in the instruction |
+    
+    ## Output format — IntentSpec
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "objective": "<one-sentence statement of what must be achieved>",
+      "desired_outcome": "OUTCOME_OK | OUTCOME_DENIED_SECURITY | OUTCOME_NONE_UNSUPPORTED | OUTCOME_NONE_CLARIFICATION",
+      "params": {"<name>": "<method description or $agent_var — never a re-seeded literal>"},
+      "outcome_space": ["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+      "constraints": [
+        {
+          "anchor": "<#section > entry in AGENTS.MD>",
+          "rule": "<verbatim AGENTS.MD line>",
+          "security": true,
+          "deny_when": {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<literal or $ref>"}
+        }
+      ],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<value>"}
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "<human-readable template, e.g. 'Processed {count} items'>"
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {"kind": "policy_doc", "path": "/docs/<governing-doc>.md"},
+          {"kind": "record_path", "source": "$<row>.record_path"}
+        ]
+      }
+    }
+    ```
+    
+    ### Field rules
+    
+    - `objective` — one sentence; no implementation detail.
+    - `desired_outcome` — the nominal happy-path outcome; PLAN may produce others.
+    - `params` — encode **how** to find a value (e.g. `"lookup from <TABLE> WHERE ..."`),
+      never bake a re-seeded literal. Values beginning with `$` are resolved at runtime.
+    - `outcome_space` — every outcome the task can legitimately produce; order does not matter.
+    - `constraints` — one entry per AGENTS.MD rule that applies. Copy `rule` verbatim.
+      - `security: true` when the rule can produce `OUTCOME_DENIED_SECURITY`.
+      - `deny_when` (**required** on security constraints): a PredExpr that, when true,
+        mandates denial. Evaluated against runtime env after discovery.
+    - `required_refs` — keyed by outcome. For each outcome the answer can take, list the
+      evidence the grader requires: a `policy_doc` (literal `/docs/...md` `path` taken from
+      THIS run's `docs_inventory`/`policies` — the governing rule/count/procedure the
+      decision rests on) and/or a `record_path` (a `$ref` `source` bound at runtime to the
+      reported row's path). Declare ONLY load-bearing refs (reading a doc ≠ obligation to
+      cite it). Exactly one of `path`/`source` per RefSpec, matching its `kind`.
+    - `success_criteria` — a map keyed by outcome (same shape as `required_refs`).
+      List STRUCTURAL / grounding checks only per outcome (e.g. `count ge 0`, a
+      nonempty bound id). A negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`)
+      typically needs no criteria — it is gated by `outcome_space`. Do NOT bake a SQL
+      recipe, join, `kind_id`, or `city` here — that is PLAN's job (HOW).
+    
+    ### Learned rules
+    
+    You may receive a `LEARNED_RULES (active)` block — validated, task-scoped guidance
+    distilled from prior runs. Honor it when shaping the spec, especially `required_refs`,
+    `success_criteria`, `outcome_space`, and `params`. These rules state methods (how to
+    ground an answer, which evidence the grader requires), never re-seeded literals — apply
+    the method, do not copy any example value.
+    
+    ### Security scope — role-aware customer-ownership deny
+    
+    `facts.identity.kind` is one of `customer`, `employee`, `guest` (structural,
+    derived from the `/bin/id` id-shape — not a role-name list). The `security.md`
+    customer-ownership clause binds **customers** acting on their own account — NOT
+    an employee operational read or action.
+    
+    Apply a customer-ownership `deny_when` **only when** the caller is a customer:
+    
+    ```json
+    {"op":"and","args":[
+      {"op":"eq","lhs":"$_facts.identity.kind","rhs":"customer"},
+      {"op":"ne","lhs":"$record.customer_id","rhs":"$_facts.identity.customer_id"}]}
+    ```
+    
+    Do NOT emit an owner-mismatch deny for an `employee`/operational identity — an
+    employee reading or acting on a record they do not "own" is not a customer-scope
+    violation. Customer-only actions (account recovery, email change per the doc)
+    remain a separate class. Ground this in the `security.md` scope + `facts.identity`,
+    never a hardcoded role or id.
+    
+    ## IDD vs SDD (what belongs here)
+    
+    INTENT is the IDD layer: WHAT must hold and WHY — `objective`, `outcome_space`,
+    `constraints`, `required_refs` (cite the governing doc + the reported record),
+    `success_criteria` (structural/grounding). INTENT NEVER specifies HOW: no SQL, joins,
+    column names, `kind_id`, or `city`. PLAN (the SDD layer) reads the eligibility rule
+    from `facts.policies` and builds the rule-correct SQL.
+    
+    ## PredExpr grammar
+    
+    A predicate expression is a JSON object `{"op": ..., ...}`.
+    
+    **Leaf ops** — require `lhs` (a ref or literal); most require `rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `eq` | lhs == rhs |
+    | `ne` | lhs != rhs |
+    | `lt` | lhs < rhs (numeric) |
+    | `le` | lhs <= rhs (numeric) |
+    | `gt` | lhs > rhs (numeric) |
+    | `ge` | lhs >= rhs (numeric) |
+    | `nonempty` | lhs is non-null and non-empty (no rhs) |
+    | `isnull` | lhs is null or missing (no rhs) |
+    | `contains_any` | lhs list shares ≥1 element with rhs list |
+    | `in_set` | lhs value is in rhs list |
+    | `startswith` | str(lhs) starts with str(rhs) |
+    | `endswith` | str(lhs) ends with str(rhs) |
+    | `regex_match` | str(lhs) matches regex rhs |
+    
+    **Bool ops** — require `args` (list of nested PredExpr); no `lhs`/`rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `and` | all args true |
+    | `or` | any arg true |
+    | `not` | exactly one arg; negated |
+    
+    ### `$ref` convention
+    
+    A string starting with `$` is a runtime reference into `env`:
+    - `$name` — top-level env key
+    - `$a.b` — dotted path: `env["a"]["b"]`
+    - `$rows.0.sku` — indexed path: `env["rows"][0]["sku"]`
+    
+    Anything that does not start with `$` is treated as a literal value.
+    
+    ## Grounding rule (S3)
+    
+    The benchmark re-seeds data on every run. Never bake a literal value that
+    originates from sample data into `params` or `deny_when`. Encode the
+    **method** to retrieve it (SQL pattern, field name, policy section).
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+├ USER
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INSTRUCTION:
+    How many of these products have at least 1 items available in the central Innsbruck PowerTool shop today: the Wood and Drywall Screw from Heco in the Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw line that has screw type wood screw and diameter 6 mm,the Cleaning Liquid from Ajax in the Ajax Eco Classic 25C-DXE Cleaning Liquid line that has cleaner type degreaser,the Nut Bolt and Washer from Heco in the Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer line that has fastener type threaded rod,the Wood and Drywall Screw from Heco in the Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw line that has screw type wood screw and diameter 3 mm? Answer in exactly format "%d products" (no quotes)
+└ ASSISTANT
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [{"key": "screw type", "value": "wood screw"}, {"key": "diameter", "value": "6 mm"}]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [{"key": "cleaner type", "value": "degreaser"}]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [{"key": "fastener type", "value": "threaded rod"}]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [{"key": "screw type", "value": "wood screw"}, {"key": "diameter", "value": "3 mm"}]
+          }
+        ]
+      },
+      "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_UNSUPPORTED"],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {"op": "ge", "lhs": "$count", "rhs": 0},
+          {"op": "le", "lhs": "$count", "rhs": 4}
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products"
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {"kind": "record_path", "source": "$store.record_path"}
+        ]
+      }
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · RERANK · 4180ms · tokens 408/461 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.
+    
+    CANDIDATE KNOWLEDGE:
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    - product_available_quantity_city: Compute total available quantity of a product across stores in a city by matching product variant properties and store location.
+    - compute_total_available_quantity_across_stores: Compute total available quantity of a product across all stores in a given city, including stores with zero availability.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - count_available_products_by_category_and_location: Count distinct products of a given category that are available in a specific location with positive inventory and store open.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_products_by_kind: Count the number of catalogue products that belong to a specific product kind.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["product_available_quantity_city", "compute_total_available_quantity_across_stores"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · INVESTIGATE · 2528ms · tokens 637/275 · OK
+┌ SYSTEM (7fda40de)
+    # PHASE: INVESTIGATE
+    
+    You explore a vault ONE read-only step at a time to gather the evidence a later
+    deterministic plan needs. You do NOT write the plan and you NEVER mutate state.
+    
+    ## Each turn you receive
+    - The OBJECTIVE and the REFS the final answer must ground (required_refs targets).
+    - The BRIEF so far (resolved env + prior step lessons).
+    - A few KNOWLEDGE snippets scoped to the immediate sub-goal.
+    
+    ## Router output — pick exactly ONE next action
+    Single JSON object, no prose, no fences. Either a tool call:
+    {"tool": "<read|list|tree|stat|search|exec>", "args": {...}, "why": "<one line>"}
+    or, when the brief already grounds every required ref:
+    {"done": true}
+    
+    Tool arg shapes: read/stat {"path"}; list {"path"}; tree {"root"}; search
+    {"root","pattern","limit"}; exec {"path":"/bin/sql","stdin":"SELECT …"} (SELECT/CTE only).
+    Prefer the cheapest probe that resolves the NEXT unknown. Do not re-issue a probe
+    already in the brief.
+    
+    ## Digest output — condense the tool result
+    Single JSON object:
+    {"observation_digest": "<≤200 chars of what the result shows>",
+     "lesson": "<one-line takeaway for the next step>",
+     "env_updates": {"<key>": "<value>"},
+     "refs_found": ["<record_path>", ...]}
+    
+    Bind env keys the sufficiency gate reads: "policy_doc:/docs/<file>.md": true when you
+    have read a governing doc; "<row>.record_path": "<path>" when you have located the
+    record to cite. Keep digests SMALL — the next step sees the brief, not the raw output.
+├ USER
+    OBJECTIVE:
+    Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.
+    
+    REQUIRED_REFS:
+    record_path:$store.record_path
+    
+    KNOWLEDGE (scoped to this step):
+    - To compute the total available quantity of a product across all stores in a given city, first identify the product variant by matching its properties (e.g., storage type, color, volume) and product identifiers (brand, series, model, name). Then, for each store in the city, sum the available_today_quantity from the store_inventory table. If either the product variant or stores are not found, the result is unsupported.
+    - To compute the total available quantity of a specific product across all stores in a city, perform a LEFT JOIN between the stores table (filtered by city) and the store_inventory table on store_id and product_sku. Use COALESCE to treat NULL available_today_quantity as 0, then SUM the result. This ensures stores without an inventory record for the product are included with a quantity of 0.
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "exec", "args": {"path": "/bin/sqlite3", "stdin": ".tables"}, "why": "List tables in the database to understand schema."}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · RERANK · 4341ms · tokens 401/418 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': '.tables'} is not read-only
+    
+    CANDIDATE KNOWLEDGE:
+    - sql_safe_count_query: Safely counting records in a database while enforcing access control.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_specific_category: Count the number of catalog items that belong to a specific product kind.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - include-required-references: Ensure that the answer includes all required references, such as document paths specified in the task or error feedback.
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    - sql-count-by-category: Method to count items of a specific category in a relational database using SQL JOIN and COUNT
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    - atom-count-items-by-category-sql: A reusable method to count items belonging to a specific category in a relational database using SQL JOIN and WHERE clause, extracting the count, validating it, and formatting the output.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["sql_safe_count_query"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · INVESTIGATE · 2747ms · tokens 568/255 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    OBJECTIVE:
+    Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.
+    
+    REQUIRED_REFS:
+    record_path:$store.record_path
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': '.tables'} is not read-only
+    
+    KNOWLEDGE (scoped to this step):
+    - When counting records that belong to a specific category, construct a parameterized query that uses JOINs to filter by the category name. Ensure that the executing user has the necessary permissions to read the involved tables. Avoid executing raw SQL strings that bypass security checks or expose sensitive data.
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {
+      "tool": "exec",
+      "args": {
+        "path": "/bin/sqlite3",
+        "stdin": "SELECT name FROM sqlite_master WHERE type='table';"
+      },
+      "why": "Get list of tables in the database to understand schema"
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · RERANK · 7493ms · tokens 411/640 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': "SELECT name FROM sqlite_master WHERE type='table';"} is not read-only
+    
+    CANDIDATE KNOWLEDGE:
+    - sql_safe_count_query: Safely counting records in a database while enforcing access control.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - count_specific_category: Count the number of catalog items that belong to a specific product kind.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - include-required-references: Ensure that the answer includes all required references, such as document paths specified in the task or error feedback.
+    - sql-count-by-category: Method to count items of a specific category in a relational database using SQL JOIN and COUNT
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    - atom-count-items-by-category-sql: A reusable method to count items belonging to a specific category in a relational database using SQL JOIN and WHERE clause, extracting the count, validating it, and formatting the output.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["sql_safe_count_query", "atom-count-items-by-category-sql"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · INVESTIGATE · 1866ms · tokens 762/176 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    OBJECTIVE:
+    Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.
+    
+    REQUIRED_REFS:
+    record_path:$store.record_path
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': '.tables'} is not read-only
+    2. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': "SELECT name FROM sqlite_master WHERE type='table';"} is not read-only
+    
+    KNOWLEDGE (scoped to this step):
+    - When counting records that belong to a specific category, construct a parameterized query that uses JOINs to filter by the category name. Ensure that the executing user has the necessary permissions to read the involved tables. Avoid executing raw SQL strings that bypass security checks or expose sensitive data.
+    - To count items of a specific category:
+    1. Construct a SQL query that joins the items table with the categories table on the category identifier.
+    2. Use a WHERE clause to filter rows where the category name equals the target category.
+    3. Apply COUNT(*) to get the total number of matching items.
+    4. Execute the query and capture the result set.
+    5. Extract the count value from the first row and column of the result.
+    6. Convert the extracted value to a numeric type if necessary.
+    7. Validate that the count is non-negative; if negative, treat as an error or unsupported case.
+    8. Format the output message by embedding the count into a predefined template (e.g., '<COUNT:{count}>').
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "list", "args": {"path": "/"}}
+
+  · [List /] -> <empty>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · INVESTIGATE · 4293ms · tokens 568/356 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    GOAL:
+    rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': "SELECT name FROM sqlite_master WHERE type='table';"} is not read-only
+    
+    TOOL: list {'path': '/'}
+    
+    RAW_RESULT (condense this):
+    [name: "AGENTS.MD"
+    path: "/AGENTS.MD"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "bin"
+    path: "/bin"
+    kind: NODE_KIND_DIR
+    , name: "docs"
+    path: "/docs"
+    kind: NODE_KIND_DIR
+    , name: "proc"
+    path: "/proc"
+    kind: NODE_KIND_DIR
+    , name: "run"
+    path: "/run"
+    kind: NODE_KIND_DIR
+    ]
+    
+    Return the digest JSON.
+└ ASSISTANT
+    {
+      "observation_digest": "Root contains AGENTS.MD, bin, docs, proc, run.",
+      "lesson": "Start by reading AGENTS.MD for context, then explore docs.",
+      "env_updates": {},
+      "refs_found": []
+    }
+
+  · [investigate_stop] {"reason": "sufficient", "data_paths_total": 0, "data_paths_probed": 0, "seq": 18}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · PLAN · 45135ms · tokens 5453/8279 · OK
+┌ SYSTEM (4a851949)
+    # PHASE: PLAN
+    
+    You receive an IntentSpec and produce a PlanIR — a deterministic execution
+    plan. You decide **how** to satisfy the intent. The interpreter executes your
+    plan directly; no code generation is involved.
+    
+    ## Output format — PlanIR
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "discovery": [
+        {"rpc": "<RPC name>", "args": {}, "bind": "<env key>"}
+      ],
+      "rowsets": [
+        {
+          "from": "<env key of raw text>",
+          "format": "auto_delim",
+          "into": "<env key for parsed rows>",
+          "columns": [
+            {"into": "<field name>", "candidates": ["<col header variant>", "..."]}
+          ]
+        }
+      ],
+      "compute": [
+        {"prim": "<primitive name>", "args": ["$ref_or_literal", "..."], "into": "<env key>"}
+      ],
+      "decision": {
+        "branches": [
+          {"when": {"op": "<PredExpr op>", "lhs": "$ref", "rhs": "value"}, "label": "<label>"}
+        ],
+        "default_label": "<label>"
+      },
+      "ops": [
+        {
+          "rpc": "<RPC name>",
+          "args": {},
+          "bind": "<env key or null>",
+          "guard_label": "<decision label or null>",
+          "outcome_from_exit": null
+        }
+      ],
+      "answer": {
+        "<label>": {"message": "<template with {slot} placeholders>", "outcome": "OUTCOME_OK", "refs": []}
+      },
+      "custom_extract": [
+        {"name": "<parser name>", "input": "$ref", "into": "<env key>"}
+      ]
+    }
+    ```
+    
+    ### Field rules
+    
+    **`discovery`** — read-only RPCs that populate `env`. Run before decision.
+    Use `Exec /bin/sql` with parameterised `:name` placeholders; never inline
+    re-seeded literals. Batch with CTEs into a single call where possible (S4).
+    When a computation depends on an eligibility/count rule, first `Read` the governing
+    `/docs` policy path (surfaced in `docs_inventory`) in a `discovery` step, then encode
+    the rule-correct SQL from the documented rule — the documented count/filter, not a
+    naive one.
+    
+    **`rowsets`** — parse delimited text from a bound env key into a list of dicts.
+    `format` is `auto_delim` (tab/comma auto-detect) or `json`.
+    `columns[*].candidates` lists header variants tried in order; first match wins.
+    
+    **`compute`** — apply a named primitive to already-resolved args; result goes to `into`.
+    Args are resolved: `$name` → env lookup; anything else → literal.
+    
+    **`decision`** — evaluate branches in order; first true branch wins; fall through to
+    `default_label`. Security-first ordering (H3): branches whose label maps to
+    `OUTCOME_DENIED_SECURITY` **must precede** all non-denied branches.
+    
+    **`ops`** — mutation or terminal RPCs. Two exclusive idioms:
+    
+    - **decide-then-guard** (`guard_label` set, `outcome_from_exit` null): the op runs
+      only when the current decision label matches `guard_label`. Outcome comes from the
+      decision tree.
+    - **mutate-then-classify** (`outcome_from_exit` set, `guard_label` null): the op
+      always runs; the interpreter classifies outcome from exit code + stderr keyword
+      matching. `outcome_from_exit` has `ok_outcome`, `keyword_buckets[{keywords, outcome}]`,
+      and `default_outcome`.
+    
+    **`answer`** — keyed by decision label. Each `AnswerTemplateIR`:
+    - `message` — f-string-style template; `{slot}` resolves from env (same as `$slot`).
+    - `outcome` — one of the `Outcome` enum values: `OUTCOME_OK`, `OUTCOME_DENIED_SECURITY`, `OUTCOME_NONE_CLARIFICATION`, `OUTCOME_NONE_UNSUPPORTED`, `OUTCOME_ERR_INTERNAL`.
+    - `refs` — always-required grounding is PROJECTED from `INTENT.required_refs[selected_outcome]`,
+      so for an unconditional ref leave this `[]` and just bind the env key the INTENT `source`
+      points at. For **conditional** grounding — a ref needed on SOME branches only (e.g. a
+      `record_path` that exists only when a match is FOUND, absent on the not-found branch) —
+      author the `$binding` in THAT branch's `refs`; the interpreter resolves it best-effort and
+      DROPS it if it resolves to nothing (so the empty branch is not forced to carry it). Bind the
+      env key it points at (e.g. a `$row.record_path` column selected from `/bin/sql`). Never
+      author a literal you cannot ground at runtime.
+    
+    **`custom_extract`** — named-parser escape hatch (H2). Dispatches to `PARSERS[name]`
+    with `(text, params)` → `list[dict]`; result stored at `into`.
+    
+    ## Primitive registry (13)
+    
+    The following primitive names are valid in `compute[*].prim`:
+    
+    `abs_diff`, `div`, `to_number`, `sum_col`, `count`, `column`,
+    `first`, `get`, `dedupe`, `concat`, `all_true`, `any_true`, `filter_rows`
+    
+    ## Parser registry
+    
+    Valid names for `custom_extract[*].name`:
+    
+    `fuzzy_sku_receipt`
+    
+    ## `$ref` / `{slot}` convention
+    
+    - In `args` and `when.lhs/rhs`: `$name` → env lookup; literal otherwise.
+    - In `answer[*].message`: `{name}` resolves from env at answer time (same lookup,
+      without the `$` prefix).
+    - Dotted and indexed paths: `$a.b`, `$rows.0.field`.
+    
+    ## Predicate ops (exact spellings)
+    
+    `decision.branches[*].when` accepts ONLY these ops — use the exact spelling:
+    
+    - Leaf: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `nonempty`, `isnull`,
+      `contains_any`, `in_set`, `startswith`, `endswith`, `regex_match`
+    - Bool: `and`, `or`, `not` (each takes `args`: a list of nested predicates)
+    
+    Do NOT use `neq`, `!=`, `==`, `gte`, or `lte` — they are not valid op names.
+    
+    ## AnswerTemplateIR shape (exact keys)
+    
+    Each `answer[<label>]` object has ONLY these keys: `message`, `outcome`, `refs`.
+    Add no other keys. Message `{slot}` placeholders resolve from `env`, never from
+    extra fields on the answer object.
+    
+    ## Tool selection rules
+    
+    - Prefer `Find` / `Search` / `Read` with line ranges over full `Tree` + parse.
+    - Batch SQL into a single `Exec /bin/sql` with CTEs (S4).
+    - Use `Stat` before `Read` when path existence is uncertain.
+    - `discovery` items must be read-only; mutations belong in `ops`.
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+    
+    
+    ## TOOL CATALOG (validated — exact rpc names + arg keys)
+    
+    ### Read (read)
+    - purpose: Read a file (optionally line-numbered range).
+    - required args: path
+    - optional args: end_line, number, start_line
+    - when: Fetch a known file's content (policy doc, /proc record).
+    - example: {'rpc': 'Read', 'args': {'path': '/docs/security.md'}}
+    
+    ### List (read)
+    - purpose: List a directory's entries.
+    - required args: path
+    - optional args: —
+    - when: Enumerate a dir before reading specific children.
+    - example: {'rpc': 'List', 'args': {'path': '/proc'}}
+    
+    ### Tree (read)
+    - purpose: Recursive tree under a root (level=0 unlimited).
+    - required args: root
+    - optional args: level
+    - when: Discover a subtree's shape; prefer Find/Search when targeted.
+    - example: {'rpc': 'Tree', 'args': {'root': '/docs', 'level': 0}}
+    
+    ### Find (read)
+    - purpose: Path search by name under a root.
+    - required args: root
+    - optional args: kind, limit, name
+    - when: Locate a file by name when its dir is unknown.
+    - example: {'rpc': 'Find', 'args': {'root': '/', 'name': 'security.md'}}
+    
+    ### Search (read)
+    - purpose: Regex content search; returns path+line+text.
+    - required args: pattern, root
+    - optional args: limit
+    - when: Find docs/records mentioning an entity token.
+    - example: {'rpc': 'Search', 'args': {'root': '/docs', 'pattern': 'refund', 'limit': 30}}
+    
+    ### Exec (read)
+    - purpose: Run a runtime tool (e.g. /bin/sql, /bin/id).
+    - required args: path
+    - optional args: args, stdin
+    - when: Query the catalog DB via /bin/sql; read identity via /bin/id.
+    - NOTE: /bin/sql reads the query from the real STDIN channel. Put the SQL in `stdin` (a string); do NOT inline it anywhere else. `args` is also accepted and is moved to stdin by the pre-lint repair. The runner returns its usage banner if the SQL never reaches stdin (the r012 bug).
+    - example: {'rpc': 'Exec', 'args': {'path': '/bin/sql', 'stdin': 'SELECT 1;'}}
+    
+    ### Write (mutate)
+    - purpose: Write a file (optional compare-and-swap).
+    - required args: content, path
+    - optional args: idempotency_key, if_match_sha256
+    - when: Persist a mutation; belongs in `ops`, never `discovery`.
+    - example: {'rpc': 'Write', 'args': {'path': '/proc/x.json', 'content': '{}'}}
+    
+    ### Delete (mutate)
+    - purpose: Delete a file or directory.
+    - required args: path
+    - optional args: —
+    - when: Remove a record; belongs in `ops`.
+    - example: {'rpc': 'Delete', 'args': {'path': '/proc/x.json'}}
+    
+    ### Stat (read)
+    - purpose: Metadata for a path (kind, content_type).
+    - required args: path
+    - optional args: —
+    - when: Check existence/kind before Read.
+    - example: {'rpc': 'Stat', 'args': {'path': '/docs'}}
+    
+    Use ONLY these rpc names and arg keys. An unknown rpc or arg key is rejected by the interpreter and returned to you to fix.
+├ USER
+    ## ANTI-PATTERNS — AVOID (known failure causes)
+    - (retail, inventory) To compute the total available quantity of a product across all stores in a given city, first identify the product variant by matching its properties (e.g., storage type, color, volume) and product identifiers (brand, series, model, name). Then, for each store in the city, sum the available_today_quantity from the store_inventory table. If either the product variant or stores are not found, the result is unsupported.
+    - (data_query, inventory, aggregation) To compute the total available quantity of a specific product across all stores in a city, perform a LEFT JOIN between the stores table (filtered by city) and the store_inventory table on store_id and product_sku. Use COALESCE to treat NULL available_today_quantity as 0, then SUM the result. This ensures stores without an inventory record for the product are included with a quantity of 0.
+    - (inventory, SQL, data aggregation, error handling) When aggregating inventory quantities across stores for a specific product, ensure the query returns a result for all cases. Use a LEFT JOIN from stores to inventory (or product) to include stores with zero quantity. If the product itself is not found, do not treat it as an unsupported case; instead, return a total of 0 (or appropriate default) and set the outcome to OK. The decision logic should not branch on product existence; it should always produce an answer.
+    
+    INTENT_SPEC:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': '.tables'} is not read-only
+    2. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': "SELECT name FROM sqlite_master WHERE type='table';"} is not read-only
+    3. [list] Root contains AGENTS.MD, bin, docs, proc, run. -> Start by reading AGENTS.MD for context, then explore docs.
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), products (product_id, brand, series, model) AS (VALUES (0, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw'), (1, 'Ajax', 'Ajax Eco Classic 25C-DXE', 'Cleaning Liquid'), (2, 'Heco', 'Heco Zinc Plated HECO 3DW-64B', 'Nut Bolt and Washer'), (3, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw')), required_props (product_id, property_key, property_value_text) AS (VALUES (0, 'screw type', 'wood screw'), (0, 'diameter', '6 mm'), (1, 'cleaner type', 'degreaser'), (2, 'fastener type', 'threaded rod'), (3, 'screw type', 'wood screw'), (3, 'diameter', '3 mm')), prop_counts AS (SELECT p.product_id, pv.product_sku, COUNT(*) AS match_count FROM products p JOIN product_variants pv ON pv.brand = p.brand AND pv.series = p.series AND pv.model = p.model JOIN required_props rp ON rp.product_id = p.product_id JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku AND pvp.property_key = rp.property_key AND pvp.property_value_text = rp.property_value_text GROUP BY p.product_id, pv.product_sku), total_props AS (SELECT product_id, COUNT(*) AS total FROM required_props GROUP BY product_id), matched_skus AS (SELECT pc.product_id, pc.product_sku FROM prop_counts pc JOIN total_props tp ON tp.product_id = pc.product_id AND pc.match_count = tp.total), inventory AS (SELECT ms.product_id, COALESCE(si.available_today_quantity, 0) AS available FROM matched_skus ms CROSS JOIN store s LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = ms.product_sku) SELECT COALESCE(s.record_path, '') AS store_record_path, COALESCE((SELECT COUNT(*) FROM inventory WHERE available >= 1), 0) AS count_products_with_stock FROM (SELECT 1) dummy LEFT JOIN store s ON 1=1;"
+          },
+          "bind": "raw_store_data"
+        }
+      ],
+      "rowsets": [
+        {
+          "from": "raw_store_data",
+          "format": "auto_delim",
+          "into": "store_data",
+          "columns": [
+            {"into": "store_record_path", "candidates": ["store_record_path"]},
+            {"into": "count_products_with_stock", "candidates": ["count_products_with_stock"]}
+          ]
+        }
+      ],
+      "compute": [
+        {"prim": "first", "args": ["$store_data"], "into": "store_row"},
+        {"prim": "column", "args": ["$store_row", "count_products_with_stock"], "into": "count_str"},
+        {"prim": "to_number", "args": ["$count_str"], "into": "count"},
+        {"prim": "column", "args": ["$store_row", "store_record_path"], "into": "store_record_path"}
+      ],
+      "decision": {
+        "branches": [
+          {"when": {"op": "nonempty", "lhs": "$store_record_path", "rhs": ""}, "label": "found"}
+        ],
+        "default_label": "not_found"
+      },
+      "ops": [],
+      "answer": {
+        "found": {
+          "message": "{count} products",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {"kind": "record_path", "path": null, "source": "$store_record_path"}
+          ]
+        },
+        "not_found": {
+          "message": "Unsupported: store not found",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 1, "step_type": "LINT", "passed": true, "reason": "", "seq": 21}
+  · [Exec /bin/sql] -> store_record_path,count_products_with_stock
+      /proc/stores/store_innsbruck_wilten.json,0
+  · [gate] {"cycle": 1, "step_type": "INTERPRET", "passed": false, "reason": "interpret: compute step 'column' failed: 'column' exp
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · LEARN · 5655ms · tokens 2139/808 · OK
+┌ SYSTEM (dc81071f)
+    # PHASE: LEARN (Plan-IR)
+    
+    You diagnose a failed interpreter cycle and produce a corrective rule for the
+    PLAN phase (which emits a PlanIR — structured data, never code). You may also
+    deactivate stale rules and request additional pre-phase deep-reads.
+    
+    ## Inputs
+    
+    - `TOOL_PLAN` — the frozen IntentSpec JSON for this run (WHAT/why; do not change it)
+    - `ERROR` — failure string (`plan:`, `interpret:`, `verify:`, `real_vm:`)
+    - `OBSERVED_RPC_OUTPUTS` — stdout/content captured from the failed run's RPCs
+      (present when the cycle reached execution). Use it to see WHY a ref was empty:
+      a table missing, a column misnamed, a listing that returned nothing.
+    - `SCRIPT_CODE` — the failing **PlanIR JSON** (the candidate "how")
+    - `EXISTING_RULES` — active IR rules from prior cycles/runs
+    
+    ## Output format
+    
+    Single JSON object — no prose, no markdown fences:
+    
+    ```json
+    {
+      "rule_content": "<starts with Never|Always|Use|Do not|When|If|Prefer>",
+      "agents_md_anchor": "<#section> or null",
+      "reasoning": "<diagnosis: verbatim error, root cause, failing PlanIR fragment, rule linkage>",
+      "deactivate_ids": ["rXXX"],
+      "deactivate_reason": "<why obsolete> or null",
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+    ```
+    
+    ## Rules
+    
+    - `rule_content` must describe a PLAN technique — how to shape the PlanIR
+      (discovery steps, rowsets, decision branches, ref projection) so the next
+      cycle grounds correctly. NOT a domain conclusion, NOT a literal task value.
+    - `rule_content` must be task-agnostic — never embed a re-seeded literal
+      (SKU, id, city, date).
+    - `prephase_deep_read` (optional): list table names or absolute literal paths the
+      pre-phase MUST read next run because grounding needed data it did not surface
+      (a table named only by synonym, or a literal directory the instruction named).
+      These are read EAGERLY next run (Tier-2 deep-read set) — they self-tune the
+      pre-phase, so PREFER them over baking a value into a rule. Leave `[]` when the
+      failure is purely a PlanIR-shape bug.
+    - Skip (`skip: true`) only if an existing rule already covers this.
+    - Use `deactivate_ids` when the new rule strictly supersedes prior ones — set `deactivate_reason`.
+    - Length: `rule_content` >= 20 chars; must start with a listed lead verb.
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    ERROR:
+    interpret: compute step 'column' failed: 'column' expects list[dict]; use 'get' for a single row
+    CONTRACT: column(rows, col): arg must be list[dict] rows; use 'get' for a single row
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Exec","args":{"path":"/bin/sql","stdin":"WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), products (product_id, brand, series, model) AS (VALUES (0, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw'), (1, 'Ajax', 'Ajax Eco Classic 25C-DXE', 'Cleaning Liquid'), (2, 'Heco', 'Heco Zinc Plated HECO 3DW-64B', 'Nut Bolt and Washer'), (3, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw')), required_props (product_id, property_key, property_value_text) AS (VALUES (0, 'screw type', 'wood screw'), (0, 'diameter', '6 mm'), (1, 'cleaner type', 'degreaser'), (2, 'fastener type', 'threaded rod'), (3, 'screw type', 'wood screw'), (3, 'diameter', '3 mm')), prop_counts AS (SELECT p.product_id, pv.product_sku, COUNT(*) AS match_count FROM products p JOIN product_variants pv ON pv.brand = p.brand AND pv.series = p.series AND pv.model = p.model JOIN required_props rp ON rp.product_id = p.product_id JOIN product_variant_properties pvp ON pvp.product_sku = pv.product_sku AND pvp.property_key = rp.property_key AND pvp.property_value_text = rp.property_value_text GROUP BY p.product_id, pv.product_sku), total_props AS (SELECT product_id, COUNT(*) AS total FROM required_props GROUP BY product_id), matched_skus AS (SELECT pc.product_id, pc.product_sku FROM prop_counts pc JOIN total_props tp ON tp.product_id = pc.product_id AND pc.match_count = tp.total), inventory AS (SELECT ms.product_id, COALESCE(si.available_today_quantity, 0) AS available FROM matched_skus ms CROSS JOIN store s LEFT JOIN store_inventory si ON si.store_id = s.store_id AND si.product_sku = ms.product_sku) SELECT COALESCE(s.record_path, '') AS store_record_path, COALESCE((SELECT COUNT(*) FROM inventory WHERE available >= 1), 0) AS count_products_with_stock FROM (SELECT 1) dummy LEFT JOIN store s ON 1=1;"},"bind":"raw_store_data"}],"rowsets":[{"from_":"raw_store_data","format":"auto_delim","into":"store_data","columns":[{"into":"store_record_path","candidates":["store_record_path"]},{"into":"count_products_with_stock","candidates":["count_products_with_stock"]}]}],"compute":[{"prim":"first","args":["$store_data"],"into":"store_row"},{"prim":"column","args":["$store_row","count_products_with_stock"],"into":"count_str"},{"prim":"to_number","args":["$count_str"],"into":"count"},{"prim":"column","args":["$store_row","store_record_path"],"into":"store_record_path"}],"decision":{"branches":[{"when":{"op":"nonempty","lhs":"$store_record_path","rhs":"","args":[]},"label":"found"}],"default_label":"not_found"},"ops":[],"answer":{"found":{"message":"{count} products","outcome":"OUTCOME_OK","refs":[{"kind":"record_path","path":null,"source":"$store_record_path"}]},"not_found":{"message":"Unsupported: store not found","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]}},"custom_extract":[]}
+    ```
+    
+    EXISTING_RULES:
+    (none)
+└ ASSISTANT
+    {
+      "rule_content": "When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.",
+      "agents_md_anchor": null,
+      "reasoning": "Error: 'column' expects list[dict]; use 'get' for a single row. Root cause: after 'first' returned a single dict ($store_row), the next compute step used 'column' which requires a list of dicts. Failing PlanIR fragment: {\"prim\":\"first\",\"args\":[\"$store_data\"],\"into\":\"store_row\"}, then {\"prim\":\"column\",\"args\":[\"$store_row\",\"count_products_with_stock\"],\"into\":\"count_str\"}. The rule ensures that after extracting a single row via 'first', field extraction uses 'get' instead of 'column'.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · PLAN · 30471ms · tokens 5559/6047 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    ## ANTI-PATTERNS — AVOID (known failure causes)
+    - (retail, inventory) To compute the total available quantity of a product across all stores in a given city, first identify the product variant by matching its properties (e.g., storage type, color, volume) and product identifiers (brand, series, model, name). Then, for each store in the city, sum the available_today_quantity from the store_inventory table. If either the product variant or stores are not found, the result is unsupported.
+    - (data_query, inventory, aggregation) To compute the total available quantity of a specific product across all stores in a city, perform a LEFT JOIN between the stores table (filtered by city) and the store_inventory table on store_id and product_sku. Use COALESCE to treat NULL available_today_quantity as 0, then SUM the result. This ensures stores without an inventory record for the product are included with a quantity of 0.
+    - (inventory, SQL, data aggregation, error handling) When aggregating inventory quantities across stores for a specific product, ensure the query returns a result for all cases. Use a LEFT JOIN from stores to inventory (or product) to include stores with zero quantity. If the product itself is not found, do not treat it as an unsupported case; instead, return a total of 0 (or appropriate default) and set the outcome to OK. The decision logic should not branch on product existence; it should always produce an answer.
+    
+    INTENT_SPEC:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': '.tables'} is not read-only
+    2. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': "SELECT name FROM sqlite_master WHERE type='table';"} is not read-only
+    3. [list] Root contains AGENTS.MD, bin, docs, proc, run. -> Start by reading AGENTS.MD for context, then explore docs.
+    
+    LEARNED_RULES (active):
+      - [in-session] When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.
+    
+    PREVIOUS_ERROR:
+    interpret: compute step 'column' failed: 'column' expects list[dict]; use 'get' for a single row
+    CONTRACT: column(rows, col): arg must be list[dict] rows; use 'get' for a single row
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), products (product_id, brand, series, model, prop1_key, prop1_val, prop2_key, prop2_val) AS (VALUES (1, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw', 'screw type', 'wood screw', 'diameter', '6 mm'), (2, 'Ajax', 'Ajax Eco Classic 25C-DXE', 'Cleaning Liquid', 'cleaner type', 'degreaser', NULL, NULL), (3, 'Heco', 'Heco Zinc Plated HECO 3DW-64B', 'Nut Bolt and Washer', 'fastener type', 'threaded rod', NULL, NULL), (4, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw', 'screw type', 'wood screw', 'diameter', '3 mm')), matched_skus AS (SELECT p.product_id, pv.product_sku FROM products p JOIN product_variants pv ON pv.brand = p.brand AND pv.series = p.series AND pv.model = p.model WHERE (p.prop1_key IS NULL OR EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = p.prop1_key AND pvp.property_value_text = p.prop1_val)) AND (p.prop2_key IS NULL OR EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = p.prop2_key AND pvp.property_value_text = p.prop2_val))), inventory_check AS (SELECT ms.product_id, si.available_today_quantity FROM matched_skus ms JOIN store_inventory si ON si.product_sku = ms.product_sku AND si.store_id = (SELECT store_id FROM store) WHERE si.available_today_quantity >= 1) SELECT (SELECT record_path FROM store) AS store_record_path, (SELECT COUNT(DISTINCT product_id) FROM inventory_check) AS count;"
+          },
+          "bind": "result_rows"
+        }
+      ],
+      "rowsets": [],
+      "compute": [
+        {
+          "prim": "first",
+          "args": ["$result_rows"],
+          "into": "result_row"
+        },
+        {
+          "prim": "get",
+          "args": ["$result_row", "store_record_path"],
+          "into": "store_record_path"
+        },
+        {
+          "prim": "get",
+          "args": ["$result_row", "count"],
+          "into": "count"
+        }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "isnull",
+              "lhs": "$store_record_path"
+            },
+            "label": "unsupported"
+          }
+        ],
+        "default_label": "ok"
+      },
+      "ops": [],
+      "answer": {
+        "unsupported": {
+          "message": "Unable to find the store.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        },
+        "ok": {
+          "message": "{count} products",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {
+              "kind": "record_path",
+              "path": "$store_record_path"
+            }
+          ]
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 2, "step_type": "LINT", "passed": true, "reason": "", "seq": 27}
+  · [Exec /bin/sql] -> store_record_path,count
+      /proc/stores/store_innsbruck_wilten.json,0
+  · [gate] {"cycle": 2, "step_type": "INTERPRET", "passed": false, "reason": "interpret: compute step 'first' failed: 'ExecResponse
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · LEARN · 9463ms · tokens 2005/1406 · OK
+┌ SYSTEM (dc81071f) — same as above
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    ERROR:
+    interpret: compute step 'first' failed: 'ExecResponse' object is not subscriptable
+    CONTRACT: first(seq)
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Exec","args":{"path":"/bin/sql","stdin":"WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), products (product_id, brand, series, model, prop1_key, prop1_val, prop2_key, prop2_val) AS (VALUES (1, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw', 'screw type', 'wood screw', 'diameter', '6 mm'), (2, 'Ajax', 'Ajax Eco Classic 25C-DXE', 'Cleaning Liquid', 'cleaner type', 'degreaser', NULL, NULL), (3, 'Heco', 'Heco Zinc Plated HECO 3DW-64B', 'Nut Bolt and Washer', 'fastener type', 'threaded rod', NULL, NULL), (4, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw', 'screw type', 'wood screw', 'diameter', '3 mm')), matched_skus AS (SELECT p.product_id, pv.product_sku FROM products p JOIN product_variants pv ON pv.brand = p.brand AND pv.series = p.series AND pv.model = p.model WHERE (p.prop1_key IS NULL OR EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = p.prop1_key AND pvp.property_value_text = p.prop1_val)) AND (p.prop2_key IS NULL OR EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = p.prop2_key AND pvp.property_value_text = p.prop2_val))), inventory_check AS (SELECT ms.product_id, si.available_today_quantity FROM matched_skus ms JOIN store_inventory si ON si.product_sku = ms.product_sku AND si.store_id = (SELECT store_id FROM store) WHERE si.available_today_quantity >= 1) SELECT (SELECT record_path FROM store) AS store_record_path, (SELECT COUNT(DISTINCT product_id) FROM inventory_check) AS count;"},"bind":"result_rows"}],"rowsets":[],"compute":[{"prim":"first","args":["$result_rows"],"into":"result_row"},{"prim":"get","args":["$result_row","store_record_path"],"into":"store_record_path"},{"prim":"get","args":["$result_row","count"],"into":"count"}],"decision":{"branches":[{"when":{"op":"isnull","lhs":"$store_record_path","rhs":null,"args":[]},"label":"unsupported"}],"default_label":"ok"},"ops":[],"answer":{"unsupported":{"message":"Unable to find the store.","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]},"ok":{"message":"{count} products","outcome":"OUTCOME_OK","refs":[{"kind":"record_path","path":"$store_record_path"}]}},"custom_extract":[]}
+    ```
+    
+    EXISTING_RULES:
+      - [in-session] When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.
+└ ASSISTANT
+    {
+      "rule_content": "Always extract the rows list from an ExecResponse object before using sequence primitives; use a compute step to get the 'rows' field from the response.",
+      "agents_md_anchor": null,
+      "reasoning": "Error: 'ExecResponse' object is not subscriptable at compute step 'first'. Root cause: The PlanIR bound the output of the Exec RPC (/bin/sql) directly as $result_rows, but the RPC returns an ExecResponse object, not a list of rows. The pre-phase did not surface the schema of this RPC, so the planner assumed a list. The fix is to either deep-read the RPC schema or add a rule to always extract the rows field from ExecResponse before sequence operations. The existing rule about using 'get' after 'first' is not the issue; the failure occurs before that.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": ["/bin/sql"]
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 3 · PLAN · 36614ms · tokens 5571/6396 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    ## ANTI-PATTERNS — AVOID (known failure causes)
+    - (retail, inventory) To compute the total available quantity of a product across all stores in a given city, first identify the product variant by matching its properties (e.g., storage type, color, volume) and product identifiers (brand, series, model, name). Then, for each store in the city, sum the available_today_quantity from the store_inventory table. If either the product variant or stores are not found, the result is unsupported.
+    - (data_query, inventory, aggregation) To compute the total available quantity of a specific product across all stores in a city, perform a LEFT JOIN between the stores table (filtered by city) and the store_inventory table on store_id and product_sku. Use COALESCE to treat NULL available_today_quantity as 0, then SUM the result. This ensures stores without an inventory record for the product are included with a quantity of 0.
+    - (inventory, SQL, data aggregation, error handling) When aggregating inventory quantities across stores for a specific product, ensure the query returns a result for all cases. Use a LEFT JOIN from stores to inventory (or product) to include stores with zero quantity. If the product itself is not found, do not treat it as an unsupported case; instead, return a total of 0 (or appropriate default) and set the outcome to OK. The decision logic should not branch on product existence; it should always produce an answer.
+    
+    INTENT_SPEC:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': '.tables'} is not read-only
+    2. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': "SELECT name FROM sqlite_master WHERE type='table';"} is not read-only
+    3. [list] Root contains AGENTS.MD, bin, docs, proc, run. -> Start by reading AGENTS.MD for context, then explore docs.
+    
+    LEARNED_RULES (active):
+      - [in-session] When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.
+      - [in-session] Always extract the rows list from an ExecResponse object before using sequence primitives; use a compute step to get the 'rows' field from the response.
+    
+    PREVIOUS_ERROR:
+    interpret: compute step 'first' failed: 'ExecResponse' object is not subscriptable
+    CONTRACT: first(seq)
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), prod1 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand='Heco' AND pv.series='Heco Zinc Plated TopFix GTU-YPJ' AND pv.model='Wood and Drywall Screw' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='screw type' AND pvp.property_value_text='wood screw') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='diameter' AND pvp.property_value_text='6 mm')), prod2 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand='Ajax' AND pv.series='Ajax Eco Classic 25C-DXE' AND pv.model='Cleaning Liquid' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='cleaner type' AND pvp.property_value_text='degreaser')), prod3 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand='Heco' AND pv.series='Heco Zinc Plated HECO 3DW-64B' AND pv.model='Nut Bolt and Washer' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='fastener type' AND pvp.property_value_text='threaded rod')), prod4 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand='Heco' AND pv.series='Heco Zinc Plated TopFix GTU-YPJ' AND pv.model='Wood and Drywall Screw' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='screw type' AND pvp.property_value_text='wood screw') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='diameter' AND pvp.property_value_text='3 mm')), inventory AS (SELECT si.product_sku, si.available_today_quantity FROM store_inventory si JOIN store s ON si.store_id=s.store_id) SELECT (SELECT COALESCE((SELECT 1 FROM prod1 p JOIN inventory i ON p.product_sku=i.product_sku WHERE i.available_today_quantity>=1 LIMIT 1),0)) + (SELECT COALESCE((SELECT 1 FROM prod2 p JOIN inventory i ON p.product_sku=i.product_sku WHERE i.available_today_quantity>=1 LIMIT 1),0)) + (SELECT COALESCE((SELECT 1 FROM prod3 p JOIN inventory i ON p.product_sku=i.product_sku WHERE i.available_today_quantity>=1 LIMIT 1),0)) + (SELECT COALESCE((SELECT 1 FROM prod4 p JOIN inventory i ON p.product_sku=i.product_sku WHERE i.available_today_quantity>=1 LIMIT 1),0)) AS cnt, (SELECT record_path FROM store) AS store_rp, (SELECT COUNT(*) FROM store) AS store_found;"
+          },
+          "bind": "query_result"
+        }
+      ],
+      "rowsets": [],
+      "compute": [
+        {
+          "prim": "first",
+          "args": ["$query_result"],
+          "into": "row"
+        },
+        {
+          "prim": "get",
+          "args": ["$row", "cnt"],
+          "into": "count"
+        },
+        {
+          "prim": "get",
+          "args": ["$row", "store_rp"],
+          "into": "store_rp"
+        },
+        {
+          "prim": "get",
+          "args": ["$row", "store_found"],
+          "into": "store_found"
+        }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "eq",
+              "lhs": "$store_found",
+              "rhs": 0
+            },
+            "label": "unsupported"
+          }
+        ],
+        "default_label": "ok"
+      },
+      "ops": [],
+      "answer": {
+        "unsupported": {
+          "message": "Store not found in Innsbruck with PowerTool name.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        },
+        "ok": {
+          "message": "{count} products",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {
+              "kind": "record_path",
+              "path": null,
+              "source": "$store_rp"
+            }
+          ]
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 3, "step_type": "LINT", "passed": true, "reason": "", "seq": 32}
+  · [Exec /bin/sql] -> cnt,store_rp,store_found
+      0,/proc/stores/store_innsbruck_wilten.json,1
+  · [gate] {"cycle": 3, "step_type": "INTERPRET", "passed": false, "reason": "interpret: compute step 'first' failed: 'ExecResponse
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 3 · LEARN · 24741ms · tokens 2336/2022 · OK
+┌ SYSTEM (dc81071f) — same as above
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    ERROR:
+    interpret: compute step 'first' failed: 'ExecResponse' object is not subscriptable
+    CONTRACT: first(seq)
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Exec","args":{"path":"/bin/sql","stdin":"WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), prod1 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand='Heco' AND pv.series='Heco Zinc Plated TopFix GTU-YPJ' AND pv.model='Wood and Drywall Screw' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='screw type' AND pvp.property_value_text='wood screw') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='diameter' AND pvp.property_value_text='6 mm')), prod2 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand='Ajax' AND pv.series='Ajax Eco Classic 25C-DXE' AND pv.model='Cleaning Liquid' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='cleaner type' AND pvp.property_value_text='degreaser')), prod3 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand='Heco' AND pv.series='Heco Zinc Plated HECO 3DW-64B' AND pv.model='Nut Bolt and Washer' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='fastener type' AND pvp.property_value_text='threaded rod')), prod4 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand='Heco' AND pv.series='Heco Zinc Plated TopFix GTU-YPJ' AND pv.model='Wood and Drywall Screw' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='screw type' AND pvp.property_value_text='wood screw') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku=pv.product_sku AND pvp.property_key='diameter' AND pvp.property_value_text='3 mm')), inventory AS (SELECT si.product_sku, si.available_today_quantity FROM store_inventory si JOIN store s ON si.store_id=s.store_id) SELECT (SELECT COALESCE((SELECT 1 FROM prod1 p JOIN inventory i ON p.product_sku=i.product_sku WHERE i.available_today_quantity>=1 LIMIT 1),0)) + (SELECT COALESCE((SELECT 1 FROM prod2 p JOIN inventory i ON p.product_sku=i.product_sku WHERE i.available_today_quantity>=1 LIMIT 1),0)) + (SELECT COALESCE((SELECT 1 FROM prod3 p JOIN inventory i ON p.product_sku=i.product_sku WHERE i.available_today_quantity>=1 LIMIT 1),0)) + (SELECT COALESCE((SELECT 1 FROM prod4 p JOIN inventory i ON p.product_sku=i.product_sku WHERE i.available_today_quantity>=1 LIMIT 1),0)) AS cnt, (SELECT record_path FROM store) AS store_rp, (SELECT COUNT(*) FROM store) AS store_found;"},"bind":"query_result"}],"rowsets":[],"compute":[{"prim":"first","args":["$query_result"],"into":"row"},{"prim":"get","args":["$row","cnt"],"into":"count"},{"prim":"get","args":["$row","store_rp"],"into":"store_rp"},{"prim":"get","args":["$row","store_found"],"into":"store_found"}],"decision":{"branches":[{"when":{"op":"eq","lhs":"$store_found","rhs":0,"args":[]},"label":"unsupported"}],"default_label":"ok"},"ops":[],"answer":{"unsupported":{"message":"Store not found in Innsbruck with PowerTool name.","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]},"ok":{"message":"{count} products","outcome":"OUTCOME_OK","refs":[{"kind":"record_path","path":null,"source":"$store_rp"}]}},"custom_extract":[]}
+    ```
+    
+    EXISTING_RULES:
+      - [in-session] When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.
+      - [in-session] Always extract the rows list from an ExecResponse object before using sequence primitives; use a compute step to get the 'rows' field from the response.
+└ ASSISTANT
+    {
+      "rule_content": "Always extract the 'rows' list from an ExecResponse object using a compute step with prim 'get' and args ['$result', 'rows'] before applying 'first' or 'column' on the result.",
+      "agents_md_anchor": null,
+      "reasoning": "Error: 'interpret: compute step 'first' failed: 'ExecResponse' object is not subscriptable'. The PlanIR discovery step binds the SQL Exec result to $query_result, which is an ExecResponse object (with fields like rows, columns). The compute step then applies 'first' directly to $query_result, but 'first' expects a list. The root cause is that the PlanIR did not first extract the rows list from the ExecResponse. The existing rule [in-session] already states to extract rows, but it was not followed. This new rule reinforces the technique to prevent recurrence.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · PLAN · 49568ms · tokens 5621/7736 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    ## ANTI-PATTERNS — AVOID (known failure causes)
+    - (retail, inventory) To compute the total available quantity of a product across all stores in a given city, first identify the product variant by matching its properties (e.g., storage type, color, volume) and product identifiers (brand, series, model, name). Then, for each store in the city, sum the available_today_quantity from the store_inventory table. If either the product variant or stores are not found, the result is unsupported.
+    - (data_query, inventory, aggregation) To compute the total available quantity of a specific product across all stores in a city, perform a LEFT JOIN between the stores table (filtered by city) and the store_inventory table on store_id and product_sku. Use COALESCE to treat NULL available_today_quantity as 0, then SUM the result. This ensures stores without an inventory record for the product are included with a quantity of 0.
+    - (inventory, SQL, data aggregation, error handling) When aggregating inventory quantities across stores for a specific product, ensure the query returns a result for all cases. Use a LEFT JOIN from stores to inventory (or product) to include stores with zero quantity. If the product itself is not found, do not treat it as an unsupported case; instead, return a total of 0 (or appropriate default) and set the outcome to OK. The decision logic should not branch on product existence; it should always produce an answer.
+    
+    INTENT_SPEC:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': '.tables'} is not read-only
+    2. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': "SELECT name FROM sqlite_master WHERE type='table';"} is not read-only
+    3. [list] Root contains AGENTS.MD, bin, docs, proc, run. -> Start by reading AGENTS.MD for context, then explore docs.
+    
+    LEARNED_RULES (active):
+      - [in-session] When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.
+      - [in-session] Always extract the rows list from an ExecResponse object before using sequence primitives; use a compute step to get the 'rows' field from the response.
+      - [in-session] Always extract the 'rows' list from an ExecResponse object using a compute step with prim 'get' and args ['$result', 'rows'] before applying 'first' or 'column' on the result.
+    
+    PREVIOUS_ERROR:
+    interpret: compute step 'first' failed: 'ExecResponse' object is not subscriptable
+    CONTRACT: first(seq)
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), p1 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Zinc Plated TopFix GTU-YPJ' AND pv.model = 'Wood and Drywall Screw' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'screw type' AND pvp.property_value_text = 'wood screw') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'diameter' AND pvp.property_value_text = '6 mm') LIMIT 1), p2 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand = 'Ajax' AND pv.series = 'Ajax Eco Classic 25C-DXE' AND pv.model = 'Cleaning Liquid' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'cleaner type' AND pvp.property_value_text = 'degreaser') LIMIT 1), p3 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Zinc Plated HECO 3DW-64B' AND pv.model = 'Nut Bolt and Washer' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'fastener type' AND pvp.property_value_text = 'threaded rod') LIMIT 1), p4 AS (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Zinc Plated TopFix GTU-YPJ' AND pv.model = 'Wood and Drywall Screw' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'screw type' AND pvp.property_value_text = 'wood screw') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'diameter' AND pvp.property_value_text = '3 mm') LIMIT 1) SELECT (SELECT store_id FROM store) AS store_id, (SELECT record_path FROM store) AS store_record_path, (SELECT product_sku FROM p1) AS sku1, (SELECT product_sku FROM p2) AS sku2, (SELECT product_sku FROM p3) AS sku3, (SELECT product_sku FROM p4) AS sku4, CASE WHEN (SELECT store_id FROM store) IS NOT NULL AND (SELECT product_sku FROM p1) IS NOT NULL AND (SELECT product_sku FROM p2) IS NOT NULL AND (SELECT product_sku FROM p3) IS NOT NULL AND (SELECT product_sku FROM p4) IS NOT NULL THEN (SELECT COUNT(*) FROM store_inventory si WHERE si.store_id = (SELECT store_id FROM store) AND si.product_sku IN ((SELECT product_sku FROM p1), (SELECT product_sku FROM p2), (SELECT product_sku FROM p3), (SELECT product_sku FROM p4)) AND si.available_today_quantity >= 1) ELSE NULL END AS count;"
+          },
+          "bind": "discovery_result"
+        }
+      ],
+      "rowsets": [],
+      "compute": [
+        {
+          "prim": "get",
+          "args": ["$discovery_result", "rows"],
+          "into": "discovery_rows"
+        },
+        {
+          "prim": "first",
+          "args": ["$discovery_rows"],
+          "into": "discovery_row"
+        },
+        {
+          "prim": "get",
+          "args": ["$discovery_row", "store_id"],
+          "into": "store_id"
+        },
+        {
+          "prim": "get",
+          "args": ["$discovery_row", "store_record_path"],
+          "into": "store_record_path"
+        },
+        {
+          "prim": "get",
+          "args": ["$discovery_row", "sku1"],
+          "into": "sku1"
+        },
+        {
+          "prim": "get",
+          "args": ["$discovery_row", "sku2"],
+          "into": "sku2"
+        },
+        {
+          "prim": "get",
+          "args": ["$discovery_row", "sku3"],
+          "into": "sku3"
+        },
+        {
+          "prim": "get",
+          "args": ["$discovery_row", "sku4"],
+          "into": "sku4"
+        },
+        {
+          "prim": "get",
+          "args": ["$discovery_row", "count"],
+          "into": "count"
+        }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "or",
+              "args": [
+                {"op": "isnull", "args": ["$store_id"]},
+                {"op": "isnull", "args": ["$sku1"]},
+                {"op": "isnull", "args": ["$sku2"]},
+                {"op": "isnull", "args": ["$sku3"]},
+                {"op": "isnull", "args": ["$sku4"]}
+              ]
+            },
+            "label": "unsupported"
+          }
+        ],
+        "default_label": "ok"
+      },
+      "ops": [],
+      "answer": {
+        "unsupported": {
+          "message": "Unsupported: store or product not found",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        },
+        "ok": {
+          "message": "{count} products",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {
+              "kind": "record_path",
+              "path": null,
+              "source": "$store_record_path"
+            }
+          ]
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 4, "step_type": "LINT", "passed": false, "reason": "plan: PLAN: validation failed: 5 validation errors for Pla
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · LEARN · 5568ms · tokens 1686/691 · OK
+┌ SYSTEM (dc81071f) — same as above
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    ERROR:
+    plan: PLAN: validation failed: 5 validation errors for PlanIR
+    decision.branches.0.when.args.0.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$store_id', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+    decision.branches.0.when.args.1.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$sku1', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+    decision.branches.0.when.args.2.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$sku2', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+    decision.branches.0.when.args.3.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$sku3', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+    decision.branches.0.when.args.4.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$sku4', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+    
+    SCRIPT_CODE:
+    ```python
+    
+    ```
+    
+    EXISTING_RULES:
+      - [in-session] When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.
+      - [in-session] Always extract the rows list from an ExecResponse object before using sequence primitives; use a compute step to get the 'rows' field from the response.
+      - [in-session] Always extract the 'rows' list from an ExecResponse object using a compute step with prim 'get' and args ['$result', 'rows'] before applying 'first' or 'column' on the result.
+└ ASSISTANT
+    {
+      "rule_content": "When constructing a decision branch's 'when' condition, always use PredExpr objects (with a 'ref' key) for each argument, never raw strings.",
+      "agents_md_anchor": null,
+      "reasoning": "The plan validation failed because the decision branch's 'when' clause contained raw strings (e.g., '$store_id') as arguments instead of PredExpr dictionaries (e.g., {'ref': '$store_id'}). The PlanIR schema requires each argument in a PredExpr to be a valid PredExpr or dictionary, not a plain string. This is a structural error in the PlanIR generation.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 5 · PLAN · 42660ms · tokens 5968/7686 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    ## ANTI-PATTERNS — AVOID (known failure causes)
+    - (retail, inventory) To compute the total available quantity of a product across all stores in a given city, first identify the product variant by matching its properties (e.g., storage type, color, volume) and product identifiers (brand, series, model, name). Then, for each store in the city, sum the available_today_quantity from the store_inventory table. If either the product variant or stores are not found, the result is unsupported.
+    - (data_query, inventory, aggregation) To compute the total available quantity of a specific product across all stores in a city, perform a LEFT JOIN between the stores table (filtered by city) and the store_inventory table on store_id and product_sku. Use COALESCE to treat NULL available_today_quantity as 0, then SUM the result. This ensures stores without an inventory record for the product are included with a quantity of 0.
+    - (inventory, SQL, data aggregation, error handling) When aggregating inventory quantities across stores for a specific product, ensure the query returns a result for all cases. Use a LEFT JOIN from stores to inventory (or product) to include stores with zero quantity. If the product itself is not found, do not treat it as an unsupported case; instead, return a total of 0 (or appropriate default) and set the outcome to OK. The decision logic should not branch on product existence; it should always produce an answer.
+    
+    INTENT_SPEC:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': '.tables'} is not read-only
+    2. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': "SELECT name FROM sqlite_master WHERE type='table';"} is not read-only
+    3. [list] Root contains AGENTS.MD, bin, docs, proc, run. -> Start by reading AGENTS.MD for context, then explore docs.
+    
+    LEARNED_RULES (active):
+      - [in-session] When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.
+      - [in-session] Always extract the rows list from an ExecResponse object before using sequence primitives; use a compute step to get the 'rows' field from the response.
+      - [in-session] Always extract the 'rows' list from an ExecResponse object using a compute step with prim 'get' and args ['$result', 'rows'] before applying 'first' or 'column' on the result.
+      - [in-session] When constructing a decision branch's 'when' condition, always use PredExpr objects (with a 'ref' key) for each argument, never raw strings.
+    
+    PREVIOUS_ERROR:
+    plan: PLAN: validation failed: 5 validation errors for PlanIR
+    decision.branches.0.when.args.0.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$store_id', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+    decision.branches.0.when.args.1.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$sku1', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+    decision.branches.0.when.args.2.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$sku2', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+    decision.branches.0.when.args.3.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$sku3', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+    decision.branches.0.when.args.4.args.0
+      Input should be a valid dictionary or instance of PredExpr [type=model_type, input_value='$sku4', input_type=str]
+        For further information visit https://errors.pydantic.dev/2.12/v/model_type
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), product_skus AS (SELECT 1 AS prod_idx, pv.product_sku FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Zinc Plated TopFix GTU-YPJ' AND pv.model = 'Wood and Drywall Screw' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND (pvp.property_key, pvp.property_value_text) IN (('screw type','wood screw'),('diameter','6 mm'))) = 2 LIMIT 1 UNION ALL SELECT 2, pv.product_sku FROM product_variants pv WHERE pv.brand = 'Ajax' AND pv.series = 'Ajax Eco Classic 25C-DXE' AND pv.model = 'Cleaning Liquid' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND (pvp.property_key, pvp.property_value_text) IN (('cleaner type','degreaser'))) = 1 LIMIT 1 UNION ALL SELECT 3, pv.product_sku FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Zinc Plated HECO 3DW-64B' AND pv.model = 'Nut Bolt and Washer' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND (pvp.property_key, pvp.property_value_text) IN (('fastener type','threaded rod'))) = 1 LIMIT 1 UNION ALL SELECT 4, pv.product_sku FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Zinc Plated TopFix GTU-YPJ' AND pv.model = 'Wood and Drywall Screw' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND (pvp.property_key, pvp.property_value_text) IN (('screw type','wood screw'),('diameter','3 mm'))) = 2 LIMIT 1) SELECT store.store_id, store.record_path, COALESCE((SELECT COUNT(*) FROM product_skus ps JOIN store_inventory si ON ps.product_sku = si.product_sku AND si.store_id = store.store_id WHERE si.available_today_quantity >= 1), 0) AS count FROM (SELECT 1) dummy LEFT JOIN store ON 1=1;"
+          },
+          "bind": "store_result"
+        }
+      ],
+      "rowsets": [],
+      "compute": [
+        {
+          "prim": "get",
+          "args": ["$store_result", "rows"],
+          "into": "rows"
+        },
+        {
+          "prim": "first",
+          "args": ["$rows"],
+          "into": "first_row"
+        },
+        {
+          "prim": "get",
+          "args": ["$first_row", "store_id"],
+          "into": "store_id"
+        },
+        {
+          "prim": "get",
+          "args": ["$first_row", "record_path"],
+          "into": "store_record_path"
+        },
+        {
+          "prim": "get",
+          "args": ["$first_row", "count"],
+          "into": "count"
+        }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "isnull",
+              "lhs": {"ref": "$store_id"},
+              "rhs": null
+            },
+            "label": "not_found"
+          }
+        ],
+        "default_label": "found"
+      },
+      "ops": [],
+      "answer": {
+        "found": {
+          "message": "{count} products",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {
+              "kind": "record_path",
+              "path": null,
+              "source": "$store_record_path"
+            }
+          ]
+        },
+        "not_found": {
+          "message": "Store not found",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 5, "step_type": "LINT", "passed": true, "reason": "", "seq": 40}
+  · [Exec /bin/sql] -> <empty>
+  · [gate] {"cycle": 5, "step_type": "INTERPRET", "passed": false, "reason": "interpret: unresolved required ref(s) ['$store.record
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 5 · LEARN · 16330ms · tokens 2269/2567 · OK
+┌ SYSTEM (dc81071f) — same as above
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    ERROR:
+    interpret: unresolved required ref(s) ['$store.record_path'] on OK answer
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Exec","args":{"path":"/bin/sql","stdin":"WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), product_skus AS (SELECT 1 AS prod_idx, pv.product_sku FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Zinc Plated TopFix GTU-YPJ' AND pv.model = 'Wood and Drywall Screw' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND (pvp.property_key, pvp.property_value_text) IN (('screw type','wood screw'),('diameter','6 mm'))) = 2 LIMIT 1 UNION ALL SELECT 2, pv.product_sku FROM product_variants pv WHERE pv.brand = 'Ajax' AND pv.series = 'Ajax Eco Classic 25C-DXE' AND pv.model = 'Cleaning Liquid' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND (pvp.property_key, pvp.property_value_text) IN (('cleaner type','degreaser'))) = 1 LIMIT 1 UNION ALL SELECT 3, pv.product_sku FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Zinc Plated HECO 3DW-64B' AND pv.model = 'Nut Bolt and Washer' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND (pvp.property_key, pvp.property_value_text) IN (('fastener type','threaded rod'))) = 1 LIMIT 1 UNION ALL SELECT 4, pv.product_sku FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Zinc Plated TopFix GTU-YPJ' AND pv.model = 'Wood and Drywall Screw' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND (pvp.property_key, pvp.property_value_text) IN (('screw type','wood screw'),('diameter','3 mm'))) = 2 LIMIT 1) SELECT store.store_id, store.record_path, COALESCE((SELECT COUNT(*) FROM product_skus ps JOIN store_inventory si ON ps.product_sku = si.product_sku AND si.store_id = store.store_id WHERE si.available_today_quantity >= 1), 0) AS count FROM (SELECT 1) dummy LEFT JOIN store ON 1=1;"},"bind":"store_result"}],"rowsets":[],"compute":[{"prim":"get","args":["$store_result","rows"],"into":"rows"},{"prim":"first","args":["$rows"],"into":"first_row"},{"prim":"get","args":["$first_row","store_id"],"into":"store_id"},{"prim":"get","args":["$first_row","record_path"],"into":"store_record_path"},{"prim":"get","args":["$first_row","count"],"into":"count"}],"decision":{"branches":[{"when":{"op":"isnull","lhs":{"ref":"$store_id"},"rhs":null,"args":[]},"label":"not_found"}],"default_label":"found"},"ops":[],"answer":{"found":{"message":"{count} products","outcome":"OUTCOME_OK","refs":[{"kind":"record_path","path":null,"source":"$store_record_path"}]},"not_found":{"message":"Store not found","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]}},"custom_extract":[]}
+    ```
+    
+    EXISTING_RULES:
+      - [in-session] When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.
+      - [in-session] Always extract the rows list from an ExecResponse object before using sequence primitives; use a compute step to get the 'rows' field from the response.
+      - [in-session] Always extract the 'rows' list from an ExecResponse object using a compute step with prim 'get' and args ['$result', 'rows'] before applying 'first' or 'column' on the result.
+      - [in-session] When constructing a decision branch's 'when' condition, always use PredExpr objects (with a 'ref' key) for each argument, never raw strings.
+└ ASSISTANT
+    {
+      "rule_content": "When required refs specify a source path with a dot (e.g., '$parent.child'), always use that exact path string as the source in the answer refs, and ensure the parent object is available as a variable in the data context (e.g., by storing the row object) rather than extracting the child value into a separate variable.",
+      "agents_md_anchor": null,
+      "reasoning": "Error: 'interpret: unresolved required ref(s) [''$store.record_path''] on OK answer'. Root cause: The PlanIR answer refs used source '$store_record_path' (a scalar variable holding the record_path string) instead of the required path '$store.record_path'. The interpreter expects a path expression that can be resolved against a parent object in the data context. The failing fragment is the answer block: 'refs':[{'kind':'record_path','path':null,'source':'$store_record_path'}]. The correct approach is to keep the store row as a variable (e.g., $store) and use source '$store.record_path'. This rule prevents future occurrences by mandating that dot-separated source paths be used verbatim and that the parent object be retained in the data context.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 6 · PLAN · 41195ms · tokens 5727/7535 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    ## ANTI-PATTERNS — AVOID (known failure causes)
+    - (retail, inventory) To compute the total available quantity of a product across all stores in a given city, first identify the product variant by matching its properties (e.g., storage type, color, volume) and product identifiers (brand, series, model, name). Then, for each store in the city, sum the available_today_quantity from the store_inventory table. If either the product variant or stores are not found, the result is unsupported.
+    - (data_query, inventory, aggregation) To compute the total available quantity of a specific product across all stores in a city, perform a LEFT JOIN between the stores table (filtered by city) and the store_inventory table on store_id and product_sku. Use COALESCE to treat NULL available_today_quantity as 0, then SUM the result. This ensures stores without an inventory record for the product are included with a quantity of 0.
+    - (inventory, SQL, data aggregation, error handling) When aggregating inventory quantities across stores for a specific product, ensure the query returns a result for all cases. Use a LEFT JOIN from stores to inventory (or product) to include stores with zero quantity. If the product itself is not found, do not treat it as an unsupported case; instead, return a total of 0 (or appropriate default) and set the outcome to OK. The decision logic should not branch on product existence; it should always produce an answer.
+    
+    INTENT_SPEC:
+    {
+      "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "store_city": "Innsbruck",
+        "store_name_pattern": "%PowerTool%",
+        "products": [
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "6 mm"
+              }
+            ]
+          },
+          {
+            "brand": "Ajax",
+            "series": "Ajax Eco Classic 25C-DXE",
+            "model": "Cleaning Liquid",
+            "properties": [
+              {
+                "key": "cleaner type",
+                "value": "degreaser"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated HECO 3DW-64B",
+            "model": "Nut Bolt and Washer",
+            "properties": [
+              {
+                "key": "fastener type",
+                "value": "threaded rod"
+              }
+            ]
+          },
+          {
+            "brand": "Heco",
+            "series": "Heco Zinc Plated TopFix GTU-YPJ",
+            "model": "Wood and Drywall Screw",
+            "properties": [
+              {
+                "key": "screw type",
+                "value": "wood screw"
+              },
+              {
+                "key": "diameter",
+                "value": "3 mm"
+              }
+            ]
+          }
+        ]
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 4,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "%d products",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store.record_path"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': '.tables'} is not read-only
+    2. [exec]  -> rejected (mutation): exec {'path': '/bin/sqlite3', 'stdin': "SELECT name FROM sqlite_master WHERE type='table';"} is not read-only
+    3. [list] Root contains AGENTS.MD, bin, docs, proc, run. -> Start by reading AGENTS.MD for context, then explore docs.
+    
+    LEARNED_RULES (active):
+      - [in-session] When a compute step uses 'first' to obtain a single row (a dict), always use 'get' to extract a field from that row, never 'column'.
+      - [in-session] Always extract the rows list from an ExecResponse object before using sequence primitives; use a compute step to get the 'rows' field from the response.
+      - [in-session] Always extract the 'rows' list from an ExecResponse object using a compute step with prim 'get' and args ['$result', 'rows'] before applying 'first' or 'column' on the result.
+      - [in-session] When constructing a decision branch's 'when' condition, always use PredExpr objects (with a 'ref' key) for each argument, never raw strings.
+      - [in-session] When required refs specify a source path with a dot (e.g., '$parent.child'), always use that exact path string as the source in the answer refs, and ensure the parent object is available as a variable in the data context (e.g., by storing the row object) rather than extracting the child value into a separate variable.
+    
+    PREVIOUS_ERROR:
+    interpret: unresolved required ref(s) ['$store.record_path'] on OK answer
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH target_store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), product_defs AS (SELECT 1 AS prod_id, 'Heco' AS brand, 'Heco Zinc Plated TopFix GTU-YPJ' AS series, 'Wood and Drywall Screw' AS model, 2 AS num_props UNION ALL SELECT 2, 'Ajax', 'Ajax Eco Classic 25C-DXE', 'Cleaning Liquid', 1 UNION ALL SELECT 3, 'Heco', 'Heco Zinc Plated HECO 3DW-64B', 'Nut Bolt and Washer', 1 UNION ALL SELECT 4, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw', 2), product_props AS (SELECT 1 AS prod_id, 'screw type' AS pkey, 'wood screw' AS pval UNION ALL SELECT 1, 'diameter', '6 mm' UNION ALL SELECT 2, 'cleaner type', 'degreaser' UNION ALL SELECT 3, 'fastener type', 'threaded rod' UNION ALL SELECT 4, 'screw type', 'wood screw' UNION ALL SELECT 4, 'diameter', '3 mm'), valid_skus AS (SELECT pv.product_sku, pd.prod_id FROM product_variants pv JOIN product_defs pd ON pv.brand = pd.brand AND pv.series = pd.series AND pv.model = pd.model WHERE (SELECT COUNT(*) FROM product_props pp WHERE pp.prod_id = pd.prod_id AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = pp.pkey AND pvp.property_value_text = pp.pval)) = pd.num_props), product_stock AS (SELECT vs.prod_id, MAX(COALESCE(si.available_today_quantity, 0)) AS max_qty FROM (SELECT 1) dummy LEFT JOIN valid_skus vs ON 1=1 LEFT JOIN target_store ts ON 1=1 LEFT JOIN store_inventory si ON si.store_id = ts.store_id AND si.product_sku = vs.product_sku GROUP BY vs.prod_id) SELECT (SELECT record_path FROM target_store) AS store_record_path, COUNT(CASE WHEN max_qty >= 1 THEN 1 END) AS count_products_with_stock FROM product_stock;"
+          },
+          "bind": "result"
+        }
+      ],
+      "rowsets": [],
+      "compute": [
+        {
+          "prim": "get",
+          "args": ["$result", "rows"],
+          "into": "rows"
+        },
+        {
+          "prim": "first",
+          "args": ["$rows"],
+          "into": "row"
+        },
+        {
+          "prim": "get",
+          "args": ["$row", "count_products_with_stock"],
+          "into": "count"
+        },
+        {
+          "prim": "get",
+          "args": ["$row", "store_record_path"],
+          "into": "store_record_path"
+        }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "isnull",
+              "lhs": "$store_record_path",
+              "rhs": null
+            },
+            "label": "unsupported"
+          }
+        ],
+        "default_label": "ok"
+      },
+      "ops": [],
+      "answer": {
+        "ok": {
+          "message": "%d products",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {
+              "kind": "record_path",
+              "path": null,
+              "source": "$store_record_path"
+            }
+          ]
+        },
+        "unsupported": {
+          "message": "Unable to find the Innsbruck PowerTool store.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 6, "step_type": "LINT", "passed": true, "reason": "", "seq": 45}
+  · [Exec /bin/sql] -> store_record_path,count_products_with_stock
+      /proc/stores/store_innsbruck_wilten.json,0
+═══ ANSWER (cycle 6) ═══
+  msg='Unable to find the Innsbruck PowerTool store.'  OUTCOME_NONE_UNSUPPORTED  refs=[]
+
+  · [gate] {"cycle": 6, "step_type": "INTERPRET", "passed": true, "reason": "", "seq": 48}
+  · [Find /proc] -> <empty>
+  · [Exec /bin/sql] -> record_path
+  · [Exec /bin/sql] -> record_path
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> record_path
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> record_path
+  · [Exec /bin/sql] -> record_path
+  · [Exec /bin/sql] -> <empty>
+  · [gate] {"cycle": 6, "step_type": "VERIFY", "passed": true, "reason": "", "seq": 62}

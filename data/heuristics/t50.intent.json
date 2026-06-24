@@ -1,0 +1,98 @@
+{
+  "objective": "Check out the most recently created open basket for the current user, excluding any items that are not available today.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "basket_id": "lookup from shopping_baskets WHERE customer_id = $_facts.identity.customer_id ORDER BY basket_created_at DESC LIMIT 1",
+    "store_id": "lookup from shopping_baskets WHERE basket_id = $basket_id",
+    "items": "lookup from shopping_basket_items WHERE basket_id = $basket_id",
+    "available_items": "lookup from store_inventory WHERE store_id = $store_id AND product_sku IN (items) AND available_today_quantity > 0"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [
+    {
+      "anchor": "#security-customer-ownership",
+      "rule": "A customer may only act on their own baskets.",
+      "security": true,
+      "deny_when": {
+        "op": "and",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "eq",
+            "lhs": "$_facts.identity.kind",
+            "rhs": "customer",
+            "args": []
+          },
+          {
+            "op": "ne",
+            "lhs": "$basket.customer_id",
+            "rhs": "$_facts.identity.customer_id",
+            "args": []
+          }
+        ]
+      },
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    },
+    {
+      "anchor": "#security-guest-access",
+      "rule": "Guests may not have baskets.",
+      "security": true,
+      "deny_when": {
+        "op": "eq",
+        "lhs": "$_facts.identity.kind",
+        "rhs": "guest",
+        "args": []
+      },
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    }
+  ],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$basket_id",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "ge",
+        "lhs": "$count_processed_items",
+        "rhs": 0,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "Processed basket {basket_id} with {count_processed_items} items.",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/checkout.md",
+        "source": null
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$basket.record_path"
+      }
+    ]
+  }
+}

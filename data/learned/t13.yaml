@@ -1,0 +1,89 @@
+entries:
+- agents_md_anchor: null
+  content: When a compute step uses 'first' to obtain a single row (a dict), always
+    use 'get' to extract a field from that row, never 'column'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''column'' expects list[dict]; use ''get'' for a single row.
+    Root cause: after ''first'' returned a single dict ($store_row), the next compute
+    step used ''column'' which requires a list of dicts. Failing PlanIR fragment:
+    {"prim":"first","args":["$store_data"],"into":"store_row"}, then {"prim":"column","args":["$store_row","count_products_with_stock"],"into":"count_str"}.
+    The rule ensures that after extracting a single row via ''first'', field extraction
+    uses ''get'' instead of ''column''.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the rows list from an ExecResponse object before using sequence
+    primitives; use a compute step to get the 'rows' field from the response.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable at compute step
+    ''first''. Root cause: The PlanIR bound the output of the Exec RPC (/bin/sql)
+    directly as $result_rows, but the RPC returns an ExecResponse object, not a list
+    of rows. The pre-phase did not surface the schema of this RPC, so the planner
+    assumed a list. The fix is to either deep-read the RPC schema or add a rule to
+    always extract the rows field from ExecResponse before sequence operations. The
+    existing rule about using ''get'' after ''first'' is not the issue; the failure
+    occurs before that.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the 'rows' list from an ExecResponse object using a compute
+    step with prim 'get' and args ['$result', 'rows'] before applying 'first' or 'column'
+    on the result.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. The PlanIR discovery step binds the SQL Exec result
+    to $query_result, which is an ExecResponse object (with fields like rows, columns).
+    The compute step then applies ''first'' directly to $query_result, but ''first''
+    expects a list. The root cause is that the PlanIR did not first extract the rows
+    list from the ExecResponse. The existing rule [in-session] already states to extract
+    rows, but it was not followed. This new rule reinforces the technique to prevent
+    recurrence.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When constructing a decision branch's 'when' condition, always use PredExpr
+    objects (with a 'ref' key) for each argument, never raw strings.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'The plan validation failed because the decision branch''s ''when'' clause
+    contained raw strings (e.g., ''$store_id'') as arguments instead of PredExpr dictionaries
+    (e.g., {''ref'': ''$store_id''}). The PlanIR schema requires each argument in
+    a PredExpr to be a valid PredExpr or dictionary, not a plain string. This is a
+    structural error in the PlanIR generation.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When required refs specify a source path with a dot (e.g., '$parent.child'),
+    always use that exact path string as the source in the answer refs, and ensure
+    the parent object is available as a variable in the data context (e.g., by storing
+    the row object) rather than extracting the child value into a separate variable.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$store.record_path'''']
+    on OK answer''. Root cause: The PlanIR answer refs used source ''$store_record_path''
+    (a scalar variable holding the record_path string) instead of the required path
+    ''$store.record_path''. The interpreter expects a path expression that can be
+    resolved against a parent object in the data context. The failing fragment is
+    the answer block: ''refs'':[{''kind'':''record_path'',''path'':null,''source'':''$store_record_path''}].
+    The correct approach is to keep the store row as a variable (e.g., $store) and
+    use source ''$store.record_path''. This rule prevents future occurrences by mandating
+    that dot-separated source paths be used verbatim and that the parent object be
+    retained in the data context.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 6
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+prephase_deep_read:
+- /bin/sql
+task_id: t13

@@ -1,12 +1,13 @@
 {
-  "objective": "Compute the total available today quantity of a specific product (Milwaukee M12 M12 2TN-F66 Tool Box and Bag with storage type tool bag, color family Gray, volume 8 l) across all stores in Graz.",
+  "objective": "Compute the total number of units of a specific product available today across all PowerTool stores in Vienna, including stores with zero availability.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product": "Lookup from product_variants WHERE brand='Milwaukee' AND series='M12' AND model='M12 2TN-F66' AND product_name LIKE '%Tool Box and Bag%' and then verify via product_variant_properties that property_key='storage_type' value='tool bag', property_key='color_family' value='Gray', property_key='volume' value='8' (or '8 l'). Use first match.",
-    "graz_stores": "Lookup from stores WHERE city='Graz'.",
-    "store_record_paths": "Extract record_path from each store in graz_stores.",
-    "inventory_quantities": "For each store in graz_stores, lookup available_today_quantity from store_inventory WHERE store_id=$store.store_id AND product_sku=$product.product_sku; if not found, treat as 0.",
-    "total_count": "Sum of all inventory_quantities."
+    "product_brand": "literal 'Sika' from instruction",
+    "product_family_name": "literal 'Sika Weatherproof Sikaflex 1JG-02A Sealant' from instruction",
+    "sealant_type": "literal 'silicone sealant' from instruction",
+    "color_family": "literal 'Gray' from instruction",
+    "volume": "literal '100 ml' from instruction",
+    "city": "literal 'Vienna' from instruction"
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -16,27 +17,21 @@
   "success_criteria": {
     "OUTCOME_OK": [
       {
+        "op": "nonempty",
+        "lhs": "$product.record_path",
+        "rhs": null,
+        "args": []
+      },
+      {
         "op": "ge",
-        "lhs": "$total_count",
+        "lhs": "$count",
         "rhs": 0,
-        "args": []
-      },
-      {
-        "op": "nonempty",
-        "lhs": "$product.product_sku",
-        "rhs": null,
-        "args": []
-      },
-      {
-        "op": "nonempty",
-        "lhs": "$graz_stores",
-        "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "count: {total_count}",
+    "msg_skeleton": "count: {count}",
     "kind": "",
     "columns": [],
     "rows_from": ""

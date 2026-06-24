@@ -1,0 +1,62 @@
+entries:
+- agents_md_anchor: null
+  content: Always extract the stdout from an Exec RPC response using the 'stdout'
+    primitive before applying any list operations (e.g., 'first', 'last', 'map') or
+    field access. If the Exec output is JSON, use the 'json' primitive to parse it
+    into a structured value before further processing.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. The PlanIR applied ''first'' directly to the result
+    of an Exec RPC, which returns an ExecResponse object (with stdout, stderr, exit_code)
+    rather than a list. The root cause is that the PLAN phase did not extract the
+    stdout and parse the JSON output before attempting list operations. The failing
+    fragment: compute step ''first'' on ''$result''. The rule ensures that Exec RPC
+    results are properly unwrapped before any subscript or list primitive is used.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always verify that an Exec RPC response contains a 'stdout' field before
+    using the 'stdout' primitive; if the response lacks 'stdout', check for an 'error'
+    field and fail with a descriptive message, or handle the error gracefully.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: compute step ''stdout'' failed: ''stdout''''. The
+    compute step attempted to extract ''stdout'' from $sql_raw, which is the result
+    of an Exec RPC. The RPC response likely did not contain a ''stdout'' field (e.g.,
+    due to a command failure, missing command, or SQL error). The PlanIR did not check
+    for the presence of ''stdout'' before extraction, causing the primitive to fail.
+    The existing rule (r001) only mandates extracting stdout before list operations
+    but does not require verifying its existence. A new rule is needed to ensure the
+    PlanIR includes a check for the ''stdout'' field and handles missing stdout gracefully,
+    improving robustness.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a required ref source uses a dotted path (e.g., $store.record_path),
+    do not assign a variable with a dotted name (e.g., 'store.record_path') in a rowset
+    column. Instead, assign a flat variable (e.g., 'store_record_path') and then use
+    a compute step to create an object variable (e.g., 'store') with the field set
+    to that flat variable's value.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$store.record_path'''']
+    on OK answer''. Root cause: The PlanIR rowset column uses ''into'':''store.record_path'',
+    which sets a variable with the literal name ''store.record_path'' (a single string).
+    The answer ref source ''$store.record_path'' expects a variable named ''store''
+    with a field ''record_path''. The interpreter cannot resolve the dotted path because
+    no variable ''store'' exists. The failing PlanIR fragment is the rowsets section:
+    [{''from_'':''sql_result'',''format'':''auto_delim'',''into'':''result_row'',''columns'':[{''into'':''store.record_path'',''candidates'':[''store_record_path'']},{''into'':''count'',''candidates'':[''count'']}]}].
+    The rule ensures that dotted ref sources are satisfied by creating proper nested
+    objects, avoiding this mismatch.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t16

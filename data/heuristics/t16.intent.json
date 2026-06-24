@@ -1,0 +1,114 @@
+{
+  "objective": "Determine how many of the six specified products have at least 2 items available in the central Bratislava PowerTool shop today.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "store_lookup": "SELECT store_id, record_path FROM stores WHERE city = 'Bratislava' AND store_name LIKE '%PowerTool%'",
+    "product_definitions": [
+      {
+        "brand": "Bosch",
+        "series": "Bosch Compact IXO G9T-QOS",
+        "model": "Cordless Drill Driver",
+        "properties": {
+          "voltage": "12 V",
+          "battery platform": "12v-system",
+          "kit contents": "case"
+        }
+      },
+      {
+        "brand": "Stanley",
+        "series": "Stanley Professional SX 3OT-GPF",
+        "model": "Hammer Measuring and Cutting Tool",
+        "properties": {
+          "tool type": "utility knife",
+          "length": "150 mm"
+        }
+      },
+      {
+        "brand": "Heco",
+        "series": "Heco Heavy Duty HECO 6IT-PBI",
+        "model": "Anchor and Wall Plug",
+        "properties": {
+          "anchor type": "frame fixing",
+          "diameter": "6 mm",
+          "length": "40 mm"
+        }
+      },
+      {
+        "brand": "Mellerud",
+        "series": "Mellerud Concentrate MEL PWG-BFQ",
+        "model": "Cleaning Liquid",
+        "properties": {
+          "cleaner type": "drain cleaner",
+          "volume": "5000 ml"
+        }
+      },
+      {
+        "brand": "Bondex",
+        "series": "Bondex Weather Shield Garden 2IA-K10",
+        "model": "Wood Stain and Deck Oil",
+        "properties": {
+          "product type": "primer",
+          "color family": "Gray"
+        }
+      },
+      {
+        "brand": "Legrand",
+        "series": "Legrand Eco LG 3KP-P51",
+        "model": "LED Bulb",
+        "properties": {
+          "wattage": "10 W",
+          "luminous flux": "1521 lm"
+        }
+      }
+    ],
+    "inventory_check_method": "For each product, find product_sku from product_variants WHERE brand = $product.brand AND series = $product.series AND model = $product.model, then verify all specified properties exist in product_variant_properties, then check store_inventory WHERE store_id = $store_id AND product_sku = $sku AND available_today_quantity >= 2"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "and",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 6,
+            "args": []
+          }
+        ]
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "qty=%d",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/security.md",
+        "source": null
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$store.record_path"
+      }
+    ]
+  }
+}

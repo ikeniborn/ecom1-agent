@@ -1,0 +1,96 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT v.record_path, v.product_sku, MAX(CASE WHEN p.property_key = 'cleaner type' THEN p.property_value_text END) AS cleaner_type_value, MAX(CASE WHEN p.property_key = 'wifi-enabled' THEN p.property_value_text END) AS wifi_enabled_value FROM product_variants v LEFT JOIN product_variant_properties p ON v.product_sku = p.product_sku WHERE v.brand = 'Tork' AND v.product_name LIKE '%Cleaning Liquid%' AND (v.series = 'Tork Heavy Duty T 3NB-FIT Cleaning Liquid' OR v.model = 'Tork Heavy Duty T 3NB-FIT Cleaning Liquid') GROUP BY v.product_sku HAVING cleaner_type_value = 'multi surface cleaner' AND wifi_enabled_value IS NOT NULL"
+      },
+      "bind": "product_query_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "product_query_result",
+      "format": "auto_delim",
+      "into": "product_rows",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "cleaner_type_value",
+          "candidates": [
+            "cleaner_type_value"
+          ]
+        },
+        {
+          "into": "wifi_enabled_value",
+          "candidates": [
+            "wifi_enabled_value"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$product_rows"
+      ],
+      "into": "first_product"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$first_product",
+        "record_path"
+      ],
+      "into": "record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$product_rows",
+          "rhs": null,
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
+    "default_label": "unsupported"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "Product record: {record_path}. Claim matches.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$record_path"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "No matching product found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

@@ -1,0 +1,160 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/merchant-continuity-and-critical-incidents.md"
+      },
+      "bind": "fraud_policy_doc"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_policy_doc"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/payments/3ds.md"
+      },
+      "bind": "threeds_policy_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "identity_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT payment_id, record_path, basket_id, customer_id, store_id, payment_status, three_ds_status, is_archived_basket_reference FROM payment_transactions WHERE is_archived_basket_reference = 1 AND payment_status = 'requires_3ds_action' AND three_ds_status = '3ds-status2';"
+      },
+      "bind": "raw_payments_text"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_payments_text",
+      "format": "auto_delim",
+      "into": "payments_rows",
+      "columns": [
+        {
+          "into": "payment_id",
+          "candidates": [
+            "payment_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "basket_id",
+          "candidates": [
+            "basket_id"
+          ]
+        },
+        {
+          "into": "customer_id",
+          "candidates": [
+            "customer_id"
+          ]
+        },
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "payment_status",
+          "candidates": [
+            "payment_status"
+          ]
+        },
+        {
+          "into": "three_ds_status",
+          "candidates": [
+            "three_ds_status"
+          ]
+        },
+        {
+          "into": "is_archived_basket_reference",
+          "candidates": [
+            "is_archived_basket_reference"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "count",
+      "args": [
+        "$payments_rows"
+      ],
+      "into": "count"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$payments_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$first_row",
+        "record_path"
+      ],
+      "into": "record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "gt",
+          "lhs": "$count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "Found {count} payment record(s) involved in the confirmed fraud incident.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$record_path"
+        }
+      ]
+    },
+    "not_found": {
+      "message": "No payment records found for the confirmed fraud incident.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

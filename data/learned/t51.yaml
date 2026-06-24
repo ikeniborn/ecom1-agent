@@ -1,0 +1,75 @@
+entries:
+- agents_md_anchor: null
+  content: Always extract the list of items from a ListResponse using the appropriate
+    field (e.g., 'files' or 'entries') before applying 'first' or indexing.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''ListResponse'' object is not subscriptable in compute step
+    ''first''. Root cause: PlanIR applied ''first'' directly to the List RPC result
+    ($upload_list), but ListResponse is an object with a list field (e.g., ''files''
+    or ''entries''), not a list itself. The failing fragment: {"prim":"first","args":["$upload_list"],"into":"filename"}.
+    The rule ensures the PLAN phase extracts the list field first, preventing subscript
+    errors.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always filter a directory listing to only include entries that are files
+    (e.g., by checking a 'type' field or using a field that contains only files) before
+    selecting the first element to use as a file path.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''read failed: is a directory'' on Read RPC with path ''$upload_list.files[0]''.
+    Root cause: the plan assumed the first entry in the listing is a file, but it
+    was a directory. The failing PlanIR fragment is the Read operation using the first
+    element of the list without filtering for files. Existing rule (extract list using
+    appropriate field) is insufficient; a new rule is needed to ensure only file paths
+    are selected.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always filter the results of a Find RPC to only include entries where the
+    'type' field is 'file' before using any entry as a file path, regardless of the
+    'kind' parameter used in the Find.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. Root cause: The script
+    used the first element of a Find RPC result as a file path without verifying it
+    is a file. The Find RPC with kind=''file'' returned a directory entry, indicating
+    the ''kind'' parameter may not be reliable. The script should have filtered the
+    listing to only files using the ''type'' field before selecting the first element.
+    The failing PlanIR fragment is the Read RPC at line 2: {"rpc":"Read","args":{"path":"$uploads_list.0"},"bind":"receipt_text"}.
+    The existing rule ''Always filter a directory listing...'' was not followed. This
+    new rule reinforces the need to filter after Find.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always compute a file path from a directory listing (by filtering, selecting
+    the first file, and extracting its path) before using it in a Read RPC. Place
+    the path computation (e.g., as a custom extract on the listing result) in the
+    discovery section before the Read RPC, and use the computed variable as the path
+    argument. Do not use the literal description string from the IntentSpec param
+    as a path.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: ''real_vm: read failed: invalid path: path must be absolute:
+    "discover by listing /uploads/ directory, pick the first file (assume single receipt
+    file)"''. Root cause: The PlanIR placed a Read RPC in the discovery section with
+    path argument set to the literal description string from the IntentSpec param,
+    instead of computing the actual path from the directory listing. The compute steps
+    that derive $receipt_path (filter, first, get) are in the compute section, which
+    executes after discovery, so $receipt_path is undefined when the Read RPC runs.
+    The PlanIR must compute the path within discovery (e.g., via a custom extract
+    on the List result) and use that variable in the Read RPC. This rule ensures the
+    path is derived correctly and the Read RPC is not attempted with an invalid literal.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t51

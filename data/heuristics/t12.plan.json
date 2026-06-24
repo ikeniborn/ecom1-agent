@@ -1,0 +1,75 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/ops-policy-notes/catalogue-count-work-jackets-2021-08-09.md"
+      },
+      "bind": "policy_text"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT COUNT(*) AS count FROM product_variants WHERE product_kind_id = 'work_jackets';"
+      },
+      "bind": "sql_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_result",
+      "format": "auto_delim",
+      "into": "parsed_rows",
+      "columns": [
+        {
+          "into": "count",
+          "candidates": [
+            "count",
+            "COUNT(*)"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$parsed_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "count"
+      ],
+      "into": "count"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "ge",
+          "lhs": "$count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "<COUNT:{count}>",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

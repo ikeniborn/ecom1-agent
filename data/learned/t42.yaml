@@ -1,0 +1,172 @@
+entries:
+- agents_md_anchor: '#security > discount-issuance'
+  content: When implementing a security deny_when condition from the IntentSpec, use
+    the exact ref path as declared in the security constraint (e.g., $_facts.*) rather
+    than re-deriving from a separate RPC, and set the decision default_label to the
+    allow branch to avoid spurious over-refusal.
+  created: '2026-06-24'
+  deactivated_reason: Superseded by new rule that also prohibits adding extra denial
+    branches from policy documents.
+  id: r001
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: PlanIR decision
+    condition used $identity.kind (derived from re-parsing /bin/id output) instead
+    of $_facts.identity.kind from the security constraint, and default_label was ''deny''
+    causing unconditional denial. The security deny_when predicate ($_facts.identity.kind
+    ne employee) was false (identity.kind = employee), yet PlanIR returned DENIED_SECURITY.
+    Fix: match the exact ref path and set default to allow.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use `concat` to build a JSON string; `concat` only concatenates two
+    rowset lists (list[dict] rows). Use `json` or `build` to construct a JSON object
+    from key-value pairs.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: interpret compute step ''concat'' failed: <lambda>() takes 2
+    positional arguments but 15 were given. The PlanIR used `concat` with 15 string
+    arguments to build a JSON string for a Write operation. The `concat` primitive
+    expects exactly two arguments, both list[dict] rows (parsed Exec output via rowsets).
+    This misuse causes a runtime error. The correct approach is to use a `json` or
+    `build` primitive that accepts a dict of key-value pairs and serializes it to
+    a JSON string. The rule prevents this pattern and guides proper PlanIR construction.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the IntentSpec's required refs specify a source path like $<rowset>.<field>,
+    the PlanIR must create a rowset with the exact rowset name (e.g., 'basket') and
+    include the field, and the answer ref must use that direct path (e.g., '$basket.record_path')
+    rather than a computed variable.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$basket.record_path'''']
+    on OK answer''. The PlanIR names the basket rowset ''basket_rows'' and computes
+    a variable ''$basket_record_path'' used as the ref source. The required ref expects
+    ''$basket.record_path'' — a direct field path on a rowset named ''basket''. The
+    interpreter cannot resolve a computed variable as a ref source. Fix: rename rowset
+    to ''basket'' and use ''$basket.record_path'' directly in answer refs.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never add denial branches to the decision that are not declared as security
+    deny_when in the IntentSpec's constraints array; always set the decision default_label
+    to the allow branch.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds. Root cause: The PlanIR decision includes multiple deny_security
+    branches (role not discount_manager, status not active, existing discount not
+    null, basket_store_id != emp_store_id) that are not declared as security deny_when
+    in the IntentSpec. The only declared security deny_when is identity.kind != employee,
+    which is false (identity.kind is employee). This causes a spurious over-refusal.
+    The failing PlanIR fragment is the decision block with those extra branches. The
+    existing rule (r001) advises using exact ref path and setting default_label to
+    allow branch, but the PlanIR violated it by adding extra denial branches. The
+    new rule supersedes r001 by also prohibiting addition of non-declared denial branches.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#security > discount-issuance'
+  content: When implementing a security deny_when condition from the IntentSpec, do
+    not include a discovery step to read the security policy document; instead, rely
+    solely on the IntentSpec's security constraint and use the exact ref path from
+    the constraint. Set the decision default_label to the allow branch.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: verify I3 - outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The PlanIR includes a Read
+    of /docs/security.md, which is unnecessary because the security constraint is
+    already in the IntentSpec. The existing rule advises against re-deriving from
+    a separate RPC, but the PlanIR violates it. The decision default_label is set
+    to ''allow'', which is correct, but the unnecessary read may cause the system
+    to misinterpret the security condition. Removing the read and relying on the IntentSpec''s
+    ref path should prevent spurious over-refusal.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the `get` primitive to extract a value from a ref path; ref paths
+    are resolved automatically by the interpreter. Use the ref path directly in decision
+    conditions and answer templates.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: interpret: compute step ''get'' failed: <lambda>() missing 1
+    required positional argument: ''key''. The PlanIR compute step used `get` with
+    only one argument (the ref path `$_facts.identity.kind`), but `get` requires two
+    arguments: obj and key. The ref path should not be passed to `get`; it should
+    be used directly. The interpreter resolves ref paths natively. The compute step
+    is unnecessary and malformed. The decision block also lacks branches and has incorrect
+    default_label, but the immediate error is the compute step. This rule prevents
+    future misuse of `get` for ref extraction.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#discovery'
+  content: When a required ref source is $<rowset>.<field>, the discovery step that
+    populates that rowset must explicitly include that field in the SELECT clause
+    to guarantee its presence in the rowset.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$basket.record_path'''']
+    on OK answer''. Root cause: The discovery step for basket uses SELECT * FROM shopping_baskets,
+    which may not include the column ''record_path'' in the resulting rowset. The
+    required ref source ''$basket.record_path'' therefore cannot be resolved. The
+    existing rule (r03) says to include the field but does not specify how; this new
+    rule makes it explicit that the discovery step must SELECT the field directly,
+    not rely on SELECT *. The extraneous compute step extracting the field is a separate
+    violation of an existing rule.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never add denial branches to the decision that are not explicitly declared
+    as security deny_when in the IntentSpec's constraints array. Instead, implement
+    all other preconditions (e.g., role requirements from policy documents, basket
+    eligibility checks) as guard conditions on the allow branches using AND logic.
+    Set the decision default_label to the allow branch that should be used when no
+    guard matches (typically the fallback allow branch).
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: ''verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal)''. Root cause: The PlanIR added
+    three denial branches (missing discount_manager role, basket eligibility conditions,
+    and a nonsensical store_id != store_id) that are not in the IntentSpec''s security
+    constraints. The IntentSpec only has one security deny_when: identity.kind !=
+    employee. The first branch (employee check) is correct, but the extra branches
+    cause spurious denial. Failing PlanIR fragment: the decision branches array, specifically
+    the second, third, and fourth branches. Rule linkage: Existing rule ''Never add
+    denial branches to the decision that are not declared as security deny_when in
+    the IntentSpec''s constraints array; always set the decision default_label to
+    the allow branch'' was violated. This new rule reinforces that all non-security
+    preconditions must be guard conditions on allow branches, superseding the prior
+    rule.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the IntentSpec's security constraint uses $_facts.* (e.g., $_facts.identity.kind),
+    include a discovery step to run /bin/id to populate the facts before the decision,
+    otherwise the condition may evaluate incorrectly and cause spurious over-refusal.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR did
+    not include a discovery step to run /bin/id, so $_facts.identity.kind was not
+    populated, causing the decision condition (ne lhs=$_facts.identity.kind rhs=employee)
+    to evaluate to true (null != ''employee'') even though the actual identity is
+    employee, leading to spurious denial. The existing rule about not reading the
+    security policy document is correct, but the PlanIR must still run /bin/id to
+    populate facts. The failing PlanIR fragment: decision branch condition uses $_facts.identity.kind
+    without prior /bin/id execution. Rule linkage: New rule ensures facts are available
+    for security conditions.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 10
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t42

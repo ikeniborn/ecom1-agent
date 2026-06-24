@@ -1,0 +1,47 @@
+entries:
+- agents_md_anchor: null
+  content: Always pass the predicate as the first argument and the rows as the second
+    argument when using filter_rows in PlanIR compute steps.
+  created: '2026-06-24'
+  deactivated_reason: This rule incorrectly specified the argument order for filter_rows;
+    the correct order is rows first, predicate second.
+  id: r001
+  reasoning: 'Error: ''dict'' object has no attribute ''op'' on filter_rows. The interpreter
+    attempts to access .op on a dict that is not the predicate (likely a row dict),
+    indicating the arguments are swapped: the rows are being treated as the predicate.
+    The contract states first arg must be rows, but the runtime behavior expects predicate
+    first. To avoid this, the PlanIR must place the predicate dict before the rowset
+    reference in the args list.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the required_refs for an outcome include a ref variable, the answer
+    block for that outcome must include that variable in its refs list.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''unresolved required ref(s) [''$fraud_row_refs''] on OK answer''.
+    The PlanIR computes fraud_row_refs in the compute steps but the answer block has
+    ''refs'':[], omitting the required ref. The root cause is a missing refs entry
+    in the answer block. The rule ensures that any variable listed in required_refs
+    for an outcome is included in the answer''s refs array, preventing the interpret
+    phase from failing.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always pass the rows variable (list of dicts) as the first argument and
+    the predicate dict as the second argument when using filter_rows in PlanIR compute
+    steps.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''interpret: compute step ''filter_rows'' failed: ''filter_rows''
+    expects list[dict]; use ''get'' for a single row''. Root cause: In the PlanIR
+    compute step, filter_rows was called with the predicate string as the first argument
+    and $rows as the second, but the contract requires rows (list[dict]) first, predicate
+    second. The existing rule r001 incorrectly specified predicate first, rows second,
+    leading to this reversal. The failing fragment: {"prim":"filter_rows","args":["{\"op\":\"eq\",...}","$rows"]}.
+    The new rule corrects the order and supersedes r001.'
+  status: active
+  surface: ir
+task_id: t48

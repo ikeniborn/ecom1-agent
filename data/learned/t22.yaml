@@ -1,0 +1,42 @@
+entries:
+- agents_md_anchor: null
+  content: Always include discovery steps to ground required parameters from the user's
+    session or system context before falling back to clarification.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''interpret: attempt grounded discovery before clarifying (clarify-only
+    plan rejected while OUTCOME_OK is reachable)''. The PlanIR had empty discovery
+    and a default decision label of ''clarification'', meaning it immediately asked
+    for basket_id without attempting to discover it from the user''s session or context.
+    The TOOL_PLAN requires basket_id as a parameter, and OUTCOME_OK is reachable,
+    so the plan must include discovery steps to try to find the basket_id before clarifying.
+    The rule ensures that the planner always attempts discovery for required parameters
+    before resorting to clarification.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the plan requires a user or customer record, use the identity context
+    ($_facts.identity) to locate the record via a query rather than a hardcoded path.
+    If identity is not available, fall back to clarification.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: real_vm: read failed: not found. Root cause: The PlanIR hardcodes
+    a Read RPC for ''/customer/guest'', which does not exist in the system. The plan
+    also reads ''/docs/checkout.md'' unnecessarily, but the primary failure is the
+    missing guest path. The plan ignores the identity context provided in the TOOL_PLAN
+    and does not attempt to extract the basket_id from the instruction or session.
+    The existing rule (ground parameters from session/system context) is too vague;
+    this new rule specifically prevents hardcoded paths by requiring identity-based
+    queries.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 2
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+prephase_deep_read:
+- /customer
+task_id: t22

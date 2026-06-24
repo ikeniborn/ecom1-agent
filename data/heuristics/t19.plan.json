@@ -1,0 +1,130 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH product AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key='color family' AND pvp1.property_value_text='Blue' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key='size' AND pvp2.property_value_text='XL' WHERE pv.brand='Helly Hansen' AND pv.product_family_name='Helly Hansen Chelsea Evolution Kensington V83-TOZ Work Jacket') SELECT p.product_sku, p.record_path AS product_record_path, s.store_id, s.record_path AS store_record_path, COALESCE(inv.available_today_quantity, 0) AS available_today_quantity FROM product p CROSS JOIN stores s LEFT JOIN store_inventory inv ON s.store_id = inv.store_id AND inv.product_sku = p.product_sku WHERE s.city='Graz' ORDER BY s.store_id;"
+      },
+      "bind": "inventory_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "inventory_raw",
+      "format": "auto_delim",
+      "into": "inventory_rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "product_record_path",
+          "candidates": [
+            "product_record_path"
+          ]
+        },
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "store_record_path",
+          "candidates": [
+            "store_record_path"
+          ]
+        },
+        {
+          "into": "available_today_quantity",
+          "candidates": [
+            "available_today_quantity"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "sum_col",
+      "args": [
+        "$inventory_rows",
+        "available_today_quantity"
+      ],
+      "into": "total_available_raw"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$total_available_raw"
+      ],
+      "into": "total_available"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$inventory_rows",
+        "store_record_path"
+      ],
+      "into": "store_paths_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$inventory_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "product_record_path"
+      ],
+      "into": "product_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$inventory_rows",
+          "rhs": null,
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
+    "default_label": "unsupported"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "answer={total_available}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store_paths_list"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "Product variant not found",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

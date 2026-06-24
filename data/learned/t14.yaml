@@ -1,0 +1,31 @@
+entries:
+- agents_md_anchor: null
+  content: Always include a discovery step for each product specification that retrieves
+    the product_sku and record_path by joining product_variants on brand, series,
+    model and product_variant_properties on property_key and property_value_text.
+    Then include a rowset that counts how many of those products have at least the
+    required number of items in stock at the identified store, using the inventory
+    table. The answer refs must only reference variables that are actually bound in
+    the plan, and must include a decision branch to handle the case where the store
+    is not found.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
+    ''$product1.record_path'', ...] on OK answer. Root cause: The PlanIR only discovers
+    the store via SQL but omits any discovery steps for the product specifications.
+    The answer block references $product1..$product6.record_path which were never
+    bound. Additionally, $store.record_path may be unresolved because the SQL result
+    could be empty (no matching store) and the plan lacks a decision branch to handle
+    that case. The failing PlanIR fragment is the answer block with refs to unbound
+    product record_paths and no conditional logic. The new rule ensures product discovery
+    steps are always included and that answer refs are consistent with bound variables,
+    with a branch for missing store.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 2
+  date: '2026-06-24'
+  outcome: OUTCOME_DENIED_SECURITY
+  status: failure
+task_id: t14

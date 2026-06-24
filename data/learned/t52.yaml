@@ -1,0 +1,52 @@
+entries:
+- agents_md_anchor: null
+  content: Always extract the 'rows' list from the result of an Exec RPC (SQL query)
+    using a 'get' primitive before applying list operations like filter_rows, sum_col,
+    or any other list-based compute step.
+  created: '2026-06-24'
+  deactivated_reason: Superseded by more precise rule that explicitly requires extracting
+    'rows' before list operations on Exec results.
+  id: r001
+  reasoning: 'Error: ''filter_rows expects list[dict]; use get for a single row''.
+    The plan used $all_variants directly from an Exec RPC (SQL query) as the first
+    argument to filter_rows. The Exec RPC returns a dict with a ''rows'' key containing
+    the list of row dicts, not a bare list. The interpreter saw a dict and suggested
+    using ''get'' to extract a field. The fix is to add a compute step that gets the
+    ''rows'' list from the Exec result before filtering.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use concat with a single argument; concat requires two list[dict]
+    arguments. For scalar assignments, use a 'get' primitive with a list containing
+    the scalar as the first argument and 0 as the second argument.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. The PlanIR used concat with a single string
+    literal argument to set receipt_file_path, but concat expects two list[dict] arguments.
+    Root cause: misuse of concat for scalar assignment. Failing fragment: {"prim":"concat","args":["/uploads/receipt_ocr_CHo16gtZ.txt"],"into":"receipt_file_path"}.
+    New rule prevents this pattern and prescribes correct scalar assignment via get.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the 'rows' list from the result of an Exec RPC (SQL query)
+    using a 'get' primitive with the key 'rows' before using that result as the first
+    argument to filter_rows, sum_col, or any other list operation that expects list[dict].
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''filter_rows'' expects list[dict]; first arg must be list[dict].
+    Root cause: The PlanIR used the raw Exec result ''$all_variants'' directly as
+    the first argument to filter_rows, but Exec returns a dict with a ''rows'' key
+    containing the list. The existing rule (r001) was not applied, resulting in a
+    missing ''get'' step to extract the rows. Failing fragment: filter_rows step with
+    args [''$all_variants'', ...]. New rule ensures extraction is always performed.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t52

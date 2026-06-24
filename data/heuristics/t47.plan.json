@@ -1,0 +1,50 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "policy_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "identity"
+    }
+  ],
+  "rowsets": [],
+  "compute": [],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$identity.kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "deny_security"
+      }
+    ],
+    "default_label": "clarification"
+  },
+  "ops": [],
+  "answer": {
+    "deny_security": {
+      "message": "Access denied: guests cannot check store availability.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        "policy_doc"
+      ]
+    },
+    "clarification": {
+      "message": "Cannot check product descriptions without a valid store identity.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

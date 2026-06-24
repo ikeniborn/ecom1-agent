@@ -1,0 +1,25 @@
+entries:
+- agents_md_anchor: null
+  content: 'Always extract the ''rows'' field from an ExecResponse object before applying
+    ''first'' or any sequence operation. In the PlanIR, after binding the Exec result
+    to a variable (e.g., $product_rows), add a compute step to retrieve the rows list:
+    {''prim'':''column'',''args'':[''$product_rows'',''rows''],''into'':''$rows_list''}.
+    Then use ''$rows_list'' in subsequent compute steps like ''first''.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. Root cause: The PlanIR discovery step binds the
+    Exec RPC result to $product_rows, but Exec returns an ExecResponse object (with
+    fields like rows, columns), not a list. The compute step ''first'' expects a sequence
+    (list) but receives an object, causing the error. Failing PlanIR fragment: {"prim":"first","args":["$product_rows"],"into":"product_row"}.
+    The new rule ensures the planner extracts the ''rows'' field before using ''first'',
+    preventing this error in future cycles.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 2
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t08

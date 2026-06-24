@@ -4,45 +4,71 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH product AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'storage_type' AND pvp1.property_value_text = 'tool bag' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'color_family' AND pvp2.property_value_text = 'Gray' JOIN product_variant_properties pvp3 ON pv.product_sku = pvp3.product_sku AND pvp3.property_key = 'volume' AND (pvp3.property_value_text = '8' OR pvp3.property_value_text = '8 l') WHERE pv.brand = 'Milwaukee' AND pv.series = 'M12' AND pv.model = 'M12 2TN-F66' AND pv.product_name LIKE '%Tool Box and Bag%' LIMIT 1) SELECT p.product_sku, p.record_path, COALESCE(SUM(si.available_today_quantity), 0) AS total_count FROM product p CROSS JOIN stores s LEFT JOIN store_inventory si ON s.store_id = si.store_id AND si.product_sku = p.product_sku WHERE s.city = 'Graz' GROUP BY p.product_sku, p.record_path;"
+        "stdin": "WITH product AS (SELECT pv.product_sku, pv.record_path AS product_record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_variant_properties pvp_color ON pv.product_sku = pvp_color.product_sku AND pvp_color.property_key = 'color' JOIN product_variant_properties pvp_volume ON pv.product_sku = pvp_volume.product_sku AND pvp_volume.property_key = 'volume' WHERE pv.brand = 'Sika' AND pf.product_family_name = 'Sika Weatherproof Sikaflex 1JG-02A Sealant' AND pvp_color.property_value_text = 'Gray' AND pvp_volume.property_value_text = '100 ml' LIMIT 1), stores_vienna AS (SELECT store_id FROM stores WHERE city = 'Vienna'), inventory_sum AS (SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total_quantity FROM stores_vienna sv LEFT JOIN store_inventory si ON sv.store_id = si.store_id AND si.product_sku = (SELECT product_sku FROM product)) SELECT (SELECT product_sku FROM product) AS product_sku, (SELECT product_record_path FROM product) AS product_record_path, (SELECT total_quantity FROM inventory_sum) AS total_quantity;"
       },
-      "bind": "product_total_raw"
+      "bind": "product_sum_raw"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT record_path FROM stores WHERE city = 'Graz';"
+        "stdin": "SELECT record_path FROM stores WHERE city = 'Vienna';"
       },
-      "bind": "store_paths_raw"
+      "bind": "stores_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "$product_total_raw.stdout",
-      "format": "json",
-      "into": "product_total_parsed",
-      "columns": []
+      "from_": "product_sum_raw",
+      "format": "auto_delim",
+      "into": "product_sum_rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "product_record_path",
+          "candidates": [
+            "product_record_path"
+          ]
+        },
+        {
+          "into": "total_quantity",
+          "candidates": [
+            "total_quantity"
+          ]
+        }
+      ]
     },
     {
-      "from_": "$store_paths_raw.stdout",
-      "format": "json",
-      "into": "store_paths_parsed",
-      "columns": []
+      "from_": "stores_raw",
+      "format": "auto_delim",
+      "into": "stores_rows",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
     }
   ],
   "compute": [
     {
       "prim": "first",
       "args": [
-        "$product_total_parsed"
+        "$product_sum_rows"
       ],
-      "into": "product_total_row"
+      "into": "product_sum_row"
     },
     {
       "prim": "get",
       "args": [
-        "$product_total_row",
+        "$product_sum_row",
         "product_sku"
       ],
       "into": "product_sku"
@@ -50,23 +76,23 @@
     {
       "prim": "get",
       "args": [
-        "$product_total_row",
-        "record_path"
+        "$product_sum_row",
+        "product_record_path"
       ],
       "into": "product.record_path"
     },
     {
       "prim": "get",
       "args": [
-        "$product_total_row",
-        "total_count"
+        "$product_sum_row",
+        "total_quantity"
       ],
-      "into": "total_count"
+      "into": "count"
     },
     {
       "prim": "column",
       "args": [
-        "$store_paths_parsed",
+        "$stores_rows",
         "record_path"
       ],
       "into": "store_record_paths"
@@ -76,33 +102,20 @@
     "branches": [
       {
         "when": {
-          "op": "and",
-          "lhs": null,
+          "op": "nonempty",
+          "lhs": "$product_sku",
           "rhs": null,
-          "args": [
-            {
-              "op": "nonempty",
-              "lhs": "$product_sku",
-              "rhs": null,
-              "args": []
-            },
-            {
-              "op": "nonempty",
-              "lhs": "$store_paths_parsed",
-              "rhs": null,
-              "args": []
-            }
-          ]
+          "args": []
         },
         "label": "found"
       }
     ],
-    "default_label": "unsupported"
+    "default_label": "not_found"
   },
   "ops": [],
   "answer": {
     "found": {
-      "message": "count: {total_count}",
+      "message": "count: {count}",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
@@ -117,8 +130,8 @@
         }
       ]
     },
-    "unsupported": {
-      "message": "Unable to compute total available quantity because product or stores not found.",
+    "not_found": {
+      "message": "Product not found",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

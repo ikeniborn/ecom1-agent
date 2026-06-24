@@ -1,0 +1,42 @@
+entries:
+- agents_md_anchor: null
+  content: Always set variable names in PlanIR compute steps to exactly match the
+    required_refs source names from the TOOL_PLAN when constructing answer refs. For
+    example, if required_refs specifies '$product_variant.record_path', the PlanIR
+    must define a variable named '$product_variant.record_path' and reference it in
+    the answer refs.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: verify: I1: required ref source(s) [''$product_variant.record_path'']
+    did not resolve on OUTCOME_OK answer. Root cause: PlanIR answer refs used source
+    ''$product_record_path'' instead of the required ''$product_variant.record_path''.
+    The compute step set $product_record_path but the required_refs expects exactly
+    ''$product_variant.record_path''. This mismatch caused the verification to fail
+    because the ref source was not found. The SQL query and decision logic are correct;
+    only the variable naming is wrong.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When required_refs source is a dotted path, set the parent variable as
+    an object with the field, not a flat variable with the full dotted name.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: verify: I1: required refs source(s) [''$product_variant.record_path'']
+    did not resolve on OUTCOME_OK answer (resolve-before-cite). Root cause: PlanIR
+    compute step set a variable named ''$product_variant.record_path'' (flat), but
+    the required_refs source is interpreted as a path to a field of variable ''$product_variant''.
+    Since ''$product_variant'' was never set, the ref did not resolve. Failing fragment:
+    compute step `{"prim":"get","args":["$product_row","record_path"],"into":"$product_variant.record_path"}`.
+    Existing rule ''Always set variable names in PlanIR compute steps to exactly match
+    the required_refs source names'' is too simplistic for dotted paths and led to
+    this error; it will be deactivated.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 3
+  date: '2026-06-24'
+  outcome: OUTCOME_OK
+  status: success
+task_id: t07

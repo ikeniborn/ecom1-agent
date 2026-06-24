@@ -1,0 +1,51 @@
+{
+  "objective": "Determine how many of the six specified products have no same-day availability (available_today_quantity = 0 or NULL) in the Veveri PowerTool shop in Brno.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "store_id": "lookup from stores WHERE store_name LIKE '%Veveri PowerTool%' AND city = 'Brno'",
+    "product_skus": "For each of the six product descriptions in the instruction, identify the product_sku by matching the product family (brand, series, model) and variant properties (property_key, property_value_text) from product_variants, product_families, and product_variant_properties.",
+    "store_record_path": "lookup record_path from stores WHERE store_id = $store_id"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "ge",
+        "lhs": "$count",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "le",
+        "lhs": "$count",
+        "rhs": 6,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$store_id",
+        "rhs": null,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "count : %d",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$store_record_path"
+      }
+    ]
+  }
+}

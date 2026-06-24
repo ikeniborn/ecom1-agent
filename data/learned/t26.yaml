@@ -1,0 +1,150 @@
+entries:
+- agents_md_anchor: null
+  content: Use a SQL RPC (e.g., 'Sql' or 'Query') that returns a list of rows when
+    querying a database, not an Exec RPC that returns an ExecResponse object. Then
+    apply 'first' to the bound variable to get the first row.
+  created: '2026-06-24'
+  deactivated_reason: Superseded by broader rule covering all SQL statements that
+    return rows, not just queries.
+  id: r001
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable at compute step
+    ''first'' on ''$customer_basket_info''. Root cause: The discovery step used an
+    Exec RPC to run a SQL query, which returns an ExecResponse object (containing
+    stdout, stderr, exit code), not a list of rows. The ''first'' primitive expects
+    a sequence (list). The PlanIR should have used a SQL RPC that returns rows directly,
+    or parsed the ExecResponse stdout first. The rule guides the PLAN phase to use
+    the correct RPC type for database queries.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the `concat` primitive for string concatenation; `concat` requires
+    exactly two arguments, each a list of dict rows (rowsets). For building strings,
+    use a single string literal or the `format` primitive with placeholders.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes
+    2 positional arguments but 3 were given''. Root cause: PlanIR used `concat` with
+    three string arguments to build a SQL query, violating the contract that `concat(a,
+    b)` expects both args to be list[dict] rows. Additional misuses include `concat`
+    with one argument. The correct approach is to avoid `concat` for string building;
+    use a single string literal or `format` instead. This rule prevents future misuse.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never include a decision branch that duplicates a security constraint's
+    deny_when condition; let the system enforce security automatically. Instead, only
+    include decision branches for non-security business logic conditions. Additionally,
+    when a security policy document requires running /bin/id before identity-dependent
+    actions, include a discovery step to run /bin/id and bind the result to a variable
+    (e.g., 'identity') to ensure the identity fact is available for any necessary
+    checks.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: The PlanIR included a decision branch that checks $identity.kind != 'employee'
+    to deny, but the security constraint already enforces that condition. The plan
+    did not run /bin/id to obtain the identity, so $identity.kind was undefined, causing
+    the condition to evaluate as true (null != 'employee') and spurious denial. The
+    system's security constraint evaluated to false because the actual identity (from
+    /bin/id) was employee, so the plan's over-refusal was flagged. The fix is to remove
+    the redundant decision branch and add a discovery step to run /bin/id to satisfy
+    the security policy's requirement.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the `get` primitive with more than two arguments. When a database
+    query returns a list of rows (e.g., from a Query RPC), first apply the `first`
+    primitive to extract the single row, then use `get` with two arguments (the row
+    variable and the field name) to extract a field.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: ''interpret: compute step ''get'' failed: <lambda>() takes 2
+    positional arguments but 3 were given''. Root cause: The PlanIR used `get` with
+    three arguments (e.g., `["$basket_info", 0, "basket_id"]`), but the `get` primitive
+    only accepts two arguments (object and key). The plan attempted to both index
+    into a list and extract a field in one step. The correct pattern is to first use
+    `first` to get the first row from the list, then `get` to extract the field. Additionally,
+    the plan used an Exec RPC for the SELECT query, which returns an ExecResponse,
+    not a list of rows; a Query RPC (e.g., ''Sql'' or ''Query'') should be used instead.
+    The existing rule about using a SQL RPC that returns a list of rows was violated,
+    and the compute steps were malformed. This new rule explicitly forbids the three-argument
+    `get` pattern and prescribes the correct two-step approach.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the exact path from the required refs (e.g., '$basket.record_path')
+    as the source in answer refs, never a separately computed variable name. The answer
+    ref source must match the required ref path exactly so the system can resolve
+    it from the basket object.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$basket.record_path'''']
+    on OK answer''. The PlanIR answer for apply_discount includes a ref with source
+    ''$basket_record_path'', but the required ref expects ''$basket.record_path''.
+    The system cannot resolve ''$basket_record_path'' because it is a variable name,
+    not a path into the basket object. The fix is to use the exact path ''$basket.record_path''
+    as the source, which matches the required ref and is resolvable from the basket
+    row.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use an Exec RPC for any SQL statement that needs to return rows;
+    always use a Query RPC (or Sql) that returns a list of rows, even for UPDATE/INSERT/DELETE
+    with RETURNING. Exec RPC returns an ExecResponse object, which lacks row data,
+    causing rowset extraction and ref resolution to fail.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: The PlanIR used an Exec RPC for an UPDATE ... RETURNING statement, which
+    returned an ExecResponse instead of rows. The 'first' primitive then produced
+    a non-row object, so the required ref '$basket.record_path' could not be resolved.
+    The existing rule r001 only covered queries, not updates. The new rule extends
+    the prohibition to all row-returning SQL.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use an Exec RPC for any SQL statement that is intended to return
+    rows (e.g., SELECT, or any statement with RETURNING); always use a Query RPC (or
+    Sql) that returns a list of rows. Exec RPC returns an ExecResponse object which
+    cannot be parsed into rowsets, causing rowset extraction and ref resolution to
+    fail.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$basket.record_path'''']
+    on OK answer''. The PlanIR uses an Exec RPC for the SELECT query that retrieves
+    the basket row. Exec RPC returns an ExecResponse object, not a list of rows. The
+    rowset extraction from an ExecResponse fails, so the ''basket'' object does not
+    contain the expected ''record_path'' field, causing the ref resolution to fail.
+    The existing rule ''Use a SQL RPC...'' was violated. This new rule explicitly
+    forbids Exec RPC for row-returning SQL and mandates Query RPC, which returns a
+    list of rows that can be properly parsed into rowsets.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use a security outcome label (e.g., 'denied_security') as the default
+    branch of a decision tree unless the branch condition itself is a security check.
+    For business logic failures (e.g., empty basket, existing discount), use a distinct
+    outcome label to avoid spurious security refusals.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: ''verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal)''. The plan''s decision tree
+    had a default label ''denied_security'' that was reached when the basket was not
+    eligible (e.g., empty rows or discount already present). This caused the interpreter
+    to emit a security denial without any security predicate being violated. The root
+    cause is that the default branch was mislabeled as a security outcome, conflating
+    business rule failures with security. The new rule prevents this by requiring
+    distinct outcome labels for non-security failures.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 10
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t26

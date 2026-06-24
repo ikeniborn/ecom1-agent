@@ -1,0 +1,62 @@
+{
+  "objective": "Count the total available units of a specific Uvex work glove product (size L, color Blue) across all Vienna PowerTool branches today.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "product_sku": "lookup from product_variants WHERE brand='Uvex' AND series='Uvex Industrial' AND model='uvex 2KV-937 Work Gloves' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku=product_variants.product_sku AND property_key='Size' AND property_value_text='L') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku=product_variants.product_sku AND property_key='Color Family' AND property_value_text='Blue')",
+    "vienna_stores": "select store_id from stores where city='Vienna' and is_open=1",
+    "count": "sum of available_today_quantity from store_inventory where store_id in ($vienna_stores) and product_sku = $product_sku"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$product_sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$vienna_stores",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "ge",
+        "lhs": "$count",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "regex_match",
+        "lhs": "$answer",
+        "rhs": "^Count: \\d+$",
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "Count: {count}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_variant.record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$store.record_path"
+      }
+    ]
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/uploads/receipt_ocr_CHo16gtZ.txt"
+      },
+      "bind": "receipt_text"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_policy"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT '/uploads/receipt_ocr_CHo16gtZ.txt' AS path;"
+      },
+      "bind": "path_result"
+    }
+  ],
+  "rowsets": [],
+  "compute": [
+    {
+      "prim": "get",
+      "args": [
+        "$path_result",
+        "rows"
+      ],
+      "into": "path_rows"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$path_rows",
+        0
+      ],
+      "into": "path_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$path_row",
+        "path"
+      ],
+      "into": "receipt_file_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$parsed_receipt",
+        "rows"
+      ],
+      "into": "parsed_receipt_rows"
+    },
+    {
+      "prim": "filter_rows",
+      "args": [
+        "$parsed_receipt_rows",
+        {
+          "op": "ne",
+          "lhs": "$product_sku",
+          "rhs": "TOTAL"
+        }
+      ],
+      "into": "product_rows"
+    },
+    {
+      "prim": "filter_rows",
+      "args": [
+        "$parsed_receipt_rows",
+        {
+          "op": "eq",
+          "lhs": "$product_sku",
+          "rhs": "TOTAL"
+        }
+      ],
+      "into": "total_row_list"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$total_row_list",
+        0
+      ],
+      "into": "total_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$total_row",
+        "price_cents"
+      ],
+      "into": "old_total_cents"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_rows",
+        "product_sku"
+      ],
+      "into": "product_skus"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$all_prices_result",
+        "rows"
+      ],
+      "into": "all_prices_rows"
+    },
+    {
+      "prim": "filter_rows",
+      "args": [
+        "$all_prices_rows",
+        {
+          "op": "in_set",
+          "lhs": "$product_sku",
+          "rhs": "$product_skus"
+        }
+      ],
+      "into": "current_prices_rows"
+    },
+    {
+      "prim": "sum_col",
+      "args": [
+        "$current_prices_rows",
+        "price_cents"
+      ],
+      "into": "new_total_cents"
+    },
+    {
+      "prim": "abs_diff",
+      "args": [
+        "$old_total_cents",
+        "$new_total_cents"
+      ],
+      "into": "difference_cents"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "or",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "isnull",
+              "lhs": "$old_total_cents",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "isnull",
+              "lhs": "$new_total_cents",
+              "rhs": null,
+              "args": []
+            }
+          ]
+        },
+        "label": "unsupported"
+      },
+      {
+        "when": {
+          "op": "le",
+          "lhs": "$difference_cents",
+          "rhs": 300,
+          "args": []
+        },
+        "label": "within"
+      }
+    ],
+    "default_label": "outside"
+  },
+  "ops": [],
+  "answer": {
+    "within": {
+      "message": "The total price difference is {difference_cents} cents, which is within the 3 EUR threshold.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$receipt_file_path"
+        }
+      ]
+    },
+    "outside": {
+      "message": "The total price difference is {difference_cents} cents, which is outside the 3 EUR threshold.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "unsupported": {
+      "message": "Unable to compute price difference due to missing data.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": [
+    {
+      "name": "fuzzy_sku_receipt",
+      "input": "$receipt_text",
+      "into": "parsed_receipt"
+    }
+  ]
+}

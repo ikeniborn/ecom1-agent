@@ -1,0 +1,334 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/payments/3ds.md"
+      },
+      "bind": "policy_3ds"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "policy_security"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/checkout.md"
+      },
+      "bind": "policy_checkout"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT * FROM shopping_baskets WHERE basket_id = 'basket_216';"
+      },
+      "bind": "basket_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT * FROM payment_transactions WHERE basket_id = 'basket_216' ORDER BY payment_created_at DESC LIMIT 1;"
+      },
+      "bind": "payment_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "basket_raw",
+      "format": "auto_delim",
+      "into": "basket_rows",
+      "columns": [
+        {
+          "into": "basket_id",
+          "candidates": [
+            "basket_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "customer_id",
+          "candidates": [
+            "customer_id"
+          ]
+        },
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "basket_status",
+          "candidates": [
+            "basket_status"
+          ]
+        },
+        {
+          "into": "basket_created_at",
+          "candidates": [
+            "basket_created_at"
+          ]
+        },
+        {
+          "into": "discount_percent",
+          "candidates": [
+            "discount_percent"
+          ]
+        },
+        {
+          "into": "discount_reason_code",
+          "candidates": [
+            "discount_reason_code"
+          ]
+        },
+        {
+          "into": "discount_issuer_employee_id",
+          "candidates": [
+            "discount_issuer_employee_id"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "payment_raw",
+      "format": "auto_delim",
+      "into": "payment_rows",
+      "columns": [
+        {
+          "into": "payment_id",
+          "candidates": [
+            "payment_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "basket_id",
+          "candidates": [
+            "basket_id"
+          ]
+        },
+        {
+          "into": "is_archived_basket_reference",
+          "candidates": [
+            "is_archived_basket_reference"
+          ]
+        },
+        {
+          "into": "customer_id",
+          "candidates": [
+            "customer_id"
+          ]
+        },
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "payment_amount_cents",
+          "candidates": [
+            "payment_amount_cents"
+          ]
+        },
+        {
+          "into": "payment_currency",
+          "candidates": [
+            "payment_currency"
+          ]
+        },
+        {
+          "into": "payment_status",
+          "candidates": [
+            "payment_status"
+          ]
+        },
+        {
+          "into": "payment_created_at",
+          "candidates": [
+            "payment_created_at"
+          ]
+        },
+        {
+          "into": "payment_method_fingerprint",
+          "candidates": [
+            "payment_method_fingerprint"
+          ]
+        },
+        {
+          "into": "device_fingerprint",
+          "candidates": [
+            "device_fingerprint"
+          ]
+        },
+        {
+          "into": "observed_latitude",
+          "candidates": [
+            "observed_latitude"
+          ]
+        },
+        {
+          "into": "observed_longitude",
+          "candidates": [
+            "observed_longitude"
+          ]
+        },
+        {
+          "into": "three_ds_status",
+          "candidates": [
+            "three_ds_status"
+          ]
+        },
+        {
+          "into": "three_ds_failure_reason",
+          "candidates": [
+            "three_ds_failure_reason"
+          ]
+        },
+        {
+          "into": "three_ds_attempts",
+          "candidates": [
+            "three_ds_attempts"
+          ]
+        },
+        {
+          "into": "three_ds_max_attempts",
+          "candidates": [
+            "three_ds_max_attempts"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$basket_rows"
+      ],
+      "into": "basket"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$payment_rows"
+      ],
+      "into": "payment"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket",
+        "basket_id"
+      ],
+      "into": "basket_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment",
+        "payment_id"
+      ],
+      "into": "payment_id"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "eq",
+              "lhs": "$payment.three_ds_status",
+              "rhs": "failed",
+              "args": []
+            },
+            {
+              "op": "ge",
+              "lhs": "$payment.three_ds_attempts",
+              "rhs": "$payment.three_ds_max_attempts",
+              "args": []
+            }
+          ]
+        },
+        "label": "denied"
+      },
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$payment.three_ds_status",
+          "rhs": "success",
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
+    "default_label": "unsupported"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "Checkout for basket {basket_id} has been recovered. Payment {payment_id} is now safe.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/payments/3ds.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$payment.record_path"
+        }
+      ]
+    },
+    "denied": {
+      "message": "Checkout recovery denied due to 3DS failure limit reached.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$payment.record_path"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "Cannot recover checkout: 3DS status is {payment.three_ds_status} and retries may be available but recovery action not supported.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/payments/3ds.md",
+          "source": null
+        }
+      ]
+    }
+  },
+  "custom_extract": []
+}

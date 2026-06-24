@@ -1,0 +1,74 @@
+entries:
+- agents_md_anchor: null
+  content: When a parameter value is a literal string (not derived from a rowset or
+    RPC output), use the 'literal' primitive (or 'const') to create a value, not 'concat'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. Contract: concat(a, b) requires two list[dict]
+    rows. The PlanIR compute step used concat with a single string ''basket_086''
+    to create basket_id. The correct primitive for a literal constant is ''literal''
+    (or ''const''), not ''concat''. This rule prevents similar malformed PlanIR in
+    future cycles.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'When an RPC returns a text output with key: value pairs (like /bin/id),
+    do not use format ''json'' for rowset extraction; instead parse the text lines
+    as key: value pairs (e.g., split by newline then by colon) to extract fields like
+    user and roles.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds. Root cause: PlanIR used format ''json'' for identity_raw,
+    but /bin/id output is text (user: emp_027, roles: ...). Rowset extraction failed,
+    identity.kind became undefined, making ne condition true and triggering spurious
+    security denial. Verify step saw actual identity.kind is employee, so deny_when
+    predicate false, hence spurious over-refusal. Fix: parse text output correctly.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When an RPC returns a text output with key:value pairs, do not use format
+    'auto_delim' for rowset extraction; instead, add a preprocessing RPC that converts
+    the output to JSON (e.g., via a script) and then use format 'json' to extract
+    rows as a list of dicts.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: interpret: compute step ''filter_rows'' failed: ''dict'' object
+    has no attribute ''op''. Root cause: The rowset extraction for id_output_raw used
+    format ''auto_delim'', which produced a single dict instead of a list of dicts.
+    Consequently, the variable $id_rows was a dict, and filter_rows received a dict
+    as its first argument, violating the contract that requires a list[dict]. Failing
+    PlanIR fragment: rowsets definition for id_rows and the subsequent filter_rows
+    steps. Existing rule ''parse text lines as key:value pairs'' was not correctly
+    implemented; the new rule ensures a reliable list-of-dicts extraction by converting
+    to JSON first.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When using the filter_rows primitive in a compute step, represent the predicate
+    as a list [op, lhs, rhs] rather than a dict, because the interpreter's filter_rows
+    implementation expects a list and fails with AttributeError on a dict.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: ''interpret: compute step ''filter_rows'' failed: ''dict'' object
+    has no attribute ''op''''. Root cause: The compute step filter_rows received a
+    dict predicate {"op":"eq","lhs":"$key","rhs":"user"} but the interpreter''s filter_rows
+    function attempts to access .op on the predicate, which fails because dicts do
+    not support attribute access. The decision branches use the same dict format but
+    are evaluated by a different engine that handles dicts correctly. The failing
+    PlanIR fragment is the compute step: {"prim":"filter_rows","args":["$id_rows",{"op":"eq","lhs":"$key","rhs":"user"}],"into":"user_rows"}.
+    The rule ensures predicates in compute steps are lists, avoiding the attribute
+    access bug.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 6
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t37

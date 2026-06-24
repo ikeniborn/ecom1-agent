@@ -1,0 +1,56 @@
+{
+  "objective": "Determine whether the total price (excluding VAT) of the products listed on the old receipt in /uploads/ would be within 3 EUR of the old receipt's total if sold today.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "receipt_file_path": "read the file at /uploads/ (exact filename unknown; may need to list directory)",
+    "old_total_cents": "extract the total price (excluding VAT) from the receipt file, in cents",
+    "product_skus": "extract the list of product SKUs from the receipt file",
+    "current_prices": "lookup from product_variants WHERE product_sku IN ($product_skus) to get price_cents",
+    "new_total_cents": "sum of current_prices",
+    "difference_cents": "absolute difference between old_total_cents and new_total_cents",
+    "within_3_eur": "difference_cents <= 300"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$old_total_cents",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$new_total_cents",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "le",
+        "lhs": "$difference_cents",
+        "rhs": 300,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "The total price difference is {difference_cents} cents, which is {within_3_eur ? 'within' : 'outside'} the 3 EUR threshold.",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$receipt_file_path"
+      }
+    ]
+  }
+}

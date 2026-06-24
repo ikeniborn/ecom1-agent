@@ -1,0 +1,98 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city='Graz' AND store_name LIKE '%PowerTool%' AND store_name LIKE '%north%' LIMIT 1), product1 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Bosch' AND pv.series='Professional' AND pv.model='GSR 12V' AND pvp.property_key='Battery Voltage' AND pvp.property_value_text='12V' LIMIT 1), product2 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Bosch' AND pv.series='Professional' AND pv.model='GWS 7-115' AND pvp.property_key='Disc Diameter' AND pvp.property_value_text='115mm' LIMIT 1), product3 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Bosch' AND pv.series='Professional' AND pv.model='GBH 2-26' AND pvp.property_key='Impact Energy' AND pvp.property_value_text='2.6 J' LIMIT 1), product4 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Makita' AND pv.series='XPT' AND pv.model='DHR242' AND pvp.property_key='Battery Voltage' AND pvp.property_value_text='18V' LIMIT 1), product5 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Makita' AND pv.series='XPT' AND pv.model='DHP484' AND pvp.property_key='Battery Voltage' AND pvp.property_value_text='18V' LIMIT 1), product6 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='DeWalt' AND pv.series='XRP' AND pv.model='DCD791' AND pvp.property_key='Battery Voltage' AND pvp.property_value_text='20V' LIMIT 1), inventory AS (SELECT si.product_sku, si.available_today_quantity FROM store_inventory si JOIN store s ON si.store_id = s.store_id), counted AS (SELECT COUNT(*) as cnt FROM (SELECT product_sku FROM product1 UNION ALL SELECT product_sku FROM product2 UNION ALL SELECT product_sku FROM product3 UNION ALL SELECT product_sku FROM product4 UNION ALL SELECT product_sku FROM product5 UNION ALL SELECT product_sku FROM product6) all_products JOIN inventory i ON all_products.product_sku = i.product_sku WHERE i.available_today_quantity >= 4) SELECT s.record_path AS store_path, p1.record_path AS p1_path, p2.record_path AS p2_path, p3.record_path AS p3_path, p4.record_path AS p4_path, p5.record_path AS p5_path, p6.record_path AS p6_path, counted.cnt FROM store s, product1 p1, product2 p2, product3 p3, product4 p4, product5 p5, product6 p6, counted;"
+      },
+      "bind": "raw_sql_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_sql_result",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "$store.record_path",
+          "candidates": [
+            "store_path"
+          ]
+        },
+        {
+          "into": "$product1.record_path",
+          "candidates": [
+            "p1_path"
+          ]
+        },
+        {
+          "into": "$product2.record_path",
+          "candidates": [
+            "p2_path"
+          ]
+        },
+        {
+          "into": "$product3.record_path",
+          "candidates": [
+            "p3_path"
+          ]
+        },
+        {
+          "into": "$product4.record_path",
+          "candidates": [
+            "p4_path"
+          ]
+        },
+        {
+          "into": "$product5.record_path",
+          "candidates": [
+            "p5_path"
+          ]
+        },
+        {
+          "into": "$product6.record_path",
+          "candidates": [
+            "p6_path"
+          ]
+        },
+        {
+          "into": "$count",
+          "candidates": [
+            "cnt"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$rows",
+          "rhs": null,
+          "args": []
+        },
+        "label": "store_found"
+      }
+    ],
+    "default_label": "store_not_found"
+  },
+  "ops": [],
+  "answer": {
+    "store_found": {
+      "message": "Count: {count}",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    },
+    "store_not_found": {
+      "message": "Store not found",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

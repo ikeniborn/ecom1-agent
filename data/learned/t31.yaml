@@ -1,0 +1,102 @@
+entries:
+- agents_md_anchor: '#security > guest-restrictions'
+  content: 'Always parse the output of /bin/id as text (not JSON) to extract the user
+    and roles. Use a custom extract to parse lines like ''roles: <role>''. Only produce
+    the deny outcome when the identity kind matches the security deny_when predicate;
+    otherwise, do not produce any outcome (no answer).'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR always
+    produces DENIED_SECURITY because it incorrectly parses /bin/id output as JSON
+    (which fails, leaving identity_parsed empty) and defaults to deny. The actual
+    identity is ''customer'', so the deny_when predicate (identity.kind == guest)
+    does not hold. The failing PlanIR fragment: rowset from identity_raw uses format
+    ''json'' but output is text; decision has default_label ''deny''. Rule linkage:
+    The plan must correctly parse identity and only deny when the security constraint
+    applies.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'Never use the ''get'' primitive with a single argument; ''get'' requires
+    two arguments: obj and key. When the plan needs to determine the identity kind,
+    first discover the identity by executing /bin/id (or reading /etc/passwd) and
+    then use a custom extract to parse the output to extract the user and roles. Do
+    not attempt to use ''get'' on a literal string.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: compute step ''get'' failed: <lambda>() missing
+    1 required positional argument: key''. Root cause: the PlanIR compute step used
+    ''get'' with only one argument ("guest"), but ''get'' expects two arguments: obj
+    and key. The plan attempted to extract an identity kind from a literal string
+    instead of first discovering the identity (e.g., via /bin/id) and then parsing
+    its output. The failing fragment is: {"prim":"get","args":["guest"],"into":"identity_kind"}.
+    The existing rule about parsing /bin/id output was not followed. This new rule
+    corrects the PlanIR shape by mandating proper discovery and extraction steps.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#security > guest-restrictions'
+  content: 'Always extract the identity kind from the /bin/id output by parsing the
+    roles line: if the roles list contains the value specified in the security deny_when
+    predicate''s rhs, set identity.kind to that value; otherwise, set identity.kind
+    to the first role. Then use identity.kind in the decision branch condition to
+    match the deny_when predicate. Only produce the deny outcome when identity.kind
+    equals the deny_when rhs; do not produce the deny outcome for any other identity
+    kind.'
+  created: '2026-06-24'
+  deactivated_reason: Superseded by new rule that explicitly requires using $_facts.identity.kind
+    in the decision branch condition to match the security deny_when predicate.
+  id: r003
+  reasoning: 'verify error: outcome DENIED_SECURITY produced but no declared security
+    deny_when predicate holds. The plan''s decision branches both produce DENIED_SECURITY
+    without checking identity.kind. The only deny_when predicate requires identity.kind
+    == ''guest'', but the plan used roles directly (roles == ''guest'') and also had
+    a default branch that always denies. The plan extracted user and roles but not
+    kind. The existing rule about only producing deny when kind matches was not followed.
+    This new rule ensures proper extraction of identity.kind and correct condition
+    matching.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#security > guest-restrictions'
+  content: When implementing a security deny_when predicate that checks identity.kind,
+    first discover the identity by executing /bin/id, parse the output to set $_facts.identity.kind
+    to the appropriate role, and then in the decision branch use the condition `{"op":"eq","lhs":"$_facts.identity.kind","rhs":"<deny_when
+    rhs>"}` to ensure the predicate holds.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR used
+    a computed variable `$identity_kind` in the decision branch condition, but the
+    security deny_when predicate checks `$_facts.identity.kind`. The plan did not
+    set `$_facts.identity.kind` via discovery and custom extract, so the predicate
+    evaluated to false. The existing rule r003 (Always extract identity kind...) was
+    ambiguous about using the fact path directly. New rule clarifies that the decision
+    branch must reference `$_facts.identity.kind` to match the predicate.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#security > guest-restrictions'
+  content: Always include a custom_extract step after executing /bin/id to parse the
+    stdout and set $_facts.identity.kind to the appropriate role value. Then use an
+    eq condition on $_facts.identity.kind in the decision branch to compare against
+    the deny_when rhs. Do not use the raw ExecResponse object in comparisons.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: real_vm: Protocol message ExecResponse has no ''guest'' field.
+    Root cause: The PlanIR uses contains_any on the raw ExecResponse object ($identity_raw)
+    with rhs [''guest'']. The runtime attempts to access a field ''guest'' on the
+    ExecResponse, which does not exist. The correct approach is to parse the stdout
+    of /bin/id via a custom_extract to extract the identity kind (e.g., ''guest'')
+    and store it in $_facts.identity.kind, then use an eq condition on that field.
+    The existing rules advise this but the script omitted the custom_extract step.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 5
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t31

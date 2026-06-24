@@ -1,0 +1,57 @@
+entries:
+- agents_md_anchor: null
+  content: Always include a discovery step to read the identity facts before any decision
+    branch that references $_facts.identity.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The PlanIR decision branch
+    checked $_facts.identity.kind != customer, but no discovery step populated $_facts.identity,
+    so the branch incorrectly denied. Root cause: missing discovery of identity facts
+    before the decision. Failing fragment: decision branch referencing $_facts.identity
+    without prior discovery.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#identity-parsing'
+  content: Always parse the output of /bin/id into a structured rowset with columns
+    'user', 'roles', and 'kind' (derived from roles) before referencing $_facts.identity
+    in decision branches.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR''s decision
+    branch uses ''$identity.kind'' in a condition, but the identity binding from /bin/id
+    is a raw string ("user: cust_068\nroles: customer") that was never parsed into
+    a structured object. Consequently, ''$identity.kind'' is undefined, and the ''ne''
+    comparison with ''customer'' evaluates to true, incorrectly triggering the deny_security
+    branch. The PlanIR fragment shows the decision branch: [{"when":{"op":"ne","lhs":"$identity.kind","rhs":"customer","args":[]},"label":"deny_security"}].
+    The existing rule (in-session) only mandates reading identity facts, not parsing
+    them into usable fields. This rule fills that gap by requiring a rowset parse
+    step after the /bin/id discovery.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always parse the stdout of /bin/id into a structured rowset with columns
+    'user', 'roles', and 'kind' (derived from roles) before using identity facts in
+    decision branches; do not use the raw ExecResponse object for string matching.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''real_vm: Protocol message ExecResponse has no "roles: customer"
+    field.'' Root cause: The PlanIR used the raw ExecResponse from /bin/id as a string
+    in a contains_any operation, but the ExecResponse is a structured protocol message,
+    not a string. The decision branch attempted to check for ''roles: customer'' by
+    accessing a field on the ExecResponse, which does not exist. The existing rule
+    (parse /bin/id output into structured rowset) was not followed. The failing PlanIR
+    fragment: decision branch with contains_any(''$identity_raw'', [''roles: customer'']).
+    The corrective rule enforces proper parsing before decision branches.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 3
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t30

@@ -1,0 +1,141 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH matching_variant AS (\n  SELECT pv.record_path, pv.product_sku AS sku\n  FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id\n  WHERE pv.brand = 'Ceresit'\n    AND (pf.product_family_name = 'Ceresit CM CS 114-CVQ Tape and Foam' OR pv.series = 'Ceresit CM CS 114-CVQ Tape and Foam')\n    AND pk.product_kind_name = 'repair tape'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'color_family' AND pvp.property_value_text = 'Brown')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'length' AND pvp.property_value_text = '5 m')\n  LIMIT 1\n)\nSELECT mv.record_path, mv.sku,\n  CASE WHEN EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = mv.sku AND pvp.property_key = 'color_family' AND pvp.property_value_text = 'gray') THEN 1 ELSE 0 END AS extra_present\nFROM matching_variant mv;"
+      },
+      "bind": "$product_rows"
+    }
+  ],
+  "rowsets": [],
+  "compute": [
+    {
+      "prim": "column",
+      "args": [
+        "$product_rows",
+        "rows"
+      ],
+      "into": "$rows_list"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$rows_list",
+        0
+      ],
+      "into": "$product_variant"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_variant",
+        "record_path"
+      ],
+      "into": "$record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_variant",
+        "sku"
+      ],
+      "into": "$sku"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "not",
+              "lhs": null,
+              "rhs": null,
+              "args": [
+                {
+                  "op": "isnull",
+                  "lhs": "$product_variant",
+                  "rhs": null,
+                  "args": []
+                }
+              ]
+            },
+            {
+              "op": "eq",
+              "lhs": "$product_variant.extra_present",
+              "rhs": 1,
+              "args": []
+            }
+          ]
+        },
+        "label": "found_extra"
+      },
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "not",
+              "lhs": null,
+              "rhs": null,
+              "args": [
+                {
+                  "op": "isnull",
+                  "lhs": "$product_variant",
+                  "rhs": null,
+                  "args": []
+                }
+              ]
+            },
+            {
+              "op": "eq",
+              "lhs": "$product_variant.extra_present",
+              "rhs": 0,
+              "args": []
+            }
+          ]
+        },
+        "label": "found_no_extra"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found_extra": {
+      "message": "Product record: {record_path}. SKU: {sku}. Extra claim (color family gray) present: yes.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$record_path"
+        }
+      ]
+    },
+    "found_no_extra": {
+      "message": "Product record: {record_path}. SKU: {sku}. Extra claim (color family gray) present: no. If absent, answer: <NO> {sku}.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$record_path"
+        }
+      ]
+    },
+    "not_found": {
+      "message": "Product not found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

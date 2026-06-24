@@ -1,0 +1,80 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH target_store AS (SELECT store_id, record_path FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1), product_defs AS (SELECT 1 AS prod_id, 'Heco' AS brand, 'Heco Zinc Plated TopFix GTU-YPJ' AS series, 'Wood and Drywall Screw' AS model, 2 AS num_props UNION ALL SELECT 2, 'Ajax', 'Ajax Eco Classic 25C-DXE', 'Cleaning Liquid', 1 UNION ALL SELECT 3, 'Heco', 'Heco Zinc Plated HECO 3DW-64B', 'Nut Bolt and Washer', 1 UNION ALL SELECT 4, 'Heco', 'Heco Zinc Plated TopFix GTU-YPJ', 'Wood and Drywall Screw', 2), product_props AS (SELECT 1 AS prod_id, 'screw type' AS pkey, 'wood screw' AS pval UNION ALL SELECT 1, 'diameter', '6 mm' UNION ALL SELECT 2, 'cleaner type', 'degreaser' UNION ALL SELECT 3, 'fastener type', 'threaded rod' UNION ALL SELECT 4, 'screw type', 'wood screw' UNION ALL SELECT 4, 'diameter', '3 mm'), valid_skus AS (SELECT pv.product_sku, pd.prod_id FROM product_variants pv JOIN product_defs pd ON pv.brand = pd.brand AND pv.series = pd.series AND pv.model = pd.model WHERE (SELECT COUNT(*) FROM product_props pp WHERE pp.prod_id = pd.prod_id AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = pp.pkey AND pvp.property_value_text = pp.pval)) = pd.num_props), product_stock AS (SELECT vs.prod_id, MAX(COALESCE(si.available_today_quantity, 0)) AS max_qty FROM (SELECT 1) dummy LEFT JOIN valid_skus vs ON 1=1 LEFT JOIN target_store ts ON 1=1 LEFT JOIN store_inventory si ON si.store_id = ts.store_id AND si.product_sku = vs.product_sku GROUP BY vs.prod_id) SELECT (SELECT record_path FROM target_store) AS store_record_path, COUNT(CASE WHEN max_qty >= 1 THEN 1 END) AS count_products_with_stock FROM product_stock;"
+      },
+      "bind": "result"
+    }
+  ],
+  "rowsets": [],
+  "compute": [
+    {
+      "prim": "get",
+      "args": [
+        "$result",
+        "rows"
+      ],
+      "into": "rows"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "count_products_with_stock"
+      ],
+      "into": "count"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "store_record_path"
+      ],
+      "into": "store_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "isnull",
+          "lhs": "$store_record_path",
+          "rhs": null,
+          "args": []
+        },
+        "label": "unsupported"
+      }
+    ],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "%d products",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store_record_path"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "Unable to find the Innsbruck PowerTool store.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

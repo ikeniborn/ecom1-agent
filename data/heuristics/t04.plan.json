@@ -1,0 +1,78 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT v.record_path FROM product_variants v JOIN product_variant_properties p1 ON v.product_sku = p1.product_sku AND p1.property_key = 'sealant_type' AND p1.property_value_text = :sealant_type JOIN product_variant_properties p2 ON v.product_sku = p2.product_sku AND p2.property_key = 'color_family' AND p2.property_value_text = :color_family WHERE v.brand = :brand AND v.series = :series LIMIT 1;"
+      },
+      "bind": "sql_output"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_output",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "record_path"
+      ],
+      "into": "found_record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$found_record_path",
+          "rhs": null,
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "The product {brand} {series} with sealant type {sealant_type} and color family {color_family} is available in the catalogue.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$found_record_path"
+        }
+      ]
+    },
+    "not_found": {
+      "message": "The product {brand} {series} with sealant type {sealant_type} and color family {color_family} is not available in the catalogue.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

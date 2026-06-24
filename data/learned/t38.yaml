@@ -1,0 +1,72 @@
+entries:
+- agents_md_anchor: null
+  content: Never include a List or Read RPC for a path that is not explicitly provided
+    in the user's intent or confirmed by a prior discovery step (e.g., a search result
+    or a doc that mentions the path). If the path is unknown, first search for it
+    using appropriate patterns derived from the intent, or ask for clarification.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''real_vm: list failed: not found'' on path ''/payments''. Root
+    cause: The PlanIR guessed a directory path ''/payments'' without evidence that
+    it exists. The user intent mentions ''archived payment history'' but does not
+    specify a path. The agent attempted to list a non-existent directory, causing
+    a VM failure. Failing PlanIR fragment: {"rpc":"List","args":{"path":"/payments"},"bind":"payments_list"}.
+    The rule prevents such guesswork by requiring that any path used in a List or
+    Read RPC must be either explicitly given in the intent or discovered via a prior
+    search or documentation read.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always include at least one discovery step (List, Read, or Search) in the
+    PlanIR when the IntentSpec's required_refs for a non-clarification outcome contain
+    a path that is not explicitly provided in the user's intent or confirmed by a
+    prior step. The discovery step should attempt to locate the required data (e.g.,
+    search for the policy doc, list archived payment records) before falling back
+    to a clarification answer.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: attempt grounded discovery before clarifying (clarify-only
+    plan rejected while OUTCOME_OK is reachable)''. The PlanIR had no discovery steps
+    and immediately defaulted to clarification, even though the IntentSpec required
+    refs (policy_doc /docs/security.md, record_path from $fraud_payment_records) for
+    OUTCOME_OK. The interpreter rejects a clarify-only plan when a non-clarification
+    outcome is reachable. Root cause: the plan omitted any List/Read/Search to ground
+    the required refs. The existing rule (rXXX) allowed asking for clarification without
+    attempting discovery, which is now superseded.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the IntentSpec's required_refs for a non-clarification outcome include
+    a record_path from a category (e.g., 'payment records', 'archived history') and
+    the exact path is not explicitly provided in the user's intent or confirmed by
+    a prior discovery step, the PlanIR must first search for the directory or file
+    that contains such records using patterns derived from the category description
+    (e.g., search for 'payment' or 'archive' in the root or in a known parent directory).
+    Only after the search yields a valid path should a List or Read RPC be issued
+    on that path. If the search returns no results, the PlanIR should fall back to
+    a clarification answer.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'The error ''real_vm: list failed: not found'' occurred because the PlanIR
+    attempted to List ''/payments'' which does not exist. The user''s intent mentions
+    ''archived payment history'' but does not provide an explicit path. The existing
+    rule #1 prohibits listing unknown paths, but the PlanIR violated it. The root
+    cause is that the PlanIR hardcoded ''/payments'' without first searching for the
+    actual location of archived payment records. The fix is to enforce a rule that
+    requires searching for the directory or file using patterns derived from the category
+    description before listing. Additionally, deep-reading the root directory (''/'')
+    will provide the pre-phase with knowledge of available top-level paths, preventing
+    future hardcoding of non-existent paths.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+prephase_deep_read:
+- /
+task_id: t38

@@ -1,0 +1,145 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH product AS (\n  SELECT pv.product_sku, pv.record_path AS product_record_path\n  FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  WHERE pv.brand = 'Heco'\n    AND pf.product_family_name = 'Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer'\n    AND EXISTS (\n      SELECT 1 FROM product_variant_properties pvp\n      WHERE pvp.product_sku = pv.product_sku\n        AND pvp.property_key = 'fastener type' AND pvp.property_value_text = 'bolt'\n    )\n    AND EXISTS (\n      SELECT 1 FROM product_variant_properties pvp\n      WHERE pvp.product_sku = pv.product_sku\n        AND pvp.property_key = 'diameter' AND pvp.property_value_text = '10 mm'\n    )\n),\nvienna_stores AS (\n  SELECT store_id, record_path AS store_record_path\n  FROM stores\n  WHERE city = 'Vienna'\n),\ninventory AS (\n  SELECT vs.store_id, si.available_today_quantity\n  FROM vienna_stores vs\n  LEFT JOIN store_inventory si ON si.store_id = vs.store_id AND si.product_sku = (SELECT product_sku FROM product)\n)\nSELECT json_array(\n  json_object(\n    'product_sku', (SELECT product_sku FROM product),\n    'product_record_path', (SELECT product_record_path FROM product),\n    'store_record_paths', (SELECT json_group_array(store_record_path) FROM vienna_stores),\n    'total_available', COALESCE((SELECT SUM(available_today_quantity) FROM inventory), 0)\n  )\n) AS result;"
+      },
+      "bind": "raw_output"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_output",
+      "format": "json",
+      "into": "result_rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "product_record_path",
+          "candidates": [
+            "product_record_path"
+          ]
+        },
+        {
+          "into": "store_record_paths",
+          "candidates": [
+            "store_record_paths"
+          ]
+        },
+        {
+          "into": "total_available",
+          "candidates": [
+            "total_available"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$result_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "product_sku"
+      ],
+      "into": "product_sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "product_record_path"
+      ],
+      "into": "product_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "store_record_paths"
+      ],
+      "into": "store_record_paths"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "total_available"
+      ],
+      "into": "total_available"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "or",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "isnull",
+              "lhs": "$product_sku",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "not",
+              "lhs": null,
+              "rhs": null,
+              "args": [
+                {
+                  "op": "nonempty",
+                  "lhs": "$store_record_paths",
+                  "rhs": null,
+                  "args": []
+                }
+              ]
+            }
+          ]
+        },
+        "label": "unsupported"
+      }
+    ],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "count: {total_available}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store_record_paths"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_record_path"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "Unable to find product or stores in Vienna.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

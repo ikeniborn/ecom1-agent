@@ -1,0 +1,68 @@
+entries:
+- agents_md_anchor: null
+  content: When using /bin/sql to execute a query, the output includes column headers.
+    To extract the data rows, either use a format that omits headers (e.g., 'tsv'
+    with header=false) or in the rowsets step, skip the first row by using a filter
+    or by specifying a row offset.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: verify: success_criteria[OUTCOME_OK][0] failed: regex_match on
+    $answer. Root cause: The SQL query output includes a header line (''count'') which
+    was parsed as a data row by auto_delim, causing the first row to be the header
+    string ''count'' instead of the numeric value. The PlanIR fragment: rowsets with
+    format auto_delim and no skip. The answer became ''result count'' which failed
+    regex. Rule: When using /bin/sql, handle column headers by omitting them or skipping
+    the first row.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the instruction specifies products by description, the PlanIR must
+    include a discovery step that extracts the product descriptions from the instruction
+    and maps them to SKUs using the product_variants, product_families, and product_variant_properties
+    tables, not a placeholder subquery.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: The PlanIR used a subquery 'WHERE 1=0' to select product SKUs, which
+    always returns an empty set, causing the inventory count to be 0. The instruction
+    likely listed product descriptions, but the PlanIR failed to extract them and
+    map to SKUs. The root cause is a missing discovery step in the PlanIR to resolve
+    product descriptions to SKUs. The rule ensures future PlanIRs include proper product
+    description extraction and SKU mapping.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'When the instruction requires counting products that meet a condition
+    (e.g., availability threshold) in a specific store, the PlanIR must include discovery
+    steps to: (1) identify the store_id from the store name, (2) identify the product
+    SKUs from the product descriptions using product_variants, product_families, and
+    product_variant_properties tables, (3) query inventory or stock tables to get
+    item counts per SKU for that store, (4) filter those with count >= threshold,
+    and (5) compute the count of such products. The answer must be derived from that
+    computed count, not a hardcoded value.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: The verify failure (regex mismatch) occurred because the PlanIR produced
+    a hardcoded answer 'result 0' without performing the actual product counting.
+    The plan only looked up the store_id and set count to 0, ignoring the core objective.
+    The OBSERVED_RPC_OUTPUTS shows only the SQL execution, suggesting the plan may
+    have stopped early or the answer was not properly set. The root cause is a missing
+    discovery and computation chain for product identification and inventory check.
+    The new rule ensures the planner includes all necessary steps to derive the count
+    from data.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 3
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+prephase_deep_read:
+- product_variants
+- product_families
+- product_variant_properties
+- inventory
+- stock
+task_id: t15

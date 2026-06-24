@@ -1,0 +1,42 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END AS exists_flag FROM product_variants v JOIN product_families f ON v.product_family_id = f.product_family_id JOIN product_variant_properties p ON v.product_sku = p.product_sku WHERE v.brand = 'Festool' AND f.product_family_name LIKE '%Stackable SYS 3JJ-9LM%' AND p.property_key = 'storage_type' AND p.property_value_text = 'tool bag';"
+      },
+      "bind": "exists_flag"
+    }
+  ],
+  "rowsets": [],
+  "compute": [],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$exists_flag",
+          "rhs": "1",
+          "args": []
+        },
+        "label": "exists"
+      }
+    ],
+    "default_label": "not_exists"
+  },
+  "ops": [],
+  "answer": {
+    "exists": {
+      "message": "The product exists: {exists_flag}",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    },
+    "not_exists": {
+      "message": "The product does not exist.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

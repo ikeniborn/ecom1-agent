@@ -1,0 +1,138 @@
+entries:
+- agents_md_anchor: null
+  content: Never use a path in the RPC name for Exec; use 'Exec' as the RPC and pass
+    the SQL command in args.stdin.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''Exec /bin/sql'' not in catalog. Root cause: PlanIR discovery
+    step used an invalid RPC name with a path. Valid RPCs are simple names (Exec,
+    Delete, Find, List, Read, Search, Stat, Tree, Write). The correct form is ''rpc'':
+    ''Exec'' with ''args'': {''stdin'': ''<SQL>''}. This rule prevents future invalid
+    RPC names in PlanIR.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'Never pass two arguments to the ''first'' primitive; ''first'' only accepts
+    a single sequence argument. To extract a column from a rows variable, use the
+    ''column'' primitive with two arguments: the rows variable and the column name.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: interpret: compute step ''first'' failed: <lambda>() takes 1
+    positional argument but 2 were given. Root cause: PlanIR compute step used ''first''
+    with two arguments (rows variable and column name) instead of using the ''column''
+    primitive. Failing fragment: {"prim":"first","args":["$inventory_rows","product_record_path"],"into":"product_record_path"}.
+    The ''first'' primitive expects a single sequence; extracting a column requires
+    ''column''. New rule prevents this misuse.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'rows' primitive to extract the rows list from an ExecResponse
+    before applying 'first' or 'column' primitives.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable at compute step
+    ''first'' on ''$product_and_total''. Root cause: The PlanIR applies ''first''
+    directly to the result of an Exec RPC, which is an ExecResponse object, not a
+    sequence. The same issue applies to the subsequent ''column'' on ''$vienna_stores''.
+    The correct pattern is to first extract the rows using the ''rows'' primitive
+    (e.g., `{"prim":"rows","args":["$product_and_total"],"into":"product_rows"}`),
+    then apply ''first'' or ''column'' on that rows list. The existing rule about
+    ''first'' taking one argument is correct but insufficient; it does not address
+    the need to unwrap the ExecResponse.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that every outcome label in the decision branches maps to
+    an outcome that is present in the outcome_space. If the outcome_space contains
+    only one outcome, the decision must not have a default branch that produces a
+    different outcome; instead, the default branch should produce the same outcome
+    with an appropriate message.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: verify I2: outcome ''OUTCOME_NONE_UNSUPPORTED'' not in outcome_space
+    [''OUTCOME_OK'']. Root cause: The PlanIR decision has a default branch labeled
+    ''unsupported'' that maps to OUTCOME_NONE_UNSUPPORTED, which is not in the allowed
+    outcome_space. The condition for the ''ok'' branch failed because the product
+    discovery step returned no rows (product_sku empty), causing the default to trigger.
+    The PlanIR must ensure that all possible decision outcomes are within the outcome_space.
+    Since the outcome_space is a singleton, the decision should not have a default
+    branch that produces a different outcome; instead, the default should produce
+    the singleton outcome with a fallback message, or the condition must be guaranteed
+    to be true.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use a string expression for the predicate in filter_rows (e.g.,
+    'type = "total"') instead of a structured dict, because the interpreter expects
+    a string that it can parse into a predicate object.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: ''dict'' object has no attribute ''op'' at compute step ''filter_rows''.
+    Root cause: the predicate argument is a JSON dict ({"op":"eq","lhs":"$type","rhs":"total"}),
+    but the interpreter attempts to access `.op` on it as if it were a predicate object
+    with attributes. The interpreter expects a string expression that it can parse
+    into a predicate object. The failing PlanIR fragment is the second argument of
+    the first filter_rows call. No existing rule covers this predicate format issue.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always include all required refs from the TOOL_PLAN's required_refs in
+    the answer block for each outcome, ensuring that each required ref variable is
+    defined in the compute section (e.g., extract record_path from the product row
+    if required).
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$product.record_path'']
+    on OK answer. Root cause: PlanIR answer block had refs: [] but TOOL_PLAN required_refs
+    for OUTCOME_OK include $product.record_path and $vienna_stores. The compute section
+    did not extract record_path from the product row, and the answer block omitted
+    both refs. Rule ensures PlanIR always satisfies required_refs.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'rows' primitive on a variable that holds an ExecResponse
+    before applying 'first' or 'column' primitives to that variable. The compute step
+    that extracts rows must be the first operation on that variable after binding.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: interpret compute step ''first'' failed: ''ExecResponse'' object
+    is not subscriptable. Root cause: The PlanIR applied ''first'' directly to $product_info,
+    which is an ExecResponse object from an Exec RPC, without first extracting the
+    rows list via the ''rows'' primitive. The same issue exists for $total_available_raw
+    and $vienna_stores_raw. The existing rule ''Always use the rows primitive...''
+    was not followed. This new rule reinforces the required ordering: rows extraction
+    must be the immediate next step after binding an Exec result.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always break down the discovery into separate steps for each logical entity
+    (e.g., product, stores, inventory) rather than combining them into a single complex
+    SQL query, to ensure each step can be validated independently and to avoid SQL
+    errors from missing columns or incorrect joins.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: interpret compute step ''rows'' failed: ''rows''. The failing
+    step attempted to extract rows from $product_total, which was bound from a single
+    complex SQL query. The query had a flaw: the ''stores'' CTE selected only record_path,
+    but the ''total'' CTE joined on s.store_id, which does not exist in that CTE,
+    causing an SQL error. The Exec RPC likely returned an error response, and the
+    ''rows'' primitive failed because it cannot extract rows from an error. The root
+    cause is the attempt to compute everything in one query. The corrective rule ensures
+    the PlanIR uses separate discovery steps for product, stores, and inventory, making
+    each step simpler and less error-prone.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 10
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t18

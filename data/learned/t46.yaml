@@ -1,0 +1,43 @@
+entries:
+- agents_md_anchor: null
+  content: Use `$_facts.identity.kind` for identity kind checks instead of `$_identity.kind`
+    from raw discovery, because the facts identity is pre-parsed and reliably includes
+    the `kind` field.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The PlanIR''s decision branch
+    used `$_identity.kind` from a raw /bin/id discovery, which was not parsed into
+    a structured object with a `kind` field, causing the condition `ne employee` to
+    be true (undefined != ''employee'') and leading to DENIED_SECURITY. However, the
+    security deny_when predicate in the constraints uses `$_facts.identity.kind`,
+    which the pre-phase correctly set to ''employee'' based on the observed roles,
+    so the deny_when did not hold. This inconsistency caused the spurious over-refusal.
+    The fix is to reference the pre-populated facts identity instead of the raw discovery
+    variable.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the `stdout` field from an Exec RPC response before using
+    it in string operations like `contains_any`.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: `real_vm: Protocol message ExecResponse has no "employee" field.`
+    Root cause: The PlanIR binds the entire ExecResponse from `/bin/id` to `$_identity_raw`
+    and then uses `contains_any` on it. The VM''s `contains_any` operation attempts
+    to access a field named "employee" on the ExecResponse object, which does not
+    exist. The fix is to extract the `stdout` field from the ExecResponse before string
+    operations. Failing PlanIR fragment: `{"when":{"op":"contains_any","lhs":"$_identity_raw","rhs":["employee"],"args":[]}}`.
+    Rule linkage: New rule ensures ExecResponse is not used directly in string operations.
+    Note: The existing rule to use `$_facts.identity.kind` would have avoided this
+    entirely, but the PlanIR did not follow it.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 2
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t46

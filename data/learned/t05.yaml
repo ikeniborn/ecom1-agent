@@ -1,0 +1,28 @@
+entries:
+- agents_md_anchor: null
+  content: 'Never use the ''get'' primitive with a single argument; ''get'' requires
+    two arguments: the object and the key. To extract a scalar from a list, use ''first''
+    (or ''column'' with indexing) instead.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: interpret: compute step ''get'' failed: <lambda>() missing 1
+    required positional argument: ''key''. The compute step {"prim":"get","args":["$record_path"],"into":"product_variant.record_path"}
+    is missing the second argument ''key''. The ''get'' primitive is intended for
+    accessing a property from an object (e.g., get(obj, key)). Here, the user attempted
+    to assign a scalar value (record_path) to a ref, but used the wrong primitive.
+    The correct approach is to use ''first'' to extract the scalar from the list and
+    assign it directly. The PlanIR should have used {"prim":"first","args":["$record_path_list"],"into":"product_variant.record_path"}
+    instead of the redundant ''get'' step. The existing compute steps already extract
+    record_path via ''first'' into a temporary variable, but the final assignment
+    to the ref should also use ''first'' or simply reuse the temporary variable in
+    the answer refs. The rule guides the agent to use ''first'' for scalar extraction
+    and avoid ''get'' without a key.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 2
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t05

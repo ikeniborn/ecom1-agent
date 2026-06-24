@@ -1,0 +1,77 @@
+entries:
+- agents_md_anchor: null
+  content: Always set the 'args' field of a compute step in PlanIR to a list of strings,
+    never a dict. The first element must be the command path (e.g., '/bin/sql'), followed
+    by any flags or arguments as separate strings. Do not use keys like 'path' or
+    'stdin' inside args.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: plan validation failed because compute.0.args was a dict (e.g.,
+    {''path'': ''/bin/sql'', ''stdin'': ''...''}) instead of a list. The PlanIR schema
+    requires args to be a list of strings. The root cause is that the PLAN phase incorrectly
+    structured the compute step''s args as a key-value mapping. The corrective rule
+    enforces the correct list format, preventing this validation error in future cycles.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When an Exec RPC returns tabular data (e.g., SQL query output), always
+    include a rowsets step in PlanIR to parse the output into a list of dicts before
+    using compute primitives like 'column' or 'get'. The rowsets step must reference
+    the bound variable from the Exec RPC as its source and specify the format (e.g.,
+    'csv'). Then use the rowset variable in compute steps; for a single scalar value,
+    first use 'first' to get the row dict, then 'get' to extract the column.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: compute step ''column'' failed: ''column'' expects
+    list[dict]; use ''get'' for a single row''. Root cause: The PlanIR''s compute
+    step used ''column'' on the raw string output of an Exec RPC (SQL result), but
+    ''column'' requires a list of dicts. The PlanIR omitted a rowsets step to parse
+    the SQL output into a structured list of dicts. Failing fragment: compute step
+    with prim ''column'' on ''$sql_result'' directly. Rule linkage: No existing rule
+    covers this; the existing rule about Exec args is unrelated. The new rule ensures
+    the PLAN phase always inserts a rowsets step for tabular Exec outputs, preventing
+    this type of interpret failure.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the success_criteria includes a regex_match on $answer, the PlanIR
+    answer for that outcome must be a plain string (the message), not a dict with
+    a message field. The answer should be the message string directly, and any refs
+    should be omitted or placed in a separate field if the system supports it, but
+    the answer itself must be a string.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: The verify step failed because the success_criteria regex_match on $answer
+    failed. The PlanIR answer for outcome 'ok' is a dict {'message':'<COUNT:14>','outcome':'OUTCOME_OK','refs':[...]},
+    but the success_criteria expects a plain string matching '<COUNT:\d+>'. The answer
+    must be a plain string, not a dict. The root cause is that the PlanIR answer structure
+    is incorrect for a regex_match success_criteria. The corrective rule enforces
+    that when success_criteria uses regex_match on $answer, the PlanIR answer must
+    be a plain string.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When using the 'concat' primitive in a compute step, the 'args' list must
+    contain exactly two elements, each being a string (either a literal or a variable
+    reference prefixed with '$'), representing the two values to concatenate. Do not
+    pass a single string or a list with one element.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: ''interpret: compute step concat failed: <lambda>() missing 1
+    required positional argument: b''. The PlanIR compute step had args: [''nuts_bolts_washers'']
+    (one element), but concat expects two arguments (a and b). Root cause: the PlanIR
+    incorrectly specified a single string instead of two separate arguments. This
+    rule ensures the args list has exactly two elements, preventing the missing argument
+    error.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 6
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t11

@@ -1,0 +1,56 @@
+{
+  "objective": "Calculate the total number of units of a specific product (Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer, fastener type bolt, diameter 10 mm) available today across all Vienna stores, including stores with zero availability, and cite each store record and the product record.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "product_sku": "lookup from product_variants, product_families, product_variant_properties matching brand='Heco', product_family_name='Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer', property_key='fastener type' value='bolt', property_key='diameter' value='10 mm'",
+    "vienna_stores": "lookup from stores WHERE city='Vienna'",
+    "total_available": "sum over vienna_stores of available_today_quantity from store_inventory for product_sku, default 0"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "ge",
+        "lhs": "$total_available",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$vienna_store_paths",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$product_record_path",
+        "rhs": null,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "count: {count}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$vienna_store_paths"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_record_path"
+      }
+    ]
+  }
+}

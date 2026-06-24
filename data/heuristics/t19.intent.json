@@ -1,0 +1,46 @@
+{
+  "objective": "Calculate the total number of units of a specific product variant available today across all stores in Graz, including stores with zero availability.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "product_sku": "lookup from product_variants WHERE brand='Helly Hansen' AND product_family_name='Helly Hansen Chelsea Evolution Kensington V83-TOZ Work Jacket' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku=product_variants.product_sku AND property_key='color family' AND property_value_text='Blue') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku=product_variants.product_sku AND property_key='size' AND property_value_text='XL')",
+    "graz_stores": "lookup from stores WHERE city='Graz'",
+    "product_record_path": "record_path from product_variants WHERE product_sku=$product_sku",
+    "store_record_paths": "list of record_path from stores WHERE city='Graz'"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "regex_match",
+        "lhs": "$answer",
+        "rhs": "^answer=\\d+$",
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "answer=%d",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$store_record_paths"
+      }
+    ]
+  }
+}

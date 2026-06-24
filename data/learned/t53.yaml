@@ -1,0 +1,127 @@
+entries:
+- agents_md_anchor: null
+  content: Always extract the entries list from a List RPC response using a 'get'
+    primitive (e.g., get $response 'entries') before applying sequence primitives
+    like first, last, nth, or iterating over rows.
+  created: '2026-06-24'
+  deactivated_reason: Superseded by more specific rule that requires filtering entries
+    to files before reading.
+  id: r001
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ListResponse''
+    object is not subscriptable''. Root cause: The PlanIR applied the ''first'' primitive
+    directly to the List RPC response bound to $upload_list, but ListResponse is an
+    object, not a sequence. The ''first'' primitive expects a sequence (list). The
+    fix is to first extract the entries list from the response using a ''get'' step
+    (e.g., get $upload_list ''entries'' into $upload_entries) and then apply ''first''
+    to that list. This rule ensures that all List RPC responses are properly unwrapped
+    before sequence operations.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the result of a List RPC to determine the exact file path before
+    attempting to Read a file from that directory. Do not hardcode a filename unless
+    it is explicitly given in the instruction.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error ''real_vm: read failed: not found'' occurred because the plan
+    hardcoded the path ''/uploads/receipt.txt'' without verifying the actual filename.
+    The plan performed a List of ''/uploads/'' but ignored the result (bound to ''uploads_list'').
+    The root cause is that the plan assumed a fixed filename, which is not guaranteed.
+    The corrective rule ensures that the plan extracts the filename from the directory
+    listing before reading, making it robust to unknown filenames.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'When the objective requires comparing a historical total (e.g., from a
+    receipt) with current prices, the PlanIR must include a complete sequence of RPCs
+    and computations: (1) Read the historical document, (2) Extract the historical
+    total and the list of items (identifiers and quantities), (3) Lookup current prices
+    for those identifiers, (4) Compute the current total, (5) Compute the difference,
+    and (6) Use the computed difference in the decision condition. Do not rely on
+    undefined variables in decision conditions.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: verify failed for OUTCOME_NONE_UNSUPPORTED condition (gt diff_cents
+    100). Root cause: $diff_cents was never computed in the PlanIR. The script only
+    discovered the receipt file path via List and a dummy SQL, but did not Read the
+    receipt, extract old total or product list, lookup current prices, or compute
+    totals. The decision condition used an undefined $diff_cents, causing the default
+    branch to be taken, and the verify condition failed. The PlanIR is missing essential
+    computation steps.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always provide 'args' as a list of arguments (even if empty) and 'into'
+    as a string naming the output variable when constructing a compute step in PlanIR.
+    Do not use a dict for 'args' or omit 'into'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'The PlanIR validation failed because compute.1 had ''args'' as a dict
+    (e.g., {''name'': ''fuzzy_sku_recei...'', ''into'': ''receipt_items''}) instead
+    of a list, and the required ''into'' field was missing. This violates the PlanIR
+    schema where compute steps must have ''args'' as a list of arguments and ''into''
+    as a string. The root cause is an incorrectly structured compute step in the generated
+    PlanIR. The rule ensures future PlanIRs conform to the schema.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always filter the entries from a directory listing to only those that are
+    files (e.g., by checking the 'type' field equals 'file' or using a condition on
+    the entry's attributes) before selecting a specific entry to read. Do not assume
+    the first entry is a file.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. The PlanIR performed
+    a List on /uploads and then attempted to Read the first entry ($uploads_list.entries[0])
+    without verifying it is a file. The listing may contain subdirectories, causing
+    the Read to fail. The existing rule ''Always use the result of a List RPC to determine
+    the exact file path'' is insufficient because it does not specify how to handle
+    non-file entries. This new rule ensures that only file entries are considered,
+    preventing the directory read error.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always inspect the keys of the first entry from a directory listing to
+    identify the correct field name for file/directory discrimination (e.g., 'type',
+    'kind', 'is_dir') before constructing a filter condition. After filtering, verify
+    that the selected entry's file indicator matches the expected file value (e.g.,
+    'file' or false for is_dir) before reading its path. Do not assume a fixed field
+    name or that the first entry is a file.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. Root cause: The PlanIR
+    listed /uploads, filtered entries using a condition on ''type'' field equals ''file'',
+    but the directory listing entries may use a different field name (e.g., ''kind''
+    or ''is_dir''), so the filter did not exclude directories. The first entry after
+    filtering was still a directory, causing the Read RPC to fail. Failing PlanIR
+    fragment: Read RPC with path from $receipt_path derived from the first file after
+    filtering. Rule linkage: Existing rule about filtering to files did not specify
+    how to determine the correct field name, leading to an incorrect filter condition.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never apply the 'get' primitive to a value that is already a scalar or
+    string; only use 'get' to extract a field from an object/dict. After extracting
+    a field (e.g., path from a file entry), use that value directly in subsequent
+    RPCs or computations without an additional 'get'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: ''interpret: compute step ''get'' failed: <lambda>() missing
+    1 required positional argument: ''key''''. Root cause: The PlanIR includes a compute
+    step `{"prim":"get","args":["$receipt_path"],"into":"old_receipt_path"}` that
+    calls `get` with only one argument. The `get` primitive requires two arguments
+    (obj and key). The variable `$receipt_path` already holds the path string (extracted
+    from the file entry via a prior correct `get`). The extra `get` is unnecessary
+    and causes a runtime error because it tries to call `get` on a string without
+    a key. The existing rules do not explicitly forbid this misuse. The new rule prevents
+    this by mandating that `get` always receives two arguments and is never applied
+    to a scalar value.'
+  status: active
+  surface: ir
+task_id: t53

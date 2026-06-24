@@ -1,0 +1,55 @@
+entries:
+- agents_md_anchor: null
+  content: Always define a rowset for each Exec RPC that returns tabular data, specifying
+    the path to the rows in the response (e.g., 'rows' or 'result'), before using
+    compute primitives like 'first' or 'column' on the bound variable.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. The PlanIR attempted to apply the ''first'' primitive
+    directly to the ExecResponse bound from an Exec RPC, but the response is an object,
+    not a list of rows. The PlanIR''s ''rowsets'' field was empty, so no row extraction
+    was defined. The fix is to always define a rowset for each Exec RPC that returns
+    tabular data, extracting the rows (e.g., via path ''rows'' or ''result'') before
+    using compute primitives. This rule ensures the compute step receives a list of
+    rows, not the raw response object.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always provide both arguments (rows and col) when using the 'sum_col' compute
+    primitive; do not pass a pre-extracted list of values.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: compute step sum_col failed: _sum_col() missing
+    1 required positional argument: col''. Root cause: The PlanIR compute step called
+    sum_col with only one argument ($available_today_list), which is a list of numbers
+    extracted via the ''column'' primitive. sum_col expects two arguments: a list
+    of dicts (rows) and a column name. The failing fragment: {"prim":"sum_col","args":["$available_today_list"]}.
+    The correct usage is either sum_col($inventory_rows, ''available_today'') or,
+    if a list of numbers is already available, use the ''sum'' primitive instead.
+    This rule ensures the PLAN phase emits correct sum_col invocations.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always format the ''args'' field of a compute step as a list of positional
+    arguments, not a dict. For example, for ''first'' use ''args'': [''$rowset''],
+    for ''get'' use ''args'': [''$obj'', ''key''], for ''column'' use ''args'': [''$rowset'',
+    ''col''], for ''sum_col'' use ''args'': [''$rowset'', ''col''], for ''int'' use
+    ''args'': [''$val''].'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Validation errors show compute steps with args as dict (e.g., {''rows'':
+    ''$product_sum_rows''}) instead of a list. The PlanIR schema requires args to
+    be a list of positional arguments. This rule corrects the format for all compute
+    primitives.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t19

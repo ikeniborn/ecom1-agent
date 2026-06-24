@@ -1,0 +1,108 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_policy"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/docs",
+        "pattern": "fraud",
+        "limit": 10
+      },
+      "bind": "fraud_search_results"
+    },
+    {
+      "rpc": "Find",
+      "args": {
+        "root": "/",
+        "name": "archive",
+        "kind": "dir",
+        "limit": 5
+      },
+      "bind": "archive_dirs"
+    },
+    {
+      "rpc": "Search",
+      "args": {
+        "root": "/docs",
+        "pattern": "archived",
+        "limit": 10
+      },
+      "bind": "archived_search_results"
+    }
+  ],
+  "rowsets": [],
+  "compute": [
+    {
+      "prim": "get",
+      "args": [
+        "$fraud_search_results",
+        "0"
+      ],
+      "into": "first_fraud_doc"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$archived_search_results",
+        "0"
+      ],
+      "into": "first_archived_doc"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$archive_dirs",
+        "0"
+      ],
+      "into": "first_archive_dir"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$first_fraud_doc",
+          "rhs": null,
+          "args": []
+        },
+        "label": "fraud_doc_found"
+      },
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$first_archive_dir",
+          "rhs": null,
+          "args": []
+        },
+        "label": "archive_dir_found"
+      }
+    ],
+    "default_label": "clarification"
+  },
+  "ops": [],
+  "answer": {
+    "fraud_doc_found": {
+      "message": "Found a fraud-related document: {first_fraud_doc.path}. Please confirm if this defines the 'known fraud hit' and specify the archived payment history location.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    },
+    "archive_dir_found": {
+      "message": "Found an archive directory: {first_archive_dir}. Please confirm if this is the archived payment history and provide the fraud hit identifier.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    },
+    "clarification": {
+      "message": "To identify payment records belonging to a known fraud hit in the archived payment history, I need more information: (1) What is the fraud hit identifier or case number? (2) Where is the archived payment history located (e.g., a directory path or database query)? (3) Are there any specific criteria for 'archived' (e.g., is_archived_basket_reference = 1)?",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

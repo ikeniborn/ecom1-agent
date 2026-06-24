@@ -1,0 +1,78 @@
+entries:
+- agents_md_anchor: null
+  content: Always use rows($result) to extract the list of row dicts from an ExecResponse
+    before applying sequence primitives like first, last, or filter. Prefer using
+    column(first(rows($result)), 'colname') to extract a scalar value from a single-row
+    result.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. Root cause: The compute step applied ''first''
+    directly to $count_result, which is an ExecResponse object (not a list). ExecResponse
+    has a ''rows'' attribute containing the list of row dicts. The failing PlanIR
+    fragment: {"prim":"first","args":["$count_result"],"into":"first_row"}. The rule
+    mandates extracting rows() first, preventing this type mismatch.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always check the Exec RPC result for an 'error' field before applying the
+    'rows' primitive, and always derive filter values from policy doc content when
+    the objective references a policy doc for category definitions.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: The error 'rows' failed because the Exec RPC result was not a valid ExecResponse
+    (likely an error object due to incorrect SQL query). The PlanIR hardcoded categories
+    and store filters without reading the policy doc, leading to a failing SQL query.
+    The corrective rule ensures that Exec results are checked for errors before using
+    'rows', and that policy doc content is used to derive filter values.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always check the Exec RPC result for an 'error' field before applying the
+    'rows' primitive, and when the objective references a policy doc for category
+    definitions, parse the policy doc text to extract the category names and use them
+    in the SQL query's IN clause.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Verbatim error: ''interpret: compute step ''rows'' failed: ''rows''''.
+    Root cause: The compute step applied the ''rows'' primitive to the Exec RPC result
+    without first checking for an ''error'' field. The SQL query likely failed (possibly
+    due to hardcoded categories ''Tool Box'' and ''Bag'' not matching the policy doc
+    definitions), producing an error response without a ''rows'' field. The PlanIR
+    fragment shows the compute step {"prim":"rows","args":["$count_result"],"into":"count_rows"}
+    and the discovery step hardcoding categories instead of deriving them from the
+    policy doc. Existing rules require error checking and derivation from policy doc,
+    but the plan did not implement them. This new rule reinforces those requirements
+    with more specific guidance.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always check the Exec RPC result for an 'error' field before applying the
+    'rows' primitive. If the result has an 'error' field, do not attempt to extract
+    rows; instead, handle the error (e.g., set a flag or use a default value). When
+    the objective references a policy doc for category definitions, parse the policy
+    doc text to extract the category names and use them in the SQL query's IN clause,
+    rather than hardcoding them.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: ''interpret: compute step ''rows'' failed: ''rows''''. The script
+    applied the ''rows'' primitive directly to the Exec RPC result without checking
+    for an ''error'' field. The Exec likely returned an error (e.g., SQL failure due
+    to incorrect table/column names or missing data), causing the ''rows'' primitive
+    to fail. Additionally, the script hardcoded category names (''Tool Box'', ''Bag'')
+    and a store name condition (''PowerTool'') instead of extracting them from the
+    policy doc, which may lead to incorrect queries or failures. The existing rule
+    about checking for error exists but was not followed; this new rule reinforces
+    the check and adds the policy doc parsing requirement.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t09

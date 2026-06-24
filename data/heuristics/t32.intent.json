@@ -1,0 +1,50 @@
+{
+  "objective": "Verify whether the catalogue contains a product matching the description: Cleaning Liquid from Tork in the Tork Heavy Duty T 3NB-FIT Cleaning Liquid line with cleaner type multi surface cleaner and wifi-enabled.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "product_search_method": "SELECT * FROM product_variants WHERE brand = 'Tork' AND product_name LIKE '%Cleaning Liquid%' AND (series = 'Tork Heavy Duty T 3NB-FIT Cleaning Liquid' OR model = 'Tork Heavy Duty T 3NB-FIT Cleaning Liquid')",
+    "property_check_method": "SELECT property_key, property_value_text FROM product_variant_properties WHERE product_sku = $product.sku AND property_key IN ('cleaner type', 'wifi-enabled')"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$product",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$cleaner_type_value",
+        "rhs": "multi surface cleaner",
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$wifi_enabled_property",
+        "rhs": null,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "Product record: {record_path}. {#if wifi_enabled_found}Claim matches.{else}<NO> {sku}{/if}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product.record_path"
+      }
+    ]
+  }
+}

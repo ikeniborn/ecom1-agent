@@ -1,0 +1,88 @@
+entries:
+- agents_md_anchor: null
+  content: When a Read RPC fails with 'is a directory', replace the Read with a List
+    RPC on that path, then select the last entry (by modification time) and read that
+    entry.
+  created: '2026-06-24'
+  deactivated_reason: Superseded by new rule that handles both list and object responses
+    from List RPC.
+  id: r001
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. The PlanIR attempted
+    a Read RPC on ''/proc/incoming/payments'' which is a directory, not a file. The
+    objective requires retrieving the last transaction from that path. The plan should
+    have first listed the directory contents, then read the most recent file. This
+    rule ensures the planner handles directory paths by listing and selecting the
+    last entry.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the list of items from a ListResponse object (e.g., via
+    the 'entries' field) before using it as a sequence in compute steps such as count
+    or get.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''object of type ListResponse has no len()'' in compute step
+    ''count'' on $dir_list. Root cause: PlanIR directly passes the ListResponse object
+    (from a List RPC) to count, which expects a list/rowset. The plan must first extract
+    the list from the response (e.g., using prim=''get'' with field ''entries'') before
+    counting or indexing. This rule ensures the PLAN phase shapes the PlanIR correctly
+    for any List RPC result.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using Stat to check if a path is a directory, use the field ''file_type''
+    (or ''type'') and compare to ''directory'' (or ''dir'') based on the actual stat
+    response structure; if uncertain, include a fallback: after Stat, if the path
+    is a directory, the Read will fail with ''is a directory'', so plan to handle
+    that failure by listing and reading the last entry.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: real_vm: read failed: is a directory. The PlanIR attempted to
+    read /proc/incoming/payments directly, but it is a directory. The PlanIR includes
+    a decision branch that checks if stat_result.kind == ''directory'' to list instead,
+    but the condition failed because the stat result''s ''kind'' field is not ''directory''
+    (likely the field is ''file_type'' with value ''dir'' or ''directory''). The existing
+    rule handles the failure reactively, but the proactive detection needs correction.
+    The new rule guides the PLAN phase to use the correct field for directory detection
+    and to include a fallback if uncertain.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a Read RPC is planned on a path that is not guaranteed to be a file,
+    first use Stat to check the type; if the path is a directory, list the directory
+    (using List RPC) and read the last entry (by modification time) to obtain the
+    most recent file's content.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: real_vm: read failed: is a directory. Root cause: PlanIR attempted
+    to Read ''/proc/incoming/payments'' which is a directory, not a file. The plan
+    did not check the path type before reading. Existing rule (reactive: replace Read
+    with List on failure) was not applied because the plan did not anticipate the
+    failure. The corrective rule ensures the plan proactively uses Stat to determine
+    the path type and, if directory, lists and reads the last entry, avoiding the
+    failure entirely.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When using the result of a List RPC as a sequence, first check if the result
+    is a list; if it is, use it directly; if it is an object, extract the list from
+    the field that contains the entries (commonly 'entries', 'items', or 'files').
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: Error 'bad argument type for built-in operation' occurred during compute
+    step 'get' with key 'entries' on $dir_listing. The PlanIR assumed the List RPC
+    result is an object with an 'entries' field, but the actual response may be a
+    list directly. The existing rule (r001) incorrectly mandates extraction via 'entries',
+    causing a type error when the result is a list. New rule handles both cases.
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 6
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t55

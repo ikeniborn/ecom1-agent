@@ -1,0 +1,59 @@
+entries:
+- agents_md_anchor: '#security > role-based-access'
+  content: Always use the facts variable (`$_facts.*`) as specified in the constraint's
+    deny_when predicate when implementing a security deny branch in the decision block,
+    rather than a locally bound variable from an RPC output.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The PlanIR branch condition
+    used `$identity.kind` (local variable from Exec /bin/id) instead of `$_facts.identity.kind`
+    as declared in the security constraint''s deny_when. The verification expects
+    the exact variable path from the constraint; mismatch causes the predicate to
+    be unrecognized, leading to spurious denial. Fix by using the facts variable directly.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#security > role-based-access'
+  content: Always use the exact deny_when predicate from the security constraint (referencing
+    `$_facts.*` variables) as the condition for the security deny branch in the decision
+    block, rather than deriving a condition from an RPC output or any other source.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: verify reported spurious DENIED_SECURITY because the PlanIR used
+    a regex_match on identity_stdout (''roles: employee'') instead of the constraint''s
+    deny_when predicate (`$_facts.identity.kind != ''employee''`). The existing rule
+    already advises using facts, but the PlanIR ignored it. This new rule explicitly
+    requires the exact predicate to prevent mismatched conditions.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that the pre-phase has read the identity facts (e.g., by
+    requesting a prephase_deep_read of the identity source) before relying on `$_facts.identity.*`
+    in a security deny condition, to avoid spurious over-refusal due to undefined
+    facts.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The PlanIR correctly uses the
+    exact deny_when predicate from the constraint (ne employee) in the decision branch.
+    However, the outcome was DENIED_SECURITY, meaning the condition evaluated to true.
+    Since the identity is likely employee, the condition should be false. The most
+    likely cause is that `$_facts.identity.kind` was undefined because the pre-phase
+    did not read the identity facts. Undefined compared with ''ne'' returns true,
+    causing spurious denial. The existing rules correctly mandate using the facts
+    variable and exact predicate, but they do not ensure the facts are populated.
+    Therefore, a new rule is needed to ensure the pre-phase reads the identity facts
+    before the decision.'
+  status: active
+  surface: ir
+last_run:
+  cycles_used: 3
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+prephase_deep_read:
+- identity
+task_id: t25

@@ -4,21 +4,14 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT COUNT(*) AS count FROM product_variants v JOIN product_kinds k ON v.product_kind_id = k.product_kind_id WHERE k.product_kind_name = 'Work Gloves';"
+        "stdin": "WITH target_kind AS (\n  SELECT product_kind_id FROM product_kinds WHERE product_kind_name = 'Work Trousers'\n),\nlinz_stores AS (\n  SELECT store_id FROM stores WHERE city = 'Linz' AND is_open = 1 AND store_name LIKE '%PowerTool%'\n),\neligible_inventory AS (\n  SELECT DISTINCT product_sku FROM store_inventory WHERE store_id IN (SELECT store_id FROM linz_stores) AND available_today_quantity > 0\n)\nSELECT COUNT(DISTINCT v.product_sku) AS count\nFROM product_variants v\nJOIN target_kind k ON v.product_kind_id = k.product_kind_id\nWHERE v.product_sku IN (SELECT product_sku FROM eligible_inventory);"
       },
-      "bind": "raw_sql_output"
-    },
-    {
-      "rpc": "Read",
-      "args": {
-        "path": "/docs/checkout.md"
-      },
-      "bind": "policy_doc"
+      "bind": "raw_result"
     }
   ],
   "rowsets": [
     {
-      "from_": "raw_sql_output",
+      "from_": "raw_result",
       "format": "auto_delim",
       "into": "result",
       "columns": [
@@ -33,10 +26,9 @@
   ],
   "compute": [
     {
-      "prim": "get",
+      "prim": "to_number",
       "args": [
-        "$result",
-        "count"
+        "$result.count"
       ],
       "into": "count"
     }
@@ -46,31 +38,25 @@
       {
         "when": {
           "op": "ge",
-          "lhs": "$result.count",
+          "lhs": "$count",
           "rhs": 0,
           "args": []
         },
         "label": "ok"
       }
     ],
-    "default_label": "denied_security"
+    "default_label": "unsupported"
   },
   "ops": [],
   "answer": {
     "ok": {
-      "message": "{count}",
+      "message": "<COUNT:{count}>",
       "outcome": "OUTCOME_OK",
-      "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/checkout.md",
-          "source": null
-        }
-      ]
+      "refs": []
     },
-    "denied_security": {
-      "message": "Access denied",
-      "outcome": "OUTCOME_DENIED_SECURITY",
+    "unsupported": {
+      "message": "Unable to count work trousers.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }
   },
