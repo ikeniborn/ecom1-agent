@@ -19,7 +19,7 @@ def _counting_embed(calls):
 
 def test_atom_embedded_once_across_instances(tmp_path, monkeypatch):
     monkeypatch.setenv("ECOM_ORACLE_FLOOR", "-1")  # disable floor for this test
-    emb = tmp_path / "embeddings.json"
+    emb = tmp_path / "embeddings.jsonl"
     atoms = [_atom("a", "C:alpha")]
     calls = []
 
@@ -36,19 +36,21 @@ def test_atom_embedded_once_across_instances(tmp_path, monkeypatch):
 
 def test_cache_persisted_to_file(tmp_path, monkeypatch):
     monkeypatch.setenv("ECOM_ORACLE_FLOOR", "-1")
-    emb = tmp_path / "embeddings.json"
+    emb = tmp_path / "embeddings.jsonl"
     atoms = [_atom("a", "C:alpha")]
     o = KnowledgeOracle(atoms=atoms, embed_fn=_counting_embed([]),
                         embeddings_path=emb)
     o.retrieve("alpha query", k=1, rank_fn=None)
-    data = json.loads(emb.read_text())
+    # JSONL: one {"hash","embedding"} object per line
+    rows = [json.loads(ln) for ln in emb.read_text().splitlines() if ln.strip()]
+    hashes = {r["hash"] for r in rows}
     from agent.oracle_atoms import content_hash
-    assert content_hash("C:alpha") in data
+    assert content_hash("C:alpha") in hashes
 
 
 def test_corrupt_cache_file_rebuilds(tmp_path, monkeypatch):
     monkeypatch.setenv("ECOM_ORACLE_FLOOR", "-1")
-    emb = tmp_path / "embeddings.json"
+    emb = tmp_path / "embeddings.jsonl"
     emb.write_text("{ this is not json")
     atoms = [_atom("a", "C:alpha")]
     o = KnowledgeOracle(atoms=atoms, embed_fn=_counting_embed([]),

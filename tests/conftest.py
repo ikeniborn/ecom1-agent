@@ -22,8 +22,8 @@ def reset_pipeline_caches():
 def isolate_oracle_embeddings(tmp_path_factory, monkeypatch):
     """Redirect the oracle's default embeddings cache to a tmp file so tests that
     build a default-path KnowledgeOracle never read or write the repo's
-    data/oracle/embeddings.json."""
+    data/oracle/embeddings.jsonl."""
     import agent.oracle
-    emb = tmp_path_factory.mktemp("oracle_emb") / "embeddings.json"
+    emb = tmp_path_factory.mktemp("oracle_emb") / "embeddings.jsonl"
     monkeypatch.setattr(agent.oracle, "_DEFAULT_EMBEDDINGS", emb)
     yield

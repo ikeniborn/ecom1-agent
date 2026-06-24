@@ -11,7 +11,7 @@ from . import llm
 from .llm import call_llm_json
 
 _DEFAULT_ATOMS = Path(__file__).resolve().parent.parent / "data" / "oracle" / "atoms.yaml"
-_DEFAULT_EMBEDDINGS = Path(__file__).resolve().parent.parent / "data" / "oracle" / "embeddings.json"
+_DEFAULT_EMBEDDINGS = Path(__file__).resolve().parent.parent / "data" / "oracle" / "embeddings.jsonl"
 
 
 def _cosine(a, b):
@@ -33,18 +33,37 @@ class KnowledgeOracle:
         self._vec_cache: dict[str, list[float]] = self._load_vec_cache()
 
     def _load_vec_cache(self) -> dict:
-        """Load persisted atom vectors. Corrupt/missing file → empty (rebuild)."""
+        """Load persisted atom vectors from JSONL — one {"hash","embedding"} object per
+        line. Corrupt/missing file → empty (rebuild); blank or garbled lines are skipped
+        so a single bad line never discards the whole cache."""
+        cache: dict[str, list[float]] = {}
         try:
-            data = json.loads(self._emb_path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
+            text = self._emb_path.read_text(encoding="utf-8")
         except Exception:
-            return {}
+            return cache
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+                h, vec = row["hash"], row["embedding"]
+            except Exception:
+                continue
+            if isinstance(h, str) and isinstance(vec, list):
+                cache[h] = vec
+        return cache
 
     def _save_vec_cache(self) -> None:
-        """Persist atom vectors. Non-critical — failure is silently ignored."""
+        """Persist atom vectors as JSONL — one {"hash","embedding"} object per line, so
+        the file grows line-by-line (one per atom) and diffs readably. Non-critical —
+        failure is silently ignored."""
         try:
             self._emb_path.parent.mkdir(parents=True, exist_ok=True)
-            self._emb_path.write_text(json.dumps(self._vec_cache), encoding="utf-8")
+            lines = [json.dumps({"hash": h, "embedding": v})
+                     for h, v in self._vec_cache.items()]
+            self._emb_path.write_text("\n".join(lines) + ("\n" if lines else ""),
+                                      encoding="utf-8")
         except Exception:
             pass
 
