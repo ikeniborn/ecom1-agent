@@ -297,8 +297,8 @@ def test_investigate_stops_on_sufficiency(monkeypatch):
 
 def test_investigate_respects_budget(monkeypatch):
     # Single ungrounded policy_doc ref — sufficient() stays False until budget exhausted.
-    # (record_path refs are PLAN-produced and are skipped by sufficient(); this test uses
-    # only a policy_doc so the budget mechanism is not masked by ref-kind skipping.)
+    # (this test uses only a policy_doc ref; a record_path ref would need "resolved:{source}"
+    # in env to ground, so policy_doc-only keeps the budget mechanism isolated.)
     intent = IntentSpec(
         objective="cite fraud payments",
         desired_outcome="OUTCOME_OK",
