@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Result-check — Oracle → PLAN injection</title>
+<style>
+  :root[data-theme="dark"]{
+    --bg:#0f1419; --panel:#1a212b; --panel2:#222c38; --fg:#e6edf3; --muted:#9aa7b4;
+    --line:#30404f; --accent:#4ea1ff; --ok:#3fb950; --warn:#d29922; --crit:#f85149;
+    --chip:#2d3b4a; --after:#1d3326;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#eef2f6; --fg:#1f2328; --muted:#5a6671;
+    --line:#d0d7de; --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --crit:#cf222e;
+    --chip:#e6ecf2; --after:#e6f6ec;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 22px 60px;}
+  header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+    border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:8px;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:18px;margin:32px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+  h3{font-size:14px;margin:18px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .sub{color:var(--muted);font-size:13.5px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.85em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  table{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:13px;}
+  th,td{text-align:left;padding:8px 10px;border:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel2);font-weight:600;}
+  tr:nth-child(even) td{background:var(--panel);}
+  .pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+  .b-ok{background:var(--ok);color:#fff} .b-warn{background:var(--warn);color:#fff} .b-done{background:var(--ok);color:#fff}
+  button#tg{cursor:pointer;background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+    border-radius:8px;padding:7px 13px;font-size:13px;}
+  .verdict{display:inline-flex;align-items:center;gap:8px;font-size:16px;font-weight:700;
+    background:var(--after);color:var(--ok);padding:8px 16px;border-radius:10px;border:1px solid var(--ok);}
+  .summary-cards{display:flex;gap:12px;flex-wrap:wrap}
+  .card{flex:1;min-width:120px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:6px 0}
+  .card .n{font-size:24px;font-weight:700}
+  .muted{color:var(--muted)}
+  .ok{color:var(--ok)} .warn{color:var(--warn)}
+  ul{margin:6px 0 6px 18px;padding:0} li{margin:2px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Result-check — Oracle → PLAN injection</h1>
+      <div class="sub">2026-06-24 · сверка плана vs <code>git diff HEAD~1</code> (HEAD = <code>e5748c8</code>)</div>
+    </div>
+    <button id="tg" onclick="(function(){var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';})()">🌓 Тема</button>
+  </header>
+
+  <div class="summary-cards">
+    <div class="card"><div class="muted">Вердикт</div><div class="n ok">OK</div></div>
+    <div class="card"><div class="muted">DONE</div><div class="n ok">6</div></div>
+    <div class="card"><div class="muted">PARTIAL</div><div class="n">0</div></div>
+    <div class="card"><div class="muted">MISSING</div><div class="n">0</div></div>
+    <div class="card"><div class="muted">WARNING</div><div class="n warn">2</div></div>
+  </div>
+
+  <!-- ===================== БЛОК 1 ===================== -->
+  <h2>1. Резюме сверки</h2>
+  <table>
+    <thead><tr><th>Документ</th><th>Путь / значение</th></tr></thead>
+    <tbody>
+      <tr><td>plan</td><td><code>docs/superpowers/plans/2026-06-24-oracle-plan-injection.md</code> (hash <code>40271f6328a47a9b</code>)</td></tr>
+      <tr><td>spec</td><td><code>docs/superpowers/specs/2026-06-24-oracle-plan-injection-design.md</code> (hash <code>de8fd57ee094020d</code>)</td></tr>
+      <tr><td>intent</td><td><span class="muted">null — intent doc отсутствует</span></td></tr>
+      <tr><td>diff base</td><td><code>git diff HEAD~1</code> · 5 файлов изменено</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===================== БЛОК 2 ===================== -->
+  <h2>2. Результаты проверки</h2>
+
+  <h3>Покрытие шагов плана</h3>
+  <table>
+    <thead><tr><th>Шаг</th><th>Статус</th><th>Свидетельство в diff / прогоне</th></tr></thead>
+    <tbody>
+      <tr><td>Step 1 — тест</td><td><span class="pill b-done">DONE</span></td><td><code>tests/test_pipeline_investigate.py</code> +34 строки, <code>test_run_pipeline_injects_oracle_atoms_into_plan</code></td></tr>
+      <tr><td>Step 2 — FAIL</td><td><span class="pill b-done">DONE</span></td><td>Прогон: FAIL <code>assert [] == ['ATOM-SENTINEL']</code> (verification, без diff)</td></tr>
+      <tr><td>Step 3 — фикс</td><td><span class="pill b-done">DONE</span></td><td><code>agent/pipeline.py</code>: снят <code>if not _investigate_on</code>, retrieve в обоих режимах</td></tr>
+      <tr><td>Step 4 — PASS</td><td><span class="pill b-done">DONE</span></td><td>Прогон: 1 passed (verification, без diff)</td></tr>
+      <tr><td>Step 5 — регресс</td><td><span class="pill b-done">DONE</span></td><td>13 passed (investigate + pipeline_v2 + oracle_retrieve)</td></tr>
+      <tr><td>Step 6 — commit</td><td><span class="pill b-done">DONE</span></td><td>commit <code>e5748c8</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Findings</h3>
+  <table>
+    <thead><tr><th>Severity</th><th>Шаг</th><th>Plan</th><th>Diff</th><th>Fix options</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="pill b-warn">WARNING</span></td>
+        <td>EXCESS (вне плана)</td>
+        <td>Нет шага для <code>data/heuristics/t01.intent.json</code>, <code>t01.plan.json</code>, <code>data/learned/t01.yaml</code></td>
+        <td>t01 изменены: objective → «count rows», stdin → <code>SELECT 1 AS n</code>, status → success — degenerate-прогон</td>
+        <td><ul><li>amend <code>e5748c8</code>, убрать 3 t01-файла когда параллельный <code>main.py</code> простаивает</li><li>отдельный revert-коммит t01</li><li>оставить (мусор данных, не код)</li></ul></td>
+      </tr>
+      <tr>
+        <td><span class="pill b-warn">WARNING</span></td>
+        <td>Step 5 (F-001)</td>
+        <td>Регресс-прогон существующих тестов</td>
+        <td><code>test_run_pipeline_builds_brief_then_plan</code> теперь триггерит реальный <code>retrieve()</code>/Ollama-embed (проглочен), прогон ~29s</td>
+        <td><ul><li>при флаках <code>monkeypatch _new_oracle</code> в этот тест</li><li>оставить (зелёный)</li></ul></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Покрытие Intent / Spec</h3>
+  <table>
+    <thead><tr><th>Источник</th><th>Покрытие</th></tr></thead>
+    <tbody>
+      <tr><td>Desired Outcomes (intent)</td><td><span class="muted">n/a — intent doc отсутствует</span></td></tr>
+      <tr><td>Spec requirements</td><td>R1/R3/R4/R6 ✓ (<code>pipeline.py</code> фикс) · R5 ✓ (investigate не тронут) · R7 ✓ (<code>try/except</code> сохранён) · SC3 ✓ (тесты 13/13)</td></tr>
+      <tr><td>Отложено / по дизайну</td><td>SC1 — ручной trace (не в diff) · R2/R9/R10 — no task by design</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Excess Changes</h3>
+  <ul>
+    <li><span class="warn">WARNING</span> <code>data/heuristics/t01.intent.json</code>, <code>data/heuristics/t01.plan.json</code>, <code>data/learned/t01.yaml</code> — нет шага плана (загрязнение общим индексом параллельной сессии)</li>
+  </ul>
+
+  <h3>Сводка</h3>
+  <p>
+    <span class="pill" style="background:var(--crit);color:#fff">CRITICAL: 0</span>
+    &nbsp;<span class="pill b-warn">WARNING: 2</span>
+    &nbsp;<span class="pill" style="background:var(--chip);color:var(--fg)">INFO: 0</span>
+  </p>
+  <p><span class="verdict">✓ Вердикт: OK</span></p>
+
+  <h3>Chain</h3>
+  <div class="sub">intent <code>null</code> → spec <code>2026-06-24-oracle-plan-injection-design.md</code> → plan <code>2026-06-24-oracle-plan-injection.md</code></div>
+
+  <p class="sub" style="margin-top:30px">Артефакт IDD-проверки · сгенерирован навыком <code>check-result</code> → <code>html-report</code>.</p>
+</div>
+</body>
+</html>

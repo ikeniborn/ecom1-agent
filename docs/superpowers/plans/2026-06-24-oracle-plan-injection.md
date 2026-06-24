@@ -28,6 +28,17 @@ review:
 chain:
   intent: null
   spec: docs/superpowers/specs/2026-06-24-oracle-plan-injection-design.md
+result_check:
+  verdict: OK
+  plan_hash: 40271f6328a47a9b
+  last_run: 2026-06-24
+  note: >-
+    All plan steps DONE (Step1 test + Step3 guard removal in diff; Step2/4/5 runs,
+    Step6 commit e5748c8). MISSING=0, PARTIAL=0. EXCESS [WARNING]: data/heuristics/t01.*
+    and data/learned/t01.yaml were swept into e5748c8 by a shared index (concurrent
+    main.py run) — degenerate "count rows" churn, NOT part of this plan. Recommend
+    amending e5748c8 to drop the three t01 files when the concurrent run is idle.
+    Spec R1/R3/R4/R6 + SC3 covered; intent doc absent (chain.intent=null).
 ---
 
 # Oracle → PLAN injection regression fix — Implementation Plan
