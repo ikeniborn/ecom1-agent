@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from .ir_models import IntentSpec, PlanIR, RowSet
 from .predicates import evaluate, resolve
 from .tools import validate_step
-from .trace import current_cycle, get_trace, log_lint_fire_auto
+from .trace import current_cycle, get_trace
 
 
 def _trace_answer(message: str, outcome: str, refs: list) -> None:
@@ -317,35 +317,6 @@ def repair_sql_stdin(plan: PlanIR) -> PlanIR:
                 st.args["stdin"] = "\n".join(str(a) for a in sql_args)
                 st.args["args"] = []
     return plan
-
-
-def lint(plan: PlanIR) -> None:
-    """Registry-driven plan-time lint (F8). Dispatches each non-inactive check-spec in
-    data/harness/checks.yaml to its `kind` handler. An ACTIVE error-severity violation
-    raises InterpretError (blocks); a `candidate` entry, or a `warn`-severity one, logs
-    only. Unknown kinds / malformed specs / handler errors degrade to a logged no-op."""
-    from . import harness
-    for spec in harness.load_checks():
-        if not isinstance(spec, dict) or spec.get("status") == "inactive":
-            continue
-        handler = harness.handler_for(spec.get("kind"))
-        if handler is None:
-            print(f"[lint] unknown check kind {spec.get('kind')!r} (id={spec.get('id')}) — skipped")
-            continue
-        try:
-            violations = handler(plan, spec)
-        except Exception as e:                       # a bad handler/spec is never fatal
-            print(f"[lint] check {spec.get('id')!r} errored: {e} — skipped")
-            continue
-        if not violations:
-            continue
-        blocking = (spec.get("status", "active") == "active"
-                    and spec.get("severity", "error") == "error")
-        log_lint_fire_auto(spec.get("id", ""), spec.get("kind", ""),
-                           spec.get("severity", "error"), blocking, violations[0])
-        if blocking:
-            raise InterpretError("; ".join(violations))
-        print(f"[lint] warn ({spec.get('id')}): {violations[0]}")
 
 
 def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResult:

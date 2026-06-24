@@ -311,21 +311,6 @@ class TraceLogger:
             "reason": reason or "",
         })
 
-    def log_lint_fire(self, cycle: int, check_id: str, kind: str,
-                      severity: str, blocking: bool, message: str) -> None:
-        """One fired lint check-spec (data/harness/checks.yaml): which check, its kind/
-        severity, whether it blocked the plan, and the violation message. Captures warn-
-        level fires that the aggregate LINT `gate` record does not surface."""
-        self._write({
-            "type": "lint_fire",
-            "cycle": cycle,
-            "check_id": check_id,
-            "kind": kind,
-            "severity": severity,
-            "blocking": bool(blocking),
-            "message": message,
-        })
-
     def log_investigate_stop(self, reason: str, data_paths_total: int,
                              data_paths_probed: int) -> None:
         """Why the investigator stopped (sufficient | budget). Retained as A/B telemetry
@@ -495,10 +480,6 @@ def render_trace(source, *, color: bool = False, max_chars: int = 0, phase: str 
             out.append(f"{pre} sql+answer tests generated")
         elif t == "schema_refresh":
             out.append(f"{pre} c{cyc} +tables {rec.get('added_tables')}")
-        elif t == "lint_fire":
-            mark = "BLOCK" if rec.get("blocking") else "warn"
-            out.append(f"{pre} c{cyc} {rec.get('check_id')} [{mark}] "
-                       f"{(rec.get('message') or '')[:80]}")
         else:
             payload = {k: v for k, v in rec.items() if k not in ("ts", "task_id", "type")}
             out.append(f"{pre} {json.dumps(payload, ensure_ascii=False)[:120]}")
@@ -561,17 +542,6 @@ def log_gate_auto(step_type: str, passed: bool, reason: str) -> None:
         return
     try:
         t.log_gate(current_cycle(), step_type, passed, reason)
-    except Exception:
-        pass
-
-
-def log_lint_fire_auto(check_id: str, kind: str, severity: str,
-                       blocking: bool, message: str) -> None:
-    t = get_trace()
-    if t is None:
-        return
-    try:
-        t.log_lint_fire(current_cycle(), check_id, kind, severity, blocking, message)
     except Exception:
         pass
 
