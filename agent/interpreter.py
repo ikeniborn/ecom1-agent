@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from .ir_models import IntentSpec, PlanIR, RowSet
 from .predicates import evaluate, resolve
+from .resolve import relax_sql
 from .tools import validate_step
 from .trace import current_cycle, get_trace
 
@@ -338,7 +339,6 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
     mutation_landed = False
 
     # 2. discovery (read-only, in order)
-    from .resolve import relax_sql
     for step in plan.discovery:
         kwargs = _resolve_args(step.args, env)
         _validate_dispatch(step.rpc, step.args, mutation_landed)
