@@ -7,7 +7,7 @@ import textwrap
 import threading
 import time
 import zoneinfo
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import IO
 
@@ -106,6 +106,10 @@ BITGN_API_KEY = os.getenv("ECOM_BITGN_API_KEY") or ""
 _base_run_name = os.getenv("ECOM_BITGN_RUN_NAME") or ""
 BITGN_RUN_NAME = f"{_base_run_name}-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}" if _base_run_name else ""
 PARALLEL_TASKS = max(1, int(os.getenv("ECOM_PARALLEL_TASKS", "1")))
+# FIX: hard per-task wall-clock cap so one slow/hung task never freezes the run.
+# A degraded LLM endpoint can make a single task take tens of minutes (10 cycles ×
+# ~180s reads × retries); past this many seconds we abandon the task and submit the rest.
+TASK_TIMEOUT_S = float(os.getenv("ECOM_TASK_TIMEOUT_S", "600"))
 TRAIN_MAX_CYCLES = max(1, int(os.getenv("ECOM_TRAIN_MAX_CYCLES", "1")))
 
 _MODELS_JSON = Path(__file__).parent / "models.json"
@@ -242,6 +246,36 @@ def _write_summary(scores: list, run_start: float) -> None:
         _log_stats(line)
 
 
+def _collect_with_deadline(pool, futures: dict, deadline_s: float) -> dict:
+    """Collect results of futures that finish within `deadline_s` (wall clock from now).
+    Unfinished futures are abandoned (their worker thread leaks but the process exits at
+    run end). Returns {task_id: (task_id, trial_id, elapsed, token_stats, trace, filtered)}.
+    """
+    import concurrent.futures as _cf
+    out: dict = {}
+    end = time.monotonic() + deadline_s
+    pending = set(futures)
+    while pending:
+        remaining = end - time.monotonic()
+        if remaining <= 0:
+            break
+        done, pending = _cf.wait(pending, timeout=remaining,
+                                 return_when=_cf.FIRST_COMPLETED)
+        if not done:                      # timed out with nothing newly finished
+            break
+        for fut in done:
+            try:
+                res = fut.result()
+            except Exception as exc:
+                print(f"{CLI_RED}[{futures[fut]}] Task error: {exc}{CLI_CLR}")
+                continue
+            out[res[0]] = res             # res[0] is task_id
+    if pending:
+        print(f"{CLI_RED}[run] {len(pending)} task(s) exceeded "
+              f"{deadline_s:.0f}s deadline — abandoned, submitting the rest{CLI_CLR}")
+    return out
+
+
 def _run_one_pass(client, task_filter: list, train_cycle: int):
     """One StartRun → trial loop → SubmitRun. Returns (scores, submit_result).
 
@@ -255,32 +289,31 @@ def _run_one_pass(client, task_filter: list, train_cycle: int):
     print(f"Run started: {run.run_id} ({len(run.trial_ids)} trials)")
 
     pending: dict[str, tuple] = {}
+    pool = ThreadPoolExecutor(max_workers=PARALLEL_TASKS)
     try:
-        with ThreadPoolExecutor(max_workers=PARALLEL_TASKS) as pool:
-            futures = {
-                pool.submit(_run_single_task, tid, task_filter, train_cycle): tid
-                for tid in run.trial_ids
-            }
-            for fut in as_completed(futures):
-                try:
-                    task_id, trial_id, task_elapsed, token_stats, trace, filtered = fut.result()
-                except Exception as exc:
-                    failed_tid = futures[fut]
-                    print(f"{CLI_RED}[{failed_tid}] Task error: {exc}{CLI_CLR}")
-                    continue
-                if filtered:
-                    continue
-                pending[task_id] = (trial_id, task_elapsed, token_stats, trace)
-                # live progress into main.log as each task finishes (score arrives at
-                # SubmitRun, so it is not known yet — the final table fills it in).
-                _ts_now = datetime.datetime.now().strftime("%H:%M:%S")
-                _log_stats(
-                    f"[{_ts_now}] done {task_id:<10} {task_elapsed:>6.1f}s  "
-                    f"in={token_stats.get('input_tokens', 0):>8,} "
-                    f"out={token_stats.get('output_tokens', 0):>8,} "
-                    f"cycles={token_stats.get('cycles_used', 0)}  (score @submit)"
-                )
+        futures = {
+            pool.submit(_run_single_task, tid, task_filter, train_cycle): tid
+            for tid in run.trial_ids
+        }
+        # Whole-pass budget: each parallel lane may spend TASK_TIMEOUT_S per task.
+        import math
+        lanes = max(1, PARALLEL_TASKS)
+        pass_deadline = TASK_TIMEOUT_S * math.ceil(len(futures) / lanes) + 120.0
+        collected = _collect_with_deadline(pool, futures, pass_deadline)
+        for task_id, res in collected.items():
+            _task_id, trial_id, task_elapsed, token_stats, trace, filtered = res
+            if filtered:
+                continue
+            pending[task_id] = (trial_id, task_elapsed, token_stats, trace)
+            _ts_now = datetime.datetime.now().strftime("%H:%M:%S")
+            _log_stats(
+                f"[{_ts_now}] done {task_id:<10} {task_elapsed:>6.1f}s  "
+                f"in={token_stats.get('input_tokens', 0):>8,} "
+                f"out={token_stats.get('output_tokens', 0):>8,} "
+                f"cycles={token_stats.get('cycles_used', 0)}  (score @submit)"
+            )
     finally:
+        pool.shutdown(wait=False, cancel_futures=True)
         print(f"\n{CLI_GREEN}>>>> Submitting run... <<<<{CLI_CLR}")
         result = client.submit_run(SubmitRunRequest(run_id=run.run_id, force=True))
         print(f"Run submitted: {run.run_id}")
