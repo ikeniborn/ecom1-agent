@@ -46,7 +46,9 @@ deterministic Plan-IR interpreter.
    errors become lessons; hard failure falls back to the slim seed facts. Returns a `Brief`
    (step-notes + bound `env`); `render_brief(brief)` is injected into every PLAN cycle via
    `run_plan(..., brief_block=...)`. When `ECOM_INVESTIGATE_ENABLED=0`, this step is skipped
-   and the pipeline uses the legacy eager gather + whole-instruction oracle dump.
+   and the pipeline uses the legacy eager gather. The whole-instruction oracle retrieval into
+   PLAN (`oracle.retrieve(instruction)` → `oracle_atoms`) runs in **both** modes — not gated
+   by this toggle.
 2.5. **SECURITY PREFLIGHT** (`decide.py:security_preflight`, no LLM) — between INTENT and
    the loop (in fact right after the INTENT-None guard and **before** INVESTIGATE, so a
    clear deny does not spend the ReAct budget): a facts/identity-driven terminal
