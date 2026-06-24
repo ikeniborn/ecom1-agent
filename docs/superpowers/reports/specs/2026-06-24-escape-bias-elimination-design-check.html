@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>check-spec · Escape-bias elimination</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#171c24; --panel2:#1d242e; --ink:#e6edf3; --mut:#9aa7b4;
+    --line:#2b3440; --accent:#4ea1ff; --ok:#3fb950; --warn:#d29922; --crit:#f85149;
+    --info:#6e7681; --chip:#22303f; --node:#1d242e; --nodeln:#37506e;
+  }
+  html[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#f0f3f6; --ink:#1c2128; --mut:#57606a;
+    --line:#d0d7de; --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --crit:#cf222e;
+    --info:#8c959f; --chip:#eaeef2; --node:#ffffff; --nodeln:#9fc3ef;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px}
+  header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px}
+  h1{font-size:24px;margin:0 0 2px}
+  h2{font-size:19px;margin:34px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:20px 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .sub{color:var(--mut);font-size:13px}
+  .verdict{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:15px;
+    padding:6px 14px;border-radius:999px;background:rgba(63,185,80,.13);color:var(--ok);
+    border:1px solid var(--ok)}
+  table{width:100%;border-collapse:collapse;margin:10px 0;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--panel2);color:var(--mut);font-weight:600;font-size:13px}
+  tr:last-child td{border-bottom:none}
+  code{background:var(--chip);padding:1px 6px;border-radius:5px;font-size:12.5px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid}
+  .c-ok{color:var(--ok);border-color:var(--ok);background:rgba(63,185,80,.1)}
+  .c-info{color:var(--info);border-color:var(--info);background:var(--chip)}
+  .c-warn{color:var(--warn);border-color:var(--warn);background:rgba(210,153,34,.1)}
+  .c-crit{color:var(--crit);border-color:var(--crit);background:rgba(248,81,73,.1)}
+  .toggle{cursor:pointer;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:7px 12px;font-size:13px}
+  .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;
+    padding:10px 14px;margin:12px 0;color:var(--mut);font-size:13.5px}
+  /* solution block/flow */
+  .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:14px 0}
+  .step{flex:1 1 150px;min-width:140px;background:var(--node);border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px}
+  .step b{display:block;font-size:13.5px}
+  .step span{font-size:12px;color:var(--mut)}
+  .step.chg{border-color:var(--accent);box-shadow:0 0 0 1px rgba(78,161,255,.25)}
+  .arrow{align-self:center;color:var(--mut);font-size:18px}
+  .legend{font-size:12.5px;color:var(--mut);margin-top:6px}
+  figure{margin:14px 0}
+  .matrix td.hit{background:rgba(78,161,255,.14);color:var(--accent);font-weight:700;text-align:center}
+  .matrix td.def{background:rgba(210,153,34,.12);color:var(--warn);text-align:center}
+  .matrix td.mid{text-align:center;color:var(--mut)}
+  svg{width:100%;height:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .gnode rect{fill:var(--node);stroke:var(--nodeln);stroke-width:1.4}
+  .gnode text{fill:var(--ink);font:12px sans-serif}
+  .gnode .t2{fill:var(--mut);font-size:10.5px}
+  .gedge{stroke:var(--nodeln);stroke-width:1.6;fill:none}
+  .gedge-lbl{fill:var(--mut);font:10px sans-serif}
+  footer{margin-top:40px;color:var(--mut);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Проверка спецификации — Escape-bias elimination</h1>
+    <div class="sub">Детерминированный резолв · обоснованный отказ · облегчённый структурный PLAN</div>
+    <div class="sub">Дата: 2026-06-24 · ветка <code>determinism</code> · <code>spec_hash de80843a2502353f</code></div>
+  </div>
+  <button class="toggle" onclick="(function(h){h.dataset.theme=h.dataset.theme==='light'?'dark':'light'})(document.documentElement)">◐ Тема</button>
+</header>
+
+<div style="margin:10px 0"><span class="verdict">● Вердикт: OK — спека чистая</span></div>
+<div class="note">Скоупы проверены по 5 бакетам провалов из диагностического прогона deepseek-flash
+(75% задач уходят в escape-исход: 53% UNSUPPORTED + 22% DENIED_SECURITY). Спека закрывает их 5 фазами.</div>
+
+<!-- ============ BLOCK 1: SPEC SUMMARY ============ -->
+<h2>1 · Резюме спецификации</h2>
+
+<h3>Требования по фазам</h3>
+<table>
+  <thead><tr><th>Фаза</th><th>Бакет</th><th>Требование</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="3"><b>Фаза 1</b><br>Resolve-or-prove</td><td rowspan="3">B1 · ~14 задач</td>
+        <td>Нормализованный probe резолва (<code>agent/resolve.py</code>): прогрессивная релаксация exact → normalized (trim/case/whitespace/unit-suffix <code>'8 l'↔'8'</code>) → token-subset LIKE; реальный SKU/record_path в <code>Brief.env</code></td></tr>
+    <tr><td><code>investigate.sufficient()</code> больше не пунтит резолв ключевой сущности на PLAN — ref с источником <code>record_path</code> должен быть фактически найден</td></tr>
+    <tr><td>Запрет «0 строк ⇒ не существует» для презюмируемо-существующей сущности: пустой резолв → лестница релаксации, UNSUPPORTED только после её исчерпания</td></tr>
+
+    <tr><td><b>Фаза 2</b><br>No ungrounded denial</td><td>B2 · ~10 задач</td>
+        <td><code>decide</code> понижает PLAN-авторский <code>DENIED_SECURITY</code> до следующего исхода лестницы, если ни один объявленный security <code>deny_when</code> не держится; легитимные отказы (с holding-предикатом) сохраняются</td></tr>
+
+    <tr><td rowspan="4"><b>Фаза 3</b><br>Prompt diet + structured chain</td><td rowspan="4">B3 + множитель</td>
+        <td>Выкинуть <code>CREATE INDEX</code> dump из фактов; заменить компактным списком <code>table(col,…)</code></td></tr>
+    <tr><td>Фиксированный минимальный скелет PLAN-промта; learned/oracle блоки делимитированы и капнуты</td></tr>
+    <tr><td>Декомпозиция монолитного PLAN в structured-output цепочку (resolve→compute→answer, tiny-schema + CoT); оценить замену ReAct на детерминированную probe-секвенцию — flag-gated A/B</td></tr>
+    <tr><td>Никакого нерендеренного шаблона в message (t53); вычисленный ответ ⇒ не-escape outcome (t05/t07)</td></tr>
+
+    <tr><td rowspan="3"><b>Фаза 4</b><br>LEARN hygiene</td><td rowspan="3">анти-регресс</td>
+        <td>Детектор противоречий в <code>apply_learn_diff</code>: новое правило с противоположным outcome-гайдансом деактивирует старое (t20: r001↔r006)</td></tr>
+    <tr><td>Дистилляция семантики данных вместо водопровода (на empty-resolve → «сэмпли реальные значения / релаксируй матч»)</td></tr>
+    <tr><td>Жёсткий <code>ECOM_LEARN_MAX_ACTIVE</code> + дедуп near-duplicate активных правил</td></tr>
+
+    <tr><td rowspan="2"><b>Фаза 5</b><br>Reliability <span class="chip c-info">первая по импл-порядку</span></td><td rowspan="2">B5</td>
+        <td>Жёсткий таймаут на КАЖДЫЙ сетевой вызов (LLM-провайдеры, Ollama-embed, BitGN RPC)</td></tr>
+    <tr><td>Per-task wall-clock бюджет → при превышении терминальный outcome; один таск не морозит прогон, SubmitRun отрабатывает</td></tr>
+  </tbody>
+</table>
+
+<h3>Success criteria</h3>
+<table>
+  <thead><tr><th>#</th><th>Критерий приёмки</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Полный прогон deepseek-flash завершается без зависания и выдаёт grader-скоры</td></tr>
+    <tr><td>2</td><td>Распределение submitted-outcome решительно сдвигается от escape; B1 «not found» и B2 spurious-denial в основном устранены (легитимные отказы сохранены)</td></tr>
+    <tr><td>3</td><td>Вход PLAN-вызова падает <b>≥25%</b> (от текущих ~3 080 tok) после удаления schema-dump</td></tr>
+    <tr><td>4</td><td>Никаких новых task-specific правил в промтах; всё изменение поведения — в коде</td></tr>
+    <tr><td>5</td><td>Существующие тесты зелёные; новые пер-фазовые тесты проходят</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ BLOCK 2: DIAGRAMS ============ -->
+<h2>2 · Схемы решения и зависимостей</h2>
+
+<h3>Схема решения — пайплайн с правками (синие = изменяемые узлы)</h3>
+<figure>
+<div class="flow">
+  <div class="step">INTENT<br><span>дескрипторы сущности</span></div>
+  <div class="arrow">→</div>
+  <div class="step chg">INVESTIGATE<br><span>+ resolve-probe (Ф1)<br>sufficiency не пунтит (Ф1)</span></div>
+  <div class="arrow">→</div>
+  <div class="step chg">PLAN<br><span>облегчённый промт (Ф3)<br>structured chain (Ф3)</span></div>
+  <div class="arrow">→</div>
+  <div class="step">interpret</div>
+</div>
+<div class="flow">
+  <div class="step chg">decide<br><span>downgrade ungrounded deny (Ф2)<br>computed ⇒ не-escape (Ф3)</span></div>
+  <div class="arrow">→</div>
+  <div class="step chg">format-gate<br><span>нет template-leak (Ф3)</span></div>
+  <div class="arrow">→</div>
+  <div class="step">verify<br><span>I3 backstop</span></div>
+  <div class="arrow">→</div>
+  <div class="step">answer ×1</div>
+</div>
+<div class="legend">Сквозные: <b>Ф4 LEARN-гигиена</b> (петля iLEARN, между циклами) · <b>Ф5 таймаут+бюджет</b> (на каждом сетевом вызове и на всём таске).</div>
+</figure>
+
+<h3>Граф зависимостей фаз (A→B = A зависит от B; циклов нет)</h3>
+<figure>
+<svg viewBox="0 0 980 360" role="img" aria-label="Граф зависимостей фаз">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--nodeln)"></path>
+    </marker>
+  </defs>
+  <!-- edges -->
+  <g>
+    <path class="gedge" marker-end="url(#arr)" d="M250,95 L250,150"></path>
+    <text class="gedge-lbl" x="258" y="126">резолв до plan</text>
+    <path class="gedge" marker-end="url(#arr)" d="M360,180 L470,115"></path>
+    <text class="gedge-lbl" x="372" y="158">потребляет кандидатов</text>
+    <path class="gedge" marker-end="url(#arr)" d="M780,180 L690,300"></path>
+    <text class="gedge-lbl" x="700" y="245">скоры только при</text>
+    <path class="gedge" marker-end="url(#arr)" d="M250,250 L250,180"></path>
+    <text class="gedge-lbl" x="120" y="218">не дать петле re-bloat</text>
+    <path class="gedge" marker-end="url(#arr)" d="M560,300 L300,250"></path>
+    <text class="gedge-lbl" x="360" y="292">B1-конверсия меряется только при таймауте</text>
+  </g>
+  <!-- nodes -->
+  <g class="gnode">
+    <g transform="translate(170,55)"><rect width="160" height="44" rx="9"></rect>
+      <text x="12" y="20">Ф3 structured chain</text><text class="t2" x="12" y="36">облегчённый PLAN</text></g>
+    <g transform="translate(170,150)"><rect width="160" height="44" rx="9"></rect>
+      <text x="12" y="20">Ф1 resolve-or-prove</text><text class="t2" x="12" y="36">probe + sufficiency</text></g>
+    <g transform="translate(170,235)"><rect width="160" height="44" rx="9"></rect>
+      <text x="12" y="20">Ф4 LEARN-гигиена</text><text class="t2" x="12" y="36">contradiction + cap</text></g>
+    <g transform="translate(470,70)"><rect width="160" height="44" rx="9"></rect>
+      <text x="12" y="20">Ф2 grounded deny</text><text class="t2" x="12" y="36">decide downgrade</text></g>
+    <g transform="translate(700,150)"><rect width="170" height="44" rx="9"></rect>
+      <text x="12" y="20">Ф5 reliability</text><text class="t2" x="12" y="36">таймаут + бюджет</text></g>
+    <g transform="translate(560,290)"><rect width="180" height="44" rx="9"></rect>
+      <text x="12" y="20">Верификация (scored)</text><text class="t2" x="12" y="36">чистый ре-ран + дельта</text></g>
+  </g>
+</svg>
+<div class="legend">Ф1 — фундамент (Ф3-цепочка потребляет его кандидатов; Ф4 защищает его петлю). Ф5 — предусловие любой измеримой верификации. Ф2 независим. Циклов нет → порядок реализации корректен.</div>
+</figure>
+
+<h3>Карта покрытия — бакет задач → фаза спеки</h3>
+<table class="matrix">
+  <thead><tr><th>Бакет (задачи)</th><th>Ф1</th><th>Ф2</th><th>Ф3</th><th>Ф4</th><th>Ф5</th></tr></thead>
+  <tbody>
+    <tr><td>B1 resolve give-up (~14)</td><td class="hit">✓</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td></tr>
+    <tr><td>B2 ungrounded deny (~10)</td><td class="mid">·</td><td class="hit">✓</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td></tr>
+    <tr><td>B3 outcome-mismatch / template-leak (~3)</td><td class="mid">·</td><td class="mid">·</td><td class="hit">✓</td><td class="mid">·</td><td class="mid">·</td></tr>
+    <tr><td>B4 input capture (~2)</td><td class="mid">·</td><td class="mid">·</td><td class="def">≈ deferred</td><td class="mid">·</td><td class="mid">·</td></tr>
+    <tr><td>B5 reliability / hang</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="hit">✓</td></tr>
+    <tr><td>анти-регресс петли</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="hit">✓</td><td class="mid">·</td></tr>
+  </tbody>
+</table>
+<div class="legend">Каждый бакет покрыт ≥1 требованием. B4 явно отложен (Out of scope + follow-up).</div>
+
+<!-- ============ BLOCK 3: CHECK RESULTS ============ -->
+<h2>3 · Результаты проверки</h2>
+
+<h3>Статус фаз</h3>
+<table>
+  <thead><tr><th>Фаза</th><th>Статус</th><th>Комментарий</th></tr></thead>
+  <tbody>
+    <tr><td>structure</td><td><span class="chip c-ok">passed</span></td><td>Нет плейсхолдеров, битых ссылок, пропусков нумерации, дублей заголовков</td></tr>
+    <tr><td>coverage</td><td><span class="chip c-ok">passed</span></td><td>B1→Ф1, B2→Ф2, B3→Ф3, B5→Ф5; B4 явно отложен; нет orphan-требований; противоречий нет</td></tr>
+    <tr><td>clarity</td><td><span class="chip c-ok">passed</span></td><td>У каждой фазы свой Verify/DoD; термины согласованы; единственный INFO исправлен</td></tr>
+    <tr><td>consistency</td><td><span class="chip c-ok">passed</span></td><td>Первый прогон: все 12 секций новые; конфликтующих изменений нет</td></tr>
+  </tbody>
+</table>
+
+<h3>Findings</h3>
+<table>
+  <thead><tr><th>ID</th><th>Severity</th><th>Секция</th><th>Текст</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>F-001</td><td><span class="chip c-info">INFO</span></td><td><code>## Success criteria</code></td>
+      <td>«PLAN input tokens drop materially» — расплывчатый термин без числового порога</td>
+      <td><span class="chip c-ok">fixed</span> → порог ≥25%</td></tr>
+  </tbody>
+</table>
+
+<h3>Сводка</h3>
+<table>
+  <thead><tr><th>CRITICAL open</th><th>WARNING open</th><th>INFO open</th><th>Итог</th></tr></thead>
+  <tbody><tr><td>0</td><td>0</td><td>0</td><td><span class="chip c-ok">OK</span></td></tr></tbody>
+</table>
+
+<div class="note">Chain: <code>intent → null</code> · spec = <code>docs/superpowers/specs/2026-06-24-escape-bias-elimination-design.md</code>.
+Следующий шаг — writing-plans (план реализации, фаза 5 первой).</div>
+
+<footer>
+Сгенерировано навыком html-report · self-contained, offline · тёмная/светлая темы.
+Источник данных — прогон <code>check-spec</code> (clean-context субагент) + диагностика <code>logs/20260624_194401_deepseek-v4-flash-cloud</code>.
+</footer>
+</div>
+</body>
+</html>
