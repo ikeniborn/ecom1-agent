@@ -87,6 +87,12 @@ def _payload(result: Any) -> str:
     return (stdout or content or "").strip()
 
 
+def _rows_in_payload(pay: str) -> int:
+    """Data-row count for a delimited /bin/sql payload (non-empty lines minus header)."""
+    lines = [ln for ln in (pay or "").splitlines() if ln.strip()]
+    return max(0, len(lines) - 1)
+
+
 def _is_sql_banner(payload: str) -> bool:
     """True when /bin/sql returned its usage banner instead of data — a runtime backstop
     to the pre-lint repair. Detect it so the pipeline retries instead of parsing an empty
@@ -332,10 +338,24 @@ def interpret(plan: PlanIR, intent: IntentSpec, vm, facts=None) -> InterpretResu
     mutation_landed = False
 
     # 2. discovery (read-only, in order)
+    from .resolve import relax_sql
     for step in plan.discovery:
         kwargs = _resolve_args(step.args, env)
         _validate_dispatch(step.rpc, step.args, mutation_landed)
         result = getattr(vm, step.rpc.lower())(**kwargs)
+        # Auto-relax (A-seat): a read-only /bin/sql resolving step that returns 0 data rows
+        # is retried once with normalized predicates (case/unit/whitespace + numeric-column
+        # fallback). If the relaxed query finds rows, use it; else the empty result stands.
+        if step.rpc == "Exec" and kwargs.get("path") == "/bin/sql":
+            pay0 = _payload(result)
+            stdin0 = str(kwargs.get("stdin") or "")
+            if not _is_sql_banner(pay0) and _rows_in_payload(pay0) == 0 and stdin0:
+                relaxed = relax_sql(stdin0)
+                if relaxed != stdin0:
+                    r2 = vm.exec(path="/bin/sql", stdin=relaxed)
+                    if _rows_in_payload(_payload(r2)) > 0:
+                        result = r2
+                        kwargs = dict(kwargs, stdin=relaxed)
         if step.bind:
             env[step.bind] = result
         pay = _payload(result)
