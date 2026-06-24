@@ -30,11 +30,9 @@ def test_collect_returns_finished_and_does_not_block_on_hung_task():
     assert "t99" not in done, "hung task excluded"
 
 
-import os
-
-
 def test_llm_retry_budget_is_bounded():
+    """Source-default per-call wall clock must leave room for several cycles in the
+    600s task cap. Guards agent/llm.py's defaults, NOT any local .env override —
+    raising the module default back to 180 must turn this RED."""
     import agent.llm as llm
-    max_retries = int(os.environ.get("ECOM_LLM_MAX_RETRIES", "2"))
-    # worst-case single-call wall clock must leave room for several cycles in TASK_TIMEOUT_S
-    assert llm._HTTP_READ_TIMEOUT_S * (max_retries + 1) <= 400.0
+    assert llm._DEFAULT_HTTP_READ_TIMEOUT_S * (llm._DEFAULT_MAX_RETRIES + 1) <= 400.0

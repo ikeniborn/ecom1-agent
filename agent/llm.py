@@ -53,10 +53,11 @@ _CC_ENABLED = os.environ.get("ECOM_CC_ENABLED") == "1"  # Claude Code tier (icla
 # FIX-215: explicit HTTP timeout — OpenAI SDK defaults to 600s; Ollama local can hang
 # silently on stuck sockets (observed 40+ min hang during COPRO). Read-timeout 180s keeps
 # us under TASK_TIMEOUT_S and lets TRANSIENT_KWS retry loop recover from stalled requests.
+_DEFAULT_HTTP_READ_TIMEOUT_S = 120.0
 try:
-    _HTTP_READ_TIMEOUT_S = float(os.environ.get("ECOM_LLM_HTTP_READ_TIMEOUT_S", "120"))
+    _HTTP_READ_TIMEOUT_S = float(os.environ.get("ECOM_LLM_HTTP_READ_TIMEOUT_S", str(_DEFAULT_HTTP_READ_TIMEOUT_S)))
 except ValueError:
-    _HTTP_READ_TIMEOUT_S = 120.0
+    _HTTP_READ_TIMEOUT_S = _DEFAULT_HTTP_READ_TIMEOUT_S
 try:
     _HTTP_CONNECT_TIMEOUT_S = float(os.environ.get("ECOM_LLM_HTTP_CONNECT_TIMEOUT_S", "10"))
 except ValueError:
@@ -264,7 +265,8 @@ def get_response_format(mode: str) -> dict | None:
 # Per-call retry budget — default 2 so worst-case call wall-clock is
 # _HTTP_READ_TIMEOUT_S * (_MAX_RETRIES + 1) = 120 * 3 = 360s < 600s task cap.
 # Override via ECOM_LLM_MAX_RETRIES; 0 = 1 attempt only.
-_MAX_RETRIES = int(os.environ.get("ECOM_LLM_MAX_RETRIES", "2"))
+_DEFAULT_MAX_RETRIES = 2
+_MAX_RETRIES = int(os.environ.get("ECOM_LLM_MAX_RETRIES", str(_DEFAULT_MAX_RETRIES)))
 
 # Transient error keywords — single source of truth; imported by loop.py
 # FIX-215: added timeout/timed out — httpx/OpenAI timeouts should retry
