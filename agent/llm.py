@@ -54,9 +54,9 @@ _CC_ENABLED = os.environ.get("ECOM_CC_ENABLED") == "1"  # Claude Code tier (icla
 # silently on stuck sockets (observed 40+ min hang during COPRO). Read-timeout 180s keeps
 # us under TASK_TIMEOUT_S and lets TRANSIENT_KWS retry loop recover from stalled requests.
 try:
-    _HTTP_READ_TIMEOUT_S = float(os.environ.get("ECOM_LLM_HTTP_READ_TIMEOUT_S", "180"))
+    _HTTP_READ_TIMEOUT_S = float(os.environ.get("ECOM_LLM_HTTP_READ_TIMEOUT_S", "120"))
 except ValueError:
-    _HTTP_READ_TIMEOUT_S = 180.0
+    _HTTP_READ_TIMEOUT_S = 120.0
 try:
     _HTTP_CONNECT_TIMEOUT_S = float(os.environ.get("ECOM_LLM_HTTP_CONNECT_TIMEOUT_S", "10"))
 except ValueError:
@@ -261,6 +261,11 @@ def get_response_format(mode: str) -> dict | None:
 # Lightweight raw LLM call (used by classify_task_llm in classifier.py)
 # ---------------------------------------------------------------------------
 
+# Per-call retry budget — default 2 so worst-case call wall-clock is
+# _HTTP_READ_TIMEOUT_S * (_MAX_RETRIES + 1) = 120 * 3 = 360s < 600s task cap.
+# Override via ECOM_LLM_MAX_RETRIES; 0 = 1 attempt only.
+_MAX_RETRIES = int(os.environ.get("ECOM_LLM_MAX_RETRIES", "2"))
+
 # Transient error keywords — single source of truth; imported by loop.py
 # FIX-215: added timeout/timed out — httpx/OpenAI timeouts should retry
 TRANSIENT_KWS = (
@@ -356,7 +361,7 @@ def _call_raw_single_model(
     cfg: dict,
     max_tokens: int = 20,
     think: bool | None = None,  # None=use cfg, False=disable, True=enable
-    max_retries: int = 3,  # classifier passes 0 → 1 attempt, no retries
+    max_retries: int = _MAX_RETRIES,  # classifier passes 0 → 1 attempt, no retries
     plain_text: bool = False,  # FIX-181: skip response_format (for code generation, not JSON)
     token_out: dict | None = None,  # if provided, populated with {"input": N, "output": N}
     logprobs: bool = False,  # GEPA ConfidenceAdapter: request logprobs (OpenRouter/Ollama only)
@@ -591,7 +596,7 @@ def call_llm_raw(
     cfg: dict,
     max_tokens: int = 20,
     think: bool | None = None,
-    max_retries: int = 3,
+    max_retries: int = _MAX_RETRIES,
     plain_text: bool = False,
     token_out: dict | None = None,
     logprobs: bool = False,

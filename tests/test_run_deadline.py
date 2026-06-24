@@ -28,3 +28,13 @@ def test_collect_returns_finished_and_does_not_block_on_hung_task():
     assert elapsed < 10.0, "collection must not block on the hung task"
     assert len(done) == 3, "all quick tasks collected"
     assert "t99" not in done, "hung task excluded"
+
+
+import os
+
+
+def test_llm_retry_budget_is_bounded():
+    import agent.llm as llm
+    max_retries = int(os.environ.get("ECOM_LLM_MAX_RETRIES", "2"))
+    # worst-case single-call wall clock must leave room for several cycles in TASK_TIMEOUT_S
+    assert llm._HTTP_READ_TIMEOUT_S * (max_retries + 1) <= 400.0
