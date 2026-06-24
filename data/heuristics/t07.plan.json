@@ -4,32 +4,16 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT product_sku, record_path, brand, product_name, properties FROM product_variants WHERE LOWER(brand) = LOWER(:brand) AND LOWER(product_name) LIKE LOWER('%' || :product_name_search || '%');"
+        "stdin": "WITH found AS (SELECT product_sku, record_path FROM product_variants WHERE LOWER(brand) = LOWER('Caparol') AND LOWER(product_name) LIKE LOWER('%' || 'Caparol Premium Capa 32D-5X8 Metal and Concrete Paint' || '%') LIMIT 1) SELECT f.product_sku, f.record_path, p1.property_value_text AS prop_concrete_sealer, p2.property_value_text AS prop_color_gray, p3.property_value_text AS prop_metal_paint FROM found f LEFT JOIN product_variant_properties p1 ON f.product_sku = p1.product_sku AND LOWER(p1.property_key) = LOWER('product_type') AND LOWER(p1.property_value_text) = LOWER('concrete sealer') LEFT JOIN product_variant_properties p2 ON f.product_sku = p2.product_sku AND LOWER(p2.property_key) = LOWER('color_family') AND LOWER(p2.property_value_text) = LOWER('Gray') LEFT JOIN product_variant_properties p3 ON f.product_sku = p3.product_sku AND LOWER(p3.property_key) = LOWER('product_type') AND LOWER(p3.property_value_text) = LOWER('metal paint');"
       },
-      "bind": "matching_variants_raw"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT (EXISTS (SELECT 1 FROM product_variant_properties pvp JOIN product_variants pv ON pvp.product_sku = pv.product_sku WHERE LOWER(pv.brand) = LOWER(:brand) AND LOWER(pv.product_name) LIKE LOWER('%' || :product_name_search || '%') AND pvp.property_key = 'cleaner_type' AND pvp.property_value_text = :cleaner_type)) AS has_cleaner_type, (EXISTS (SELECT 1 FROM product_variant_properties pvp JOIN product_variants pv ON pvp.product_sku = pv.product_sku WHERE LOWER(pv.brand) = LOWER(:brand) AND LOWER(pv.product_name) LIKE LOWER('%' || :product_name_search || '%') AND pvp.property_key = 'volume' AND pvp.property_value_number = :volume_4000 AND pvp.product_sku IN (SELECT pvp2.product_sku FROM product_variant_properties pvp2 WHERE pvp2.property_key = 'cleaner_type' AND pvp2.property_value_text = :cleaner_type))) AS has_volume_4000, (EXISTS (SELECT 1 FROM product_variant_properties pvp JOIN product_variants pv ON pvp.product_sku = pv.product_sku WHERE LOWER(pv.brand) = LOWER(:brand) AND LOWER(pv.product_name) LIKE LOWER('%' || :product_name_search || '%') AND pvp.property_key = 'volume' AND pvp.property_value_number = :volume_250 AND pvp.product_sku IN (SELECT pvp2.product_sku FROM product_variant_properties pvp2 WHERE pvp2.property_key = 'cleaner_type' AND pvp2.property_value_text = :cleaner_type))) AS has_volume_250;"
-      },
-      "bind": "conditions_raw"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'cleaner_type' AND pvp1.property_value_text = :cleaner_type JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'volume' AND (pvp2.property_value_number = :volume_4000 OR pvp2.property_value_number = :volume_250) WHERE LOWER(pv.brand) = LOWER(:brand) AND LOWER(pv.product_name) LIKE LOWER('%' || :product_name_search || '%');"
-      },
-      "bind": "verified_sku_raw"
+      "bind": "product_query_result"
     }
   ],
   "rowsets": [
     {
-      "from_": "matching_variants_raw",
+      "from_": "product_query_result",
       "format": "auto_delim",
-      "into": "matching_variants",
+      "into": "product_rows",
       "columns": [
         {
           "into": "product_sku",
@@ -44,65 +28,21 @@
           ]
         },
         {
-          "into": "brand",
+          "into": "prop_concrete_sealer",
           "candidates": [
-            "brand"
+            "prop_concrete_sealer"
           ]
         },
         {
-          "into": "product_name",
+          "into": "prop_color_gray",
           "candidates": [
-            "product_name"
+            "prop_color_gray"
           ]
         },
         {
-          "into": "properties",
+          "into": "prop_metal_paint",
           "candidates": [
-            "properties"
-          ]
-        }
-      ]
-    },
-    {
-      "from_": "conditions_raw",
-      "format": "auto_delim",
-      "into": "conditions",
-      "columns": [
-        {
-          "into": "has_cleaner_type",
-          "candidates": [
-            "has_cleaner_type"
-          ]
-        },
-        {
-          "into": "has_volume_4000",
-          "candidates": [
-            "has_volume_4000"
-          ]
-        },
-        {
-          "into": "has_volume_250",
-          "candidates": [
-            "has_volume_250"
-          ]
-        }
-      ]
-    },
-    {
-      "from_": "verified_sku_raw",
-      "format": "auto_delim",
-      "into": "verified_sku_list",
-      "columns": [
-        {
-          "into": "product_sku",
-          "candidates": [
-            "product_sku"
-          ]
-        },
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
+            "prop_metal_paint"
           ]
         }
       ]
@@ -112,63 +52,49 @@
     {
       "prim": "first",
       "args": [
-        "$matching_variants"
+        "$product_rows"
       ],
-      "into": "base_variant"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$conditions"
-      ],
-      "into": "condition_row"
+      "into": "product_row"
     },
     {
       "prim": "get",
       "args": [
-        "$condition_row",
-        "has_cleaner_type"
-      ],
-      "into": "has_cleaner_type"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$condition_row",
-        "has_volume_4000"
-      ],
-      "into": "has_volume_4000"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$condition_row",
-        "has_volume_250"
-      ],
-      "into": "has_volume_250"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$verified_sku_list"
-      ],
-      "into": "verified_sku"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$verified_sku",
+        "$product_row",
         "product_sku"
       ],
-      "into": "verified_sku_str"
+      "into": "sku"
     },
     {
       "prim": "get",
       "args": [
-        "$base_variant",
-        "product_sku"
+        "$product_row",
+        "record_path"
       ],
-      "into": "base_sku_str"
+      "into": "record_path_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "prop_concrete_sealer"
+      ],
+      "into": "prop_concrete_sealer_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "prop_color_gray"
+      ],
+      "into": "prop_color_gray_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "prop_metal_paint"
+      ],
+      "into": "prop_metal_paint_val"
     }
   ],
   "decision": {
@@ -181,58 +107,70 @@
           "args": [
             {
               "op": "nonempty",
-              "lhs": "$matching_variants",
+              "lhs": "$product_row",
               "rhs": null,
               "args": []
             },
             {
-              "op": "eq",
-              "lhs": "$has_cleaner_type",
-              "rhs": true,
+              "op": "nonempty",
+              "lhs": "$prop_concrete_sealer_val",
+              "rhs": null,
               "args": []
             },
             {
-              "op": "eq",
-              "lhs": "$has_volume_4000",
-              "rhs": true,
+              "op": "nonempty",
+              "lhs": "$prop_color_gray_val",
+              "rhs": null,
               "args": []
             },
             {
-              "op": "eq",
-              "lhs": "$has_volume_250",
-              "rhs": true,
+              "op": "nonempty",
+              "lhs": "$prop_metal_paint_val",
+              "rhs": null,
               "args": []
             }
           ]
         },
         "label": "ok"
+      },
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$product_row",
+          "rhs": null,
+          "args": []
+        },
+        "label": "unsupported_missing_props"
       }
     ],
-    "default_label": "unsupported"
+    "default_label": "unsupported_not_found"
   },
   "ops": [],
   "answer": {
     "ok": {
-      "message": "SKU: {verified_sku_str} - verified",
+      "message": "Claim check result: OK SKU: {sku}",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
-          "path": null,
-          "source": "$verified_sku.record_path"
+          "source": "$record_path_val"
         }
       ]
     },
-    "unsupported": {
-      "message": "SKU: {base_sku_str} - not found",
+    "unsupported_missing_props": {
+      "message": "Claim check result: Unsupported (missing properties) SKU: {sku}",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": [
         {
           "kind": "record_path",
-          "path": null,
-          "source": "$base_variant.record_path"
+          "source": "$record_path_val"
         }
       ]
+    },
+    "unsupported_not_found": {
+      "message": "Claim check result: Unsupported (product not found) SKU: N/A",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
     }
   },
   "custom_extract": []

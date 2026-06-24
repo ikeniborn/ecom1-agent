@@ -1,11 +1,11 @@
 {
-  "objective": "Determine whether the product catalog contains a Karcher product from the 'Karcher Professional FC 33Z-7OP Trimmer and Blower' line with tool type 'pressure sprayer'.",
+  "objective": "Determine whether the product variant described as 'Respiratory Protection from Honeywell in the Honeywell Pro HW 2GM-UMP Respiratory Protection line with mask type dust mask and protection class basic' is available in the product catalog.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "brand": "Karcher",
-    "line": "Karcher Professional FC 33Z-7OP Trimmer and Blower",
-    "tool_type": "pressure sprayer",
-    "lookup_method": "Search product_variants joined with product_variant_properties for a product where brand = $brand, (series = $line OR product_family_name = $line), and there exists a property with key 'tool type' and value $tool_type."
+    "brand": "literal 'Honeywell' from instruction",
+    "product_family_name": "literal 'Honeywell Pro HW 2GM-UMP Respiratory Protection' from instruction",
+    "mask_type": "literal 'dust mask' from instruction",
+    "protection_class": "literal 'basic' from instruction"
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -15,22 +15,37 @@
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "nonempty",
-        "lhs": "$rows.0.product_sku",
+        "op": "not",
+        "lhs": null,
         "rhs": null,
-        "args": []
+        "args": [
+          {
+            "op": "isnull",
+            "lhs": "$matching_products",
+            "rhs": null,
+            "args": []
+          }
+        ]
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "The product {product_name} (SKU: {product_sku}) is in the catalogue."
+    "msg_skeleton": "The requested product is {availability} in our catalog.",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
+        "kind": "policy_doc",
+        "path": "/docs/README.md",
+        "source": null
+      },
+      {
         "kind": "record_path",
         "path": null,
-        "source": "$row.record_path"
+        "source": "$matching_products.0.record_path"
       }
     ]
   }

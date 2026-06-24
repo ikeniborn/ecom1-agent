@@ -4,7 +4,7 @@ entries:
     two rowsets. Use a string concatenation primitive (e.g., str_concat) that accepts
     multiple string arguments.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r001
   reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes
     2 positional arguments but 3 were given. CONTRACT: concat(a, b): both args must
@@ -12,11 +12,92 @@ entries:
     compute step used concat with three string arguments (''/payments/'', ''$new_payment_id'',
     ''.json'') to build a path, violating the concat contract. Failing fragment: {"prim":"concat","args":["/payments/","$new_payment_id",".json"],"into":"payment_record_path"}.
     Rule: instruct to use a dedicated string concatenation primitive instead.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always populate the answer's refs list with the required refs for the outcome
+    as specified in the TOOL_PLAN's required_refs, and ensure the plan includes steps
+    that produce those refs (e.g., by executing the appropriate RPCs and binding the
+    results to the required ref variables).
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$payment_transaction.record_path'',
+    ''$basket.record_path''] on OK answer. Root cause: The PlanIR for the ''proceed_checkout''
+    branch has an empty refs list, but the TOOL_PLAN requires those refs for OUTCOME_OK.
+    The plan lacks any operations to perform checkout and capture the payment transaction
+    and basket record paths. The failing fragment is the answer object: {"proceed_checkout":{"message":"Checkout
+    processed for basket {basket_id}.","outcome":"OUTCOME_OK","refs":[]}}. The rule
+    ensures that the plan includes the necessary steps to produce required refs and
+    that the answer''s refs list is correctly populated.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always use 'get' to extract a field from a single row (dict); use 'column'
+    only when operating on a list of dicts (rowset).
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''column'' expects list[dict]; use ''get'' for a single row.
+    Root cause: PlanIR uses ''first'' to reduce a rowset to a single dict, then applies
+    ''column'' on that dict. ''column'' requires a list of dicts. The correct primitive
+    for a single row is ''get''. Failing fragment: compute steps after ''first'' (e.g.,
+    {"prim":"column","args":["$customer_basket_row","basket_record_path"]}). Rule
+    linkage: new rule prevents misuse of ''column'' on single-row results.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When a security constraint defines a deny_when predicate, the decision
+    block must include a branch that matches that predicate (leading to the denied
+    outcome) and a default branch that leads to the normal outcome (OUTCOME_OK). The
+    plan must also include the necessary steps (RPCs, compute) to produce the required
+    refs for the normal outcome.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR decision
+    block has two branches: one when identity_kind equals ''guest'' leads to ''denied'',
+    and the default_label is also ''denied''. This causes the plan to always output
+    DENIED_SECURITY regardless of the actual identity kind. The security rule only
+    denies when identity is guest; for a customer, the plan should proceed to OUTCOME_OK.
+    The plan also lacks any steps for the normal checkout flow (RPCs, required refs).
+    The failing PlanIR fragment is the decision block with default_label ''denied''
+    and no branch for non-guest. The new rule ensures the decision structure correctly
+    reflects the security constraint and includes the normal outcome path.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the 'stdout' field from an ExecResponse (e.g., from /bin/id)
+    using a 'get' compute step before using the output in string matching or containment
+    checks. Use string primitives (e.g., str_contains) on the extracted string, not
+    contains_any on the raw ExecResponse object.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: ''real_vm: Protocol message ExecResponse has no "roles: guest"
+    field.'' Root cause: The plan''s decision branch uses contains_any on $identity_raw,
+    which is an ExecResponse object (not a string). The VM attempts to access a field
+    named ''roles: guest'' on that object, which does not exist. The fix is to first
+    extract the stdout field from the ExecResponse via a compute step (prim:''get'',
+    args:[''$identity_raw'',''stdout'']), then apply string matching on the extracted
+    string. This rule prevents similar failures when using Exec RPC outputs in conditions.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-22'
-  outcome: OUTCOME_DENIED_SECURITY
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t34

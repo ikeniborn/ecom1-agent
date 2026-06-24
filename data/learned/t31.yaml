@@ -1,63 +1,81 @@
 entries:
 - agents_md_anchor: null
-  content: When the desired outcome is a deny outcome (e.g., OUTCOME_DENIED_SECURITY) and the deny condition
-    is not always true, set the default_label to a non-deny outcome (e.g., 'ok') and add a branch for
-    the deny condition only. Never set default_label to a deny outcome unless the deny condition is always
-    true.
+  content: When the desired outcome is a deny outcome (e.g., OUTCOME_DENIED_SECURITY)
+    and the deny condition is not always true, set the default_label to a non-deny
+    outcome (e.g., 'ok') and add a branch for the deny condition only. Never set default_label
+    to a deny outcome unless the deny condition is always true.
   created: '2026-06-22'
   deactivated_reason: null
   id: r004
-  reasoning: The script's decision default_label was 'deny', which maps to OUTCOME_DENIED_SECURITY. The
-    deny condition (identity.kind == 'guest') was not always true, so the outcome was produced even when
-    identity.kind was 'customer', causing the success criteria to fail. Existing rule r001 warns against
-    this but was not applied; this rule clarifies the case when the desired outcome itself is a deny outcome.
+  reasoning: The script's decision default_label was 'deny', which maps to OUTCOME_DENIED_SECURITY.
+    The deny condition (identity.kind == 'guest') was not always true, so the outcome
+    was produced even when identity.kind was 'customer', causing the success criteria
+    to fail. Existing rule r001 warns against this but was not applied; this rule
+    clarifies the case when the desired outcome itself is a deny outcome.
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Do not hardcode constant values in discovery queries to simulate facts that are already available
-    in the interpreter's $_facts (e.g., identity.kind). Instead, reference the $_facts path directly in
-    decision branch conditions.
+  content: Do not hardcode constant values in discovery queries to simulate facts
+    that are already available in the interpreter's $_facts (e.g., identity.kind).
+    Instead, reference the $_facts path directly in decision branch conditions.
   created: '2026-06-22'
   deactivated_reason: null
   id: r005
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION. The script''s discovery
-    step hardcoded ''guest'' as kind in a SQL constant, but the actual identity is not guest, and the
-    query likely failed due to missing column ''record_path'' in payment_transactions, causing empty rows
-    and a compute failure that led to clarification. The root cause is fabricating a fact instead of using
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION. The
+    script''s discovery step hardcoded ''guest'' as kind in a SQL constant, but the
+    actual identity is not guest, and the query likely failed due to missing column
+    ''record_path'' in payment_transactions, causing empty rows and a compute failure
+    that led to clarification. The root cause is fabricating a fact instead of using
     $_facts.identity.kind, and possibly selecting a non-existent column.'
   status: active
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
   source: verdict
-  status: active
+  status: inactive
   submitted_message: Guests are not permitted to perform payment operations.
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: When a decision branch uses $_facts.identity.kind to enforce a security constraint, include
-    a discovery step to read the identity source file (e.g., /home/user/.session) and use its content
-    to determine the kind, rather than relying solely on $_facts.
+  content: When a decision branch uses $_facts.identity.kind to enforce a security
+    constraint, include a discovery step to read the identity source file (e.g., /home/user/.session)
+    and use its content to determine the kind, rather than relying solely on $_facts.
   created: '2026-06-22'
   deactivated_reason: null
   id: r006
-  reasoning: 'Error: grader expected OUTCOME_OK but got OUTCOME_DENIED_SECURITY. The PlanIR decision branch
-    correctly checks $_facts.identity.kind == ''guest'' to deny, but the pre-phase mis-set identity.kind
-    to ''guest'' even though the true identity is not guest (desired outcome OK). The PlanIR had no independent
-    verification of identity, so it trusted the incorrect $_facts and took the deny branch. The new rule
-    ensures the PlanIR reads the identity source file directly, making the decision robust to pre-phase
-    errors.'
+  reasoning: 'Error: grader expected OUTCOME_OK but got OUTCOME_DENIED_SECURITY. The
+    PlanIR decision branch correctly checks $_facts.identity.kind == ''guest'' to
+    deny, but the pre-phase mis-set identity.kind to ''guest'' even though the true
+    identity is not guest (desired outcome OK). The PlanIR had no independent verification
+    of identity, so it trusted the incorrect $_facts and took the deny branch. The
+    new rule ensures the PlanIR reads the identity source file directly, making the
+    decision robust to pre-phase errors.'
   status: active
   surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Cannot restart 3DS authentication for payment pay_010.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /proc/baskets/basket_210.json
+  - /proc/payments/pay_010.json
+  - /docs/payments/3ds.md
 last_run:
   cycles_used: 1
-  date: '2026-06-22'
-  outcome: OUTCOME_DENIED_SECURITY
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 prephase_deep_read:
 - /db/schema

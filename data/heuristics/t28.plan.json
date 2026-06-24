@@ -3,16 +3,16 @@
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/security.md"
+        "path": "/docs/discounts.md"
       },
-      "bind": "policy_security"
+      "bind": "policy_discounts"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/discounts.md"
+        "path": "/docs/security.md"
       },
-      "bind": "policy_discounts"
+      "bind": "policy_security"
     },
     {
       "rpc": "Exec",
@@ -25,9 +25,17 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH store AS (\n  SELECT store_id, record_path FROM stores WHERE store_name = 'PowerTool Graz Jakomini'\n),\nmanager AS (\n  SELECT e.employee_id, e.record_path FROM employee_accounts e\n  JOIN store s ON e.store_id = s.store_id\n  WHERE e.employee_display_name = 'Tobias Hartmann' AND e.job_title = 'manager'\n),\nbasket AS (\n  SELECT record_path FROM shopping_baskets WHERE basket_id = 'basket_037'\n)\nSELECT s.record_path AS store_record_path,\n       m.record_path AS manager_record_path,\n       b.record_path AS basket_record_path\nFROM store s\nLEFT JOIN manager m ON 1=1\nLEFT JOIN basket b ON 1=1;"
+        "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE store_name = 'PowerTool Vienna Meidling'), employee AS (SELECT employee_id, record_path FROM employee_accounts WHERE employee_display_name = 'Frederike Blom' AND store_id IN (SELECT store_id FROM store)), role AS (SELECT role_code FROM employee_role_assignments WHERE employee_id IN (SELECT employee_id FROM employee)) SELECT store.store_id, store.record_path as store_path, employee.employee_id, employee.record_path as employee_path, role.role_code FROM store, employee, role LIMIT 1;"
       },
-      "bind": "lookup_raw"
+      "bind": "manager_sql"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT basket_id, record_path, discount_percent, discount_reason_code, discount_issuer_employee_id, basket_status FROM shopping_baskets WHERE basket_id = 'basket_054';"
+      },
+      "bind": "basket_sql"
     }
   ],
   "rowsets": [
@@ -38,26 +46,81 @@
       "columns": []
     },
     {
-      "from_": "lookup_raw",
+      "from_": "manager_sql",
       "format": "auto_delim",
-      "into": "lookup_rows",
+      "into": "manager_rows",
       "columns": [
         {
-          "into": "store_record_path",
+          "into": "store_id",
           "candidates": [
-            "store_record_path"
+            "store_id"
           ]
         },
         {
-          "into": "manager_record_path",
+          "into": "store_path",
           "candidates": [
-            "manager_record_path"
+            "store_path"
           ]
         },
         {
-          "into": "basket_record_path",
+          "into": "employee_id",
           "candidates": [
-            "basket_record_path"
+            "employee_id"
+          ]
+        },
+        {
+          "into": "employee_path",
+          "candidates": [
+            "employee_path"
+          ]
+        },
+        {
+          "into": "role_code",
+          "candidates": [
+            "role_code"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "basket_sql",
+      "format": "auto_delim",
+      "into": "basket_rows",
+      "columns": [
+        {
+          "into": "basket_id",
+          "candidates": [
+            "basket_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "discount_percent",
+          "candidates": [
+            "discount_percent"
+          ]
+        },
+        {
+          "into": "discount_reason_code",
+          "candidates": [
+            "discount_reason_code"
+          ]
+        },
+        {
+          "into": "discount_issuer_employee_id",
+          "candidates": [
+            "discount_issuer_employee_id"
+          ]
+        },
+        {
+          "into": "basket_status",
+          "candidates": [
+            "basket_status"
           ]
         }
       ]
@@ -65,28 +128,49 @@
   ],
   "compute": [
     {
-      "prim": "column",
+      "prim": "first",
       "args": [
-        "$lookup_rows",
-        "store_record_path"
+        "$identity"
       ],
-      "into": "store_record_path"
+      "into": "identity_obj"
     },
     {
-      "prim": "column",
+      "prim": "first",
       "args": [
-        "$lookup_rows",
-        "manager_record_path"
+        "$manager_rows"
       ],
-      "into": "manager_record_path"
+      "into": "manager"
     },
     {
-      "prim": "column",
+      "prim": "first",
       "args": [
-        "$lookup_rows",
-        "basket_record_path"
+        "$basket_rows"
       ],
-      "into": "basket_record_path"
+      "into": "basket"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$manager",
+        "employee_id"
+      ],
+      "into": "emp_id"
+    },
+    {
+      "prim": "concat",
+      "args": [
+        "UPDATE shopping_baskets SET discount_percent = 5, discount_reason_code = 'service_recovery', discount_issuer_employee_id = '",
+        "$emp_id"
+      ],
+      "into": "sql_part1"
+    },
+    {
+      "prim": "concat",
+      "args": [
+        "$sql_part1",
+        "' WHERE basket_id = 'basket_054';"
+      ],
+      "into": "update_sql"
     }
   ],
   "decision": {
@@ -94,26 +178,59 @@
       {
         "when": {
           "op": "eq",
-          "lhs": "$identity.kind",
+          "lhs": "$identity_obj.kind",
           "rhs": "guest",
           "args": []
         },
-        "label": "denied"
+        "label": "denied_guest"
+      },
+      {
+        "when": {
+          "op": "ne",
+          "lhs": "$manager.role_code",
+          "rhs": "store_manager",
+          "args": []
+        },
+        "label": "denied_role"
+      },
+      {
+        "when": {
+          "op": "ne",
+          "lhs": "$basket.basket_status",
+          "rhs": "active",
+          "args": []
+        },
+        "label": "clarify_status"
+      },
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$basket.discount_percent",
+          "rhs": null,
+          "args": []
+        },
+        "label": "clarify_discount"
       }
     ],
-    "default_label": "denied"
+    "default_label": "ok"
   },
-  "ops": [],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "$update_sql"
+      },
+      "bind": null,
+      "guard_label": "ok",
+      "outcome_from_exit": null
+    }
+  ],
   "answer": {
-    "denied": {
-      "message": "Confirmed Tobias Hartmann is manager at PowerTool Graz Jakomini. Cannot apply 5% service_recovery discount to basket_037: guest identity not authorized.",
+    "denied_guest": {
+      "message": "Cannot apply discount: unauthorized (guest).",
       "outcome": "OUTCOME_DENIED_SECURITY",
       "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/security.md",
-          "source": null
-        },
         {
           "kind": "policy_doc",
           "path": "/docs/discounts.md",
@@ -122,17 +239,66 @@
         {
           "kind": "record_path",
           "path": null,
-          "source": "$store_record_path"
+          "source": "$basket.record_path"
+        }
+      ]
+    },
+    "denied_role": {
+      "message": "Cannot apply discount: manager role not store_manager.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
         },
         {
           "kind": "record_path",
           "path": null,
-          "source": "$manager_record_path"
+          "source": "$basket.record_path"
+        }
+      ]
+    },
+    "clarify_status": {
+      "message": "Cannot apply discount: basket not active.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
+        }
+      ]
+    },
+    "clarify_discount": {
+      "message": "Cannot apply discount: basket already has discount.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
+        }
+      ]
+    },
+    "ok": {
+      "message": "Confirmed manager Frederike Blom and applied 5% service_recovery discount to basket basket_054.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
         },
         {
           "kind": "record_path",
           "path": null,
-          "source": "$basket_record_path"
+          "source": "$basket.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$manager.employee_path"
         }
       ]
     }

@@ -4,24 +4,24 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH product AS (SELECT product_sku, record_path FROM product_variants WHERE brand = 'Raaco' AND series = 'Raaco Stackable Assorter 20C-L8E Storage Bin and Organizer' AND product_name = 'Storage Bin and Organizer' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'storage_type' AND property_value_text = 'storage bin') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'color_family' AND property_value_text = 'Red') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'volume' AND property_value_text = '3 l')) SELECT product_sku, record_path, (SELECT COALESCE(SUM(si.available_today_quantity), 0) FROM stores vs LEFT JOIN store_inventory si ON vs.store_id = si.store_id AND si.product_sku = product.product_sku WHERE vs.city = 'Vienna') AS total_count FROM product;"
+        "stdin": "WITH product AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  INNER JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND LOWER(TRIM(pvp1.property_key)) = 'wattage' AND LOWER(TRIM(pvp1.property_value_text)) = LOWER(TRIM('15 W'))\n  INNER JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND LOWER(TRIM(pvp2.property_key)) = 'luminous flux' AND LOWER(TRIM(pvp2.property_value_text)) = LOWER(TRIM('1055 lm'))\n  WHERE LOWER(TRIM(pv.brand)) = LOWER(TRIM('Osram'))\n    AND LOWER(TRIM(pv.series)) = LOWER(TRIM('Eco Classic 3PW-R88'))\n    AND LOWER(TRIM(pv.model)) = LOWER(TRIM('LED Bulb'))\n)\nSELECT p.product_sku, p.record_path, COALESCE(SUM(si.available_today_quantity), 0) AS total_available\nFROM product p\nCROSS JOIN (SELECT store_id FROM stores WHERE LOWER(TRIM(city)) = LOWER(TRIM('Vienna'))) s\nLEFT JOIN store_inventory si ON s.store_id = si.store_id AND si.product_sku = p.product_sku\nGROUP BY p.product_sku, p.record_path;"
       },
-      "bind": "$product_and_count_raw"
+      "bind": "product_total_raw"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT store_id, record_path FROM stores WHERE city = 'Vienna';"
+        "stdin": "SELECT record_path FROM stores WHERE LOWER(TRIM(city)) = LOWER(TRIM('Vienna'));"
       },
-      "bind": "$stores_raw"
+      "bind": "stores_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "$product_and_count_raw",
+      "from_": "product_total_raw",
       "format": "auto_delim",
-      "into": "$product_and_count_rows",
+      "into": "product_total_rows",
       "columns": [
         {
           "into": "product_sku",
@@ -30,30 +30,24 @@
           ]
         },
         {
-          "into": "record_path",
+          "into": "product_record_path",
           "candidates": [
             "record_path"
           ]
         },
         {
-          "into": "total_count",
+          "into": "total_available",
           "candidates": [
-            "total_count"
+            "total_available"
           ]
         }
       ]
     },
     {
-      "from_": "$stores_raw",
+      "from_": "stores_raw",
       "format": "auto_delim",
-      "into": "$stores_rows",
+      "into": "stores_rows",
       "columns": [
-        {
-          "into": "store_id",
-          "candidates": [
-            "store_id"
-          ]
-        },
         {
           "into": "record_path",
           "candidates": [
@@ -67,25 +61,25 @@
     {
       "prim": "first",
       "args": [
-        "$product_and_count_rows"
+        "$product_total_rows"
       ],
-      "into": "$product_and_count_first"
+      "into": "$product_row"
     },
     {
       "prim": "get",
       "args": [
-        "$product_and_count_first",
-        "record_path"
+        "$product_row",
+        "product_record_path"
       ],
-      "into": "$product.record_path"
+      "into": "$product_record_path"
     },
     {
       "prim": "get",
       "args": [
-        "$product_and_count_first",
-        "total_count"
+        "$product_row",
+        "total_available"
       ],
-      "into": "$total_count"
+      "into": "$total"
     },
     {
       "prim": "column",
@@ -93,43 +87,56 @@
         "$stores_rows",
         "record_path"
       ],
-      "into": "$stores"
+      "into": "$store_record_paths"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "nonempty",
-          "lhs": "$product_and_count_rows",
+          "op": "and",
+          "lhs": null,
           "rhs": null,
-          "args": []
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$product_record_path",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$store_record_paths",
+              "rhs": null,
+              "args": []
+            }
+          ]
         },
         "label": "ok"
       }
     ],
-    "default_label": "no_product"
+    "default_label": "unsupported"
   },
   "ops": [],
   "answer": {
     "ok": {
-      "message": "count: {total_count}",
+      "message": "Total available today quantity of the LED bulb across Vienna stores: {total}",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
           "path": null,
-          "source": "$product.record_path"
+          "source": "$product_record_path"
         },
         {
           "kind": "record_path",
           "path": null,
-          "source": "$stores"
+          "source": "$store_record_paths"
         }
       ]
     },
-    "no_product": {
-      "message": "Product not found.",
+    "unsupported": {
+      "message": "Could not find the product or Vienna stores.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

@@ -1,54 +1,86 @@
 entries:
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
-  status: active
+  status: inactive
   submitted_message: Product not found
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: When using Exec to run a command that reads SQL or other input from stdin, always provide the
-    stdin content as a top-level 'stdin' field in the Exec args object, not inside the 'args' array.
+  content: When using Exec to run a command that reads SQL or other input from stdin,
+    always provide the stdin content as a top-level 'stdin' field in the Exec args
+    object, not inside the 'args' array.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r006
-  reasoning: The error 'sql returned usage banner — SQL not delivered via stdin' indicates that the SQL
-    command did not receive the stdin content. The PlanIR placed the stdin string inside the 'args' object
-    alongside 'path' and 'args', but the Exec RPC likely expects 'stdin' as a separate top-level field.
-    The rule corrects this structural mistake for future PlanIR generation.
-  status: active
+  reasoning: The error 'sql returned usage banner — SQL not delivered via stdin' indicates
+    that the SQL command did not receive the stdin content. The PlanIR placed the
+    stdin string inside the 'args' object alongside 'path' and 'args', but the Exec
+    RPC likely expects 'stdin' as a separate top-level field. The rule corrects this
+    structural mistake for future PlanIR generation.
+  status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: When using Exec to run a command that reads from stdin, always pass the stdin content as a
-    string element in the 'args' array, not as a top-level 'stdin' field.
+  content: When using Exec to run a command that reads from stdin, always pass the
+    stdin content as a string element in the 'args' array, not as a top-level 'stdin'
+    field.
   created: '2026-06-22'
   deactivated_reason: null
   id: r007
-  reasoning: The PlanIR used 'stdin' as a top-level field in the Exec args object, but the interpreter
-    did not recognize it and thus did not deliver the SQL to the command, causing sql to print its usage
-    banner. The error was 'sql returned usage banner — SQL not delivered via stdin'. The correct method
-    is to include the stdin content as a string in the 'args' array.
+  reasoning: The PlanIR used 'stdin' as a top-level field in the Exec args object,
+    but the interpreter did not recognize it and thus did not deliver the SQL to the
+    command, causing sql to print its usage banner. The error was 'sql returned usage
+    banner — SQL not delivered via stdin'. The correct method is to include the stdin
+    content as a string in the 'args' array.
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: 'Always provide the ''args'' field of a discovery step as a dictionary (e.g., {"command": "/bin/sql",
-    "stdin": "SELECT ..."}) rather than a list, because the PlanIR schema expects a dict for args.'
+  content: 'Always provide the ''args'' field of a discovery step as a dictionary
+    (e.g., {"command": "/bin/sql", "stdin": "SELECT ..."}) rather than a list, because
+    the PlanIR schema expects a dict for args.'
   created: '2026-06-22'
   deactivated_reason: null
   id: r008
-  reasoning: 'PlanIR validation failed: discovery.0.args, discovery.1.args, discovery.2.args were lists
-    (e.g., [''/bin/sql'', ''SELECT ...'']) but the schema requires a dict. The failing PlanIR used list-style
-    args for Exec-like discovery steps, causing a type error. The rule instructs the PLAN phase to always
-    emit args as a dict.'
+  reasoning: 'PlanIR validation failed: discovery.0.args, discovery.1.args, discovery.2.args
+    were lists (e.g., [''/bin/sql'', ''SELECT ...'']) but the schema requires a dict.
+    The failing PlanIR used list-style args for Exec-like discovery steps, causing
+    a type error. The rule instructs the PLAN phase to always emit args as a dict.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When using Exec RPC, the returned value is a dict with a 'rows' key containing
+    the list of rows. Always extract the rows list using a 'get' primitive (e.g.,
+    get($exec_result, 'rows')) before applying list operations like filter_rows or
+    column.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Error: interpret: compute step ''filter_rows'' failed: ''filter_rows''
+    expects list[dict]; use ''get'' for a single row. Root cause: The discovery step
+    binds the entire Exec RPC result to $result_rows, but Exec returns a dict with
+    a ''rows'' key, not a list. The subsequent filter_rows expects a list, causing
+    failure. The PlanIR must extract the rows list before row-level operations.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Product not found or no stores in Graz.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
-  cycles_used: 4
-  date: '2026-06-22'
+  cycles_used: 2
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 prephase_deep_read:

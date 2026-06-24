@@ -3,38 +3,35 @@
     {
       "rpc": "Read",
       "args": {
-        "path": "/archive/payment_batch_export_ELRhniWLDW.tsv"
+        "path": "/archive/payment_batch_export_DXad65HdYb.tsv"
       },
       "bind": "tsv_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "tsv_raw",
+      "from_": "tsv_content",
       "format": "auto_delim",
       "into": "rows",
       "columns": [
         {
-          "into": "fraud_flag",
+          "into": "fraud_indicator",
           "candidates": [
-            "is_fraud",
-            "fraud_flag",
-            "fraud"
+            "incident_type",
+            "fraud_flag"
           ]
         },
         {
-          "into": "amount_cents",
+          "into": "payment_amount",
           "candidates": [
-            "amount_cents",
-            "amount",
-            "payment_amount_cents"
+            "payment_amount_cents",
+            "amount"
           ]
         },
         {
           "into": "row_id",
           "candidates": [
             "RowID",
-            "id",
             "row_id"
           ]
         }
@@ -43,74 +40,119 @@
   ],
   "compute": [
     {
-      "prim": "column",
+      "prim": "get",
+      "args": [
+        "$tsv_raw",
+        "content"
+      ],
+      "into": "tsv_content"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "filter_rows",
       "args": [
         "$rows",
-        "fraud_flag"
+        "fraud_indicator != ''"
       ],
-      "into": "fraud_col"
+      "into": "fraud_rows"
     },
     {
       "prim": "column",
       "args": [
-        "$rows",
-        "amount_cents"
-      ],
-      "into": "amount_col"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$rows",
+        "$fraud_rows",
         "row_id"
       ],
-      "into": "row_id_col"
+      "into": "fraud_row_paths"
+    },
+    {
+      "prim": "sum_col",
+      "args": [
+        "$fraud_rows",
+        "payment_amount"
+      ],
+      "into": "total_fraud_amount_cents"
+    },
+    {
+      "prim": "div",
+      "args": [
+        "$total_fraud_amount_cents",
+        100
+      ],
+      "into": "euros"
+    },
+    {
+      "prim": "div",
+      "args": [
+        "$euros",
+        0.01
+      ],
+      "into": "euros_times_100"
+    },
+    {
+      "prim": "abs_diff",
+      "args": [
+        "$total_fraud_amount_cents",
+        "$euros_times_100"
+      ],
+      "into": "cents"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "and",
+          "op": "or",
           "lhs": null,
           "rhs": null,
           "args": [
             {
-              "op": "nonempty",
-              "lhs": "$fraud_col",
+              "op": "isnull",
+              "lhs": "$first_row.fraud_indicator",
               "rhs": null,
               "args": []
             },
             {
-              "op": "nonempty",
-              "lhs": "$amount_col",
+              "op": "isnull",
+              "lhs": "$first_row.payment_amount",
               "rhs": null,
               "args": []
             },
             {
-              "op": "nonempty",
-              "lhs": "$row_id_col",
+              "op": "isnull",
+              "lhs": "$first_row.row_id",
               "rhs": null,
               "args": []
             }
           ]
         },
-        "label": "unsupported_refs"
+        "label": "OUTCOME_NONE_UNSUPPORTED"
       }
     ],
-    "default_label": "missing_columns"
+    "default_label": "proceed"
   },
   "ops": [],
   "answer": {
-    "missing_columns": {
-      "message": "Required columns (fraud flag, amount, row ID) not found in the TSV file.",
+    "OUTCOME_NONE_UNSUPPORTED": {
+      "message": "The TSV file does not contain the required columns for fraud detection.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     },
-    "unsupported_refs": {
-      "message": "Unable to generate per-row record paths due to missing element-wise string concatenation primitive.",
-      "outcome": "OUTCOME_NONE_UNSUPPORTED",
-      "refs": []
+    "proceed": {
+      "message": "EUR {euros}.{cents:02d}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$fraud_row_paths"
+        }
+      ]
     }
   },
   "custom_extract": []

@@ -4,25 +4,31 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH product_family AS (\n  SELECT product_family_id\n  FROM product_families\n  WHERE brand = 'Heco'\n    AND series = 'Heco Zinc Plated'\n    AND model = 'HECO 3DW-64B'\n    AND product_family_name = 'Nut Bolt and Washer'\n),\nproduct_variant AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  JOIN product_family pf ON pv.product_family_id = pf.product_family_id\n  JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku\n  WHERE pvp.property_key = 'fastener type'\n    AND pvp.property_value_text = 'threaded rod'\n),\ngraz_stores AS (\n  SELECT store_id\n  FROM stores\n  WHERE city = 'Graz'\n)\nSELECT pv.product_sku, pv.record_path AS product_record_path,\n       COALESCE(SUM(si.available_today_quantity), 0) AS total_available\nFROM graz_stores gs\nCROSS JOIN product_variant pv\nLEFT JOIN store_inventory si ON gs.store_id = si.store_id AND si.product_sku = pv.product_sku\nGROUP BY pv.product_sku, pv.record_path;"
+        "stdin": "SELECT CASE WHEN EXISTS (SELECT 1 FROM product_families pf JOIN product_variants pv ON pf.product_family_id = pv.product_family_id JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'screw type' AND pvp1.property_value_text = 'wood screw' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'diameter' AND pvp2.property_value_text = '6 mm' WHERE pf.product_family_name = 'Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw') THEN 1 ELSE 0 END as product_found, (SELECT pv.product_sku FROM product_families pf JOIN product_variants pv ON pf.product_family_id = pv.product_family_id JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'screw type' AND pvp1.property_value_text = 'wood screw' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'diameter' AND pvp2.property_value_text = '6 mm' WHERE pf.product_family_name = 'Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw' LIMIT 1) as product_sku, (SELECT pv.record_path FROM product_families pf JOIN product_variants pv ON pf.product_family_id = pv.product_family_id JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'screw type' AND pvp1.property_value_text = 'wood screw' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'diameter' AND pvp2.property_value_text = '6 mm' WHERE pf.product_family_name = 'Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw' LIMIT 1) as product_record_path;"
       },
-      "bind": "product_query"
+      "bind": "product_info_raw"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT record_path FROM stores WHERE city = 'Graz';"
+        "stdin": "WITH product AS (SELECT pv.product_sku FROM product_families pf JOIN product_variants pv ON pf.product_family_id = pv.product_family_id JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'screw type' AND pvp1.property_value_text = 'wood screw' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'diameter' AND pvp2.property_value_text = '6 mm' WHERE pf.product_family_name = 'Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw' LIMIT 1) SELECT s.store_id, s.record_path, COALESCE(si.available_today_quantity, 0) as available_today_quantity FROM stores s LEFT JOIN store_inventory si ON s.store_id = si.store_id AND si.product_sku = (SELECT product_sku FROM product) WHERE s.city = 'Vienna';"
       },
-      "bind": "store_query"
+      "bind": "inventory_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "$product_query.stdout",
+      "from_": "$product_info_raw.stdout",
       "format": "auto_delim",
-      "into": "product_rowset",
+      "into": "product_info_rows",
       "columns": [
+        {
+          "into": "product_found",
+          "candidates": [
+            "product_found"
+          ]
+        },
         {
           "into": "product_sku",
           "candidates": [
@@ -34,24 +40,30 @@
           "candidates": [
             "product_record_path"
           ]
-        },
-        {
-          "into": "total_available",
-          "candidates": [
-            "total_available"
-          ]
         }
       ]
     },
     {
-      "from_": "$store_query.stdout",
+      "from_": "$inventory_raw.stdout",
       "format": "auto_delim",
-      "into": "store_rowset",
+      "into": "inventory_rows",
       "columns": [
         {
-          "into": "store_record_path",
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "record_path",
           "candidates": [
             "record_path"
+          ]
+        },
+        {
+          "into": "available_today_quantity",
+          "candidates": [
+            "available_today_quantity"
           ]
         }
       ]
@@ -61,95 +73,102 @@
     {
       "prim": "column",
       "args": [
-        "$product_rowset",
-        "product_record_path"
+        "$product_info_rows",
+        "product_found"
       ],
-      "into": "product_record_paths_list"
+      "into": "product_found_list"
     },
     {
-      "prim": "first",
+      "prim": "get",
       "args": [
-        "$product_record_paths_list"
+        "$product_found_list",
+        0
       ],
-      "into": "product_record_path"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$product_record_paths_list"
-      ],
-      "into": "product_variant.record_path"
+      "into": "product_found"
     },
     {
       "prim": "column",
       "args": [
-        "$product_rowset",
-        "total_available"
+        "$product_info_rows",
+        "product_sku"
       ],
-      "into": "total_available_list"
+      "into": "product_sku_list"
     },
     {
-      "prim": "first",
+      "prim": "get",
       "args": [
-        "$total_available_list"
+        "$product_sku_list",
+        0
+      ],
+      "into": "product_sku"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_info_rows",
+        "product_record_path"
+      ],
+      "into": "product_rp_list"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_rp_list",
+        0
+      ],
+      "into": "product_rp"
+    },
+    {
+      "prim": "sum_col",
+      "args": [
+        "$inventory_rows",
+        "available_today_quantity"
       ],
       "into": "count"
     },
     {
       "prim": "column",
       "args": [
-        "$store_rowset",
-        "store_record_path"
+        "$inventory_rows",
+        "record_path"
       ],
-      "into": "store_record_paths"
-    },
-    {
-      "prim": "count",
-      "args": [
-        "$store_record_paths"
-      ],
-      "into": "num_stores_in_graz"
+      "into": "stores_rp_list"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "and",
-          "lhs": null,
-          "rhs": null,
-          "args": [
-            {
-              "op": "nonempty",
-              "lhs": "$product_rowset",
-              "rhs": null,
-              "args": []
-            },
-            {
-              "op": "nonempty",
-              "lhs": "$store_rowset",
-              "rhs": null,
-              "args": []
-            }
-          ]
+          "op": "eq",
+          "lhs": "$product_found",
+          "rhs": 1,
+          "args": []
         },
-        "label": "ok"
+        "label": "found"
       }
     ],
-    "default_label": "unsupported"
+    "default_label": "not_found"
   },
   "ops": [],
   "answer": {
-    "ok": {
+    "found": {
       "message": "count: {count}",
       "outcome": "OUTCOME_OK",
       "refs": [
-        "product_variant.record_path",
-        "store_record_paths"
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_rp"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$stores_rp_list"
+        }
       ]
     },
-    "unsupported": {
-      "message": "Product or stores not found",
+    "not_found": {
+      "message": "Product not found",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

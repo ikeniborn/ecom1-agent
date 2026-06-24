@@ -1,60 +1,155 @@
 entries:
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - Answer should contain '<NO>'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: Product found but properties are present.
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: Never pass a default value as a third argument to the 'get' primitive; it only accepts two
-    arguments (object, key). If a default is needed, use the 'get_or_default' primitive instead.
+  content: Never pass a default value as a third argument to the 'get' primitive;
+    it only accepts two arguments (object, key). If a default is needed, use the 'get_or_default'
+    primitive instead.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r009
-  reasoning: 'The error ''compute step ''get'' failed: <lambda>() takes 2 positional arguments but 3 were
-    given'' indicates the PlanIR compute step `{"prim":"get","args":["$first_row","product_sku",""],"into":"sku"}`
-    supplied three arguments to the ''get'' primitive, violating its contract of exactly two arguments
-    (object, key). The empty string was intended as a default, but ''get'' does not support defaults.
-    The correct primitive for a default is ''get_or_default''.'
-  status: active
+  reasoning: 'The error ''compute step ''get'' failed: <lambda>() takes 2 positional
+    arguments but 3 were given'' indicates the PlanIR compute step `{"prim":"get","args":["$first_row","product_sku",""],"into":"sku"}`
+    supplied three arguments to the ''get'' primitive, violating its contract of exactly
+    two arguments (object, key). The empty string was intended as a default, but ''get''
+    does not support defaults. The correct primitive for a default is ''get_or_default''.'
+  status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: When using the sql tool, always pass the SQL query as a command-line argument (e.g., -c or
-    --query) rather than via stdin, unless the tool's documentation explicitly states that it reads SQL
-    from stdin.
+  content: When using the sql tool, always pass the SQL query as a command-line argument
+    (e.g., -c or --query) rather than via stdin, unless the tool's documentation explicitly
+    states that it reads SQL from stdin.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r010
-  reasoning: 'interpret: sql returned usage banner — SQL not delivered via stdin. Root cause: PlanIR discovery
-    step used Exec RPC with stdin field to pass SQL, but the sql tool did not receive it, likely because
-    it expects SQL as a command-line argument. Failing PlanIR fragment: discovery step with stdin containing
-    SQL. No existing rule covers sql invocation method.'
+  reasoning: 'interpret: sql returned usage banner — SQL not delivered via stdin.
+    Root cause: PlanIR discovery step used Exec RPC with stdin field to pass SQL,
+    but the sql tool did not receive it, likely because it expects SQL as a command-line
+    argument. Failing PlanIR fragment: discovery step with stdin containing SQL. No
+    existing rule covers sql invocation method.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a compute step uses 'nonempty' on a value that may be NULL from a
+    discovery step (e.g., a SQL subquery result), ensure the value is never NULL by
+    either wrapping the SQL subquery with COALESCE(..., '') to return an empty string
+    for missing properties, or by using 'get_or_default' to extract the column with
+    a default empty string before calling 'nonempty'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r011
+  reasoning: 'The error ''interpret: compute step ''nonempty'' failed: ''nonempty''''
+    occurred because the ''nonempty'' primitive was called on a NULL value. The SQL
+    subqueries in the discovery step return NULL when the property is not found, and
+    the ''nonempty'' primitive cannot handle NULL. The failing PlanIR fragment: compute
+    steps with ''nonempty'' on $has_bolt, $has_threaded_rod, $has_diameter, which
+    were bound directly from subquery results that may be NULL. No existing rule covers
+    NULL handling for ''nonempty''.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never apply sequence primitives (first, last, nth) directly to the result
+    of an Exec RPC; Exec returns an object (ExecResponse), not a list. Instead, use
+    a discovery tool that returns a list of rows (e.g., a database query tool) or
+    include a compute step to parse the Exec output into a list before applying sequence
+    primitives.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r012
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. Root cause: The PlanIR binds the result of an Exec
+    RPC (which returns an ExecResponse object) to ''product_info_raw'' and then applies
+    the ''first'' primitive, which expects a list. The ExecResponse is not subscriptable,
+    causing a type error. The failing PlanIR fragment is the discovery step using
+    Exec and the subsequent compute step ''first''. This rule prevents the pattern
+    by requiring that sequence primitives only be applied to list-returning tools
+    or after explicit parsing.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always match the answer ref source variable name exactly to the required
+    ref source from the IntentSpec, including any dotted prefix (e.g., 'product_variant.record_path'),
+    by computing a variable with that exact name in the compute step and using it
+    in the answer refs.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Error: verify: I1: required ref source(s) [''$product_variant.record_path'']
+    did not resolve on OUTCOME_NONE_UNSUPPORTED answer. Root cause: The PlanIR answer
+    for the unsupported branch uses ref source ''$record_path'', but the IntentSpec
+    requires ''$product_variant.record_path''. The compute step sets variable ''record_path''
+    instead of ''product_variant.record_path''. The verify phase cannot resolve the
+    ref because the variable name does not match. The same issue exists for the ok
+    branch. The fix is to compute a variable named exactly ''product_variant.record_path''
+    and reference it in both answer refs.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: When a compute step uses 'nonempty' on a value that may be NULL from a discovery step (e.g.,
-    a SQL subquery result), ensure the value is never NULL by either wrapping the SQL subquery with COALESCE(...,
-    '') to return an empty string for missing properties, or by using 'get_or_default' to extract the
-    column with a default empty string before calling 'nonempty'.
-  created: '2026-06-22'
+  content: 'Never use a dotted variable name (e.g., ''$product_variant.record_path'')
+    as the ''into'' target of a ''get'' primitive. Instead, first compute the value
+    into a simple variable (e.g., ''$record_path'') using ''get'', then use a ''let''
+    primitive to bind the dotted name: {''prim'':''let'', ''args'':[''$product_variant.record_path'',
+    ''$record_path'']}. If ''let'' is unavailable, use ''merge'' to build an object
+    with the required dotted path.'
+  created: '2026-06-24'
   deactivated_reason: null
-  id: r011
-  reasoning: 'The error ''interpret: compute step ''nonempty'' failed: ''nonempty'''' occurred because
-    the ''nonempty'' primitive was called on a NULL value. The SQL subqueries in the discovery step return
-    NULL when the property is not found, and the ''nonempty'' primitive cannot handle NULL. The failing
-    PlanIR fragment: compute steps with ''nonempty'' on $has_bolt, $has_threaded_rod, $has_diameter, which
-    were bound directly from subquery results that may be NULL. No existing rule covers NULL handling
-    for ''nonempty''.'
+  id: r014
+  reasoning: 'Error: verify: I1: required ref source(s) [''$product_variant.record_path'']
+    did not resolve on OUTCOME_NONE_UNSUPPORTED answer (resolve-before-cite). Root
+    cause: The compute step ''{"prim":"get","args":["$product_row","record_path"],"into":"$product_variant.record_path"}''
+    attempted to set a variable with a dot in its name. The PlanIR interpreter does
+    not support dots in variable names, so the variable was never created, leaving
+    the required ref unresolved. The in-session rule ''Always match the answer ref
+    source variable name exactly...'' prompted this approach but is insufficient because
+    ''get'' cannot target dotted names. A two-step compute (simple variable + let
+    alias) is needed.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: 'When a required ref source has a dotted name (e.g., ''product_variant.record_path''),
+    never use a ''get'' primitive with that dotted name as the ''into'' target. Instead,
+    first extract the value into a simple variable (e.g., ''record_path'') using ''get'',
+    then use a ''let'' primitive to assign the dotted variable: {''prim'':''let'',
+    ''args'':[''$product_variant.record_path'', ''$record_path'']}.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r015
+  reasoning: 'Error: ''verify: I1: required ref source(s) [''''$product_variant.record_path'''']
+    did not resolve on OUTCOME_NONE_UNSUPPORTED answer (resolve-before-cite)''. Root
+    cause: The compute step used ''get'' with into ''product_variant.record_path'',
+    a dotted variable name. Existing rule [in-session] forbids this; it causes the
+    variable to not be set correctly, leaving the ref unresolved. Failing PlanIR fragment:
+    {"prim":"get","args":["$product_row","record_path"],"into":"product_variant.record_path"}.
+    Rule linkage: Violates [in-session] which states never to use a dotted variable
+    name as the ''into'' target of a ''get'' primitive. The planner should have used
+    a two-step process: first ''get'' into a simple variable, then ''let'' to assign
+    the dotted variable.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
   cycles_used: 4
-  date: '2026-06-22'
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t05

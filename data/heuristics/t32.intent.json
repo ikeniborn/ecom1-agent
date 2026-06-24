@@ -1,44 +1,99 @@
 {
-  "objective": "Verify whether the product catalogue contains a Makita Heavy Duty DDF IX7-HSM Chainsaw with power source corded, bar length 20 cm, and built-in GPS tracking, and if the base product exists but lacks GPS tracking, respond with <NO> and the SKU.",
+  "objective": "Verify whether the product variant matching the description (Engelbert Strauss e.s.motion vision 39A-KCI Work Trousers, color family Gray, size 3XL, fit women, Bluetooth control) exists in the catalogue, and if the base product exists but lacks Bluetooth control, report the SKU with a negative answer.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_name": "the product name from the support note: 'Makita Heavy Duty DDF IX7-HSM Chainsaw'",
-    "brand": "the brand from the support note: 'Makita'",
-    "power_source": "the power source property value: 'corded'",
-    "bar_length": "the bar length property value: '20 cm'",
-    "gps_tracking": "the built-in GPS tracking property key to check, e.g. 'GPS tracking' or 'built-in GPS'"
+    "base_product_query": "lookup from product_variants WHERE brand = 'Engelbert Strauss' AND series = 'e.s.motion vision 39A-KCI' AND model = 'Work Trousers' (or product_name LIKE '%Work Trousers%')",
+    "property_checks": "for each SKU from base_product_query, query product_variant_properties for property_key in ['color_family', 'size', 'fit', 'bluetooth_control'] and compare values to 'Gray', '3XL', 'women', and a truthy value for bluetooth_control"
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_NONE_UNSUPPORTED"
+    "OUTCOME_NONE_UNSUPPORTED",
+    "OUTCOME_NONE_CLARIFICATION"
   ],
   "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$answer.sku",
+        "lhs": "$product_sku",
         "rhs": null,
         "args": []
       },
       {
-        "op": "nonempty",
-        "lhs": "$answer.product_record_path",
-        "rhs": null,
+        "op": "eq",
+        "lhs": "$color_family",
+        "rhs": "Gray",
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$size",
+        "rhs": "3XL",
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$fit",
+        "rhs": "women",
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$bluetooth_control",
+        "rhs": "true",
         "args": []
       }
-    ]
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
+      {
+        "op": "nonempty",
+        "lhs": "$product_sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "or",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "isnull",
+            "lhs": "$bluetooth_control",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "ne",
+            "lhs": "$bluetooth_control",
+            "rhs": "true",
+            "args": []
+          }
+        ]
+      }
+    ],
+    "OUTCOME_NONE_CLARIFICATION": []
   },
   "answer_shape": {
-    "msg_skeleton": "<NO> {sku}"
+    "msg_skeleton": "OUTCOME_OK: 'The product exists: {record_path} with SKU {sku}.' | OUTCOME_NONE_UNSUPPORTED: '<NO> {sku}' | OUTCOME_NONE_CLARIFICATION: 'Product not found.'",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$answer.product_record_path"
+        "source": "$product_variant.record_path"
       }
-    ]
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_variant.record_path"
+      }
+    ],
+    "OUTCOME_NONE_CLARIFICATION": []
   }
 }

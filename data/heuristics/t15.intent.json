@@ -1,78 +1,109 @@
 {
-  "objective": "Count how many of the specified products have at least 1 item available today at the central Ljubljana hardware store.",
+  "objective": "Count how many of the specified six products have at least one item available today in the Ljubljana Center PowerTool store.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "store_lookup": "find store_id from stores where city = 'Ljubljana' and store_name contains 'central' and 'hardware'",
-    "product_lines": [
+    "store_name": "literal 'Ljubljana Center PowerTool'",
+    "store": "lookup from stores WHERE store_name = $store_name, returning all columns including record_path",
+    "product_descriptions": [
+      {
+        "brand": "Milwaukee",
+        "series": "Milwaukee Professional M18 5AB-LER",
+        "model": "Corded Angle Grinder",
+        "properties": {
+          "disc_diameter": "115 mm"
+        }
+      },
+      {
+        "brand": "Karcher",
+        "series": "Karcher Workshop SC 27T-68S",
+        "model": "Cleaning Machine",
+        "properties": {
+          "machine_type": "wet dry vacuum",
+          "power": "1400 W"
+        }
+      },
+      {
+        "brand": "Karcher",
+        "series": "Karcher WD SC 1PM-1UM",
+        "model": "Cleaning Liquid",
+        "properties": {
+          "cleaner_type": "floor cleaner",
+          "volume": "500 ml",
+          "surface": "glass"
+        }
+      },
+      {
+        "brand": "Spax",
+        "series": "Spax Outdoor T-Star 1GS-NEI",
+        "model": "Wood and Drywall Screw",
+        "properties": {
+          "screw_type": "drywall screw",
+          "diameter": "6 mm"
+        }
+      },
       {
         "brand": "Wavin",
-        "family": "Wavin Professional Tigris 31G-M1A Drain Trap and Siphon",
+        "series": "Wavin Professional Tigris 31G-M1A",
+        "model": "Drain Trap and Siphon",
         "properties": {
-          "trap type": "drain trap",
-          "diameter": "25 mm"
+          "trap_type": "bottle trap",
+          "diameter": "50 mm"
         }
       },
       {
-        "brand": "Castrol",
-        "family": "Castrol All Season GTX 3PP-ZPA Engine Oil",
+        "brand": "AlcaPlast",
+        "series": "AlcaPlast Universal Basic 1CT-04J",
+        "model": "Valve and Connector",
         "properties": {
-          "volume": "250 ml",
-          "viscosity": "5W-40"
-        }
-      },
-      {
-        "brand": "Osram",
-        "family": "Osram Eco Classic 3PW-R88 LED Bulb",
-        "properties": {
-          "wattage": "15 W",
-          "luminous flux": "806 lm"
-        }
-      },
-      {
-        "brand": "Bosch",
-        "family": "Bosch Workshop GWS 17A-FAQ Automotive Charger and Bulb",
-        "properties": {
-          "product type": "battery charger",
-          "voltage": "24 V"
-        }
-      },
-      {
-        "brand": "Legrand",
-        "family": "Legrand Valena Plexo 2UK-M0J Wiring Device",
-        "properties": {
-          "device type": "work light",
-          "color family": "Gray"
-        }
-      },
-      {
-        "brand": "Giacomini",
-        "family": "Giacomini R Series R 1PA-6JD Valve and Connector",
-        "properties": {
-          "connector type": "ball valve",
-          "diameter": "32 mm"
+          "connector_type": "shower hose",
+          "diameter": "20 mm"
         }
       }
     ],
-    "availability_threshold": 1
+    "product_skus": "for each product description, find product_sku from product_variants matching brand, series, model, and having all specified property key-value pairs in product_variant_properties",
+    "availability_count": "count of product_skus where store_inventory has store_id = $store.store_id and product_sku = $sku and available_today_quantity >= 1"
   },
   "outcome_space": [
-    "OUTCOME_OK"
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED",
+    "OUTCOME_DENIED_SECURITY"
   ],
   "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
+        "op": "nonempty",
+        "lhs": "$store.store_id",
+        "rhs": null,
+        "args": []
+      },
+      {
         "op": "ge",
-        "lhs": "$count",
+        "lhs": "$availability_count",
         "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "le",
+        "lhs": "$availability_count",
+        "rhs": 6,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "result {count}"
+    "msg_skeleton": "qty=%d",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
-    "OUTCOME_OK": []
+    "OUTCOME_OK": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$store.record_path"
+      }
+    ]
   }
 }

@@ -1,6 +1,74 @@
+entries:
+- agents_md_anchor: null
+  content: Always align answer ref variable names with the required ref sources from
+    the TOOL_PLAN. If a required ref source is '$param.record_path', compute a variable
+    named exactly '$param.record_path' (e.g., via a compute step) and use it in the
+    answer refs, rather than using a differently named variable like '$param_record_path'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$employee.record_path'''']
+    on OK answer''. The TOOL_PLAN requires that for OUTCOME_OK, the answer ref source
+    must be ''$employee.record_path''. The PlanIR computed a variable ''$emp_record_path''
+    from the SQL alias and used it in the answer ref as ''$emp_record_path'', which
+    does not match the required source. The root cause is a variable name mismatch:
+    the PlanIR did not create a variable with the exact dotted name ''$employee.record_path''.
+    The rule ensures that the PlanIR always uses the exact variable names specified
+    in the required refs, preventing such mismatches.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use unsupported compute primitives. Use only primitives from the
+    supported set (e.g., 'eq', 'get', 'first', 'all_true', 'contains', 'in', etc.).
+    If a desired operation is not directly available, decompose it into a sequence
+    of supported primitives.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: compute step ''contains_any'' failed: ''contains_any''. Root
+    cause: The PlanIR used an unsupported primitive ''contains_any'' in a compute
+    step. The interpreter does not recognize this primitive. The failing fragment
+    is: {"prim":"contains_any","args":["$job_title",["Manager"]],"into":"job_contains_manager"}.
+    The rule ensures that only supported primitives are used. For checking if a string
+    contains a substring, the supported primitive ''contains'' should be used instead.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always compute required ref sources for entities that are needed in all
+    answer branches from dedicated, independent discovery steps (e.g., separate SQL
+    queries or file reads) rather than from a combined query that may return no rows
+    when one entity is missing. This ensures the ref source is resolved (non-null)
+    even when the other entity is absent.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: verify: required ref source ''$store.record_path'' did not resolve
+    on OUTCOME_NONE_UNSUPPORTED answer. Root cause: The PlanIR computes $store.record_path
+    from a join query that only returns a row when both employee and store exist.
+    If the employee does not exist, the query returns no rows, so $first_row is null
+    and $store.record_path is null. The verify phase requires a non-null ref source
+    for the unsupported branch, but it is null when the employee is missing. Failing
+    PlanIR fragment: compute steps deriving $store.record_path from $first_row, which
+    depends on the SQL output; the unsupported answer cites $store.record_path as
+    a ref source. Rule linkage: The new rule ensures required ref sources are computed
+    independently, so they are always available regardless of other lookups.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Greta Engel is not the manager of PowerTool Innsbruck Wilten.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /proc/stores/store_innsbruck_wilten.json
 last_run:
-  cycles_used: 1
-  date: '2026-06-22'
-  outcome: OUTCOME_DENIED_SECURITY
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t29

@@ -20,14 +20,14 @@ entries:
     maps to a valid outcome from the IntentSpec's outcome_space, to prevent the system
     from defaulting to an invalid outcome like OUTCOME_NONE_CLARIFICATION.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r008
   reasoning: The plan produced outcome OUTCOME_NONE_CLARIFICATION, which is not in
     the IntentSpec's outcome_space. The likely cause is that the Exec RPC failed (e.g.,
     SQL error, missing table) and the plan lacked an on_error handler, causing the
     system to default to an invalid outcome. The PlanIR must include error handling
     for discovery steps to ensure the outcome is always one of the allowed outcomes.
-  status: active
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
@@ -118,19 +118,59 @@ entries:
   submitted_refs: []
 - content: null
   created: '2026-06-23'
+  deactivated_reason: superseded by newer verdict
   id: v018
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
-  status: active
+  status: inactive
   submitted_message: We do not carry the Heco TopFix GTU-YPJ Wood and Drywall Screw
     with drywall screw type.
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v019
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: The requested product is not available in the catalogue.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Prefer using a dedicated SQL RPC (e.g., 'Sql' or 'Query') over Exec with
+    stdin for database queries, because the sql tool may not accept stdin input and
+    will return a usage banner. If Exec must be used, pass the SQL as a command-line
+    argument (e.g., -c 'query') instead of via stdin.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Error: ''interpret: sql returned usage banner — SQL not delivered via
+    stdin''. Root cause: The PlanIR discovery step used Exec with stdin to pass a
+    SQL query, but the sql tool does not accept stdin input; it expects the query
+    as a command-line argument. The failing fragment is the Exec RPC with ''stdin''
+    containing the SQL. This rule ensures future plans avoid stdin for SQL delivery,
+    preventing the usage banner error.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v020
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Product not found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-23'
+  cycles_used: 2
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t01

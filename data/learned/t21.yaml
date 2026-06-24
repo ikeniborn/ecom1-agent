@@ -1,7 +1,115 @@
 entries:
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When you have a single row (e.g., from 'first'), use 'get' to extract a
+    column value; 'column' is only for rowsets (list of dicts).
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r020
+  reasoning: 'Error: interpret: compute step ''column'' failed: ''column'' expects
+    list[dict]; use ''get'' for a single row. Root cause: after ''first'' we bound
+    a single dict to ''summary'', but subsequent compute steps used ''column'' on
+    that single row. The correct primitive for extracting a field from a single row
+    is ''get''. Failing PlanIR fragment: compute steps like {"prim":"column","args":["$summary","basket_id"],...}.
+    No existing rule covers this.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use the 'concat' primitive for string concatenation; concat only
+    merges two rowsets (list of dicts). To build a string, use a single Exec that
+    returns the string, or use a 'format' primitive if available.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r021
+  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes
+    2 positional arguments but 3 were given CONTRACT: concat(a, b): both args must
+    be list[dict] rows (parse Exec output via rowsets first)''. Root cause: PlanIR
+    used concat with multiple string arguments to build payment_record_path, new_basket_json,
+    and payment_json, violating the contract that concat takes exactly two rowsets.
+    Failing fragment: compute steps with prim ''concat'' and args containing strings
+    and variable references. Rule ensures future PlanIR uses concat only for rowset
+    merging and uses alternative methods for string construction.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When using filter_rows, the predicate must be a string (e.g., 'nonempty($row.field)')
+    or a structured object with an 'op' attribute, not a dict.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r022
+  reasoning: 'Error: ''dict'' object has no attribute ''op'' in filter_rows. The predicate
+    was passed as a dict {"op":"nonempty","lhs":"$row.existing_payment_id"} but the
+    interpreter expected an object with an .op attribute, not a dict. Root cause:
+    incorrect predicate format in PlanIR compute step. Failing fragment: {"prim":"filter_rows","args":["$basket_items",{"op":"nonempty","lhs":"$row.existing_payment_id"}],"into":"existing_payments"}.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#security'
+  content: When constructing a decision with a security deny_when branch, set the
+    default_label to a label that represents the allowed outcome (e.g., 'proceed'
+    or 'ok'), not the denied label. The denied branch should only be taken when the
+    deny_when predicate holds.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r023
+  reasoning: 'Error: verify phase reported ''spurious over-refusal'' because the PlanIR
+    decision had default_label set to ''denied_security'', the same as the only branch
+    label. This caused the outcome to be DENIED_SECURITY even when the deny_when condition
+    (identity.kind != customer) was false. The root cause is a flawed decision structure:
+    the default should lead to the allowed path, not the denial. The new rule ensures
+    the default_label is distinct from the deny branch label, preventing incorrect
+    refusals.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Do not include a decision branch for security deny_when conditions; the
+    interpreter automatically enforces security constraints. Instead, let the plan
+    proceed with the normal flow, and the interpreter will deny if the security condition
+    holds.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r024
+  reasoning: The plan included a decision branch for the security deny_when condition,
+    producing OUTCOME_DENIED_SECURITY. However, the security deny_when predicate (identity.kind
+    != customer) did not hold (identity.kind is customer), so the denial was spurious.
+    The interpreter automatically enforces security constraints; the plan should not
+    duplicate this logic. By removing the security branch, the plan will default to
+    the allowed outcome, and the interpreter will deny only when the security condition
+    actually holds.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a security constraint with a deny_when predicate is declared in the
+    plan's constraints, the decision block must not contain any branch that returns
+    OUTCOME_DENIED_SECURITY. The decision should only have a default_label that leads
+    to the normal outcome (e.g., 'proceed'). The interpreter will automatically deny
+    if the security condition holds.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r025
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR decision
+    block included a branch for denied_security with the same predicate as the security
+    constraint. The interpreter automatically enforces security constraints; the plan
+    should not duplicate this logic. The existing rule [in-session] was insufficiently
+    explicit about the decision block structure, leading to this spurious over-refusal.
+    The new rule explicitly forbids any branch that returns OUTCOME_DENIED_SECURITY
+    when a security deny_when is declared.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
@@ -10,50 +118,9 @@ entries:
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
-- agents_md_anchor: null
-  content: When you have a single row (e.g., from 'first'), use 'get' to extract a column value; 'column'
-    is only for rowsets (list of dicts).
-  created: '2026-06-22'
-  deactivated_reason: null
-  id: r020
-  reasoning: 'Error: interpret: compute step ''column'' failed: ''column'' expects list[dict]; use ''get''
-    for a single row. Root cause: after ''first'' we bound a single dict to ''summary'', but subsequent
-    compute steps used ''column'' on that single row. The correct primitive for extracting a field from
-    a single row is ''get''. Failing PlanIR fragment: compute steps like {"prim":"column","args":["$summary","basket_id"],...}.
-    No existing rule covers this.'
-  status: active
-  surface: ir
-- agents_md_anchor: null
-  content: Do not use the 'concat' primitive for string concatenation; concat only merges two rowsets
-    (list of dicts). To build a string, use a single Exec that returns the string, or use a 'format' primitive
-    if available.
-  created: '2026-06-22'
-  deactivated_reason: null
-  id: r021
-  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes 2 positional arguments
-    but 3 were given CONTRACT: concat(a, b): both args must be list[dict] rows (parse Exec output via
-    rowsets first)''. Root cause: PlanIR used concat with multiple string arguments to build payment_record_path,
-    new_basket_json, and payment_json, violating the contract that concat takes exactly two rowsets. Failing
-    fragment: compute steps with prim ''concat'' and args containing strings and variable references.
-    Rule ensures future PlanIR uses concat only for rowset merging and uses alternative methods for string
-    construction.'
-  status: active
-  surface: ir
-- agents_md_anchor: null
-  content: When using filter_rows, the predicate must be a string (e.g., 'nonempty($row.field)') or a
-    structured object with an 'op' attribute, not a dict.
-  created: '2026-06-22'
-  deactivated_reason: null
-  id: r022
-  reasoning: 'Error: ''dict'' object has no attribute ''op'' in filter_rows. The predicate was passed
-    as a dict {"op":"nonempty","lhs":"$row.existing_payment_id"} but the interpreter expected an object
-    with an .op attribute, not a dict. Root cause: incorrect predicate format in PlanIR compute step.
-    Failing fragment: {"prim":"filter_rows","args":["$basket_items",{"op":"nonempty","lhs":"$row.existing_payment_id"}],"into":"existing_payments"}.'
-  status: active
-  surface: ir
 last_run:
-  cycles_used: 6
-  date: '2026-06-22'
+  cycles_used: 3
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t21

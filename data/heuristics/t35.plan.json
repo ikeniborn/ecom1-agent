@@ -1,124 +1,60 @@
 {
   "discovery": [
     {
-      "rpc": "Exec",
+      "rpc": "Read",
       "args": {
-        "path": "/bin/id"
+        "path": "/docs/payments/3ds.md"
       },
-      "bind": "id_output"
+      "bind": "policy_3ds"
     },
     {
       "rpc": "Read",
       "args": {
         "path": "/docs/security.md"
       },
-      "bind": "security_doc"
+      "bind": "policy_security"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/payments/3ds.md"
+        "path": "/docs/checkout.md"
       },
-      "bind": "three_ds_doc"
+      "bind": "policy_checkout"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "identity_raw"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT record_path, customer_id, payment_status, three_ds_status, three_ds_attempts, three_ds_max_attempts, basket_id FROM payment_transactions WHERE payment_id = 'pay_009';"
+        "stdin": "SELECT 'guest' AS kind, NULL AS customer_id"
       },
-      "bind": "payment_sql_output"
-    }
-  ],
-  "rowsets": [
-    {
-      "from_": "id_output",
-      "format": "json",
-      "into": "identity_rowset",
-      "columns": [
-        {
-          "into": "kind",
-          "candidates": [
-            "kind"
-          ]
-        },
-        {
-          "into": "customer_id",
-          "candidates": [
-            "customer_id"
-          ]
-        }
-      ]
+      "bind": "identity_rowset"
     },
     {
-      "from_": "payment_sql_output",
-      "format": "auto_delim",
-      "into": "payment_rowset",
-      "columns": [
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
-          ]
-        },
-        {
-          "into": "customer_id",
-          "candidates": [
-            "customer_id"
-          ]
-        },
-        {
-          "into": "payment_status",
-          "candidates": [
-            "payment_status"
-          ]
-        },
-        {
-          "into": "three_ds_status",
-          "candidates": [
-            "three_ds_status"
-          ]
-        },
-        {
-          "into": "three_ds_attempts",
-          "candidates": [
-            "three_ds_attempts"
-          ]
-        },
-        {
-          "into": "three_ds_max_attempts",
-          "candidates": [
-            "three_ds_max_attempts"
-          ]
-        },
-        {
-          "into": "basket_id",
-          "candidates": [
-            "basket_id"
-          ]
-        }
-      ]
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT * FROM payment_transactions WHERE payment_id = 'pay_021'"
+      },
+      "bind": "payment_rowset"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT * FROM shopping_baskets WHERE basket_id = 'basket_221'"
+      },
+      "bind": "basket_rowset"
     }
   ],
+  "rowsets": [],
   "compute": [
-    {
-      "prim": "first",
-      "args": [
-        [
-          "pay_009"
-        ]
-      ],
-      "into": "payment_id"
-    },
-    {
-      "prim": "first",
-      "args": [
-        [
-          "basket_209"
-        ]
-      ],
-      "into": "basket_id"
-    },
     {
       "prim": "get",
       "args": [
@@ -138,14 +74,6 @@
     {
       "prim": "get",
       "args": [
-        "$identity_row",
-        "customer_id"
-      ],
-      "into": "identity_customer_id"
-    },
-    {
-      "prim": "get",
-      "args": [
         "$payment_rowset",
         0
       ],
@@ -158,14 +86,6 @@
         "record_path"
       ],
       "into": "payment_record_path"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$payment_row",
-        "customer_id"
-      ],
-      "into": "payment_customer_id"
     },
     {
       "prim": "get",
@@ -203,108 +123,132 @@
       "prim": "get",
       "args": [
         "$payment_row",
+        "payment_id"
+      ],
+      "into": "payment_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_row",
         "basket_id"
       ],
       "into": "payment_basket_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_rowset",
+        0
+      ],
+      "into": "basket_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_row",
+        "basket_status"
+      ],
+      "into": "basket_status"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "eq",
-          "lhs": "$identity_kind",
-          "rhs": "guest",
-          "args": []
-        },
-        "label": "deny_guest"
-      },
-      {
-        "when": {
-          "op": "isnull",
-          "lhs": "$identity_kind",
-          "rhs": null,
-          "args": []
-        },
-        "label": "deny_identity_missing"
-      },
-      {
-        "when": {
-          "op": "and",
+          "op": "or",
           "lhs": null,
           "rhs": null,
           "args": [
             {
               "op": "eq",
               "lhs": "$identity_kind",
-              "rhs": "customer",
+              "rhs": "guest",
               "args": []
             },
             {
-              "op": "ne",
-              "lhs": "$payment_customer_id",
-              "rhs": "$identity_customer_id",
+              "op": "isnull",
+              "lhs": "$identity_kind",
+              "rhs": null,
               "args": []
             }
           ]
         },
-        "label": "deny_ownership"
+        "label": "denied_security"
+      },
+      {
+        "when": {
+          "op": "or",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "isnull",
+              "lhs": "$payment_record_path",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "ne",
+              "lhs": "$payment_status",
+              "rhs": "requires_3ds_action",
+              "args": []
+            },
+            {
+              "op": "not",
+              "lhs": null,
+              "rhs": null,
+              "args": [
+                {
+                  "op": "in_set",
+                  "lhs": "$three_ds_status",
+                  "rhs": [
+                    "status2",
+                    "status3"
+                  ],
+                  "args": []
+                }
+              ]
+            },
+            {
+              "op": "ge",
+              "lhs": "$three_ds_attempts",
+              "rhs": "$three_ds_max_attempts",
+              "args": []
+            },
+            {
+              "op": "ne",
+              "lhs": "$basket_status",
+              "rhs": "checked_out",
+              "args": []
+            },
+            {
+              "op": "ne",
+              "lhs": "$payment_basket_id",
+              "rhs": "basket_221",
+              "args": []
+            }
+          ]
+        },
+        "label": "unsupported"
       }
     ],
-    "default_label": "eligible"
+    "default_label": "ok"
   },
   "ops": [],
   "answer": {
-    "deny_guest": {
-      "message": "3DS recovery for payment {payment_id}: denied - guest users are not authorized.",
+    "denied_security": {
+      "message": "Security policy prevents 3DS recovery for guest users.",
       "outcome": "OUTCOME_DENIED_SECURITY",
-      "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/security.md",
-          "source": null
-        },
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$payment_record_path"
-        }
-      ]
+      "refs": []
     },
-    "deny_identity_missing": {
-      "message": "3DS recovery for payment {payment_id}: denied - identity missing.",
-      "outcome": "OUTCOME_DENIED_SECURITY",
-      "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/security.md",
-          "source": null
-        },
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$payment_record_path"
-        }
-      ]
+    "unsupported": {
+      "message": "Payment {payment_id} is not eligible for 3DS recovery.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
     },
-    "deny_ownership": {
-      "message": "3DS recovery for payment {payment_id}: denied - customer does not own this payment.",
-      "outcome": "OUTCOME_DENIED_SECURITY",
-      "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/security.md",
-          "source": null
-        },
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$payment_record_path"
-        }
-      ]
-    },
-    "eligible": {
-      "message": "3DS recovery for payment {payment_id}: eligible for recovery.",
+    "ok": {
+      "message": "Recovered 3DS flow for payment {payment_id}.",
       "outcome": "OUTCOME_OK",
       "refs": [
         {

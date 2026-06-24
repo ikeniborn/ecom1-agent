@@ -1,66 +1,139 @@
 entries:
 - agents_md_anchor: null
-  content: Always ensure that any rowset produced by a custom_extract is defined before the compute section
-    that references it. If the PlanIR structure requires custom_extract after compute, do not reference
-    such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid
-    forward references.
+  content: Always ensure that any rowset produced by a custom_extract is defined before
+    the compute section that references it. If the PlanIR structure requires custom_extract
+    after compute, do not reference such rowsets in compute; instead, parse the data
+    using a rowsets step or restructure the plan to avoid forward references.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r018
-  reasoning: The plan returned OUTCOME_NONE_CLARIFICATION because compute steps referenced $receipt_items,
-    which was only defined in the custom_extract 'fuzzy_sku_receipt' placed after the compute section.
-    The interpreter processes compute before custom_extract, causing a missing variable error and fallback
-    to an undefined outcome. The rule prevents forward references to custom_extract outputs in compute.
-  status: active
+  reasoning: The plan returned OUTCOME_NONE_CLARIFICATION because compute steps referenced
+    $receipt_items, which was only defined in the custom_extract 'fuzzy_sku_receipt'
+    placed after the compute section. The interpreter processes compute before custom_extract,
+    causing a missing variable error and fallback to an undefined outcome. The rule
+    prevents forward references to custom_extract outputs in compute.
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
   source: verdict
-  status: active
+  status: inactive
   submitted_message: The file path  is not in the allowed set. Access denied.
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: Never apply the catalog path constraint to files in /uploads/; that constraint is only for
-    catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a
-    Read RPC on the given path.
+  content: Never apply the catalog path constraint to files in /uploads/; that constraint
+    is only for catalog data. When the instruction specifies a receipt file in /uploads/,
+    read it directly using a Read RPC on the given path.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r019
-  reasoning: 'The plan applied the catalog path constraint (allowed set: /PROD, /docs/..., etc.) to the
-    receipt file path, which is in /uploads/. Since /uploads/ is not in the allowed set, the decision
-    branch triggered OUTCOME_DENIED_SECURITY. The constraint is only for catalog data, not for user-provided
-    receipt files. The plan should have directly read the receipt file from /uploads/ without checking
-    it against the catalog allowed set. The plan also lacked any discovery steps to read the receipt file,
-    which is needed to extract items. This rule ensures future plans exempt /uploads/ files from the catalog
-    constraint and include a Read RPC for the receipt.'
+  reasoning: 'The plan applied the catalog path constraint (allowed set: /PROD, /docs/...,
+    etc.) to the receipt file path, which is in /uploads/. Since /uploads/ is not
+    in the allowed set, the decision branch triggered OUTCOME_DENIED_SECURITY. The
+    constraint is only for catalog data, not for user-provided receipt files. The
+    plan should have directly read the receipt file from /uploads/ without checking
+    it against the catalog allowed set. The plan also lacked any discovery steps to
+    read the receipt file, which is needed to extract items. This rule ensures future
+    plans exempt /uploads/ files from the catalog constraint and include a Read RPC
+    for the receipt.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When the instruction says ''the single file in /uploads/'' or similar,
+    use a Find RPC with a pattern like ''*'' to locate the file, and bind the result.
+    Then use the bound path directly in a Read RPC. Do not use a List RPC to list
+    the directory and then extract a path, as List may return directory entries or
+    require additional filtering, leading to a ''read failed: is a directory'' error.'
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r020
+  reasoning: 'ERROR: real_vm: read failed: is a directory. The PlanIR used a List
+    RPC on /uploads, then attempted to read the first entry''s path via $receipt_path.0.path,
+    but that path resolved to a directory, not a file. The instruction required reading
+    the single file in /uploads. The correct PLAN technique is to use a Find RPC to
+    locate the file (e.g., with pattern ''*'') and bind the result, then Read that
+    bound path. Existing rule r017 already prefers Find over List, but this error
+    indicates a need for a more explicit rule for directory-to-file discovery.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Never pass more than two arguments to the concat primitive in a compute
+    step. When constructing a SQL query string that requires concatenating a prefix,
+    a variable, and a suffix, use two concat steps: first concat the prefix and the
+    variable, then concat the result with the suffix.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r021
+  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes
+    2 positional arguments but 3 were given''. Root cause: The PlanIR compute step
+    used concat with three arguments (prefix, $items_json_str, suffix), but the concat
+    primitive only accepts exactly two arguments (a and b). The failing fragment is
+    the compute step: {"prim":"concat","args":["WITH items AS (SELECT value->>''sku''
+    AS sku, CAST(value->>''qty'' AS INTEGER) AS qty FROM json_each(''","$items_json_str","''))
+    SELECT SUM(pv.price_cents * items.qty) FROM items JOIN product_variants pv ON
+    items.sku = pv.product_sku"],"into":"current_total_query"}. This new rule prevents
+    such malformed concat usage by requiring two-step concatenation when three parts
+    are needed.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: 'When the instruction says ''the single file in /uploads/'' or similar, use a Find RPC with
-    a pattern like ''*'' to locate the file, and bind the result. Then use the bound path directly in
-    a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return
-    directory entries or require additional filtering, leading to a ''read failed: is a directory'' error.'
-  created: '2026-06-22'
+  content: 'Always use a Find RPC with a pattern like ''*'' to locate a file when
+    the instruction specifies a file in a directory (e.g., /uploads/). Bind the result
+    to a variable and use that variable as the path in the Read RPC. Do not use a
+    List RPC or the directory path directly, as that may cause a ''read failed: is
+    a directory'' error.'
+  created: '2026-06-24'
   deactivated_reason: null
-  id: r020
-  reasoning: 'ERROR: real_vm: read failed: is a directory. The PlanIR used a List RPC on /uploads, then
-    attempted to read the first entry''s path via $receipt_path.0.path, but that path resolved to a directory,
-    not a file. The instruction required reading the single file in /uploads. The correct PLAN technique
-    is to use a Find RPC to locate the file (e.g., with pattern ''*'') and bind the result, then Read
-    that bound path. Existing rule r017 already prefers Find over List, but this error indicates a need
-    for a more explicit rule for directory-to-file discovery.'
+  id: r022
+  reasoning: 'The error ''real_vm: read failed: is a directory'' occurred because
+    the plan attempted to read a directory path directly instead of first locating
+    the file via a Find RPC. The plan''s discovery step used a Read RPC on $receipt_path,
+    which was bound to the directory path /uploads/ (or similar) rather than a specific
+    file. The existing rule r020 advises using Find with pattern ''*'', but the plan
+    did not include a Find step. This rule reinforces that requirement and clarifies
+    the consequence of omitting it.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Never use dot notation (e.g., $array.0) to access elements of an array
+    in a compute primitive. When building a SQL VALUES clause from a rowset, always
+    use a series of concat steps each with exactly two arguments, and reference the
+    rowset columns directly (e.g., $rowset.column) rather than extracting columns
+    into separate arrays. This prevents 'bad argument type' errors from concat receiving
+    non-string arguments or too many arguments.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r023
+  reasoning: 'The error ''real_vm: bad argument type for built-in operation'' occurred
+    because the compute section used concat with more than two arguments (violating
+    existing rule) and used dot notation to access array elements (e.g., $sku_array.0),
+    which are not valid string arguments. The PlanIR attempted to build a SQL VALUES
+    clause by concatenating many pieces, including array indices, causing type errors.
+    The corrective rule prevents these patterns.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-22'
-  outcome: OUTCOME_DENIED_SECURITY
+  cycles_used: 4
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 prephase_deep_read:
 - /uploads

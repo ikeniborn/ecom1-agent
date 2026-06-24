@@ -1,62 +1,155 @@
 entries:
 - agents_md_anchor: null
-  content: When using Read RPC to retrieve a document for content inspection, always extract the text
-    content from the response (e.g., via a compute step using get or extract) before applying string operations
-    like contains_any; do not pass the raw response object directly to contains_any.
+  content: When using Read RPC to retrieve a document for content inspection, always
+    extract the text content from the response (e.g., via a compute step using get
+    or extract) before applying string operations like contains_any; do not pass the
+    raw response object directly to contains_any.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r006
-  reasoning: 'Error: ''real_vm: Protocol message ReadResponse has no "guest denied" field.'' The PlanIR
-    used contains_any on the raw Read response object $security_doc, expecting it to be a string. The
-    Read RPC returns a structured protobuf message, not a plain string. The decision block''s condition
-    ''contains_any($security_doc, ["guest denied", ...])'' failed because the VM tried to find a field
-    named ''guest denied'' in the ReadResponse message. The fix is to first extract the document''s text
-    content (e.g., via a compute step like ''get($security_doc, "content")'') and then apply contains_any
-    to that extracted string.'
-  status: active
+  reasoning: 'Error: ''real_vm: Protocol message ReadResponse has no "guest denied"
+    field.'' The PlanIR used contains_any on the raw Read response object $security_doc,
+    expecting it to be a string. The Read RPC returns a structured protobuf message,
+    not a plain string. The decision block''s condition ''contains_any($security_doc,
+    ["guest denied", ...])'' failed because the VM tried to find a field named ''guest
+    denied'' in the ReadResponse message. The fix is to first extract the document''s
+    text content (e.g., via a compute step like ''get($security_doc, "content")'')
+    and then apply contains_any to that extracted string.'
+  status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: Always populate the discovery and rowsets sections with steps to retrieve the data required
-    for the desired outcome; never leave them empty when the outcome depends on data from a source.
+  content: Always populate the discovery and rowsets sections with steps to retrieve
+    the data required for the desired outcome; never leave them empty when the outcome
+    depends on data from a source.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r007
-  reasoning: 'grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION. Root cause: PlanIR
-    had empty discovery, rowsets, compute, and ops sections, so no data was retrieved to satisfy the success
-    criteria (nonempty payments, contains_any record_paths). The decision only checked identity, and the
-    ''ok'' answer block lacked any data. The interpreter could not produce OUTCOME_OK, falling back to
-    OUTCOME_NONE_CLARIFICATION. Existing rule r004 already required discovery for the desired outcome,
-    but it was too general and not followed. A more explicit rule is needed.'
-  status: active
+  reasoning: 'grader: expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION.
+    Root cause: PlanIR had empty discovery, rowsets, compute, and ops sections, so
+    no data was retrieved to satisfy the success criteria (nonempty payments, contains_any
+    record_paths). The decision only checked identity, and the ''ok'' answer block
+    lacked any data. The interpreter could not produce OUTCOME_OK, falling back to
+    OUTCOME_NONE_CLARIFICATION. Existing rule r004 already required discovery for
+    the desired outcome, but it was too general and not followed. A more explicit
+    rule is needed.'
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Access denied: guests are not authorized to access payment records.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: Always include discovery and rowsets steps that directly retrieve the data needed to construct
-    the answer for the desired outcome; a plan that only handles security constraints without attempting
-    to produce the primary answer is incomplete.
+  content: Always include discovery and rowsets steps that directly retrieve the data
+    needed to construct the answer for the desired outcome; a plan that only handles
+    security constraints without attempting to produce the primary answer is incomplete.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r008
-  reasoning: 'The plan only read /docs/security.md and checked identity; it never attempted to read /docs/payments/3ds.md
-    or payment_transactions, so it could not produce OUTCOME_OK. The error ''expected outcome OUTCOME_OK,
-    got OUTCOME_DENIED_SECURITY'' shows the plan was security-only and never designed to fulfill the objective.
-    Root cause: missing discovery/rowsets for the fraud data required by the desired outcome.'
+  reasoning: 'The plan only read /docs/security.md and checked identity; it never
+    attempted to read /docs/payments/3ds.md or payment_transactions, so it could not
+    produce OUTCOME_OK. The error ''expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY''
+    shows the plan was security-only and never designed to fulfill the objective.
+    Root cause: missing discovery/rowsets for the fraud data required by the desired
+    outcome.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required ref in the answer specifies a variable that must be derived
+    by applying a condition from a policy document, the plan must include a compute
+    step that filters the retrieved data based on that condition and assigns the result
+    to the required variable name.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$identified_payments.record_path'']
+    on OK answer. Root cause: The plan reads the policy document /docs/payments/3ds.md
+    but never uses its content to filter the payments data. The plan produces $payments_parsed
+    but the required ref expects $identified_payments. The plan lacks a compute step
+    that applies the fraud hit condition to the payments and assigns the result to
+    $identified_payments. The answer refs incorrectly use $payments_parsed.rule_content:
+    The plan must produce the variable named in the required refs by applying the
+    policy condition.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include a rowsets step that parses the stdout of an Exec RPC that
+    runs a SQL query into a rowset, and use that rowset variable (not the Exec response)
+    in compute steps that expect a sequence (e.g., count, filter, map).
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: interpret: compute step ''count'' failed: object of type ''ExecResponse''
+    has no len(). Root cause: The PlanIR binds the result of an Exec RPC (SQL query)
+    directly to variable $identified_payments, but the count primitive expects a list/rowset,
+    not an ExecResponse object. The rowsets section is empty; the plan should have
+    defined a rowset from the Exec''s stdout and used that rowset variable in the
+    count step. This is a PlanIR shape bug. Existing rule r007 advises populating
+    rowsets but is too generic; this new rule provides specific guidance to prevent
+    this exact failure.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When a security constraint denies only a specific identity kind (e.g.,
+    guest), the plan must include a decision branch that proceeds to the desired outcome
+    for all other identity kinds, and the default label must be the desired outcome
+    label, not the denial label.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR has
+    a single decision branch for guest identity, but the default label is ''denied_security''.
+    Since the identity is emp_011 (not guest), the branch is skipped and the default
+    triggers denial, even though no security constraint applies. The plan never attempts
+    to retrieve payment records or apply the fraud hit condition. The rule ensures
+    the decision tree correctly routes non-denied identities to the main objective.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When using an Exec RPC to run a command that outputs text to stdout, always
+    extract the 'stdout' field from the ExecResponse (e.g., via a compute step using
+    get) before applying string operations like contains_any; do not pass the raw
+    ExecResponse object to contains_any. Additionally, when a policy document is read
+    to determine a condition for filtering data, the plan must include a compute step
+    that extracts the condition from the document's text content and uses that condition
+    in subsequent data retrieval steps, rather than hardcoding a literal condition.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Error: ''real_vm: Protocol message ExecResponse has no "guest" field.''
+    Root cause: The plan passed the raw ExecResponse object ($identity_stdout) to
+    contains_any, which expects a string or list. The ExecResponse must be unwrapped
+    to its stdout field first. Additionally, the plan hardcoded the condition ''3ds-status1''
+    in the SQL query instead of deriving it from the policy document /docs/payments/3ds.md,
+    which was read but never used. The failing PlanIR fragment is the decision branch
+    (contains_any on $identity_stdout) and the SQL query (hardcoded condition). Existing
+    rule r006 covers Read RPC but not Exec; the in-session rule about deriving conditions
+    from policy documents exists but was not followed.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 0
-  date: '2026-06-22'
+  cycles_used: 4
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t40

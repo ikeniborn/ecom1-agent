@@ -1,68 +1,158 @@
 {
-  "objective": "Verify whether the product catalogue contains a Castrol Automotive Cleaner from the 'Castrol Workshop MAGNATEC 213-NWR Automotive Cleaner' line with cleaner type 'brake cleaner' and volumes 4000 ml and 250 ml, as claimed by a support note.",
+  "objective": "Verify whether the product 'Caparol Premium Capa 32D-5X8 Metal and Concrete Paint' from Caparol has the claimed properties: product type concrete sealer, color family Gray, and product type metal paint.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "brand": "Castrol",
-    "product_name_search": "Castrol Workshop MAGNATEC 213-NWR Automotive Cleaner",
-    "cleaner_type": "brake cleaner",
-    "volume_4000": 4000,
-    "volume_250": 250,
-    "matching_variants": "query product_variants where LOWER(brand) = LOWER(:brand) AND LOWER(product_name) LIKE LOWER('%' || :product_name_search || '%')",
-    "has_cleaner_type": "check if any variant in $matching_variants has a property in product_variant_properties with key 'cleaner_type' and value_text = :cleaner_type",
-    "has_volume_4000": "check if any variant in $matching_variants has a property with key 'volume' and value_number = :volume_4000 and also satisfies has_cleaner_type",
-    "has_volume_250": "check if any variant in $matching_variants has a property with key 'volume' and value_number = :volume_250 and also satisfies has_cleaner_type",
-    "base_variant": "first variant from $matching_variants (if any)",
-    "verified_sku": "the variant(s) that satisfy both cleaner_type and volume conditions"
+    "brand": "Caparol (literal from instruction)",
+    "product_name_search": "Caparol Premium Capa 32D-5X8 Metal and Concrete Paint (literal from instruction)",
+    "property_checks": "list of property key-value pairs to verify: [{'key':'product_type','value':'concrete sealer'}, {'key':'color_family','value':'Gray'}, {'key':'product_type','value':'metal paint'}] — lookup from product_variant_properties for the found SKU"
   },
   "outcome_space": [
     "OUTCOME_OK",
     "OUTCOME_NONE_UNSUPPORTED"
   ],
-  "constraints": [],
+  "constraints": [
+    {
+      "anchor": "LEARNED_RULES",
+      "rule": "[r018] When querying product_variants by brand and product_name, use case-insensitive comparison (e.g., LOWER(brand) = LOWER(:brand) AND LOWER(product_name) LIKE LOWER('%' || :product_name_search || '%')) to ensure the product is found even if case differs.",
+      "security": false,
+      "deny_when": null,
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    },
+    {
+      "anchor": "LEARNED_RULES",
+      "rule": "[r019] When a required ref expects a record_path from a variable (e.g., $verified_sku.record_path), ensure that variable is bound to a row object containing a record_path field, not a scalar. Use a rowset extraction that includes the record_path column, then use 'get' to extract the SKU for the message, but keep the row for the ref.",
+      "security": false,
+      "deny_when": null,
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    },
+    {
+      "anchor": "LEARNED_RULES",
+      "rule": "[r020] When using the filter_rows primitive, provide exactly two arguments: the rows list and a predicate dict (e.g., {\"op\":\"eq\",\"lhs\":\"column_name\",\"rhs\":\"value\"}). Do not pass column name and value as separate arguments.",
+      "security": false,
+      "deny_when": null,
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    }
+  ],
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "nonempty",
-        "lhs": "$matching_variants",
+        "op": "and",
+        "lhs": null,
         "rhs": null,
-        "args": []
-      },
+        "args": [
+          {
+            "op": "nonempty",
+            "lhs": "$product_row",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "and",
+            "lhs": null,
+            "rhs": null,
+            "args": [
+              {
+                "op": "nonempty",
+                "lhs": "$prop_concrete_sealer",
+                "rhs": null,
+                "args": []
+              },
+              {
+                "op": "nonempty",
+                "lhs": "$prop_color_gray",
+                "rhs": null,
+                "args": []
+              },
+              {
+                "op": "nonempty",
+                "lhs": "$prop_metal_paint",
+                "rhs": null,
+                "args": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
       {
-        "op": "eq",
-        "lhs": "$has_cleaner_type",
-        "rhs": true,
-        "args": []
-      },
-      {
-        "op": "eq",
-        "lhs": "$has_volume_4000",
-        "rhs": true,
-        "args": []
-      },
-      {
-        "op": "eq",
-        "lhs": "$has_volume_250",
-        "rhs": true,
-        "args": []
+        "op": "and",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "nonempty",
+            "lhs": "$product_row",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "not",
+            "lhs": null,
+            "rhs": null,
+            "args": [
+              {
+                "op": "and",
+                "lhs": null,
+                "rhs": null,
+                "args": [
+                  {
+                    "op": "nonempty",
+                    "lhs": "$prop_concrete_sealer",
+                    "rhs": null,
+                    "args": []
+                  },
+                  {
+                    "op": "nonempty",
+                    "lhs": "$prop_color_gray",
+                    "rhs": null,
+                    "args": []
+                  },
+                  {
+                    "op": "nonempty",
+                    "lhs": "$prop_metal_paint",
+                    "rhs": null,
+                    "args": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "SKU: {sku} - {status}"
+    "msg_skeleton": "Claim check result: {result} SKU: {sku}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$verified_sku.record_path"
+        "source": "$product_row.record_path"
       }
     ],
     "OUTCOME_NONE_UNSUPPORTED": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$base_variant.record_path"
+        "source": "$product_row.record_path"
       }
     ]
   }

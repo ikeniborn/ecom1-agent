@@ -1,45 +1,37 @@
 {
-  "objective": "Count the number of products named 'Chainsaw' in the catalogue database.",
+  "objective": "Count the number of products that are classified as Storage Bin and Organizer according to the catalogue addenda policy.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "count_query": "count of products with name 'Chainsaw' from the catalogue database"
+    "policy_doc_path": "/docs/catalogue-addenda/2024-07-17-reporting-bins-organizers-linz.md",
+    "db_path": "extract from policy doc by parsing with Read and rowset (auto_delim), then compute to select the path column",
+    "count_query": "the SQL query defined in the policy doc, to be executed against the database at db_path"
   },
   "outcome_space": [
     "OUTCOME_OK",
     "OUTCOME_DENIED_SECURITY"
   ],
-  "constraints": [
-    {
-      "anchor": "security.md",
-      "rule": "Guest access to catalogue data is prohibited.",
-      "security": true,
-      "deny_when": {
-        "op": "eq",
-        "lhs": "$_facts.identity.kind",
-        "rhs": "guest",
-        "args": []
-      }
-    }
-  ],
+  "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "regex_match",
-        "lhs": "$answer",
-        "rhs": "^<QTY: \\d+>$",
+        "op": "ge",
+        "lhs": "$count",
+        "rhs": 0,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "<QTY: {count}>"
+    "msg_skeleton": "<count:{count}>",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
-    "OUTCOME_OK": [],
-    "OUTCOME_DENIED_SECURITY": [
+    "OUTCOME_OK": [
       {
         "kind": "policy_doc",
-        "path": "/docs/security.md",
+        "path": "/docs/catalogue-addenda/2024-07-17-reporting-bins-organizers-linz.md",
         "source": null
       }
     ]

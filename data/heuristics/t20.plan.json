@@ -4,32 +4,32 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'color_family' AND pvp1.property_value_text = 'White' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'finish' AND pvp2.property_value_text = 'matte' WHERE pv.brand = 'Helios' AND pk.product_kind_name = 'Wall Paint' AND pf.product_family_name = 'Helios Interior Belton 1VS-ZMH Wall Paint';"
+        "stdin": "SELECT pv.product_sku, pv.record_path FROM product_variants pv WHERE pv.brand = 'Record Power' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'machine_type' AND pvp.property_value_text = 'compressor') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'voltage' AND pvp.property_value_text = '230 V') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'power' AND pvp.property_value_text = '3000 W') LIMIT 1;"
       },
-      "bind": "$product_text"
+      "bind": "product_info_raw"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT store_id, record_path FROM stores WHERE city = 'Graz';"
+        "stdin": "SELECT record_path FROM stores WHERE city = 'Vienna';"
       },
-      "bind": "$stores_text"
+      "bind": "vienna_stores_raw"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total FROM stores s LEFT JOIN store_inventory si ON s.store_id = si.store_id AND si.product_sku = (SELECT pv.product_sku FROM product_variants pv JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'color_family' AND pvp1.property_value_text = 'White' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'finish' AND pvp2.property_value_text = 'matte' WHERE pv.brand = 'Helios' AND pk.product_kind_name = 'Wall Paint' AND pf.product_family_name = 'Helios Interior Belton 1VS-ZMH Wall Paint') WHERE s.city = 'Graz';"
+        "stdin": "SELECT COALESCE(SUM(available_today_quantity), 0) as total FROM store_inventory WHERE product_sku = (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand = 'Record Power' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'machine_type' AND pvp.property_value_text = 'compressor') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'voltage' AND pvp.property_value_text = '230 V') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'power' AND pvp.property_value_text = '3000 W') LIMIT 1) AND store_id IN (SELECT store_id FROM stores WHERE city = 'Vienna');"
       },
-      "bind": "$count_text"
+      "bind": "inventory_sum_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "$product_text",
+      "from_": "product_info_raw",
       "format": "auto_delim",
-      "into": "$product",
+      "into": "product_info",
       "columns": [
         {
           "into": "product_sku",
@@ -38,7 +38,7 @@
           ]
         },
         {
-          "into": "record_path",
+          "into": "product_record_path",
           "candidates": [
             "record_path"
           ]
@@ -46,17 +46,11 @@
       ]
     },
     {
-      "from_": "$stores_text",
+      "from_": "vienna_stores_raw",
       "format": "auto_delim",
-      "into": "$stores",
+      "into": "vienna_stores",
       "columns": [
         {
-          "into": "store_id",
-          "candidates": [
-            "store_id"
-          ]
-        },
-        {
           "into": "record_path",
           "candidates": [
             "record_path"
@@ -65,9 +59,9 @@
       ]
     },
     {
-      "from_": "$count_text",
+      "from_": "inventory_sum_raw",
       "format": "auto_delim",
-      "into": "$count_rows",
+      "into": "inventory_sum",
       "columns": [
         {
           "into": "total",
@@ -82,63 +76,107 @@
     {
       "prim": "get",
       "args": [
-        "$count_rows",
+        "$product_info",
+        "product_sku"
+      ],
+      "into": "sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_info",
+        "product_record_path"
+      ],
+      "into": "product_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$inventory_sum",
         "total"
       ],
-      "into": "$count"
+      "into": "count"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "and",
-          "lhs": null,
+          "op": "nonempty",
+          "lhs": "$product_info",
           "rhs": null,
-          "args": [
-            {
-              "op": "nonempty",
-              "lhs": "$product",
-              "rhs": null,
-              "args": []
-            },
-            {
-              "op": "nonempty",
-              "lhs": "$stores",
-              "rhs": null,
-              "args": []
-            },
-            {
-              "op": "ge",
-              "lhs": "$count",
-              "rhs": 0,
-              "args": []
-            }
-          ]
+          "args": []
         },
-        "label": "ok"
+        "label": "found"
       }
     ],
-    "default_label": "unsupported"
+    "default_label": "not_found"
   },
   "ops": [],
   "answer": {
-    "ok": {
+    "found": {
       "message": "count: {count}",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
-          "source": "$product.record_path"
+          "path": null,
+          "source": "$product_record_path"
         },
         {
           "kind": "record_path",
-          "source": "$stores[*].record_path"
+          "path": null,
+          "source": "$vienna_stores.0.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$vienna_stores.1.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$vienna_stores.2.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$vienna_stores.3.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$vienna_stores.4.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$vienna_stores.5.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$vienna_stores.6.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$vienna_stores.7.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$vienna_stores.8.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$vienna_stores.9.record_path"
         }
       ]
     },
-    "unsupported": {
-      "message": "Unable to compute count due to missing product or stores.",
+    "not_found": {
+      "message": "Product not found",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

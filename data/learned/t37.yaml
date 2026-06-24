@@ -1,55 +1,193 @@
 entries:
 - agents_md_anchor: null
-  content: Always set args to a single string (not an array) when using a compute step with prim 'literal'.
+  content: Always set args to a single string (not an array) when using a compute
+    step with prim 'literal'.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'Superseded by new rule: args must be a list for literal compute
+    steps.'
   id: r003
-  reasoning: 'The error ''interpret: compute step ''literal'' failed: ''literal'''' occurred because the
-    script code used args: ["basket_059"] (an array) for the literal prim. The interpreter expects a single
-    string argument. The existing rule about binding literals did not specify the args format, leading
-    to this failure. The new rule clarifies the correct format.'
-  status: active
+  reasoning: 'The error ''interpret: compute step ''literal'' failed: ''literal''''
+    occurred because the script code used args: ["basket_059"] (an array) for the
+    literal prim. The interpreter expects a single string argument. The existing rule
+    about binding literals did not specify the args format, leading to this failure.
+    The new rule clarifies the correct format.'
+  status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: Always use a compute step with prim 'get' to extract values from $_facts into a named variable
-    before using that variable in a decision branch condition.
+  content: Always use a compute step with prim 'get' to extract values from $_facts
+    into a named variable before using that variable in a decision branch condition.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r004
-  reasoning: 'grader: expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION. Root cause:
-    the decision branch condition directly referenced $_facts.identity.kind, which the interpreter could
-    not evaluate, causing the branch to fail and fallback to OUTCOME_NONE_CLARIFICATION. Failing PlanIR
-    fragment: decision.branches[0].when using raw $_facts path. Extracting into a compute variable ensures
-    the interpreter can evaluate the condition.'
-  status: active
+  reasoning: 'grader: expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION.
+    Root cause: the decision branch condition directly referenced $_facts.identity.kind,
+    which the interpreter could not evaluate, causing the branch to fail and fallback
+    to OUTCOME_NONE_CLARIFICATION. Failing PlanIR fragment: decision.branches[0].when
+    using raw $_facts path. Extracting into a compute variable ensures the interpreter
+    can evaluate the condition.'
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v008
   score: 0.0
   score_detail:
   - answer missing required reference '/docs/discounts.md'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Discount application denied: caller is not an employee.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: Always include all references listed in the TOOL_PLAN's required_refs (across all outcomes)
-    in every answer branch, to ensure the answer passes the grader's reference check.
+  content: Always include all references listed in the TOOL_PLAN's required_refs (across
+    all outcomes) in every answer branch, to ensure the answer passes the grader's
+    reference check.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: r005 incorrectly requires all refs in every answer branch; required_refs
+    are per outcome and should be included only in the corresponding branch.
   id: r005
-  reasoning: 'Error: ''grader: answer missing required reference ''/docs/discounts.md''''. The PlanIR''s
-    deny branch answer only included ''/docs/security.md'', but the grader expected ''/docs/discounts.md''
-    as well. Root cause: answer refs were constructed per outcome, but the grader checks for all required
-    refs from the task specification. Failing PlanIR fragment: answer.deny.refs.'
+  reasoning: 'Error: ''grader: answer missing required reference ''/docs/discounts.md''''.
+    The PlanIR''s deny branch answer only included ''/docs/security.md'', but the
+    grader expected ''/docs/discounts.md'' as well. Root cause: answer refs were constructed
+    per outcome, but the grader checks for all required refs from the task specification.
+    Failing PlanIR fragment: answer.deny.refs.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using a compute step with prim ''literal'', args must be a single
+    string value, not an array. For example, ''args'': ''basket_080''.'
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'Error ''compute step ''literal'' failed: ''literal'''' occurred because
+    the PlanIR used args as an array (e.g., ''args'':[''basket_080'']) instead of
+    a single string. Existing rule r003 already states this, but the violation persisted,
+    so a more explicit rule is needed to ensure compliance.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always set args to a list (e.g., ['basket_080']) when using a compute step
+    with prim 'literal'.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: 'PLAN validation error: compute.2.args should be a valid list, but got
+    string ''basket_080''. Existing rule r003 incorrectly states args should be a
+    single string. The correct PlanIR schema requires args to be a list. Deactivating
+    r003 and replacing with correct rule.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always set args to a single string (not an array) when using a compute
+    step with prim 'literal'.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r008
+  reasoning: 'Error: interpret: compute step ''literal'' failed: ''literal''. Root
+    cause: PlanIR used args as an array [''basket_080''] for a literal compute step,
+    but the interpreter expects a single string. Existing rule r003 already states
+    this, but a contradictory in-session rule (advocating list) caused the violation.
+    Deactivating the incorrect in-session rule and reinforcing r003 will prevent recurrence.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When using a compute step with prim ''get'', args must be a list of exactly
+    two elements: the source object and the key to extract.'
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: 'Error: ''interpret: compute step ''get'' failed: <lambda>() missing
+    1 required positional argument: ''key''''. Root cause: the ''get'' primitive expects
+    two arguments (obj, key) but the PlanIR provided only a single string ''$basket_rows.0.record_path''
+    as args. The failing fragment: {"prim":"get","args":["$basket_rows.0.record_path"],"into":"basket_record_path"}.
+    The rule ensures args is a list of two elements, e.g., ["$basket_rows.0", "record_path"],
+    matching the lambda signature.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#discount-application'
+  content: When the TOOL_PLAN includes security constraints with deny_when predicates,
+    the decision branches must include a branch for each deny condition that maps
+    to the deny outcome, and the default branch must be the allow outcome (OUTCOME_OK)
+    unless a deny condition is met.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: 'Error: verify I3: outcome DENIED_SECURITY but no declared security deny_when
+    predicate holds. Observed identity is employee with non-null employee_id, so both
+    deny conditions (kind != employee, employee_id is null) are false. The PlanIR
+    decision has only one branch (deny_security) with conditions that are false, and
+    the default_label is also ''deny_security'', causing spurious denial. Root cause:
+    the decision structure lacks an allow branch; the default should be the allow
+    outcome when no deny condition matches. The failing PlanIR fragment is the decision
+    block with default_label set to deny_security. Rule linkage: new rule ensures
+    decision branches correctly map security constraints to outcomes.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always match the variable structure in answer ref sources to the required_refs
+    source paths: if the source uses dot notation (e.g., ''$basket.record_path''),
+    create a variable with the base name (e.g., $basket) that is an object containing
+    the referenced field, and reference the exact dot notation path in the answer''s
+    ref source.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$basket.record_path'''']
+    on OK answer''. The PlanIR''s answer for the allow branch uses source ''$basket_record_path'',
+    but the required_refs source is ''$basket.record_path''. The interpreter expects
+    a variable named $basket with a field record_path, but no such variable exists.
+    The compute step extracts record_path into a flat variable $basket_record_path,
+    which does not match the dot notation. The fix is to ensure the variable structure
+    aligns with the required_refs source path, e.g., by binding the rowset''s ''into''
+    to the base name and extracting the first row into that same variable, then referencing
+    ''$basket.record_path'' in the answer.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always set args to a list (e.g., ['basket_080']) when using a compute step
+    with prim 'literal'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Plan validation error: compute.1.args and compute.2.args were strings
+    (''basket_080'', ''emp_024'') but must be lists. The existing rule r003 incorrectly
+    states args should be a single string, causing the PlanIR to fail validation.
+    The correct shape for a literal compute step is args as a list containing the
+    literal value. This rule supersedes r003 and the in-session rule that said ''single
+    string''.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always set args to a single value (string or number) when using a compute
+    step with prim 'literal'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Error: ''interpret: compute step ''literal'' failed: ''literal''''.
+    Root cause: The PlanIR compute steps with prim ''literal'' used an array as args
+    (e.g., ''args'': [''basket_080'']), but the interpreter expects a single value
+    (e.g., ''args'': ''basket_080''). Failing fragment: {"prim":"literal","args":["basket_080"],"into":"basket_id_val"}
+    and similar. Existing rule [r003] correctly specifies single string, but the PlanIR
+    violated it. This rule supersedes any contradictory in-session rules that incorrectly
+    specify a list.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 4
-  date: '2026-06-22'
+  cycles_used: 8
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t37

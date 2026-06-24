@@ -1,59 +1,220 @@
 entries:
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
-  status: active
+  status: inactive
   submitted_message: Unable to determine the price difference.
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
 - agents_md_anchor: null
-  content: When listing a directory to locate a file, always filter the listing to include only entries
-    of type 'file' before selecting an entry to read.
+  content: When listing a directory to locate a file, always filter the listing to
+    include only entries of type 'file' before selecting an entry to read.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: Superseded by new rule that explicitly requires a List RPC and
+    adds a file-type check before reading.
   id: r021
-  reasoning: 'The real_vm error ''read failed: is a directory'' occurred because the PlanIR selected the
-    first entry from the /uploads listing without checking its type. The listing likely returned a directory
-    entry first, causing the subsequent Read step to fail. The PlanIR must filter directory listings to
-    only files before selecting a path to read.'
-  status: active
+  reasoning: 'The real_vm error ''read failed: is a directory'' occurred because the
+    PlanIR selected the first entry from the /uploads listing without checking its
+    type. The listing likely returned a directory entry first, causing the subsequent
+    Read step to fail. The PlanIR must filter directory listings to only files before
+    selecting a path to read.'
+  status: inactive
   surface: ir
 - agents_md_anchor: null
-  content: When listing a directory to locate a file, always include a decision branch that checks whether
-    the filtered list of file entries is non-empty before attempting to read the first file; if the list
-    is empty, branch to an unsupported outcome.
+  content: When listing a directory to locate a file, always include a decision branch
+    that checks whether the filtered list of file entries is non-empty before attempting
+    to read the first file; if the list is empty, branch to an unsupported outcome.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: Superseded by new rule that explicitly requires a List RPC and
+    adds a file-type check before reading.
   id: r022
-  reasoning: 'Error: ''real_vm: read failed: is a directory''. The PlanIR listed /uploads/, filtered for
-    files, but did not verify that the filtered list was non-empty. The ''first'' step on an empty list
-    likely returned null, causing ''concat'' to produce ''/uploads/'' (a directory) as the read path.
-    The Read RPC then failed because it received a directory path. The new rule ensures a check for file
-    existence before reading, preventing the directory read attempt.'
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. The PlanIR listed /uploads/,
+    filtered for files, but did not verify that the filtered list was non-empty. The
+    ''first'' step on an empty list likely returned null, causing ''concat'' to produce
+    ''/uploads/'' (a directory) as the read path. The Read RPC then failed because
+    it received a directory path. The new rule ensures a check for file existence
+    before reading, preventing the directory read attempt.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When filtering a directory listing to select files, always use the field
+    that indicates the entry type (commonly 'type' or 'is_dir') and compare to the
+    value that represents a file (e.g., 'file' or false). Do not assume the field
+    is 'kind'.
+  created: '2026-06-22'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r023
+  reasoning: 'Error: real_vm: read failed: is a directory. Root cause: The filter_rows
+    step used ''kind'' as the field to identify files, but the List RPC output likely
+    uses a different field (e.g., ''type''), so the filter did not exclude directories.
+    The first entry remained a directory, causing receipt_path to be a directory and
+    the Read RPC to fail. Failing PlanIR fragment: filter_rows with condition on ''kind''.
+    Existing in-session rule about filtering for files was too vague, leading to this
+    field-name mistake.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When defining a compute step in PlanIR, always provide the 'args' field
+    as a list of argument objects, each with 'name' and 'input' keys; never provide
+    a single dict as the value of 'args'.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r024
+  reasoning: Plan validation failed because compute.0.args was a dict instead of a
+    list. The PlanIR schema requires args to be a list of objects. This rule ensures
+    the plan generator produces valid compute steps.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the result of a List RPC is a dict (e.g., containing a 'files' or
+    'entries' key), always use a 'get' step to extract the list before applying filter_rows
+    or any row-level operation.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r025
+  reasoning: 'Error: ''filter_rows'' expects list[dict]; use ''get'' for a single
+    row. Root cause: The List RPC at /uploads returned a dict (likely with a ''files''
+    key) instead of a list of dicts. The PlanIR directly passed $uploads_list to filter_rows,
+    which expects a list. The interpreter correctly rejected it. The failing fragment:
+    {"prim":"filter_rows","args":["$uploads_list",...]}. This rule ensures the PlanIR
+    extracts the list from the dict before filtering, preventing the contract violation.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When filtering a directory listing to select files, always include a decision
+    branch that checks whether the selected entry is actually a file (e.g., by verifying
+    it is not a directory) before attempting to read it; if the entry is a directory,
+    skip it and select the next file entry, or fall back to an unsupported outcome
+    if no valid file is found.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r026
+  reasoning: 'Error ''real_vm: read failed: is a directory'' indicates that the filter
+    condition (type == ''file'') did not exclude a directory entry. The PlanIR filtered
+    listing entries by type, but the actual listing schema may have used a different
+    field or value (e.g., is_dir boolean). To prevent such failures, the PlanIR should
+    include a post-filter verification that the selected entry is not a directory
+    before reading. This rule supplements existing rules r021-r023 by adding a runtime
+    safety check. Additionally, requesting a pre-phase deep-read of /uploads will
+    allow the pre-phase to inspect the listing schema and determine the correct filter
+    condition for future cycles.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the plan requires locating a file by listing a directory, the PlanIR
+    must include a List RPC on that directory, filter the listing to entries of type
+    'file', and then read the selected file's path; do not directly Stat or Read a
+    directory path. Additionally, include a decision branch that checks whether the
+    selected entry is a file (not a directory) before reading, and if the filtered
+    list is empty, branch to an unsupported outcome.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r027
+  reasoning: 'The PlanIR attempted to Read a path that was a directory, causing ''read
+    failed: is a directory''. The PlanIR did not include a List RPC on the directory
+    /uploads/ to locate a file, nor did it filter for file entries. The existing rules
+    r021 and r022 were not implemented. A new rule is needed to mandate the List RPC
+    and subsequent filtering and file-type check before reading.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When extracting the list of entries from a List RPC result, always verify
+    that the extracted value is a list before applying filter_rows. If the extracted
+    value is a single dict (not a list), wrap it in a list using a 'list' primitive
+    (e.g., {"prim":"list","args":["$extracted"]}) before passing it to filter_rows.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r028
+  reasoning: 'Error: ''filter_rows'' expects list[dict]; use ''get'' for a single
+    row. Root cause: The plan used `get` to extract ''entries'' from the List RPC
+    result, but the ''entries'' field contained a single dict (not a list). The subsequent
+    `filter_rows` step then received a single dict instead of a list of dicts, causing
+    the type error. The failing PlanIR fragment is: `{"prim":"filter_rows","args":["$listing_entries",{"op":"eq","lhs":"$type","rhs":"file"}],"into":"file_entries"}`
+    where `$listing_entries` is a single dict. The rule ensures that the value passed
+    to `filter_rows` is always a list, handling cases where the List RPC returns a
+    single entry directly.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When reading a file path obtained from a directory listing, always perform
+    a Stat RPC on the path to verify it is a file before attempting to read it; if
+    the Stat indicates it is a directory, skip to the next file entry or fall back
+    to an unsupported outcome.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r029
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. The PlanIR filtered
+    the listing using ''type'' == ''file'' but the selected entry was a directory,
+    causing the Read RPC to fail. The plan lacked a verification step to confirm the
+    path is a file before reading. Existing rules (r021, r022, r023) address filtering
+    and non-empty checks but do not require a post-filter verification. The in-session
+    rule about checking the selected entry is a file was not followed. A new rule
+    is needed to enforce a Stat RPC (or equivalent) on the candidate path to ensure
+    it is a file, preventing reads on directories.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: When filtering a directory listing to select files, always use the field that indicates the
-    entry type (commonly 'type' or 'is_dir') and compare to the value that represents a file (e.g., 'file'
-    or false). Do not assume the field is 'kind'.
-  created: '2026-06-22'
+  content: When the plan requires locating a file by listing a directory, always include
+    a List RPC on that directory, filter the listing to entries of type 'file', select
+    the first entry's path, and set the file path variable from that path using a
+    'get' primitive on the first row's 'path' field; never hardcode the file path
+    or use 'concat' for string concatenation.
+  created: '2026-06-24'
   deactivated_reason: null
-  id: r023
-  reasoning: 'Error: real_vm: read failed: is a directory. Root cause: The filter_rows step used ''kind''
-    as the field to identify files, but the List RPC output likely uses a different field (e.g., ''type''),
-    so the filter did not exclude directories. The first entry remained a directory, causing receipt_path
-    to be a directory and the Read RPC to fail. Failing PlanIR fragment: filter_rows with condition on
-    ''kind''. Existing in-session rule about filtering for files was too vague, leading to this field-name
-    mistake.'
+  id: r030
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. The PlanIR used concat with a single string
+    argument, but concat expects two list[dict] arguments for rowset concatenation.
+    The plan also hardcoded the file path ''/uploads/receipt_ocr_hLFaevcm.txt'' without
+    listing the directory, violating existing rules r021, r022, r023. The root cause
+    is a malformed PlanIR that bypasses directory listing and misuses concat. The
+    corrective rule ensures proper directory listing, file selection, and correct
+    use of primitives.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When the plan includes a Read RPC for a path obtained from a directory
+    listing, do not include a Stat RPC or a decision branch that checks the file type
+    after selection, because the Read is executed unconditionally in discovery. Instead,
+    ensure the listing filter is correct by using the appropriate field and value
+    for file entries (e.g., 'type' == 'file' or 'is_dir' == false). If the listing
+    filter is correct, the path is guaranteed to be a file.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r031
+  reasoning: 'Error: ''real_vm: read failed: is a directory''. The PlanIR includes
+    a Read RPC in discovery for a path derived from a directory listing. Despite having
+    a Stat RPC and a decision branch checking stat_result.kind != ''file'', the Read
+    is executed before the decision, so the Stat check cannot prevent reading a directory.
+    The listing filter used ''type'' field, but the path was still a directory, indicating
+    the filter field or value is incorrect. Existing in-session rules recommending
+    a Stat check and file-type decision branch are misleading because they cannot
+    prevent the unconditional Read. The new rule corrects this by omitting the Stat
+    RPC and relying on a correct listing filter. A prephase deep-read of /uploads
+    will help determine the correct listing structure for future runs.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
-  cycles_used: 3
-  date: '2026-06-22'
-  outcome: OUTCOME_NONE_CLARIFICATION
+  cycles_used: 8
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
+prephase_deep_read:
+- /uploads
 task_id: t51

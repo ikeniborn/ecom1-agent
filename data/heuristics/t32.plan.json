@@ -4,21 +4,20 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT pv.product_sku, pv.record_path\nFROM product_variants pv\nWHERE pv.product_name = 'Makita Heavy Duty DDF IX7-HSM Chainsaw'\n  AND pv.brand = 'Makita'\n  AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'power source' AND pvp.property_value_text = 'corded')\n  AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'bar length' AND pvp.property_value_text = '20 cm')\n  AND NOT EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key IN ('GPS tracking', 'built-in GPS', 'gps tracking'))"
+        "stdin": ".mode tabs\nSELECT pv.product_sku, pv.record_path, MAX(CASE WHEN pvp.property_key='color_family' THEN pvp.property_value_text END) as color_family, MAX(CASE WHEN pvp.property_key='size' THEN pvp.property_value_text END) as size, MAX(CASE WHEN pvp.property_key='fit' THEN pvp.property_value_text END) as fit, MAX(CASE WHEN pvp.property_key='bluetooth_control' THEN pvp.property_value_text END) as bluetooth_control FROM product_variants pv LEFT JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand = 'Engelbert Strauss' AND pv.series = 'e.s.motion vision 39A-KCI' AND pv.model = 'Work Trousers' GROUP BY pv.product_sku, pv.record_path;"
       },
-      "bind": "sql_output"
+      "bind": "raw_product"
     }
   ],
   "rowsets": [
     {
-      "from_": "sql_output",
+      "from_": "raw_product",
       "format": "auto_delim",
-      "into": "matching_products",
+      "into": "product_rows",
       "columns": [
         {
-          "into": "sku",
+          "into": "product_sku",
           "candidates": [
-            "sku",
             "product_sku"
           ]
         },
@@ -26,6 +25,30 @@
           "into": "record_path",
           "candidates": [
             "record_path"
+          ]
+        },
+        {
+          "into": "color_family",
+          "candidates": [
+            "color_family"
+          ]
+        },
+        {
+          "into": "size",
+          "candidates": [
+            "size"
+          ]
+        },
+        {
+          "into": "fit",
+          "candidates": [
+            "fit"
+          ]
+        },
+        {
+          "into": "bluetooth_control",
+          "candidates": [
+            "bluetooth_control"
           ]
         }
       ]
@@ -35,57 +58,159 @@
     {
       "prim": "first",
       "args": [
-        "$matching_products"
+        "$product_rows"
       ],
-      "into": "first_match"
+      "into": "product_row"
     },
     {
       "prim": "get",
       "args": [
-        "$first_match",
-        "sku"
+        "$product_row",
+        "product_sku"
       ],
-      "into": "sku"
+      "into": "product_sku"
     },
     {
       "prim": "get",
       "args": [
-        "$first_match",
+        "$product_row",
         "record_path"
       ],
-      "into": "product_record_path"
+      "into": "record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "color_family"
+      ],
+      "into": "color_family"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "size"
+      ],
+      "into": "size"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "fit"
+      ],
+      "into": "fit"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_row",
+        "bluetooth_control"
+      ],
+      "into": "bluetooth_control"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "nonempty",
-          "lhs": "$matching_products",
+          "op": "isnull",
+          "lhs": "$product_sku",
           "rhs": null,
           "args": []
         },
-        "label": "found"
+        "label": "not_found"
+      },
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "eq",
+              "lhs": "$color_family",
+              "rhs": "Gray",
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$size",
+              "rhs": "3XL",
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$fit",
+              "rhs": "women",
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$bluetooth_control",
+              "rhs": "true",
+              "args": []
+            }
+          ]
+        },
+        "label": "ok"
+      },
+      {
+        "when": {
+          "op": "or",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "isnull",
+              "lhs": "$bluetooth_control",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "ne",
+              "lhs": "$bluetooth_control",
+              "rhs": "true",
+              "args": []
+            }
+          ]
+        },
+        "label": "unsupported"
       }
     ],
-    "default_label": "not_found"
+    "default_label": "clarification"
   },
   "ops": [],
   "answer": {
-    "found": {
-      "message": "<NO> {sku}",
+    "ok": {
+      "message": "The product exists: {record_path} with SKU {product_sku}.",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
-          "path": null,
-          "source": "$answer.product_record_path"
+          "source": "$record_path"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "<NO> {product_sku}",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": [
+        {
+          "kind": "record_path",
+          "source": "$record_path"
         }
       ]
     },
     "not_found": {
-      "message": "Product not found or has GPS tracking",
-      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "message": "Product not found.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    },
+    "clarification": {
+      "message": "Product not found.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
       "refs": []
     }
   },

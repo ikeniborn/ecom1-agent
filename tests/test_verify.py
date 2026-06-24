@@ -39,7 +39,8 @@ def test_i1_ok_with_all_required_refs_passes():
         {"kind": "policy_doc", "path": "/docs/counting.md"},
         {"kind": "record_path", "source": "$row.record_path"}]})
     res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK",
-                                 refs=["/docs/counting.md", "/proc/catalog/A.json"]))
+                                 refs=["/docs/counting.md", "/proc/catalog/A.json"]),
+                  env={"row": {"record_path": "/proc/catalog/A.json"}})
     ok, err = verify(res, intent)
     assert ok, err
 
@@ -119,18 +120,17 @@ def test_i1_dollar_ref_guard_fires_on_non_ok():
     assert not ok and "ref" in err.lower()
 
 
-def test_i1_unresolved_record_path_source_skipped_when_path_present():
-    # required record_path whose $source isn't in env, but grounding put the literal
-    # path in refs -> presence-based check skips the unresolved source and passes.
+def test_i1_unresolved_record_path_source_fails_even_when_literal_in_refs():
+    # A2: required record_path whose $source isn't in env hard-fails regardless of
+    # what grounding put in refs — the source must resolve before verify can pass.
     intent = _intent(required_refs={"OUTCOME_OK": [
         {"kind": "record_path", "source": "$row.record_path"}]})
     res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK",
                                  refs=["/proc/catalog/A.json"]))
     ok, err = verify(res, intent)
-    assert ok, err
+    assert not ok and "resolve-before-cite" in err
 
-    # Inverse: when env resolves the source, absence from refs MUST fail (proves the
-    # positive case passes because the path is present, not because nothing is required).
+    # When env resolves the source, absence from refs MUST fail (required ref absent).
     res_env_resolves = _result(
         CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]),
         env={"row": {"record_path": "/proc/catalog/A.json"}})
@@ -223,3 +223,31 @@ def test_i3_reverse_identity_only_deny_protected_passes():
                                  refs=["/docs/security.md"]), env=_GUEST_ENV)
     ok, err = verify(res, intent)
     assert ok, f"Expected PASS (protected, gate OFF); got err={err!r}"
+
+
+def test_i1_unresolved_required_record_path_fails_on_ok():
+    intent = _intent(required_refs={"OUTCOME_OK": [
+        {"kind": "record_path", "source": "$basket.record_path"}]})
+    # env has no `basket` -> $basket.record_path resolves to None (unresolved source)
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK", refs=[]))
+    ok, err = verify(res, intent)
+    assert not ok and "resolve-before-cite" in err
+
+
+def test_i1_unresolved_required_record_path_fails_on_deny():
+    intent = _intent(required_refs={"OUTCOME_DENIED_SECURITY": [
+        {"kind": "record_path", "source": "$basket.record_path"}]})
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_DENIED_SECURITY",
+                                 refs=["/docs/security.md"]))
+    ok, err = verify(res, intent)
+    assert not ok and "$basket.record_path" in err
+
+
+def test_i1_resolved_required_record_path_passes():
+    intent = _intent(required_refs={"OUTCOME_OK": [
+        {"kind": "record_path", "source": "$basket.record_path"}]})
+    res = _result(CapturedAnswer(message="m", outcome="OUTCOME_OK",
+                                 refs=["/proc/baskets/basket_019.json"]),
+                  env={"basket": {"record_path": "/proc/baskets/basket_019.json"}})
+    ok, err = verify(res, intent)
+    assert ok, err

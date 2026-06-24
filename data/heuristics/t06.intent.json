@@ -1,36 +1,52 @@
 {
-  "objective": "Verify whether the product 'Sika Professional Sika 28T-UV8 Sealant' with sealant type hybrid sealant, color family Gray, and volume 300 ml exists in the catalogue, and if it does, check whether the catalogue also claims volume 310 ml; if the extra claim is absent, answer <NO> with the product SKU.",
+  "objective": "Verify the catalogue claim about the Extension Cable from Schneider Electric with color White and length 5m, and determine if the additional claim of length 10m exists; if the base product exists but the extra claim is absent, report <NO> with the SKU.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_search": "Find product_variant where brand = 'Sika' and product_name contains 'Sika 28T-UV8 Sealant', and has product_variant_properties with key 'sealant type' = 'hybrid sealant', key 'color family' = 'Gray', key 'volume' = '300 ml'",
-    "extra_claim_check": "For the found SKU, check if there exists a product_variant_property with key 'volume' and value '310 ml'"
+    "brand": "Schneider Electric",
+    "series": "Heavy Duty Merten 214-ZHY",
+    "product_name": "Extension Cable",
+    "color_family": "White",
+    "length_5m": "5 m",
+    "length_10m": "10 m",
+    "base_sku": "lookup from product_variants where brand = $brand and series = $series and product_name = $product_name, then filter by product_variant_properties where property_key='color_family' and property_value_text=$color_family and property_key='length' and property_value_text=$length_5m",
+    "extra_claim_found": "check if there exists a product_variant_properties entry for the found base_sku with property_key='length' and property_value_text=$length_10m",
+    "base_product_record_path": "record_path from the product_variants row identified by base_sku"
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_NONE_UNSUPPORTED",
-    "OUTCOME_NONE_CLARIFICATION"
+    "OUTCOME_NONE_UNSUPPORTED"
   ],
   "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "regex_match",
-        "lhs": "$answer.msg",
-        "rhs": "^<NO> \\(SKU: .+\\)$",
+        "op": "nonempty",
+        "lhs": "$base_sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$extra_claim_found",
+        "rhs": false,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "<NO> (SKU: {sku})"
+    "msg_skeleton": "{{#if base_sku}}<NO> SKU: {{base_sku}}{{else}}<NO>{{/if}}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$row.record_path"
+        "source": "$base_product_record_path"
       }
-    ]
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": []
   }
 }

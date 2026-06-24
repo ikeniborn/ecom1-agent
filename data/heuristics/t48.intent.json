@@ -1,35 +1,74 @@
 {
-  "objective": "Identify archived payment rows that belong to fraud incidents from the TSV file and compute the total fraudulent payment amount in EUR, citing each fraud row.",
+  "objective": "Identify archived payment rows that belong to fraud incidents from the TSV file /archive/payment_batch_export_DXad65HdYb.tsv and compute the total fraudulent payment amount.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "fraud_column": "lookup from TSV header: column name that indicates fraud (e.g., 'is_fraud', 'fraud_flag') with truthy value (e.g., '1', 'true')",
-    "amount_column": "lookup from TSV header: column name for payment amount in cents (e.g., 'amount_cents')",
-    "row_id_column": "lookup from TSV header: column name for row identifier (e.g., 'RowID', 'id')"
+    "file_path": "read from /archive/payment_batch_export_DXad65HdYb.tsv",
+    "fraud_indicator_column": "discover from TSV header: find column that indicates fraud incident (e.g., 'incident_type' or 'fraud_flag')",
+    "payment_amount_column": "discover from TSV header: find column that contains payment amount in cents (e.g., 'payment_amount_cents' or 'amount')",
+    "row_id_column": "discover from TSV header: find column that contains row identifier (e.g., 'RowID' or 'row_id')"
   },
   "outcome_space": [
     "OUTCOME_OK",
     "OUTCOME_NONE_UNSUPPORTED"
   ],
-  "constraints": [],
+  "constraints": [
+    {
+      "anchor": "#learned-rules",
+      "rule": "When a plan needs to filter rows based on a column in a TSV/CSV file, always first read the header, parse column names, and use a decision branch to check for the required column; if missing, branch to unsupported, otherwise proceed with filtering and computation.",
+      "security": false,
+      "deny_when": null,
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    },
+    {
+      "anchor": "#learned-rules",
+      "rule": "When a Read RPC output is used in a decision branch or any string operation, always first extract the 'content' field with a get primitive, because the bound variable is a ReadResponse protobuf, not a plain string.",
+      "security": false,
+      "deny_when": null,
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    }
+  ],
   "success_criteria": {
     "OUTCOME_OK": [
       {
         "op": "regex_match",
-        "lhs": "$answer.message",
+        "lhs": "$answer_msg",
         "rhs": "^EUR \\d+\\.\\d{2}$",
+        "args": []
+      },
+      {
+        "op": "ge",
+        "lhs": "$total_fraud_amount_cents",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$fraud_row_paths",
+        "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "EUR {total_euros}.{total_cents_two_digits}"
+    "msg_skeleton": "EUR %d.%02d",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "for each fraud row, construct '/archive/payment_batch_export_ELRhniWLDW.tsv#row=' + $row.RowID"
+        "source": "$fraud_row_paths"
       }
     ]
   }

@@ -1,9 +1,10 @@
 {
-  "objective": "Compute the total available_today_quantity of a specific product across all stores in Graz, including stores with zero availability.",
+  "objective": "Count the total available_today_quantity of a specific Heco Wood and Drywall Screw product (screw type wood screw, diameter 6 mm) across all Vienna stores, including stores with zero availability.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_sku": "lookup from product_variants via product_family where brand='Heco', series='Heco Zinc Plated', model='HECO 3DW-64B', product_family_name='Nut Bolt and Washer', and property key='fastener type' value='threaded rod'",
-    "stores": "all stores where city='Graz'"
+    "product_sku": "Discover product family by name 'Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw', then find its variants, then filter by properties: screw type = 'wood screw' and diameter = '6 mm' using product_variant_properties table.",
+    "vienna_stores": "Query stores WHERE city = 'Vienna' to get store_id and record_path.",
+    "inventory_quantities": "For each Vienna store, query store_inventory for available_today_quantity where product_sku matches discovered SKU; if no row, treat quantity as 0."
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -20,38 +21,35 @@
       },
       {
         "op": "nonempty",
-        "lhs": "$product_record_path",
+        "lhs": "$product.record_path",
         "rhs": null,
         "args": []
       },
       {
         "op": "nonempty",
-        "lhs": "$store_record_paths",
+        "lhs": "$stores.record_path",
         "rhs": null,
-        "args": []
-      },
-      {
-        "op": "eq",
-        "lhs": "$store_record_paths.length",
-        "rhs": "$num_stores_in_graz",
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "count: {count}"
+    "msg_skeleton": "count: {count}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product_variant.record_path"
+        "source": "$product.record_path"
       },
       {
         "kind": "record_path",
         "path": null,
-        "source": "$store_record_paths"
+        "source": "$stores.record_path"
       }
     ]
   }

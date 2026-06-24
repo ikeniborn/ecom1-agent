@@ -94,6 +94,16 @@ def _is_retryable_vm_error(msg: str) -> bool:
     return any(p in msg for p in _RETRYABLE_VM_ERROR_PATTERNS)
 
 
+def negative_outcome_by_precedence(outcome_space) -> "str | None":
+    """B: pick a valid negative terminal outcome from the task's declared space, in the
+    precedence decide.unsupported_or_clarify uses (UNSUPPORTED outranks CLARIFICATION).
+    None when the space declares neither -> the caller keeps its defensive literal."""
+    for o in ("OUTCOME_NONE_UNSUPPORTED", "OUTCOME_NONE_CLARIFICATION"):
+        if o in (outcome_space or []):
+            return o
+    return None
+
+
 def _enrich_prim_error(err: str) -> str:
     """Append the failed primitive's contract so the retry sees the spec, not just the
     symptom. Matches the runtime forms ("compute step 'X'", "primitive 'X'") and the lint
@@ -489,9 +499,10 @@ def run_pipeline(vm, instruction: str, task_id: str, agents_md_text: str, facts=
             print(f"{CLI_YELLOW}[pipeline] same verify fail x{_SAME_ERROR_MAX} -> CLARIFICATION{CLI_CLR}")
             break
 
-    save_last_run(task_id, "failure", "OUTCOME_NONE_CLARIFICATION", cycle)
-    answer_once(last_error or "interpreter cycles exhausted", "OUTCOME_NONE_CLARIFICATION", [])
-    return {"cycles_used": cycle, "outcome": "OUTCOME_NONE_CLARIFICATION",
+    term = negative_outcome_by_precedence(intent.outcome_space) or "OUTCOME_NONE_CLARIFICATION"
+    save_last_run(task_id, "failure", term, cycle)
+    answer_once(last_error or "interpreter cycles exhausted", term, [])
+    return {"cycles_used": cycle, "outcome": term,
             "status": "failure", "input_tokens": total_in, "output_tokens": total_out}
 
 

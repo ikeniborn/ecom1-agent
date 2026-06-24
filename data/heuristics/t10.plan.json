@@ -3,29 +3,29 @@
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/current-updates/catalogue-counting-2025-10-08-cleaning-liquids-linz.md"
+        "path": "/docs/current-updates/catalogue-counting-2025-10-08-work-trousers-vienna.md"
       },
-      "bind": "policy_doc"
+      "bind": "policy_text"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH cleaning_liquid_kind AS (\n  SELECT product_kind_id FROM product_kinds WHERE product_kind_name = 'Cleaning Liquid'\n),\ncleaning_liquid_skus AS (\n  SELECT pv.product_sku FROM product_variants pv JOIN cleaning_liquid_kind clk ON pv.product_kind_id = clk.product_kind_id\n),\nopen_linz_stores AS (\n  SELECT store_id FROM stores WHERE city = 'Linz' AND is_open = 1\n),\neligible_inventory AS (\n  SELECT si.product_sku FROM store_inventory si\n  JOIN cleaning_liquid_skus cls ON si.product_sku = cls.product_sku\n  JOIN open_linz_stores ols ON si.store_id = ols.store_id\n  WHERE si.available_today_quantity > 0\n)\nSELECT COUNT(DISTINCT product_sku) AS count_val FROM eligible_inventory;"
+        "stdin": "WITH kind AS (SELECT product_kind_id FROM product_kinds WHERE product_kind_name = 'Work Trousers'), store AS (SELECT store_id FROM stores WHERE store_name = 'Vienna PowerTool' AND is_open = 1), cnt AS (SELECT COUNT(DISTINCT pv.product_sku) AS cnt FROM product_variants pv JOIN store_inventory si ON pv.product_sku = si.product_sku WHERE pv.product_kind_id = (SELECT product_kind_id FROM kind) AND si.store_id = (SELECT store_id FROM store) AND si.available_today_quantity > 0) SELECT cnt FROM cnt;"
       },
-      "bind": "sql_raw"
+      "bind": "sql_output"
     }
   ],
   "rowsets": [
     {
-      "from_": "sql_raw",
+      "from_": "sql_output",
       "format": "auto_delim",
-      "into": "sql_rows",
+      "into": "parsed_count",
       "columns": [
         {
-          "into": "count_val",
+          "into": "cnt",
           "candidates": [
-            "count_val"
+            "cnt"
           ]
         }
       ]
@@ -35,34 +35,40 @@
     {
       "prim": "first",
       "args": [
-        "$sql_rows"
+        "$parsed_count"
       ],
-      "into": "first_row"
+      "into": "row"
     },
     {
       "prim": "get",
       "args": [
-        "$first_row",
-        "count_val"
+        "$row",
+        "cnt"
       ],
-      "into": "qty"
+      "into": "count"
     }
   ],
   "decision": {
-    "branches": [],
+    "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "1",
+          "rhs": "1",
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
     "default_label": "ok"
   },
   "ops": [],
   "answer": {
     "ok": {
-      "message": "[QTY:{qty}]",
+      "message": "{count}",
       "outcome": "OUTCOME_OK",
       "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/current-updates/catalogue-counting-2025-10-08-cleaning-liquids-linz.md",
-          "source": "$policy_doc"
-        }
+        "/docs/current-updates/catalogue-counting-2025-10-08-work-trousers-vienna.md"
       ]
     }
   },

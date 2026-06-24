@@ -5,48 +5,27 @@
       "args": {
         "path": "/docs/security.md"
       },
-      "bind": "security_doc"
-    },
-    {
-      "rpc": "Read",
-      "args": {
-        "path": "/docs/checkout.md"
-      },
-      "bind": "checkout_doc"
+      "bind": "security_policy_text"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": ".param set :basket_id '$params.basket_id'\nWITH basket AS (\n  SELECT * FROM shopping_baskets WHERE basket_id = :basket_id\n),\nitems AS (\n  SELECT sbi.product_sku, sbi.requested_quantity, pv.price_cents\n  FROM shopping_basket_items sbi\n  JOIN product_variants pv ON sbi.product_sku = pv.product_sku\n  WHERE sbi.basket_id = :basket_id\n),\ninventory AS (\n  SELECT product_sku, available_today_quantity\n  FROM store_inventory\n  WHERE store_id = (SELECT store_id FROM basket)\n)\nSELECT\n  b.basket_id,\n  b.customer_id,\n  b.store_id,\n  b.basket_status,\n  b.record_path AS basket_record_path,\n  (SELECT SUM(price_cents * requested_quantity) FROM items) AS total_amount_cents,\n  (SELECT COUNT(*) FROM items WHERE requested_quantity > (SELECT available_today_quantity FROM inventory WHERE product_sku = items.product_sku)) AS insufficient_stock_count\nFROM basket b;"
+        "stdin": "SELECT b.record_path, b.store_id, b.basket_status, b.discount_issuer_employee_id, s.is_open FROM shopping_baskets b JOIN stores s ON b.store_id = s.store_id WHERE b.basket_id = 'basket_001';"
       },
-      "bind": "basket_info_raw"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "WITH gen AS (SELECT hex(randomblob(16)) AS payment_id) SELECT payment_id, '/payments/' || payment_id || '.json' AS record_path FROM gen;"
-      },
-      "bind": "payment_id_gen_raw"
+      "bind": "basket_sql_output"
     }
   ],
   "rowsets": [
     {
-      "from_": "basket_info_raw",
+      "from_": "basket_sql_output",
       "format": "auto_delim",
-      "into": "basket_info",
+      "into": "basket_sql_rows",
       "columns": [
         {
-          "into": "basket_id",
+          "into": "record_path",
           "candidates": [
-            "basket_id"
-          ]
-        },
-        {
-          "into": "customer_id",
-          "candidates": [
-            "customer_id"
+            "record_path"
           ]
         },
         {
@@ -62,40 +41,15 @@
           ]
         },
         {
-          "into": "basket_record_path",
+          "into": "discount_issuer_employee_id",
           "candidates": [
-            "basket_record_path"
+            "discount_issuer_employee_id"
           ]
         },
         {
-          "into": "total_amount_cents",
+          "into": "is_open",
           "candidates": [
-            "total_amount_cents"
-          ]
-        },
-        {
-          "into": "insufficient_stock_count",
-          "candidates": [
-            "insufficient_stock_count"
-          ]
-        }
-      ]
-    },
-    {
-      "from_": "payment_id_gen_raw",
-      "format": "auto_delim",
-      "into": "payment_id_gen",
-      "columns": [
-        {
-          "into": "payment_id",
-          "candidates": [
-            "payment_id"
-          ]
-        },
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
+            "is_open"
           ]
         }
       ]
@@ -103,17 +57,24 @@
   ],
   "compute": [
     {
-      "prim": "get",
+      "prim": "first",
       "args": [
-        "$basket_info.0",
-        "total_amount_cents"
+        "$basket_sql_rows"
       ],
-      "into": "total_amount_cents"
+      "into": "basket_sql_row"
     },
     {
       "prim": "get",
       "args": [
-        "$basket_info.0",
+        "$basket_sql_row",
+        "record_path"
+      ],
+      "into": "basket.record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_sql_row",
         "store_id"
       ],
       "into": "store_id"
@@ -121,94 +82,82 @@
     {
       "prim": "get",
       "args": [
-        "$payment_id_gen.0",
-        "payment_id"
+        "$basket_sql_row",
+        "basket_status"
       ],
-      "into": "payment_id"
+      "into": "basket_status"
     },
     {
       "prim": "get",
       "args": [
-        "$payment_id_gen.0",
-        "record_path"
+        "$basket_sql_row",
+        "discount_issuer_employee_id"
       ],
-      "into": "payment_record_path"
+      "into": "discount_issuer_employee_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket_sql_row",
+        "is_open"
+      ],
+      "into": "is_open"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$basket_sql_rows"
+      ],
+      "into": "basket"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "not",
-          "lhs": null,
+          "op": "isnull",
+          "lhs": "$discount_issuer_employee_id",
           "rhs": null,
-          "args": [
-            {
-              "op": "and",
-              "lhs": null,
-              "rhs": null,
-              "args": [
-                {
-                  "op": "eq",
-                  "lhs": "$params.authorization",
-                  "rhs": "verified",
-                  "args": []
-                },
-                {
-                  "op": "eq",
-                  "lhs": "$params.cross_customer_checkout",
-                  "rhs": "approved",
-                  "args": []
-                }
-              ]
-            }
-          ]
+          "args": []
         },
-        "label": "denied_security"
-      },
-      {
-        "when": {
-          "op": "not",
-          "lhs": null,
-          "rhs": null,
-          "args": [
-            {
-              "op": "nonempty",
-              "lhs": "$basket_info",
-              "rhs": null,
-              "args": []
-            }
-          ]
-        },
-        "label": "denied_security"
+        "label": "denied_no_override"
       },
       {
         "when": {
           "op": "eq",
-          "lhs": "$basket_info.0.basket_status",
+          "lhs": "$basket_status",
           "rhs": "checked_out",
           "args": []
         },
-        "label": "denied_security"
+        "label": "already_checked_out"
       },
       {
         "when": {
-          "op": "gt",
-          "lhs": "$basket_info.0.insufficient_stock_count",
+          "op": "eq",
+          "lhs": "$is_open",
           "rhs": 0,
           "args": []
         },
-        "label": "denied_security"
+        "label": "store_closed"
+      },
+      {
+        "when": {
+          "op": "isnull",
+          "lhs": "$basket",
+          "rhs": null,
+          "args": []
+        },
+        "label": "basket_not_found"
       }
     ],
     "default_label": "ok"
   },
   "ops": [
     {
-      "rpc": "Exec",
+      "rpc": "Write",
       "args": {
-        "path": "/bin/sql",
-        "stdin": ".param set :payment_id '$payment_id'\n.param set :basket_id '$params.basket_id'\n.param set :customer_id '$params.customer_id'\n.param set :store_id '$store_id'\n.param set :total_amount_cents $total_amount_cents\n.param set :record_path '$payment_record_path'\nBEGIN TRANSACTION;\nINSERT INTO payment_transactions (payment_id, record_path, basket_id, is_archived_basket_reference, customer_id, store_id, payment_amount_cents, payment_currency, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude) VALUES (:payment_id, :record_path, :basket_id, 0, :customer_id, :store_id, :total_amount_cents, 'USD', 'completed', datetime('now'), 'trusted_override', 'trusted_override', 0.0, 0.0);\nINSERT INTO payment_transaction_items (payment_id, line_number, product_sku, purchased_quantity, item_unit_price_cents) SELECT :payment_id, sbi.line_number, sbi.product_sku, sbi.requested_quantity, pv.price_cents FROM shopping_basket_items sbi JOIN product_variants pv ON sbi.product_sku = pv.product_sku WHERE sbi.basket_id = :basket_id;\nUPDATE shopping_baskets SET basket_status = 'checked_out' WHERE basket_id = :basket_id;\nCOMMIT;"
+        "path": "/proc/checkout/processed_basket_001",
+        "content": "processed"
       },
       "bind": null,
       "guard_label": "ok",
@@ -216,8 +165,28 @@
     }
   ],
   "answer": {
+    "denied_no_override": {
+      "message": "Checkout denied: no override for guest.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
+    },
+    "already_checked_out": {
+      "message": "Checkout not possible: basket already checked out.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "store_closed": {
+      "message": "Checkout not possible: store is closed.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "basket_not_found": {
+      "message": "Basket not found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
     "ok": {
-      "message": "Checkout completed for basket {params.basket_id}. Payment ID: {payment_id}.",
+      "message": "Checkout processed for basket {basket_id}.",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
@@ -228,18 +197,7 @@
         {
           "kind": "record_path",
           "path": null,
-          "source": "$payment_record_path"
-        }
-      ]
-    },
-    "denied_security": {
-      "message": "Checkout denied: security policy violation.",
-      "outcome": "OUTCOME_DENIED_SECURITY",
-      "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/checkout.md",
-          "source": null
+          "source": "$basket.record_path"
         }
       ]
     }

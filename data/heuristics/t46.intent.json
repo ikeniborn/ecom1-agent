@@ -1,61 +1,116 @@
 {
-  "objective": "Apply the maximum service_recovery discount to the most recent checkoutable basket of customer julia.wolf+cust935@icloud.com at the caller's store.",
-  "desired_outcome": "OUTCOME_DENIED_SECURITY",
+  "objective": "Apply the highest policy-allowed service_recovery discount to the last checkoutable basket of the customer identified by email matthias.schuster+cust986@icloud.com.",
+  "desired_outcome": "OUTCOME_OK",
   "params": {
-    "customer_email": "julia.wolf+cust935@icloud.com",
-    "store_id": "$_facts.identity.store_id",
-    "basket_selection": "the most recent basket for that customer at that store with status 'checkoutable' as defined by /docs/checkout.md",
-    "discount_type": "service_recovery",
-    "max_discount": "the maximum allowed service_recovery discount as defined in /docs/discounts.md",
-    "caller_employee_role": "role of the caller if they are an employee, otherwise null; determined by querying employee_accounts and employee_role_assignments for the caller's employee_id (if any)"
+    "customer_email": "from instruction: matthias.schuster+cust986@icloud.com",
+    "customer_id": "lookup from customer_accounts WHERE customer_email = $customer_email",
+    "last_checkoutable_basket": "lookup from shopping_baskets WHERE customer_id = $customer_id AND basket_status = 'checkoutable' ORDER BY basket_created_at DESC LIMIT 1",
+    "service_recovery_discount_percent": "extract from /docs/discounts.md the highest allowed service_recovery discount percent",
+    "discount_reason_code": "service_recovery",
+    "discount_issuer_employee_id": "lookup from employee_accounts WHERE employee_id = $_facts.identity.employee_id (null if not found)"
   },
   "outcome_space": [
-    "OUTCOME_DENIED_SECURITY"
+    "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY",
+    "OUTCOME_NONE_UNSUPPORTED"
   ],
   "constraints": [
     {
-      "anchor": "#security-role-based-access",
-      "rule": "Only employees with the 'store_associate' role may apply discounts.",
+      "anchor": "#r003",
+      "rule": "Never use /bin/id to determine caller identity for decision branches; always query the relevant accounts table (e.g., employee_accounts) to verify the caller's role, or omit the identity check entirely and rely on execution-time security enforcement.",
+      "security": false,
+      "deny_when": null,
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    },
+    {
+      "anchor": "#r005",
+      "rule": "When a policy doc defines a condition (e.g., checkout eligibility, discount limits), always extract that condition from the doc's content and incorporate it into the decision branches; never rely on hardcoded assumptions or ad-hoc checks.",
+      "security": false,
+      "deny_when": null,
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    },
+    {
+      "anchor": "#discount-issuer-authorization",
+      "rule": "Only authorized employees may apply discounts to baskets.",
       "security": true,
       "deny_when": {
-        "op": "or",
-        "lhs": null,
+        "op": "isnull",
+        "lhs": "$discount_issuer_employee_id",
         "rhs": null,
-        "args": [
-          {
-            "op": "isnull",
-            "lhs": "$caller_employee_role",
-            "rhs": null,
-            "args": []
-          },
-          {
-            "op": "ne",
-            "lhs": "$caller_employee_role",
-            "rhs": "store_associate",
-            "args": []
-          }
-        ]
-      }
+        "args": []
+      },
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
     }
   ],
   "success_criteria": {
-    "OUTCOME_DENIED_SECURITY": [
+    "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$denial_reason",
+        "lhs": "$last_checkoutable_basket.basket_id",
         "rhs": null,
+        "args": []
+      },
+      {
+        "op": "ge",
+        "lhs": "$applied_discount_percent",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$applied_discount_reason_code",
+        "rhs": "service_recovery",
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Discount cannot be applied: {denial_reason}"
+    "msg_skeleton": "Applied {discount_percent}% service_recovery discount to basket {basket_id} for customer {customer_email}.",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/discounts.md",
+        "source": null
+      },
+      {
+        "kind": "policy_doc",
+        "path": "/docs/security.md",
+        "source": null
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$last_checkoutable_basket.record_path"
+      }
+    ],
     "OUTCOME_DENIED_SECURITY": [
       {
         "kind": "policy_doc",
         "path": "/docs/security.md",
+        "source": null
+      }
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/discounts.md",
         "source": null
       }
     ]

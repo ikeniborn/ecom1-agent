@@ -3,29 +3,30 @@
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/current-updates/catalogue-counting-2021-08-09-lawn-mowers-fam-garden-tools-lawn-mowers-0015-3kzwpfd3.md"
+        "path": "/docs/ops-policy-notes/catalogue-count-wiring-devices-brno-2021-08-09.md"
       },
-      "bind": "policy_doc"
+      "bind": "policy_text"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT COUNT(*) AS cnt FROM product_variants WHERE product_kind_id = 'lawn_mowers' AND product_family_id != 'fam_garden_tools_lawn_mowers_0015_3kzwpfd3';"
+        "stdin": "SELECT COUNT(DISTINCT pv.product_sku) AS cnt FROM product_variants pv WHERE pv.product_kind_id = 'wiring_devices' AND EXISTS (SELECT 1 FROM store_inventory si JOIN stores s ON si.store_id = s.store_id WHERE si.product_sku = pv.product_sku AND s.city = 'Brno' AND s.is_open = 1 AND s.store_name LIKE '%PowerTool%' AND si.available_today_quantity > 0);"
       },
-      "bind": "sql_raw"
+      "bind": "sql_output"
     }
   ],
   "rowsets": [
     {
-      "from_": "sql_raw",
+      "from_": "sql_output",
       "format": "auto_delim",
-      "into": "sql_rows",
+      "into": "count_rows",
       "columns": [
         {
           "into": "cnt",
           "candidates": [
             "cnt",
+            "count",
             "COUNT(*)"
           ]
         }
@@ -34,17 +35,24 @@
   ],
   "compute": [
     {
-      "prim": "column",
+      "prim": "first",
       "args": [
-        "$sql_rows",
+        "$count_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
         "cnt"
       ],
-      "into": "cnt_str"
+      "into": "count_str"
     },
     {
       "prim": "to_number",
       "args": [
-        "$cnt_str"
+        "$count_str"
       ],
       "into": "count"
     }
@@ -56,15 +64,9 @@
   "ops": [],
   "answer": {
     "ok": {
-      "message": "<COUNT:{count}>",
+      "message": "[QTY:{count}]",
       "outcome": "OUTCOME_OK",
-      "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/current-updates/catalogue-counting-2021-08-09-lawn-mowers-fam-garden-tools-lawn-mowers-0015-3kzwpfd3.md",
-          "source": null
-        }
-      ]
+      "refs": []
     }
   },
   "custom_extract": []

@@ -1,66 +1,83 @@
 entries:
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - Answer should contain '<NO>'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: When querying product_variants by brand and product_name, use case-insensitive comparison (e.g.,
-    LOWER(brand) = LOWER(:brand) AND LOWER(product_name) LIKE LOWER('%' || :product_name_search || '%'))
-    to ensure the product is found even if case differs.
+  content: When querying product_variants by brand and product_name, use case-insensitive
+    comparison (e.g., LOWER(brand) = LOWER(:brand) AND LOWER(product_name) LIKE LOWER('%'
+    || :product_name_search || '%')) to ensure the product is found even if case differs.
   created: '2026-06-22'
   deactivated_reason: null
   id: r018
-  reasoning: The grader error 'Answer should contain '<NO>'' indicates the answer did not contain '<NO>',
-    meaning the PlanIR took the not_found or claim_present branch instead of claim_absent. Given the objective
-    expects the product to exist but claim absent, the most likely cause is that the SQL query returned
-    no rows due to case-sensitive exact match on brand (e.g., 'Wera' vs 'wera'), leading to the not_found
-    branch and answer 'Product not found.' without '<NO>'. The PlanIR should use case-insensitive matching
-    to robustly find the product.
+  reasoning: The grader error 'Answer should contain '<NO>'' indicates the answer
+    did not contain '<NO>', meaning the PlanIR took the not_found or claim_present
+    branch instead of claim_absent. Given the objective expects the product to exist
+    but claim absent, the most likely cause is that the SQL query returned no rows
+    due to case-sensitive exact match on brand (e.g., 'Wera' vs 'wera'), leading to
+    the not_found branch and answer 'Product not found.' without '<NO>'. The PlanIR
+    should use case-insensitive matching to robustly find the product.
   status: active
   surface: ir
 - agents_md_anchor: null
   content: When a required ref expects a record_path from a variable (e.g., $verified_sku.record_path),
-    ensure that variable is bound to a row object containing a record_path field, not a scalar. Use a
-    rowset extraction that includes the record_path column, then use 'get' to extract the SKU for the
-    message, but keep the row for the ref.
+    ensure that variable is bound to a row object containing a record_path field,
+    not a scalar. Use a rowset extraction that includes the record_path column, then
+    use 'get' to extract the SKU for the message, but keep the row for the ref.
   created: '2026-06-22'
   deactivated_reason: null
   id: r019
-  reasoning: 'Error: interpret: unresolved required ref(s) [''$verified_sku.record_path''] on OK answer.
-    Root cause: The PlanIR extracted verified_sku as a scalar string and verified_record_path as a separate
-    scalar, but the required ref expects a record_path attribute on the verified_sku variable. The interpreter
-    could not resolve $verified_sku.record_path because $verified_sku was a plain string, not a row object.
-    Failing PlanIR fragment: the SQL query returned verified_sku and verified_record_path as independent
-    columns, and the compute block used ''get'' to extract them as separate scalars, then the answer block
-    used $verified_record_path for the ref, which did not match the required ref''s source $verified_sku.record_path.
-    The fix is to bind verified_sku to a row that includes record_path, so that the required ref can be
-    satisfied by referencing that row''s record_path field.'
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$verified_sku.record_path'']
+    on OK answer. Root cause: The PlanIR extracted verified_sku as a scalar string
+    and verified_record_path as a separate scalar, but the required ref expects a
+    record_path attribute on the verified_sku variable. The interpreter could not
+    resolve $verified_sku.record_path because $verified_sku was a plain string, not
+    a row object. Failing PlanIR fragment: the SQL query returned verified_sku and
+    verified_record_path as independent columns, and the compute block used ''get''
+    to extract them as separate scalars, then the answer block used $verified_record_path
+    for the ref, which did not match the required ref''s source $verified_sku.record_path.
+    The fix is to bind verified_sku to a row that includes record_path, so that the
+    required ref can be satisfied by referencing that row''s record_path field.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: 'When using the filter_rows primitive, provide exactly two arguments: the rows list and a predicate
-    dict (e.g., {"op":"eq","lhs":"column_name","rhs":"value"}). Do not pass column name and value as separate
-    arguments.'
+  content: 'When using the filter_rows primitive, provide exactly two arguments: the
+    rows list and a predicate dict (e.g., {"op":"eq","lhs":"column_name","rhs":"value"}).
+    Do not pass column name and value as separate arguments.'
   created: '2026-06-22'
   deactivated_reason: null
   id: r020
-  reasoning: 'The interpret phase failed with: ''filter_rows() takes 2 positional arguments but 3 were
-    given''. The failing PlanIR compute step was: {"prim":"filter_rows","args":["$matching","has_cleaner_type","true"],"into":"cleaner_variants"}.
-    The contract for filter_rows expects (rows, pred) — a list of dicts and a predicate dict. Passing
-    column name and value as separate arguments violates the contract. The rule ensures future PlanIR
-    uses the correct two-argument form with a predicate dict.'
+  reasoning: 'The interpret phase failed with: ''filter_rows() takes 2 positional
+    arguments but 3 were given''. The failing PlanIR compute step was: {"prim":"filter_rows","args":["$matching","has_cleaner_type","true"],"into":"cleaner_variants"}.
+    The contract for filter_rows expects (rows, pred) — a list of dicts and a predicate
+    dict. Passing column name and value as separate arguments violates the contract.
+    The rule ensures future PlanIR uses the correct two-argument form with a predicate
+    dict.'
   status: active
   surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: 'Claim check result: Unsupported (missing properties) SKU: PNT-IQ8EV9EL'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /proc/catalog/paints_finishes/metal_concrete_paint/PNT-IQ8EV9EL.json
 last_run:
-  cycles_used: 3
-  date: '2026-06-22'
+  cycles_used: 1
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t07

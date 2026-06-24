@@ -1,0 +1,1766 @@
+════════════════════════════════════════════════════════════════════════
+TASK t03  ·  model=deepseek-v4-flash:cloud
+  Do you sell the Respiratory Protection from Honeywell in the Honeywell Pro HW 2GM-UMP Respiratory Protection line that has mask type dust mask and protection class basic?
+════════════════════════════════════════════════════════════════════════
+
+  · [Exec /bin/sql] -> sql
+      CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+      CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+      CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+      CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+      CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+      CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+      CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+      CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+      CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+      CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+      CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+      CREATE INDEX payment_transactions_status_idx ON paym… [+6147 chars]
+  · [Exec /bin/id] [MUTATED] -> user: anonymous
+      roles: GUEST
+  · [Tree /docs] -> <empty>
+═══ PRE-PHASE FACTS ═══
+docs_inventory (11):
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+gather_status: {"schema": "ok", "sample_rows": "skipped(slim)", "identity": "ok", "docs_inventory": "ok", "policies": "skipped(slim)", "catalogue_candidates": "skipped(slim)", "target_records": "skipped(slim)", "path_listings": "skipped(slim)"}
+identity: {"kind": "guest"}
+schema:
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(… [+5146 chars]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 0 · INTENT · 27347ms · tokens 4142/4306 · OK
+┌ SYSTEM (e659f28e)
+    # PHASE: INTENT
+    
+    You receive pre-phase facts about the task and produce an IntentSpec —
+    a structured description of **what** must be done and **why**, not **how**.
+    Emit data, not code. The PLAN phase uses your output to decide the execution
+    strategy.
+    
+    ## Pre-phase facts you receive
+    
+    | Field | Content |
+    |-------|---------|
+    | `instruction` | Verbatim task request from the caller |
+    | `agents_md` | Full AGENTS.MD vault rules |
+    | `schema` | Table/column definitions from the runtime |
+    | `sample_rows` | Small row sample per table (method-grounded; values change each run) |
+    | `docs_inventory` | Paths of policy docs available under `/docs/` |
+    | `policies` | Verbatim content of relevant policy files |
+    | `identity` | Output of `/bin/id` — caller role, store, issuer; includes a structural `kind`: `customer` \| `employee` \| `guest` |
+    | `target_records` | Any specific records named in the instruction |
+    
+    ## Output format — IntentSpec
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "objective": "<one-sentence statement of what must be achieved>",
+      "desired_outcome": "OUTCOME_OK | OUTCOME_DENIED_SECURITY | OUTCOME_NONE_UNSUPPORTED | OUTCOME_NONE_CLARIFICATION",
+      "params": {"<name>": "<method description or $agent_var — never a re-seeded literal>"},
+      "outcome_space": ["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+      "constraints": [
+        {
+          "anchor": "<#section > entry in AGENTS.MD>",
+          "rule": "<verbatim AGENTS.MD line>",
+          "security": true,
+          "deny_when": {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<literal or $ref>"}
+        }
+      ],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<value>"}
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "<human-readable template, e.g. 'Processed {count} items'>"
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {"kind": "policy_doc", "path": "/docs/<governing-doc>.md"},
+          {"kind": "record_path", "source": "$<row>.record_path"}
+        ]
+      }
+    }
+    ```
+    
+    ### Field rules
+    
+    - `objective` — one sentence; no implementation detail.
+    - `desired_outcome` — the nominal happy-path outcome; PLAN may produce others.
+    - `params` — encode **how** to find a value (e.g. `"lookup from <TABLE> WHERE ..."`),
+      never bake a re-seeded literal. Values beginning with `$` are resolved at runtime.
+    - `outcome_space` — every outcome the task can legitimately produce; order does not matter.
+    - `constraints` — one entry per AGENTS.MD rule that applies. Copy `rule` verbatim.
+      - `security: true` when the rule can produce `OUTCOME_DENIED_SECURITY`.
+      - `deny_when` (**required** on security constraints): a PredExpr that, when true,
+        mandates denial. Evaluated against runtime env after discovery.
+    - `required_refs` — keyed by outcome. For each outcome the answer can take, list the
+      evidence the grader requires: a `policy_doc` (literal `/docs/...md` `path` taken from
+      THIS run's `docs_inventory`/`policies` — the governing rule/count/procedure the
+      decision rests on) and/or a `record_path` (a `$ref` `source` bound at runtime to the
+      reported row's path). Declare ONLY load-bearing refs (reading a doc ≠ obligation to
+      cite it). Exactly one of `path`/`source` per RefSpec, matching its `kind`.
+    - `success_criteria` — a map keyed by outcome (same shape as `required_refs`).
+      List STRUCTURAL / grounding checks only per outcome (e.g. `count ge 0`, a
+      nonempty bound id). A negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`)
+      typically needs no criteria — it is gated by `outcome_space`. Do NOT bake a SQL
+      recipe, join, `kind_id`, or `city` here — that is PLAN's job (HOW).
+    
+    ### Learned rules
+    
+    You may receive a `LEARNED_RULES (active)` block — validated, task-scoped guidance
+    distilled from prior runs. Honor it when shaping the spec, especially `required_refs`,
+    `success_criteria`, `outcome_space`, and `params`. These rules state methods (how to
+    ground an answer, which evidence the grader requires), never re-seeded literals — apply
+    the method, do not copy any example value.
+    
+    ### Security scope — role-aware customer-ownership deny
+    
+    `facts.identity.kind` is one of `customer`, `employee`, `guest` (structural,
+    derived from the `/bin/id` id-shape — not a role-name list). The `security.md`
+    customer-ownership clause binds **customers** acting on their own account — NOT
+    an employee operational read or action.
+    
+    Apply a customer-ownership `deny_when` **only when** the caller is a customer:
+    
+    ```json
+    {"op":"and","args":[
+      {"op":"eq","lhs":"$_facts.identity.kind","rhs":"customer"},
+      {"op":"ne","lhs":"$record.customer_id","rhs":"$_facts.identity.customer_id"}]}
+    ```
+    
+    Do NOT emit an owner-mismatch deny for an `employee`/operational identity — an
+    employee reading or acting on a record they do not "own" is not a customer-scope
+    violation. Customer-only actions (account recovery, email change per the doc)
+    remain a separate class. Ground this in the `security.md` scope + `facts.identity`,
+    never a hardcoded role or id.
+    
+    ## IDD vs SDD (what belongs here)
+    
+    INTENT is the IDD layer: WHAT must hold and WHY — `objective`, `outcome_space`,
+    `constraints`, `required_refs` (cite the governing doc + the reported record),
+    `success_criteria` (structural/grounding). INTENT NEVER specifies HOW: no SQL, joins,
+    column names, `kind_id`, or `city`. PLAN (the SDD layer) reads the eligibility rule
+    from `facts.policies` and builds the rule-correct SQL.
+    
+    ## PredExpr grammar
+    
+    A predicate expression is a JSON object `{"op": ..., ...}`.
+    
+    **Leaf ops** — require `lhs` (a ref or literal); most require `rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `eq` | lhs == rhs |
+    | `ne` | lhs != rhs |
+    | `lt` | lhs < rhs (numeric) |
+    | `le` | lhs <= rhs (numeric) |
+    | `gt` | lhs > rhs (numeric) |
+    | `ge` | lhs >= rhs (numeric) |
+    | `nonempty` | lhs is non-null and non-empty (no rhs) |
+    | `isnull` | lhs is null or missing (no rhs) |
+    | `contains_any` | lhs list shares ≥1 element with rhs list |
+    | `in_set` | lhs value is in rhs list |
+    | `startswith` | str(lhs) starts with str(rhs) |
+    | `endswith` | str(lhs) ends with str(rhs) |
+    | `regex_match` | str(lhs) matches regex rhs |
+    
+    **Bool ops** — require `args` (list of nested PredExpr); no `lhs`/`rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `and` | all args true |
+    | `or` | any arg true |
+    | `not` | exactly one arg; negated |
+    
+    ### `$ref` convention
+    
+    A string starting with `$` is a runtime reference into `env`:
+    - `$name` — top-level env key
+    - `$a.b` — dotted path: `env["a"]["b"]`
+    - `$rows.0.sku` — indexed path: `env["rows"][0]["sku"]`
+    
+    Anything that does not start with `$` is treated as a literal value.
+    
+    ## Grounding rule (S3)
+    
+    The benchmark re-seeds data on every run. Never bake a literal value that
+    originates from sample data into `params` or `deny_when`. Encode the
+    **method** to retrieve it (SQL pattern, field name, policy section).
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+├ USER
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    LEARNED_RULES (active):
+      - [r005] When using concat to build a message string, always ensure every argument is a string. If a column is numeric (e.g., price_cents), cast it to text in the SQL query (CAST(price_cents AS TEXT) or price_cents::text) so the rowset column is already a string.
+      - [r006] Always use nested decision branches when checking rowset nonempty and then a specific row attribute, instead of combining them in a single 'and' condition, to prevent evaluation errors on empty rowsets.
+      - [r007] Always use the 'query' field for SQL discovery steps in PlanIR, not 'stdin'.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+    
+    INSTRUCTION:
+    Do you sell the Respiratory Protection from Honeywell in the Honeywell Pro HW 2GM-UMP Respiratory Protection line that has mask type dust mask and protection class basic?
+└ ASSISTANT
+    {
+      "objective": "Determine whether the product variant described as 'Respiratory Protection from Honeywell in the Honeywell Pro HW 2GM-UMP Respiratory Protection line with mask type dust mask and protection class basic' is available in the product catalog.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "brand": "literal 'Honeywell' from instruction",
+        "product_family_name": "literal 'Honeywell Pro HW 2GM-UMP Respiratory Protection' from instruction",
+        "mask_type": "literal 'dust mask' from instruction",
+        "protection_class": "literal 'basic' from instruction"
+      },
+      "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_UNSUPPORTED"],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {"op": "not", "args": [{"op": "isnull", "lhs": "$matching_products"}]}
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The requested product is {availability} in our catalog."
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {"kind": "policy_doc", "path": "/docs/README.md"},
+          {"kind": "record_path", "source": "$matching_products.0.record_path"}
+        ]
+      }
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 0 · RERANK · 2377ms · tokens 434/342 · OK
+┌ SYSTEM (7225865c)
+    You select which knowledge snippets are RELEVANT to a coding task. Return JSON {"keep": [ids]} listing only the ids whose content would help write the task's script, most relevant first.
+├ USER
+    TASK:
+    Determine whether the product variant described as 'Respiratory Protection from Honeywell in the Honeywell Pro HW 2GM-UMP Respiratory Protection line with mask type dust mask and protection class basic' is available in the product catalog.
+    
+    CANDIDATE KNOWLEDGE:
+    - existence-check-sql-product-variants: Method to check existence of specific product variants in a catalogue using SQL query and result set emptiness check
+    - sql-count-products-by-kind: Count products belonging to specific product kinds using a subquery with IN clause
+    - check-product-variant-existence-by-property: Method to determine if a product variant exists in a catalogue database given brand, product kind, product family, and a specific property key-value pair.
+    - product_packaging_classification: How to answer queries about product availability in specific packaging types (bare tool vs kit) by classifying variant names.
+    - count-products-by-kind-city-available: Method to count distinct product SKUs of a given product kind in a given city with available inventory, using a SQL query that joins product_variants, store_inventory, and stores tables.
+    - count-items-by-product-kind: Count items of a specific product kind using SQL, optionally filtering by family ID.
+    - normalized-catalogue-product-matching: Normalize both sides when matching or counting catalogue products to avoid misses from formatting and case differences.
+    - product_claim_verification_no_with_sku: Method to verify a product claim by checking if a base product exists and whether its properties match required values; if product exists but claim is absent, answer '<NO>' with the SKU.
+    - catalog-file-path-pattern: Path pattern for product catalog JSON files in the system
+    - avoid-false-positives-product-name-like: Avoid false positives in product availability checks by using exact matching or additional constraints instead of overly broad LIKE patterns.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["check-product-variant-existence-by-property", "existence-check-sql-product-variants"]}
+
+  · [Read /docs/README.md] -> # ECOM1
+      
+      Use the security policy for identity, permissions, and authorization checks.
+      Use the checkout process for basket checkout tasks.
+      Use the discount policy before applying or refusing basket discounts.
+      Use the payment policies before recovering payment workflow failures.
+      Use the returns policy before approving or finalizing customer refunds.
+      Use the OS/tooling incidents policy before applying documented runtime-tool or
+      mount workarounds.
+      Using today's catalogue reporting rule means checking for a current catalogue
+      counting or reporting update before answering catalogue product-count questions,
+      unless the request explicitly says to ignore reporting updates.
+      
+      
+      
+      ## Document Families
+      
+      The `/docs` tree contains several document families. Some are active decision
+      policies. Some are operational background. Some are migration or readiness notes
+      that sound important because they are important to the merchant, but they do not
+      decide customer-specific actions.
+      
+      When a request changes commer… [+5068 chars]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 0 · INVESTIGATE · 5774ms · tokens 1283/1013 · OK
+┌ SYSTEM (7fda40de)
+    # PHASE: INVESTIGATE
+    
+    You explore a vault ONE read-only step at a time to gather the evidence a later
+    deterministic plan needs. You do NOT write the plan and you NEVER mutate state.
+    
+    ## Each turn you receive
+    - The OBJECTIVE and the REFS the final answer must ground (required_refs targets).
+    - The BRIEF so far (resolved env + prior step lessons).
+    - A few KNOWLEDGE snippets scoped to the immediate sub-goal.
+    
+    ## Router output — pick exactly ONE next action
+    Single JSON object, no prose, no fences. Either a tool call:
+    {"tool": "<read|list|tree|stat|search|exec>", "args": {...}, "why": "<one line>"}
+    or, when the brief already grounds every required ref:
+    {"done": true}
+    
+    Tool arg shapes: read/stat {"path"}; list {"path"}; tree {"root"}; search
+    {"root","pattern","limit"}; exec {"path":"/bin/sql","stdin":"SELECT …"} (SELECT/CTE only).
+    Prefer the cheapest probe that resolves the NEXT unknown. Do not re-issue a probe
+    already in the brief.
+    
+    ## Digest output — condense the tool result
+    Single JSON object:
+    {"observation_digest": "<≤200 chars of what the result shows>",
+     "lesson": "<one-line takeaway for the next step>",
+     "env_updates": {"<key>": "<value>"},
+     "refs_found": ["<record_path>", ...]}
+    
+    Bind env keys the sufficiency gate reads: "policy_doc:/docs/<file>.md": true when you
+    have read a governing doc; "<row>.record_path": "<path>" when you have located the
+    record to cite. Keep digests SMALL — the next step sees the brief, not the raw output.
+├ USER
+    GOAL:
+    Determine whether the product variant described as 'Respiratory Protection from Honeywell in the Honeywell Pro HW 2GM-UMP Respiratory Protection line with mask type dust mask and protection class basic' is available in the product catalog.
+    
+    TOOL: read {'path': '/docs/README.md'}
+    
+    RAW_RESULT (condense this):
+    # ECOM1
+    
+    Use the security policy for identity, permissions, and authorization checks.
+    Use the checkout process for basket checkout tasks.
+    Use the discount policy before applying or refusing basket discounts.
+    Use the payment policies before recovering payment workflow failures.
+    Use the returns policy before approving or finalizing customer refunds.
+    Use the OS/tooling incidents policy before applying documented runtime-tool or
+    mount workarounds.
+    Using today's catalogue reporting rule means checking for a current catalogue
+    counting or reporting update before answering catalogue product-count questions,
+    unless the request explicitly says to ignore reporting updates.
+    
+    
+    
+    ## Document Families
+    
+    The `/docs` tree contains several document families. Some are active decision
+    policies. Some are operational background. Some are migration or readiness notes
+    that sound important because they are important to the merchant, but they do not
+    decide customer-specific actions.
+    
+    When a request changes commerce state or answers whether a customer-specific
+    action is allowed, use the smallest dedicated decision policy first. Broad
+    operations documents may provide context, but they do not override identity,
+    checkout, discount, payment, return, package, installment, or risk rules.
+    
+    ### Active Decision Policies
+    
+    | Document | Use when | Authority boundary |
+    | --- | --- | --- |
+    | `/docs/security.md` | A request depends on identity, permissions, ownership, roles, or the word "my" | Authoritative for identity and authorization checks |
+    | `/docs/checkout.md` | A request asks to check out a basket or decide whether checkout is supported | Authoritative for basket checkout inventory checks |
+    | `/docs/discounts.md` | A request asks to apply, refuse, or size a basket discount | Authoritative for basket discount conditions |
+    | `/docs/payments/3ds.md` | A request asks to recover a simulated 3DS payment flow | Authoritative for 3DS recovery conditions |
+    | `/docs/returns.md` | A request asks to approve or finalize a customer return refund | Authoritative for refund workflow conditions |
+    | `/docs/os-and-tooling-incidents-and-workarounds.md` | A runtime tool, OS mount, temporary directory, generated index, or local command reports a known incident with a documented workaround | Authoritative for who may use and cite incident workarounds |
+    
+    The active decision policies are short on purpose. A long document with a more
+    dramatic title is not more authoritative than the dedicated policy for the
+    action at hand.
+    
+    Before applying an active decision policy, check under `/docs` for dated policy
+    updates that name the same workflow, record, or operating day. A matching update
+    overrides the base policy only for the case it names.
+    
+    For catalogue product-count questions, always check today's catalogue reporting
+    rule unless the request says otherwise. Current reporting updates may live under
+    paths such as `/docs/current-updates/`, `/docs/policy-updates/`,
+    `/docs/ops-policy-notes/`, or `/docs/catalogue-addenda/`. If a matching update
+    names the catalogue count workflow, requested product kind, operating day, city,
+    family hold, or similar scope, use that rule instead of the plain catalogue row
+    count.
+    
+    ### Operational Background
+    
+    | Document | Why it exists | Do not use it for |
+    | --- | --- | --- |
+    | `/docs/merchant-continuity-and-critical-incidents.md` | Incident rhythm, staffing coordination, store communications, and after-action review | Customer authorization, payment recovery, discount approval, package conclusions, return outcomes |
+    | `/docs/powertools-agentic-os-origin-story.md` | Founding story, employee legacy, and why the workspace calls itself an agentic OS | Any current customer action, current state lookup, authorization, checkout, discount, payment, return, package, installment, or risk decision |
+    | `/docs/store-associate-exception-handbook.md` | Store-floor staffing, till, signage, training, and local associate exception notes | Runtime identity, basket ownership, discounts
+    
+    Return the digest JSON.
+└ ASSISTANT
+    {
+      "observation_digest": "README outlines document families and notes to check current catalogue reporting rule for product-count questions.",
+      "lesson": "Explore /docs to find catalogue data or reporting updates.",
+      "env_updates": {"policy_doc:/docs/README.md": true},
+      "refs_found": []
+    }
+
+  · [investigate_stop] {"reason": "sufficient", "data_paths_total": 0, "data_paths_probed": 0, "seq": 12}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · PLAN · 35429ms · tokens 5050/4980 · OK
+┌ SYSTEM (4a851949)
+    # PHASE: PLAN
+    
+    You receive an IntentSpec and produce a PlanIR — a deterministic execution
+    plan. You decide **how** to satisfy the intent. The interpreter executes your
+    plan directly; no code generation is involved.
+    
+    ## Output format — PlanIR
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "discovery": [
+        {"rpc": "<RPC name>", "args": {}, "bind": "<env key>"}
+      ],
+      "rowsets": [
+        {
+          "from": "<env key of raw text>",
+          "format": "auto_delim",
+          "into": "<env key for parsed rows>",
+          "columns": [
+            {"into": "<field name>", "candidates": ["<col header variant>", "..."]}
+          ]
+        }
+      ],
+      "compute": [
+        {"prim": "<primitive name>", "args": ["$ref_or_literal", "..."], "into": "<env key>"}
+      ],
+      "decision": {
+        "branches": [
+          {"when": {"op": "<PredExpr op>", "lhs": "$ref", "rhs": "value"}, "label": "<label>"}
+        ],
+        "default_label": "<label>"
+      },
+      "ops": [
+        {
+          "rpc": "<RPC name>",
+          "args": {},
+          "bind": "<env key or null>",
+          "guard_label": "<decision label or null>",
+          "outcome_from_exit": null
+        }
+      ],
+      "answer": {
+        "<label>": {"message": "<template with {slot} placeholders>", "outcome": "OUTCOME_OK", "refs": []}
+      },
+      "custom_extract": [
+        {"name": "<parser name>", "input": "$ref", "into": "<env key>"}
+      ]
+    }
+    ```
+    
+    ### Field rules
+    
+    **`discovery`** — read-only RPCs that populate `env`. Run before decision.
+    Use `Exec /bin/sql` with parameterised `:name` placeholders; never inline
+    re-seeded literals. Batch with CTEs into a single call where possible (S4).
+    When a computation depends on an eligibility/count rule, first `Read` the governing
+    `/docs` policy path (surfaced in `docs_inventory`) in a `discovery` step, then encode
+    the rule-correct SQL from the documented rule — the documented count/filter, not a
+    naive one.
+    
+    **`rowsets`** — parse delimited text from a bound env key into a list of dicts.
+    `format` is `auto_delim` (tab/comma auto-detect) or `json`.
+    `columns[*].candidates` lists header variants tried in order; first match wins.
+    
+    **`compute`** — apply a named primitive to already-resolved args; result goes to `into`.
+    Args are resolved: `$name` → env lookup; anything else → literal.
+    
+    **`decision`** — evaluate branches in order; first true branch wins; fall through to
+    `default_label`. Security-first ordering (H3): branches whose label maps to
+    `OUTCOME_DENIED_SECURITY` **must precede** all non-denied branches.
+    
+    **`ops`** — mutation or terminal RPCs. Two exclusive idioms:
+    
+    - **decide-then-guard** (`guard_label` set, `outcome_from_exit` null): the op runs
+      only when the current decision label matches `guard_label`. Outcome comes from the
+      decision tree.
+    - **mutate-then-classify** (`outcome_from_exit` set, `guard_label` null): the op
+      always runs; the interpreter classifies outcome from exit code + stderr keyword
+      matching. `outcome_from_exit` has `ok_outcome`, `keyword_buckets[{keywords, outcome}]`,
+      and `default_outcome`.
+    
+    **`answer`** — keyed by decision label. Each `AnswerTemplateIR`:
+    - `message` — f-string-style template; `{slot}` resolves from env (same as `$slot`).
+    - `outcome` — one of the `Outcome` enum values: `OUTCOME_OK`, `OUTCOME_DENIED_SECURITY`, `OUTCOME_NONE_CLARIFICATION`, `OUTCOME_NONE_UNSUPPORTED`, `OUTCOME_ERR_INTERNAL`.
+    - `refs` — always-required grounding is PROJECTED from `INTENT.required_refs[selected_outcome]`,
+      so for an unconditional ref leave this `[]` and just bind the env key the INTENT `source`
+      points at. For **conditional** grounding — a ref needed on SOME branches only (e.g. a
+      `record_path` that exists only when a match is FOUND, absent on the not-found branch) —
+      author the `$binding` in THAT branch's `refs`; the interpreter resolves it best-effort and
+      DROPS it if it resolves to nothing (so the empty branch is not forced to carry it). Bind the
+      env key it points at (e.g. a `$row.record_path` column selected from `/bin/sql`). Never
+      author a literal you cannot ground at runtime.
+    
+    **`custom_extract`** — named-parser escape hatch (H2). Dispatches to `PARSERS[name]`
+    with `(text, params)` → `list[dict]`; result stored at `into`.
+    
+    ## Primitive registry (13)
+    
+    The following primitive names are valid in `compute[*].prim`:
+    
+    `abs_diff`, `div`, `to_number`, `sum_col`, `count`, `column`,
+    `first`, `get`, `dedupe`, `concat`, `all_true`, `any_true`, `filter_rows`
+    
+    ## Parser registry
+    
+    Valid names for `custom_extract[*].name`:
+    
+    `fuzzy_sku_receipt`
+    
+    ## `$ref` / `{slot}` convention
+    
+    - In `args` and `when.lhs/rhs`: `$name` → env lookup; literal otherwise.
+    - In `answer[*].message`: `{name}` resolves from env at answer time (same lookup,
+      without the `$` prefix).
+    - Dotted and indexed paths: `$a.b`, `$rows.0.field`.
+    
+    ## Predicate ops (exact spellings)
+    
+    `decision.branches[*].when` accepts ONLY these ops — use the exact spelling:
+    
+    - Leaf: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `nonempty`, `isnull`,
+      `contains_any`, `in_set`, `startswith`, `endswith`, `regex_match`
+    - Bool: `and`, `or`, `not` (each takes `args`: a list of nested predicates)
+    
+    Do NOT use `neq`, `!=`, `==`, `gte`, or `lte` — they are not valid op names.
+    
+    ## AnswerTemplateIR shape (exact keys)
+    
+    Each `answer[<label>]` object has ONLY these keys: `message`, `outcome`, `refs`.
+    Add no other keys. Message `{slot}` placeholders resolve from `env`, never from
+    extra fields on the answer object.
+    
+    ## Tool selection rules
+    
+    - Prefer `Find` / `Search` / `Read` with line ranges over full `Tree` + parse.
+    - Batch SQL into a single `Exec /bin/sql` with CTEs (S4).
+    - Use `Stat` before `Read` when path existence is uncertain.
+    - `discovery` items must be read-only; mutations belong in `ops`.
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+    
+    
+    ## TOOL CATALOG (validated — exact rpc names + arg keys)
+    
+    ### Read (read)
+    - purpose: Read a file (optionally line-numbered range).
+    - required args: path
+    - optional args: end_line, number, start_line
+    - when: Fetch a known file's content (policy doc, /proc record).
+    - example: {'rpc': 'Read', 'args': {'path': '/docs/security.md'}}
+    
+    ### List (read)
+    - purpose: List a directory's entries.
+    - required args: path
+    - optional args: —
+    - when: Enumerate a dir before reading specific children.
+    - example: {'rpc': 'List', 'args': {'path': '/proc'}}
+    
+    ### Tree (read)
+    - purpose: Recursive tree under a root (level=0 unlimited).
+    - required args: root
+    - optional args: level
+    - when: Discover a subtree's shape; prefer Find/Search when targeted.
+    - example: {'rpc': 'Tree', 'args': {'root': '/docs', 'level': 0}}
+    
+    ### Find (read)
+    - purpose: Path search by name under a root.
+    - required args: root
+    - optional args: kind, limit, name
+    - when: Locate a file by name when its dir is unknown.
+    - example: {'rpc': 'Find', 'args': {'root': '/', 'name': 'security.md'}}
+    
+    ### Search (read)
+    - purpose: Regex content search; returns path+line+text.
+    - required args: pattern, root
+    - optional args: limit
+    - when: Find docs/records mentioning an entity token.
+    - example: {'rpc': 'Search', 'args': {'root': '/docs', 'pattern': 'refund', 'limit': 30}}
+    
+    ### Exec (read)
+    - purpose: Run a runtime tool (e.g. /bin/sql, /bin/id).
+    - required args: path
+    - optional args: args, stdin
+    - when: Query the catalog DB via /bin/sql; read identity via /bin/id.
+    - NOTE: /bin/sql reads the query from the real STDIN channel. Put the SQL in `stdin` (a string); do NOT inline it anywhere else. `args` is also accepted and is moved to stdin by the pre-lint repair. The runner returns its usage banner if the SQL never reaches stdin (the r012 bug).
+    - example: {'rpc': 'Exec', 'args': {'path': '/bin/sql', 'stdin': 'SELECT 1;'}}
+    
+    ### Write (mutate)
+    - purpose: Write a file (optional compare-and-swap).
+    - required args: content, path
+    - optional args: idempotency_key, if_match_sha256
+    - when: Persist a mutation; belongs in `ops`, never `discovery`.
+    - example: {'rpc': 'Write', 'args': {'path': '/proc/x.json', 'content': '{}'}}
+    
+    ### Delete (mutate)
+    - purpose: Delete a file or directory.
+    - required args: path
+    - optional args: —
+    - when: Remove a record; belongs in `ops`.
+    - example: {'rpc': 'Delete', 'args': {'path': '/proc/x.json'}}
+    
+    ### Stat (read)
+    - purpose: Metadata for a path (kind, content_type).
+    - required args: path
+    - optional args: —
+    - when: Check existence/kind before Read.
+    - example: {'rpc': 'Stat', 'args': {'path': '/docs'}}
+    
+    Use ONLY these rpc names and arg keys. An unknown rpc or arg key is rejected by the interpreter and returned to you to fix.
+├ USER
+    INTENT_SPEC:
+    {
+      "objective": "Determine whether the product variant described as 'Respiratory Protection from Honeywell in the Honeywell Pro HW 2GM-UMP Respiratory Protection line with mask type dust mask and protection class basic' is available in the product catalog.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "brand": "literal 'Honeywell' from instruction",
+        "product_family_name": "literal 'Honeywell Pro HW 2GM-UMP Respiratory Protection' from instruction",
+        "mask_type": "literal 'dust mask' from instruction",
+        "protection_class": "literal 'basic' from instruction"
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "not",
+            "lhs": null,
+            "rhs": null,
+            "args": [
+              {
+                "op": "isnull",
+                "lhs": "$matching_products",
+                "rhs": null,
+                "args": []
+              }
+            ]
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The requested product is {availability} in our catalog.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "policy_doc",
+            "path": "/docs/README.md",
+            "source": null
+          },
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$matching_products.0.record_path"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - policy_doc:/docs/README.md: True
+    - docs_read: ['/docs/README.md']
+    ## STEP_LESSONS
+    1. [read] README outlines document families and notes to check current catalogue reporting rule for product-count questions. -> Explore /docs to find catalogue data or reporting updates.
+    
+    LEARNED_RULES (active):
+      - [r005] When using concat to build a message string, always ensure every argument is a string. If a column is numeric (e.g., price_cents), cast it to text in the SQL query (CAST(price_cents AS TEXT) or price_cents::text) so the rowset column is already a string.
+      - [r006] Always use nested decision branches when checking rowset nonempty and then a specific row attribute, instead of combining them in a single 'and' condition, to prevent evaluation errors on empty rowsets.
+      - [r007] Always use the 'query' field for SQL discovery steps in PlanIR, not 'stdin'.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Read",
+          "args": {
+            "path": "/docs/README.md"
+          },
+          "bind": "readme_content"
+        },
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH family AS (SELECT product_family_id FROM product_families WHERE brand = 'Honeywell' AND product_family_name = 'Honeywell Pro HW 2GM-UMP Respiratory Protection'), matching_variants AS (SELECT pv.record_path, pv.product_sku, pv.product_name FROM product_variants pv JOIN family f ON pv.product_family_id = f.product_family_id WHERE EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'mask_type' AND pvp.property_value_text = 'dust mask') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'protection_class' AND pvp.property_value_text = 'basic')) SELECT * FROM matching_variants LIMIT 1;"
+          },
+          "bind": "matching_products"
+        }
+      ],
+      "rowsets": [
+        {
+          "from": "matching_products",
+          "format": "auto_delim",
+          "into": "matching_products_rows",
+          "columns": [
+            {
+              "into": "record_path",
+              "candidates": ["record_path"]
+            },
+            {
+              "into": "product_sku",
+              "candidates": ["product_sku"]
+            },
+            {
+              "into": "product_name",
+              "candidates": ["product_name"]
+            }
+          ]
+        }
+      ],
+      "compute": [],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "nonempty",
+              "lhs": "$matching_products_rows",
+              "rhs": null,
+              "args": []
+            },
+            "label": "found"
+          }
+        ],
+        "default_label": "not_found"
+      },
+      "ops": [],
+      "answer": {
+        "found": {
+          "message": "The requested product is available in our catalog.",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {
+              "kind": "record_path",
+              "path": null,
+              "source": "$matching_products_rows.0.record_path"
+            }
+          ]
+        },
+        "not_found": {
+          "message": "The requested product is not available in our catalog.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 1, "step_type": "LINT", "passed": true, "reason": "", "seq": 15}
+  · [Read /docs/README.md] -> # ECOM1
+      
+      Use the security policy for identity, permissions, and authorization checks.
+      Use the checkout process for basket checkout tasks.
+      Use the discount policy before applying or refusing basket discounts.
+      Use the payment policies before recovering payment workflow failures.
+      Use the returns policy before approving or finalizing customer refunds.
+      Use the OS/tooling incidents policy before applying documented runtime-tool or
+      mount workarounds.
+      Using today's catalogue reporting rule means checking for a current catalogue
+      counting or reporting update before answering catalogue product-count questions,
+      unless the request explicitly says to ignore reporting updates.
+      
+      
+      
+      ## Document Families
+      
+      The `/docs` tree contains several document families. Some are active decision
+      policies. Some are operational background. Some are migration or readiness notes
+      that sound important because they are important to the merchant, but they do not
+      decide customer-specific actions.
+      
+      When a request changes commer… [+5068 chars]
+  · [Exec /bin/sql] -> record_path,product_sku,product_name
+      /proc/catalog/safety_gear/respiratory_protection/SFE-2H6ZT48V.json,SFE-2H6ZT48V,Honeywell Pro HW 2GM-UMP Respiratory Protection dust mask basic one size
+  · [gate] {"cycle": 1, "step_type": "INTERPRET", "passed": false, "reason": "interpret: unresolved required ref(s) ['$matching_pro
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · LEARN · 11037ms · tokens 1669/2306 · OK
+┌ SYSTEM (dc81071f)
+    # PHASE: LEARN (Plan-IR)
+    
+    You diagnose a failed interpreter cycle and produce a corrective rule for the
+    PLAN phase (which emits a PlanIR — structured data, never code). You may also
+    deactivate stale rules and request additional pre-phase deep-reads.
+    
+    ## Inputs
+    
+    - `TOOL_PLAN` — the frozen IntentSpec JSON for this run (WHAT/why; do not change it)
+    - `ERROR` — failure string (`plan:`, `interpret:`, `verify:`, `real_vm:`)
+    - `OBSERVED_RPC_OUTPUTS` — stdout/content captured from the failed run's RPCs
+      (present when the cycle reached execution). Use it to see WHY a ref was empty:
+      a table missing, a column misnamed, a listing that returned nothing.
+    - `SCRIPT_CODE` — the failing **PlanIR JSON** (the candidate "how")
+    - `EXISTING_RULES` — active IR rules from prior cycles/runs
+    
+    ## Output format
+    
+    Single JSON object — no prose, no markdown fences:
+    
+    ```json
+    {
+      "rule_content": "<starts with Never|Always|Use|Do not|When|If|Prefer>",
+      "agents_md_anchor": "<#section> or null",
+      "reasoning": "<diagnosis: verbatim error, root cause, failing PlanIR fragment, rule linkage>",
+      "deactivate_ids": ["rXXX"],
+      "deactivate_reason": "<why obsolete> or null",
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+    ```
+    
+    ## Rules
+    
+    - `rule_content` must describe a PLAN technique — how to shape the PlanIR
+      (discovery steps, rowsets, decision branches, ref projection) so the next
+      cycle grounds correctly. NOT a domain conclusion, NOT a literal task value.
+    - `rule_content` must be task-agnostic — never embed a re-seeded literal
+      (SKU, id, city, date).
+    - `prephase_deep_read` (optional): list table names or absolute literal paths the
+      pre-phase MUST read next run because grounding needed data it did not surface
+      (a table named only by synonym, or a literal directory the instruction named).
+      These are read EAGERLY next run (Tier-2 deep-read set) — they self-tune the
+      pre-phase, so PREFER them over baking a value into a rule. Leave `[]` when the
+      failure is purely a PlanIR-shape bug.
+    - Skip (`skip: true`) only if an existing rule already covers this.
+    - Use `deactivate_ids` when the new rule strictly supersedes prior ones — set `deactivate_reason`.
+    - Length: `rule_content` >= 20 chars; must start with a listed lead verb.
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Determine whether the product variant described as 'Respiratory Protection from Honeywell in the Honeywell Pro HW 2GM-UMP Respiratory Protection line with mask type dust mask and protection class basic' is available in the product catalog.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "brand": "literal 'Honeywell' from instruction",
+        "product_family_name": "literal 'Honeywell Pro HW 2GM-UMP Respiratory Protection' from instruction",
+        "mask_type": "literal 'dust mask' from instruction",
+        "protection_class": "literal 'basic' from instruction"
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "not",
+            "lhs": null,
+            "rhs": null,
+            "args": [
+              {
+                "op": "isnull",
+                "lhs": "$matching_products",
+                "rhs": null,
+                "args": []
+              }
+            ]
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The requested product is {availability} in our catalog.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "policy_doc",
+            "path": "/docs/README.md",
+            "source": null
+          },
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$matching_products.0.record_path"
+          }
+        ]
+      }
+    }
+    
+    ERROR:
+    interpret: unresolved required ref(s) ['$matching_products.0.record_path'] on OK answer
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Read","args":{"path":"/docs/README.md"},"bind":"readme_content"},{"rpc":"Exec","args":{"path":"/bin/sql","stdin":"WITH family AS (SELECT product_family_id FROM product_families WHERE brand = 'Honeywell' AND product_family_name = 'Honeywell Pro HW 2GM-UMP Respiratory Protection'), matching_variants AS (SELECT pv.record_path, pv.product_sku, pv.product_name FROM product_variants pv JOIN family f ON pv.product_family_id = f.product_family_id WHERE EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'mask_type' AND pvp.property_value_text = 'dust mask') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'protection_class' AND pvp.property_value_text = 'basic')) SELECT * FROM matching_variants LIMIT 1;"},"bind":"matching_products"}],"rowsets":[{"from_":"matching_products","format":"auto_delim","into":"matching_products_rows","columns":[{"into":"record_path","candidates":["record_path"]},{"into":"product_sku","candidates":["product_sku"]},{"into":"product_name","candidates":["product_name"]}]}],"compute":[],"decision":{"branches":[{"when":{"op":"nonempty","lhs":"$matching_products_rows","rhs":null,"args":[]},"label":"found"}],"default_label":"not_found"},"ops":[],"answer":{"found":{"message":"The requested product is available in our catalog.","outcome":"OUTCOME_OK","refs":[{"kind":"record_path","path":null,"source":"$matching_products_rows.0.record_path"}]},"not_found":{"message":"The requested product is not available in our catalog.","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]}},"custom_extract":[]}
+    ```
+    
+    EXISTING_RULES:
+      - [r005] When using concat to build a message string, always ensure every argument is a string. If a column is numeric (e.g., price_cents), cast it to text in the SQL query (CAST(price_cents AS TEXT) or price_cents::text) so the rowset column is already a string.
+      - [r006] Always use nested decision branches when checking rowset nonempty and then a specific row attribute, instead of combining them in a single 'and' condition, to prevent evaluation errors on empty rowsets.
+      - [r007] Always use the 'query' field for SQL discovery steps in PlanIR, not 'stdin'.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+└ ASSISTANT
+    {
+      "rule_content": "Always name the rowset 'into' variable to exactly match the variable name used in the TOOL_PLAN's required_refs for the answer branch. If the discovery step's bind uses the same name, rename the discovery bind to a different name (e.g., append '_raw') to avoid conflict, and then create the rowset with the required name.",
+      "agents_md_anchor": null,
+      "reasoning": "Error: interpret: unresolved required ref(s) ['$matching_products.0.record_path'] on OK answer. Root cause: The PlanIR's answer ref uses $matching_products_rows.0.record_path, but the TOOL_PLAN's required_refs expect $matching_products.0.record_path. The rowset was named 'matching_products_rows' while the required ref variable is 'matching_products'. The interpreter looks for $matching_products (the raw RPC output) and tries to access .0.record_path on a string, causing unresolved ref. The fix is to name the rowset 'matching_products' and rename the discovery bind to avoid conflict.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · PLAN · 20263ms · tokens 5158/4055 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    INTENT_SPEC:
+    {
+      "objective": "Determine whether the product variant described as 'Respiratory Protection from Honeywell in the Honeywell Pro HW 2GM-UMP Respiratory Protection line with mask type dust mask and protection class basic' is available in the product catalog.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "brand": "literal 'Honeywell' from instruction",
+        "product_family_name": "literal 'Honeywell Pro HW 2GM-UMP Respiratory Protection' from instruction",
+        "mask_type": "literal 'dust mask' from instruction",
+        "protection_class": "literal 'basic' from instruction"
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "not",
+            "lhs": null,
+            "rhs": null,
+            "args": [
+              {
+                "op": "isnull",
+                "lhs": "$matching_products",
+                "rhs": null,
+                "args": []
+              }
+            ]
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The requested product is {availability} in our catalog.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "policy_doc",
+            "path": "/docs/README.md",
+            "source": null
+          },
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$matching_products.0.record_path"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - policy_doc:/docs/README.md: True
+    - docs_read: ['/docs/README.md']
+    ## STEP_LESSONS
+    1. [read] README outlines document families and notes to check current catalogue reporting rule for product-count questions. -> Explore /docs to find catalogue data or reporting updates.
+    
+    LEARNED_RULES (active):
+      - [r005] When using concat to build a message string, always ensure every argument is a string. If a column is numeric (e.g., price_cents), cast it to text in the SQL query (CAST(price_cents AS TEXT) or price_cents::text) so the rowset column is already a string.
+      - [r006] Always use nested decision branches when checking rowset nonempty and then a specific row attribute, instead of combining them in a single 'and' condition, to prevent evaluation errors on empty rowsets.
+      - [r007] Always use the 'query' field for SQL discovery steps in PlanIR, not 'stdin'.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+      - [in-session] Always name the rowset 'into' variable to exactly match the variable name used in the TOOL_PLAN's required_refs for the answer branch. If the discovery step's bind uses the same name, rename the discovery bind to a different name (e.g., append '_raw') to avoid conflict, and then create the rowset with the required name.
+    
+    PREVIOUS_ERROR:
+    interpret: unresolved required ref(s) ['$matching_products.0.record_path'] on OK answer
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Read",
+          "args": {
+            "path": "/docs/README.md"
+          },
+          "bind": "policy_doc_content"
+        },
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH family AS (SELECT product_family_id FROM product_families WHERE brand = 'Honeywell' AND product_family_name = 'Honeywell Pro HW 2GM-UMP Respiratory Protection'), variants AS (SELECT pv.* FROM product_variants pv JOIN family f ON pv.product_family_id = f.product_family_id WHERE pv.brand = 'Honeywell'), with_props AS (SELECT pv.* FROM variants pv WHERE EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'mask_type' AND pvp.property_value_text = 'dust mask') AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'protection_class' AND pvp.property_value_text = 'basic')) SELECT product_sku, record_path, product_name, price_cents, price_currency FROM with_props;"
+          },
+          "bind": "sql_output"
+        }
+      ],
+      "rowsets": [
+        {
+          "from": "sql_output",
+          "format": "auto_delim",
+          "into": "matching_products",
+          "columns": [
+            {
+              "into": "product_sku",
+              "candidates": ["product_sku"]
+            },
+            {
+              "into": "record_path",
+              "candidates": ["record_path"]
+            },
+            {
+              "into": "product_name",
+              "candidates": ["product_name"]
+            },
+            {
+              "into": "price_cents",
+              "candidates": ["price_cents"]
+            },
+            {
+              "into": "price_currency",
+              "candidates": ["price_currency"]
+            }
+          ]
+        }
+      ],
+      "compute": [],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "nonempty",
+              "lhs": "$matching_products",
+              "rhs": null,
+              "args": []
+            },
+            "label": "found"
+          }
+        ],
+        "default_label": "not_found"
+      },
+      "ops": [],
+      "answer": {
+        "found": {
+          "message": "The requested product is available in our catalog.",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {
+              "kind": "policy_doc",
+              "path": "/docs/README.md",
+              "source": null
+            },
+            {
+              "kind": "record_path",
+              "path": null,
+              "source": "$matching_products.0.record_path"
+            }
+          ]
+        },
+        "not_found": {
+          "message": "The requested product is not available in our catalog.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 2, "step_type": "LINT", "passed": true, "reason": "", "seq": 22}
+  · [Read /docs/README.md] -> # ECOM1
+      
+      Use the security policy for identity, permissions, and authorization checks.
+      Use the checkout process for basket checkout tasks.
+      Use the discount policy before applying or refusing basket discounts.
+      Use the payment policies before recovering payment workflow failures.
+      Use the returns policy before approving or finalizing customer refunds.
+      Use the OS/tooling incidents policy before applying documented runtime-tool or
+      mount workarounds.
+      Using today's catalogue reporting rule means checking for a current catalogue
+      counting or reporting update before answering catalogue product-count questions,
+      unless the request explicitly says to ignore reporting updates.
+      
+      
+      
+      ## Document Families
+      
+      The `/docs` tree contains several document families. Some are active decision
+      policies. Some are operational background. Some are migration or readiness notes
+      that sound important because they are important to the merchant, but they do not
+      decide customer-specific actions.
+      
+      When a request changes commer… [+5068 chars]
+  · [Exec /bin/sql] -> product_sku,record_path,product_name,price_cents,price_currency
+      SFE-2H6ZT48V,/proc/catalog/safety_gear/respiratory_protection/SFE-2H6ZT48V.json,Honeywell Pro HW 2GM-UMP Respiratory Protection dust mask basic one size,9300,EUR
+═══ ANSWER (cycle 2) ═══
+  msg='The requested product is available in our catalog.'  OUTCOME_OK  refs=['/docs/README.md', '/proc/catalog/safety_gear/respiratory_protection/SFE-2H6ZT48V.json']
+
+  · [gate] {"cycle": 2, "step_type": "INTERPRET", "passed": true, "reason": "", "seq": 26}
+  · [Stat /docs/README.md] -> <empty>
+  · [gate] {"cycle": 2, "step_type": "VERIFY", "passed": true, "reason": "", "seq": 28}
+════════════════════════════════════════════════════════════════════════
+RESULT  OUTCOME_OK  score=0.0  cycles=2  tokens 14350/13341  116064ms
+  - Answer should contain '<YES>'
+════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,50 @@
+{
+  "objective": "Count how many of the six specified products have at least 1 item available today at the Graz Lend hardware shop.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "store_id": "lookup from stores WHERE store_name LIKE '%Graz Lend%' OR (city='Graz' AND store_name LIKE '%Lend%')",
+    "product_skus": "for each product description (brand, series, model, property key-value pairs), lookup product_sku from product_variants matching brand, series, model, and then verify property matches in product_variant_properties; collect all matching skus",
+    "available_count": "for each product_sku in product_skus, check store_inventory WHERE store_id = $store_id AND product_sku = $sku AND available_today_quantity >= 1; count distinct skus that satisfy"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "ge",
+        "lhs": "$available_count",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "le",
+        "lhs": "$available_count",
+        "rhs": 6,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "result %d",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/checkout.md",
+        "source": null
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$store_record_path"
+      }
+    ]
+  }
+}

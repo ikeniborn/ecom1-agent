@@ -4,7 +4,7 @@ entries:
     string and do not use args for parameter substitution; embed parameter values
     directly into the SQL string using compute steps to construct the query.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r009
   reasoning: 'Error: ''interpret: sql returned usage banner — SQL not delivered via
     stdin''. Root cause: The second Exec step for /bin/sql included both ''stdin''
@@ -15,21 +15,21 @@ entries:
     payment_method_fingerprint = :method_fp;","args":["--param","device_fp=$fraud_device_fp","--param","method_fp=$fraud_method_fp"]}}.
     The correct PLAN technique is to construct the full SQL string with embedded values
     via a compute step and pass it as stdin only.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Do not use logical operators (or, and, not) in decision branch conditions;
     instead, use multiple branches with the same label to represent OR conditions,
     and nested branches for AND conditions.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r010
   reasoning: 'The plan produced OUTCOME_NONE_CLARIFICATION, indicating the decision
     block''s condition evaluation failed. The condition used ''or'' and ''not'' operators,
     which are likely unsupported by the PlanIR interpreter. The plan should have used
     two separate branches with the same ''denied'' label: one for fraudulent_count
     != 1 and one for empty record_paths.'
-  status: active
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
@@ -122,14 +122,14 @@ entries:
     default_label to deny; instead, set the default_label to an allow outcome (e.g.,
     OUTCOME_OK) and provide a corresponding answer message.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r011
   reasoning: 'grader: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY. Root
     cause: The PlanIR''s decision.default_label is ''deny'', causing denial even when
     identity is not guest. The policy only denies for guest, so non-guest should be
     allowed. Failing fragment: decision.default_label = ''deny''. Rule linkage: new
     rule instructs to not default to deny when policy only denies for a specific condition.'
-  status: active
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
@@ -195,19 +195,79 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-23'
+  deactivated_reason: superseded by newer verdict
   id: v018
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
-  status: active
+  status: inactive
   submitted_message: No fraudulent archived payment records found.
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs:
   - /docs/payments/3ds.md
+- agents_md_anchor: null
+  content: Always extract the string content from a ReadResponse (or any protocol
+    message) before using it as the lhs of a string operator (contains_any, contains,
+    etc.) in a decision condition; use a compute step with prim='field' to get the
+    'content' field.
+  created: '2026-06-24'
+  deactivated_reason: r012 incorrectly assumes Read RPC returns a structured response
+    with a 'content' field; the response is a string, so field extraction fails.
+  id: r012
+  reasoning: 'Error: ''real_vm: Protocol message ReadResponse has no "failed" field.''
+    Root cause: The decision condition uses contains_any on $fraud_criteria_doc, which
+    is a ReadResponse object. The VM interprets contains_any on a message as checking
+    for field existence, and ''failed'' is not a field of ReadResponse, causing the
+    failure. Failing PlanIR fragment: the decision branch condition with lhs=$fraud_criteria_doc.
+    No existing rule covers this technical requirement; a new rule is needed to ensure
+    string extraction before using a message in a string operator.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v019
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Never use a compute step with prim='field' to extract a 'content' field
+    from a variable bound from a Read RPC response; the Read RPC returns the content
+    as a string directly. Use the variable directly as the content string.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Error ''interpret: compute step ''field'' failed: ''field'''' indicates
+    that the compute step with prim=''field'' attempted to extract a field from a
+    variable that is not a map/object. The variable $policy_raw was bound from a Read
+    RPC of /docs/payments/3ds.md. The Read RPC returns the content as a string directly,
+    not as a structured response with a ''content'' field. Therefore, the field extraction
+    fails. Existing rule [r012] incorrectly assumes a structured response and should
+    be deactivated. The corrective rule instructs to use the variable directly as
+    the content string without field extraction.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v020
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: No fraudulent payment records found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /docs/payments/3ds.md
 last_run:
-  cycles_used: 1
-  date: '2026-06-23'
+  cycles_used: 2
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t38

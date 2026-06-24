@@ -1,15 +1,95 @@
 {
-  "discovery": [],
-  "rowsets": [],
-  "compute": [],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT s.store_id, s.record_path, (SELECT COUNT(DISTINCT pv.product_sku) FROM product_variants pv JOIN store_inventory si ON pv.product_sku = si.product_sku AND si.store_id = s.store_id WHERE si.available_today_quantity >= 4 AND ((pv.brand = 'Festool' AND pv.series = 'Modular CTL' AND pv.model = 'XPW-76I' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'storage_type' AND property_value_text = 'tool bag') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'color_family' AND property_value_text = 'Yellow')) OR (pv.brand = 'Gorilla' AND pv.series = 'Crystal Grip' AND pv.model = '2ZQ-D83' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'adhesive_type' AND property_value_text = 'epoxy')) OR (pv.brand = 'Wiha' AND pv.series = 'VDE' AND pv.model = '13X-B49' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'tool_profile' AND property_value_text = 'pozidriv')) OR (pv.brand = 'Festool' AND pv.series = 'Modular CTL' AND pv.model = 'XPW-76I' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'storage_type' AND property_value_text = 'tool box')) OR (pv.brand = 'Sika' AND pv.series = 'Professional' AND pv.model = '28T-UV8' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'sealant_type' AND property_value_text = 'silicone sealant') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'color_family' AND property_value_text = 'Black')) OR (pv.brand = '3M' AND pv.series = 'Ventilated SecureFit' AND pv.model = '2CE-B35' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'lens_color' AND property_value_text = 'Yellow')))) AS cnt FROM stores s WHERE s.store_name = 'Ljubljana Center Power Tool store'"
+      },
+      "bind": "store_data"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "store_data",
+      "format": "json",
+      "into": "store_rows",
+      "columns": [
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "cnt",
+          "candidates": [
+            "cnt"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$store_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "record_path"
+      ],
+      "into": "store.record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "cnt"
+      ],
+      "into": "count"
+    }
+  ],
   "decision": {
-    "branches": [],
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$store_rows",
+          "rhs": null,
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
     "default_label": "unsupported"
   },
   "ops": [],
   "answer": {
+    "ok": {
+      "message": "<COUNT:{count}>",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store.record_path"
+        }
+      ]
+    },
     "unsupported": {
-      "message": "No product descriptions provided; unable to count zero-availability products.",
+      "message": "Unable to process request.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }
