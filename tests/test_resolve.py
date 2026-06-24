@@ -36,3 +36,25 @@ def test_relax_sql_numeric_fallback_on_property_value_text():
 def test_relax_sql_noop_without_equality():
     sql = "SELECT count(*) FROM stores"
     assert relax_sql(sql) == sql
+
+
+from agent.resolve import resolve_product
+
+
+class _FakeVM:
+    def __init__(self): self.calls = []
+    def exec(self, path=None, stdin=None, **kw):
+        self.calls.append(stdin or "")
+        class R: pass
+        r = R()
+        r.stdout = ("product_sku,record_path\nSKU-1,/proc/products/sku-1.json\n"
+                    if "lower(" in (stdin or "").lower()
+                    else "product_sku,record_path\n")
+        return r
+
+
+def test_resolve_product_falls_through_to_relaxed():
+    vm = _FakeVM()
+    rows = resolve_product(vm, columns={"brand": "Milwaukee"}, properties={"volume": "8 l"})
+    assert rows == [{"product_sku": "SKU-1", "record_path": "/proc/products/sku-1.json"}]
+    assert len(vm.calls) >= 2

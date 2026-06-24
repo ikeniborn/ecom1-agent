@@ -50,3 +50,41 @@ def relax_sql(sql: str) -> str:
     def repl(m: "re.Match") -> str:
         return _relax_one(m.group(1), m.group(2))
     return _EQ.sub(repl, sql)
+
+
+def _parse_csv(stdout: str) -> list[dict]:
+    lines = [ln for ln in (stdout or "").splitlines() if ln.strip()]
+    if len(lines) < 2:
+        return []
+    hdr = lines[0].split(",")
+    return [dict(zip(hdr, ln.split(","))) for ln in lines[1:]]
+
+
+def _sql_stdout(vm, sql: str) -> str:
+    out = vm.exec(path="/bin/sql", stdin=sql)
+    return out.get("stdout", "") if isinstance(out, dict) else getattr(out, "stdout", "")
+
+
+def _product_select(columns: dict, properties: dict) -> str:
+    clauses = [f"pv.{c} = {sql_quote(v)}" for c, v in columns.items()]
+    for i, (k, v) in enumerate(properties.items()):
+        clauses.append(
+            f"EXISTS (SELECT 1 FROM product_variant_properties p{i} "
+            f"WHERE p{i}.product_sku = pv.product_sku "
+            f"AND p{i}.property_key = {sql_quote(k)} "
+            f"AND p{i}.property_value_text = {sql_quote(v)})")
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    return f"SELECT pv.product_sku, pv.record_path FROM product_variants pv{where} LIMIT 5;"
+
+
+def resolve_product(vm, *, columns: dict, properties: dict, limit: int = 5) -> list[dict]:
+    """Resolve [{product_sku, record_path}] via exact → relax_sql(exact). Empty ⇒ unresolved."""
+    if not columns and not properties:
+        return []
+    exact = _product_select(columns, properties)
+    for sql in (exact, relax_sql(exact)):
+        rows = _parse_csv(_sql_stdout(vm, sql))
+        if rows:
+            return [{"product_sku": r.get("product_sku", ""),
+                     "record_path": r.get("record_path", "")} for r in rows[:limit]]
+    return []

@@ -11,6 +11,7 @@ from .llm import call_llm_raw, _resolve_model_for_phase
 from .prompt import load_prompt
 from .json_extract import _extract_json_from_text
 from .trace import set_step_type, current_step_type, log_investigate_stop_auto
+from . import resolve as _resolve
 
 
 class Note(BaseModel):
@@ -46,6 +47,63 @@ def render_brief(brief: "Brief") -> str:
             ref = f" refs={n.refs_found}" if n.refs_found else ""
             lines.append(f"{i}. [{n.tool}] {n.observation_digest} -> {n.lesson}{ref}")
     return "\n".join(lines)
+
+
+_COL_KEYS = (("brand", "brand"), ("series", "series"), ("model", "model"),
+             ("family", "product_name"), ("line", "product_name"), ("name", "product_name"))
+
+
+def descriptors_from_intent(intent) -> tuple[dict, dict]:
+    """Parse INTENT prose params into (columns, properties). Free-form keys map to schema
+    columns by substring (brand/series/model/family|line|name); other keys become property
+    filters. Prose values reduce to their quoted literal. General — no task values. A param
+    with no usable literal (e.g. {'exists': '<long prose query>'}) is skipped."""
+    cols: dict = {}
+    props: dict = {}
+    for key, raw in (intent.params or {}).items():
+        if not isinstance(raw, str):
+            continue
+        lit = _resolve.literal_from_prose(raw)
+        # skip prose-only params: no quoted literal AND long free text
+        if (lit == raw and "'" not in raw and (" " in raw and len(raw) > 60)):
+            continue
+        if not lit:
+            continue
+        lk = key.lower()
+        mapped = next((col for sub, col in _COL_KEYS if sub in lk), None)
+        if mapped:
+            cols[mapped] = lit
+        else:
+            prop_key = lk.replace("product_", "").replace("_family", "")
+            props[prop_key] = lit
+    return cols, props
+
+
+def run_resolution_probe(vm, intent, brief: "Brief") -> None:
+    """Best-effort key-entity resolution (descriptor-probe fallback). Binds resolved SKU /
+    record_path into brief.env so PLAN builds against a known-resolving entity. Never raises."""
+    cols, props = descriptors_from_intent(intent)
+    if not cols and not props:
+        return
+    try:
+        rows = _resolve.resolve_product(vm, columns=cols, properties=props)
+    except Exception as e:
+        brief.notes.append(Note(goal="resolve product", lesson=f"resolve error: {e}"))
+        return
+    if not rows:
+        brief.notes.append(Note(goal="resolve product",
+                                lesson="product unresolved after relaxation"))
+        return
+    r = rows[0]
+    brief.env["resolved_product_sku"] = r["product_sku"]
+    brief.env["resolved_product_record_path"] = r["record_path"]
+    for ref in (intent.required_refs or {}).get(intent.desired_outcome, []):
+        if ref.kind == "record_path" and ref.source:
+            brief.env[f"resolved:{ref.source}"] = r["record_path"]
+    brief.notes.append(Note(goal="resolve product", tool="sql",
+                            observation_digest=f"resolved {r['product_sku']}",
+                            lesson="key product resolved; build aggregation against it",
+                            refs_found=[r["record_path"]]))
 
 
 _READ_RPCS = {"read", "list", "tree", "stat", "search"}
@@ -373,6 +431,7 @@ def investigate(vm, intent, seed=None, oracle=None, max_steps: int | None = None
             except Exception as e:                             # graceful: never raise out of a step
                 brief.notes.append(Note(goal=goal, lesson=f"step error: {e}"))
                 continue
+        run_resolution_probe(vm, intent, brief)   # B-seat: descriptor-probe fallback
         log_investigate_stop_auto(stop_reason, 0, 0)
     finally:
         set_step_type(_prev_step)
