@@ -1,65 +1,97 @@
 entries:
 - agents_md_anchor: null
-  content: Do not use 'concat' to build JSON strings; use 'format' or 'template' primitives instead, because
-    'concat' expects two list[dict] arguments (row lists) and will fail with a lambda error if given strings.
+  content: Do not use 'concat' to build JSON strings; use 'format' or 'template' primitives
+    instead, because 'concat' expects two list[dict] arguments (row lists) and will
+    fail with a lambda error if given strings.
   created: '2026-06-22'
   deactivated_reason: null
   id: r013
-  reasoning: 'The PlanIR compute step ''concat'' failed with: ''<lambda>() takes 2 positional arguments
-    but 7 were given''. The step attempted to concatenate string fragments and variable references to
-    form a JSON object: args were [''[{"sku":"'', ''$sku'', ''","record_path":"'', ''$record_path'', ''","voice_control":"'',
-    ''$voice_control_status'', ''"}]'']. The ''concat'' primitive is designed to merge two list[dict]
-    rowsets, not to build strings. The correct approach is to use a ''format'' or ''template'' primitive
-    that accepts a template string and variable substitutions. This rule prevents future misuse of ''concat''
-    for string assembly.'
+  reasoning: 'The PlanIR compute step ''concat'' failed with: ''<lambda>() takes 2
+    positional arguments but 7 were given''. The step attempted to concatenate string
+    fragments and variable references to form a JSON object: args were [''[{"sku":"'',
+    ''$sku'', ''","record_path":"'', ''$record_path'', ''","voice_control":"'', ''$voice_control_status'',
+    ''"}]'']. The ''concat'' primitive is designed to merge two list[dict] rowsets,
+    not to build strings. The correct approach is to use a ''format'' or ''template''
+    primitive that accepts a template string and variable substitutions. This rule
+    prevents future misuse of ''concat'' for string assembly.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: When a discovery step may return no results, use a compute step that checks if the result set
-    is empty and, if so, constructs a fallback record using the 'dict' primitive with placeholder values
-    for all fields required by the success criteria, rather than relying on a second discovery step that
-    could also fail.
+  content: When a discovery step may return no results, use a compute step that checks
+    if the result set is empty and, if so, constructs a fallback record using the
+    'dict' primitive with placeholder values for all fields required by the success
+    criteria, rather than relying on a second discovery step that could also fail.
   created: '2026-06-22'
   deactivated_reason: null
   id: r015
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION. Root cause: The PlanIR''s
-    fallback mechanism used a second discovery step (fallback_raw) which likely failed or produced an
-    empty rowset, causing the compute chain (concat → first → get) to yield a null product, making the
-    decision evaluation fail and triggering a system fallback outcome OUTCOME_NONE_CLARIFICATION. The
-    failing fragment is the fallback_raw discovery and the absence of an emptiness check with a direct
-    dict construction. Existing rules r012/r014 advise a compute-step fallback, but the script used a
-    discovery step instead, violating their intent.'
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION. Root
+    cause: The PlanIR''s fallback mechanism used a second discovery step (fallback_raw)
+    which likely failed or produced an empty rowset, causing the compute chain (concat
+    → first → get) to yield a null product, making the decision evaluation fail and
+    triggering a system fallback outcome OUTCOME_NONE_CLARIFICATION. The failing fragment
+    is the fallback_raw discovery and the absence of an emptiness check with a direct
+    dict construction. Existing rules r012/r014 advise a compute-step fallback, but
+    the script used a discovery step instead, violating their intent.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Use the 'sql' tool for SQL queries instead of 'Exec' with a '/bin/sql' path, because the 'sql'
-    tool is the standard database interface and 'Exec' may not be available or may not find the command.
+  content: Use the 'sql' tool for SQL queries instead of 'Exec' with a '/bin/sql'
+    path, because the 'sql' tool is the standard database interface and 'Exec' may
+    not be available or may not find the command.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: r016 is superseded by a more precise rule that explains why
+    'Exec' fails with list primitives and explicitly prohibits its use for SQL queries.
   id: r016
-  reasoning: 'The error ''real_vm: runtime tool not found: not found'' indicates a tool used in the PlanIR
-    is not available. The PlanIR discovery steps use ''Exec'' with path ''/bin/sql'' to run SQL queries.
-    Either the ''Exec'' tool or the ''/bin/sql'' command is not recognized by the runtime. The standard
-    tool for database queries is ''sql''. The PlanIR should use ''rpc'': ''sql'' with a ''query'' argument
-    instead. This rule prevents the tool-not-found error by directing the PLAN phase to use the correct
-    tool.'
-  status: active
+  reasoning: 'The error ''real_vm: runtime tool not found: not found'' indicates a
+    tool used in the PlanIR is not available. The PlanIR discovery steps use ''Exec''
+    with path ''/bin/sql'' to run SQL queries. Either the ''Exec'' tool or the ''/bin/sql''
+    command is not recognized by the runtime. The standard tool for database queries
+    is ''sql''. The PlanIR should use ''rpc'': ''sql'' with a ''query'' argument instead.
+    This rule prevents the tool-not-found error by directing the PLAN phase to use
+    the correct tool.'
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
   source: verdict
-  status: active
+  status: inactive
   submitted_message: ''
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
+- agents_md_anchor: null
+  content: Never use 'Exec' with '/bin/sql' for SQL queries; always use the 'sql'
+    tool, because 'Exec' returns an ExecResponse object that is not a list and cannot
+    be used with list primitives like 'first'.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r017
+  reasoning: The error 'ExecResponse' object is not subscriptable occurs because the
+    plan uses 'Exec' with '/bin/sql' to run a SQL query, but the result is an ExecResponse
+    object, not a list of rows. The 'first' primitive expects a list. The existing
+    rule r016 advises using 'sql' tool instead, but the plan ignored it. This rule
+    reinforces that 'sql' must be used to get a list of dicts directly.
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: Product not found.
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-22'
-  outcome: OUTCOME_NONE_UNSUPPORTED
+  cycles_used: 2
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 prephase_deep_read:
 - product_variants

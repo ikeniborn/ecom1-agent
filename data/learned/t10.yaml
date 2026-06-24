@@ -3,23 +3,24 @@ entries:
   content: Always use a variable reference (e.g., '$count_val') as the answer message
     when the answer shape is a variable reference, not a string template (e.g., '{count_val}').
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r007
   reasoning: The PlanIR answer message used '{count_val}' (a string template) instead
     of '$count_val' (a variable reference). The answer shape is '$count_val', so the
     message must be a variable reference. This mismatch caused the outcome to be OUTCOME_NONE_CLARIFICATION
     instead of OUTCOME_OK. Existing rule r005 only covers '%d' shape, so it is deactivated
     in favor of this more general rule.
-  status: active
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v014
   score: 0.0
   score_detail:
   - answer missing required reference '/docs/ops-policy-notes/catalogue-count-wood-stain-oil-vienna-2024-07-17.md'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: $count
   submitted_outcome: OUTCOME_OK
   submitted_refs: []
@@ -53,11 +54,40 @@ entries:
     rule prevents this variable-name mismatch.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always assign the scalar result of a SQL query to the variable name specified
+    in the TOOL_PLAN params using a compute step with 'assign' operation, referencing
+    the parsed column variable from the rowset (e.g., '$parsed_count.count').
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: verify success_criteria[OUTCOME_OK][0] failed because $count
+    is undefined. Root cause: The PlanIR script parsed the SQL result into a rowset
+    variable ''parsed_count'' with column ''count'', but never assigned that scalar
+    value to the variable ''count'' required by TOOL_PLAN params. The decision branch
+    used ''$count'' (undefined) and the answer message used ''{count}'' (undefined).
+    The script violated existing rule r009 (assign final computed value to param variable)
+    but lacked a compute step. A more specific rule is needed to ensure scalar SQL
+    results are explicitly assigned to the param variable.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v015
+  score: 0.0
+  score_detail:
+  - Answer should be "1"
+  source: verdict
+  status: active
+  submitted_message: '0'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/current-updates/catalogue-counting-2025-10-08-work-trousers-vienna.md
 last_run:
   cycles_used: 1
-  date: '2026-06-23'
+  date: '2026-06-24'
   outcome: OUTCOME_OK
-  status: success
+  status: failure
 prephase_deep_read:
 - /docs/ops-policy-notes/catalogue-count-wood-stain-oil-vienna-2024-07-17.md
 task_id: t10

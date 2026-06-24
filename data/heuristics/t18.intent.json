@@ -1,15 +1,17 @@
 {
-  "objective": "Compute the total available today quantity of a specific Geberit Mapress Silent IC5-GU6 Valve and Connector (ball valve type) across all Vienna stores, including stores with zero availability, and report the count with citations of the product and every Vienna store record.",
+  "objective": "Compute the total available_today_quantity of a specific Metabo Cordless Drill Driver product across all Graz stores, including stores with zero availability.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_sku": "discover from product_variants and product_variant_properties: brand='Geberit', series='Mapress Silent', model='IC5-GU6', product_name containing 'Valve and Connector', and a property with key='connector_type' value='ball valve' (case-insensitive, whitespace-trimmed)",
-    "vienna_store_ids": "list of store_id from stores where city='Vienna' (case-insensitive, whitespace-trimmed)",
-    "total_available": "sum of available_today_quantity from store_inventory for the discovered product_sku across all vienna_store_ids, using COALESCE or LEFT JOIN to treat missing inventory rows as 0",
-    "product_record_path": "record_path of the discovered product variant",
-    "store_record_paths": "list of record_path from stores where city='Vienna' (case-insensitive, whitespace-trimmed)"
+    "product_sku": "lookup from product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand = 'Metabo' AND pv.series = 'Metabo Brushless BS 1OW-IK5 Cordless Drill Driver' AND pvp.property_key = 'voltage' AND pvp.property_value_text = '18 V' AND pvp.property_key = 'battery platform' AND pvp.property_value_text = '18v-system' AND pvp.property_key = 'kit contents' AND pvp.property_value_text = 'bare tool'",
+    "graz_stores": "lookup from stores WHERE city = 'Graz'",
+    "inventory_rows": "for each graz_store, lookup from store_inventory WHERE store_id = store.store_id AND product_sku = $product_sku, else treat as 0 available_today_quantity",
+    "total_available": "sum of available_today_quantity across all inventory_rows (including missing as 0)",
+    "product_record_path": "record_path from product_variants for $product_sku",
+    "store_record_paths": "list of record_path from stores for each graz_store"
   },
   "outcome_space": [
-    "OUTCOME_OK"
+    "OUTCOME_OK",
+    "OUTCOME_NONE_UNSUPPORTED"
   ],
   "constraints": [],
   "success_criteria": {
@@ -22,14 +24,17 @@
       },
       {
         "op": "nonempty",
-        "lhs": "$product_sku",
+        "lhs": "$product_record_path",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "count: {total_available}"
+    "msg_skeleton": "answer=%d",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [

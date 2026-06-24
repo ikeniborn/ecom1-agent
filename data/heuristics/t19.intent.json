@@ -1,9 +1,10 @@
 {
-  "objective": "Compute the total available_today_quantity of the specified product across all stores in Vienna, including stores with zero availability, and output the count with citations of all Vienna store records and the product record.",
+  "objective": "Calculate the total available today quantity of a specific LED bulb product across all Vienna stores, including stores with zero availability.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_sku": "lookup product_sku from product_variants where brand = 'Raaco', series = 'Raaco Stackable Assorter 20C-L8E Storage Bin and Organizer', product_name = 'Storage Bin and Organizer', and properties contain storage type 'storage bin', color family 'Red', volume '3 l'",
-    "vienna_stores": "lookup store_id, record_path from stores where city = 'Vienna'"
+    "product_sku": "Lookup from product_variants and product_variant_properties using brand='Osram', series='Eco Classic 3PW-R88', model='LED Bulb', and properties wattage=15 W and luminous flux=1055 lm, using case-insensitive and whitespace-insensitive comparisons.",
+    "vienna_store_ids": "Select store_id from stores where city = 'Vienna'",
+    "total_available": "Sum of available_today_quantity from store_inventory for each vienna_store_id and product_sku, with missing rows treated as 0."
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -13,33 +14,42 @@
   "success_criteria": {
     "OUTCOME_OK": [
       {
+        "op": "ge",
+        "lhs": "$total",
+        "rhs": 0,
+        "args": []
+      },
+      {
         "op": "nonempty",
-        "lhs": "$answer",
+        "lhs": "$product_record_path",
         "rhs": null,
         "args": []
       },
       {
-        "op": "startswith",
-        "lhs": "$answer",
-        "rhs": "count: ",
+        "op": "nonempty",
+        "lhs": "$store_record_paths",
+        "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "count: {count}"
+    "msg_skeleton": "total products: %d",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product.record_path"
+        "source": "$product_record_path"
       },
       {
         "kind": "record_path",
         "path": null,
-        "source": "$stores"
+        "source": "$store_record_paths"
       }
     ]
   }

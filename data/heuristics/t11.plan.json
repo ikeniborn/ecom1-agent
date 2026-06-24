@@ -3,29 +3,29 @@
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/policy-updates/2024-07-17-catalogue-reporting-compressors-extractors-linz.md"
+        "path": "/docs/policy-updates/2024-07-17-catalogue-reporting-wall-paint-vienna.md"
       },
-      "bind": "policy_doc_content"
+      "bind": "policy_content"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT COUNT(DISTINCT pv.product_sku) AS cnt FROM product_variants pv JOIN store_inventory si ON pv.product_sku = si.product_sku JOIN stores s ON si.store_id = s.store_id WHERE pv.product_kind_id = 'compressors_extractors' AND s.store_name = 'Linz PowerTool' AND s.is_open = 1 AND si.available_today_quantity > 0;"
+        "stdin": "WITH vienna_powertool_stores AS (SELECT store_id FROM stores WHERE is_open = 1 AND city = 'Vienna' AND store_name LIKE '%PowerTool%') SELECT COUNT(DISTINCT pv.product_sku) AS count FROM product_variants pv WHERE pv.product_kind_id = 'wall_paint' AND EXISTS (SELECT 1 FROM store_inventory si JOIN vienna_powertool_stores vps ON si.store_id = vps.store_id WHERE si.product_sku = pv.product_sku AND si.available_today_quantity > 0);"
       },
-      "bind": "sql_output"
+      "bind": "sql_result"
     }
   ],
   "rowsets": [
     {
-      "from_": "sql_output",
+      "from_": "sql_result",
       "format": "auto_delim",
-      "into": "rows",
+      "into": "parsed_rows",
       "columns": [
         {
-          "into": "cnt",
+          "into": "count",
           "candidates": [
-            "cnt"
+            "count"
           ]
         }
       ]
@@ -35,15 +35,15 @@
     {
       "prim": "first",
       "args": [
-        "$rows"
+        "$parsed_rows"
       ],
-      "into": "row"
+      "into": "first_row"
     },
     {
       "prim": "get",
       "args": [
-        "$row",
-        "cnt"
+        "$first_row",
+        "count"
       ],
       "into": "count"
     }
@@ -53,7 +53,7 @@
       {
         "when": {
           "op": "nonempty",
-          "lhs": "$policy_doc_content",
+          "lhs": "$policy_content",
           "rhs": null,
           "args": []
         },
@@ -67,10 +67,16 @@
     "ok": {
       "message": "{count}",
       "outcome": "OUTCOME_OK",
-      "refs": []
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/policy-updates/2024-07-17-catalogue-reporting-wall-paint-vienna.md",
+          "source": null
+        }
+      ]
     },
     "unsupported": {
-      "message": "The policy document is empty or could not be read.",
+      "message": "Policy document not found or empty",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

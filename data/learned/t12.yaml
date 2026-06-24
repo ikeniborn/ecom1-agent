@@ -1,13 +1,14 @@
 entries:
 - agents_md_anchor: null
-  content: Always set the answer message to a literal string that already contains the computed value,
-    not a template with variable placeholders.
+  content: Always set the answer message to a literal string that already contains
+    the computed value, not a template with variable placeholders.
   created: '2026-06-22'
   deactivated_reason: null
   id: r004
-  reasoning: The verify step failed because the answer message was '<COUNT:{count_val}>' (a template with
-    a placeholder) instead of the literal '<COUNT:1>'. The regex ^<COUNT:\d+>$ did not match the placeholder
-    syntax. The PlanIR must embed the computed value directly into the answer message string.
+  reasoning: The verify step failed because the answer message was '<COUNT:{count_val}>'
+    (a template with a placeholder) instead of the literal '<COUNT:1>'. The regex
+    ^<COUNT:\d+>$ did not match the placeholder syntax. The PlanIR must embed the
+    computed value directly into the answer message string.
   status: active
   surface: ir
 - content: null
@@ -22,37 +23,41 @@ entries:
   submitted_outcome: OUTCOME_NONE_CLARIFICATION
   submitted_refs: []
 - agents_md_anchor: null
-  content: When adding a compute step to PlanIR, always use the 'prim' field to specify the operation
-    (e.g., 'extract_regex') and use 'source' to reference the input data. Never include 'name' or 'input'
-    fields.
+  content: When adding a compute step to PlanIR, always use the 'prim' field to specify
+    the operation (e.g., 'extract_regex') and use 'source' to reference the input
+    data. Never include 'name' or 'input' fields.
   created: '2026-06-22'
   deactivated_reason: null
   id: r005
-  reasoning: 'The PlanIR validation error indicates that a compute step contained a dict with ''name'':
-    ''fuzzy_sku_receipt'' and ''input'': ''$policy_text'' instead of the required ''prim'' field. The
-    schema expects a ''prim'' field for the operation and does not permit ''name'' or ''input'' as extra
-    fields. This rule ensures future compute steps are correctly structured.'
+  reasoning: 'The PlanIR validation error indicates that a compute step contained
+    a dict with ''name'': ''fuzzy_sku_receipt'' and ''input'': ''$policy_text'' instead
+    of the required ''prim'' field. The schema expects a ''prim'' field for the operation
+    and does not permit ''name'' or ''input'' as extra fields. This rule ensures future
+    compute steps are correctly structured.'
   status: active
   surface: ir
 - agents_md_anchor: '#planir-compute-prims'
-  content: When the answer shape is a formatted string (e.g., '<COUNT:%d>'), use a compute step with prim
-    'format' and args [template, value] to produce the final message string. Never use concat for string
-    building; concat is only for merging two row lists.
+  content: When the answer shape is a formatted string (e.g., '<COUNT:%d>'), use a
+    compute step with prim 'format' and args [template, value] to produce the final
+    message string. Never use concat for string building; concat is only for merging
+    two row lists.
   created: '2026-06-22'
   deactivated_reason: null
   id: r006
-  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() takes 2 positional arguments
-    but 3 were given. CONTRACT: concat(a, b): both args must be list[dict] rows. Root cause: PlanIR compute
-    step used concat with three arguments (a string literal, a number, a string literal) to build a formatted
-    message string, but concat is designed to merge two row lists, not to concatenate strings. Failing
-    fragment: {"prim":"concat","args":["<COUNT:","$count_num",">"],"into":"final_msg"}. The correct approach
-    is to use a ''format'' prim to produce the final message string from a template and the count value.
-    This rule ensures future plans use the appropriate prim for string formatting.'
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() takes 2
+    positional arguments but 3 were given. CONTRACT: concat(a, b): both args must
+    be list[dict] rows. Root cause: PlanIR compute step used concat with three arguments
+    (a string literal, a number, a string literal) to build a formatted message string,
+    but concat is designed to merge two row lists, not to concatenate strings. Failing
+    fragment: {"prim":"concat","args":["<COUNT:","$count_num",">"],"into":"final_msg"}.
+    The correct approach is to use a ''format'' prim to produce the final message
+    string from a template and the count value. This rule ensures future plans use
+    the appropriate prim for string formatting.'
   status: active
   surface: ir
 last_run:
-  cycles_used: 6
-  date: '2026-06-22'
+  cycles_used: 1
+  date: '2026-06-24'
   outcome: OUTCOME_OK
   status: success
 task_id: t12

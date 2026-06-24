@@ -1,0 +1,2741 @@
+════════════════════════════════════════════════════════════════════════
+TASK t53  ·  model=deepseek-v4-flash:cloud
+  Look at the old receipt in /uploads/. If we were to sell these products today, would the total price (excluding VAT) stay within 1 EUR difference with the old receipt?
+════════════════════════════════════════════════════════════════════════
+
+  · [Exec /bin/sql] -> sql
+      CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+      CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+      CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+      CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+      CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+      CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+      CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+      CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+      CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+      CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+      CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+      CREATE INDEX payment_transactions_status_idx ON paym… [+6147 chars]
+  · [Exec /bin/id] [MUTATED] -> user: emp_041
+      roles: employee, store_manager, discount_manager, refund_manager, inventory_viewer, fulfillment_viewer, customer_service
+  · [Tree /docs] -> <empty>
+═══ PRE-PHASE FACTS ═══
+docs_inventory (11):
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+gather_status: {"schema": "ok", "sample_rows": "skipped(slim)", "identity": "ok", "docs_inventory": "ok", "policies": "skipped(slim)", "catalogue_candidates": "skipped(slim)", "target_records": "skipped(slim)", "path_listings": "skipped(slim)"}
+identity: {"kind": "guest"}
+schema:
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(… [+5146 chars]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · INTENT · 22800ms · tokens 4216/3059 · OK
+┌ SYSTEM (e659f28e)
+    # PHASE: INTENT
+    
+    You receive pre-phase facts about the task and produce an IntentSpec —
+    a structured description of **what** must be done and **why**, not **how**.
+    Emit data, not code. The PLAN phase uses your output to decide the execution
+    strategy.
+    
+    ## Pre-phase facts you receive
+    
+    | Field | Content |
+    |-------|---------|
+    | `instruction` | Verbatim task request from the caller |
+    | `agents_md` | Full AGENTS.MD vault rules |
+    | `schema` | Table/column definitions from the runtime |
+    | `sample_rows` | Small row sample per table (method-grounded; values change each run) |
+    | `docs_inventory` | Paths of policy docs available under `/docs/` |
+    | `policies` | Verbatim content of relevant policy files |
+    | `identity` | Output of `/bin/id` — caller role, store, issuer; includes a structural `kind`: `customer` \| `employee` \| `guest` |
+    | `target_records` | Any specific records named in the instruction |
+    
+    ## Output format — IntentSpec
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "objective": "<one-sentence statement of what must be achieved>",
+      "desired_outcome": "OUTCOME_OK | OUTCOME_DENIED_SECURITY | OUTCOME_NONE_UNSUPPORTED | OUTCOME_NONE_CLARIFICATION",
+      "params": {"<name>": "<method description or $agent_var — never a re-seeded literal>"},
+      "outcome_space": ["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+      "constraints": [
+        {
+          "anchor": "<#section > entry in AGENTS.MD>",
+          "rule": "<verbatim AGENTS.MD line>",
+          "security": true,
+          "deny_when": {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<literal or $ref>"}
+        }
+      ],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<value>"}
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "<human-readable template, e.g. 'Processed {count} items'>"
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {"kind": "policy_doc", "path": "/docs/<governing-doc>.md"},
+          {"kind": "record_path", "source": "$<row>.record_path"}
+        ]
+      }
+    }
+    ```
+    
+    ### Field rules
+    
+    - `objective` — one sentence; no implementation detail.
+    - `desired_outcome` — the nominal happy-path outcome; PLAN may produce others.
+    - `params` — encode **how** to find a value (e.g. `"lookup from <TABLE> WHERE ..."`),
+      never bake a re-seeded literal. Values beginning with `$` are resolved at runtime.
+    - `outcome_space` — every outcome the task can legitimately produce; order does not matter.
+    - `constraints` — one entry per AGENTS.MD rule that applies. Copy `rule` verbatim.
+      - `security: true` when the rule can produce `OUTCOME_DENIED_SECURITY`.
+      - `deny_when` (**required** on security constraints): a PredExpr that, when true,
+        mandates denial. Evaluated against runtime env after discovery.
+    - `required_refs` — keyed by outcome. For each outcome the answer can take, list the
+      evidence the grader requires: a `policy_doc` (literal `/docs/...md` `path` taken from
+      THIS run's `docs_inventory`/`policies` — the governing rule/count/procedure the
+      decision rests on) and/or a `record_path` (a `$ref` `source` bound at runtime to the
+      reported row's path). Declare ONLY load-bearing refs (reading a doc ≠ obligation to
+      cite it). Exactly one of `path`/`source` per RefSpec, matching its `kind`.
+    - `success_criteria` — a map keyed by outcome (same shape as `required_refs`).
+      List STRUCTURAL / grounding checks only per outcome (e.g. `count ge 0`, a
+      nonempty bound id). A negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`)
+      typically needs no criteria — it is gated by `outcome_space`. Do NOT bake a SQL
+      recipe, join, `kind_id`, or `city` here — that is PLAN's job (HOW).
+    
+    ### Learned rules
+    
+    You may receive a `LEARNED_RULES (active)` block — validated, task-scoped guidance
+    distilled from prior runs. Honor it when shaping the spec, especially `required_refs`,
+    `success_criteria`, `outcome_space`, and `params`. These rules state methods (how to
+    ground an answer, which evidence the grader requires), never re-seeded literals — apply
+    the method, do not copy any example value.
+    
+    ### Security scope — role-aware customer-ownership deny
+    
+    `facts.identity.kind` is one of `customer`, `employee`, `guest` (structural,
+    derived from the `/bin/id` id-shape — not a role-name list). The `security.md`
+    customer-ownership clause binds **customers** acting on their own account — NOT
+    an employee operational read or action.
+    
+    Apply a customer-ownership `deny_when` **only when** the caller is a customer:
+    
+    ```json
+    {"op":"and","args":[
+      {"op":"eq","lhs":"$_facts.identity.kind","rhs":"customer"},
+      {"op":"ne","lhs":"$record.customer_id","rhs":"$_facts.identity.customer_id"}]}
+    ```
+    
+    Do NOT emit an owner-mismatch deny for an `employee`/operational identity — an
+    employee reading or acting on a record they do not "own" is not a customer-scope
+    violation. Customer-only actions (account recovery, email change per the doc)
+    remain a separate class. Ground this in the `security.md` scope + `facts.identity`,
+    never a hardcoded role or id.
+    
+    ## IDD vs SDD (what belongs here)
+    
+    INTENT is the IDD layer: WHAT must hold and WHY — `objective`, `outcome_space`,
+    `constraints`, `required_refs` (cite the governing doc + the reported record),
+    `success_criteria` (structural/grounding). INTENT NEVER specifies HOW: no SQL, joins,
+    column names, `kind_id`, or `city`. PLAN (the SDD layer) reads the eligibility rule
+    from `facts.policies` and builds the rule-correct SQL.
+    
+    ## PredExpr grammar
+    
+    A predicate expression is a JSON object `{"op": ..., ...}`.
+    
+    **Leaf ops** — require `lhs` (a ref or literal); most require `rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `eq` | lhs == rhs |
+    | `ne` | lhs != rhs |
+    | `lt` | lhs < rhs (numeric) |
+    | `le` | lhs <= rhs (numeric) |
+    | `gt` | lhs > rhs (numeric) |
+    | `ge` | lhs >= rhs (numeric) |
+    | `nonempty` | lhs is non-null and non-empty (no rhs) |
+    | `isnull` | lhs is null or missing (no rhs) |
+    | `contains_any` | lhs list shares ≥1 element with rhs list |
+    | `in_set` | lhs value is in rhs list |
+    | `startswith` | str(lhs) starts with str(rhs) |
+    | `endswith` | str(lhs) ends with str(rhs) |
+    | `regex_match` | str(lhs) matches regex rhs |
+    
+    **Bool ops** — require `args` (list of nested PredExpr); no `lhs`/`rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `and` | all args true |
+    | `or` | any arg true |
+    | `not` | exactly one arg; negated |
+    
+    ### `$ref` convention
+    
+    A string starting with `$` is a runtime reference into `env`:
+    - `$name` — top-level env key
+    - `$a.b` — dotted path: `env["a"]["b"]`
+    - `$rows.0.sku` — indexed path: `env["rows"][0]["sku"]`
+    
+    Anything that does not start with `$` is treated as a literal value.
+    
+    ## Grounding rule (S3)
+    
+    The benchmark re-seeds data on every run. Never bake a literal value that
+    originates from sample data into `params` or `deny_when`. Encode the
+    **method** to retrieve it (SQL pattern, field name, policy section).
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+├ USER
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    LEARNED_RULES (active):
+      - [r018] Always ensure that any rowset produced by a custom_extract is defined before the compute section that references it. If the PlanIR structure requires custom_extract after compute, do not reference such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid forward references.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+      - [r019] Never apply the catalog path constraint to files in /uploads/; that constraint is only for catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a Read RPC on the given path.
+      - [r020] When the instruction says 'the single file in /uploads/' or similar, use a Find RPC with a pattern like '*' to locate the file, and bind the result. Then use the bound path directly in a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return directory entries or require additional filtering, leading to a 'read failed: is a directory' error.
+    
+    INSTRUCTION:
+    Look at the old receipt in /uploads/. If we were to sell these products today, would the total price (excluding VAT) stay within 1 EUR difference with the old receipt?
+└ ASSISTANT
+    {
+      "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "receipt_file_path": "Find the single file in /uploads/ using Find RPC with pattern '*', then bind the path.",
+        "receipt_content": "Read the file at receipt_file_path using Read RPC.",
+        "old_total_cents": "Parse receipt_content to extract the old total price in cents (excluding VAT).",
+        "line_items": "Parse receipt_content to extract a list of objects each with product_sku and quantity.",
+        "current_total_cents": "For each line item, look up price_cents from product_variants WHERE product_sku = $item.sku, multiply by quantity, sum to get current total in cents.",
+        "difference_cents": "Compute absolute difference between old_total_cents and current_total_cents."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "nonempty",
+            "lhs": "$old_total_cents"
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$current_total_cents"
+          },
+          {
+            "op": "le",
+            "lhs": "$difference_cents",
+            "rhs": 100
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The difference is {difference_cents} cents, which is {within} 1 EUR."
+      },
+      "required_refs": {
+        "OUTCOME_OK": []
+      }
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · RERANK · 4722ms · tokens 508/200 · OK
+┌ SYSTEM (7225865c)
+    You select which knowledge snippets are RELEVANT to a coding task. Return JSON {"keep": [ids]} listing only the ids whose content would help write the task's script, most relevant first.
+├ USER
+    TASK:
+    Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.
+    
+    CANDIDATE KNOWLEDGE:
+    - receipt-total-comparison-matched-set: When comparing an old receipt total to current prices, ensure both totals are computed over the same set of products by joining parsed receipt items with current product prices before aggregation, to avoid mismatched product sets causing incorrect difference calculations.
+    - compute_total_inventory_by_city_and_product: Compute total available today quantity of a product across all stores in a given city, including stores with zero availability, using SQL left join and coalesce; handle missing product with unsupported outcome.
+    - receipt-catalog-price-comparison: Method to compare total price of items from a receipt against a product catalog, ensuring all items are matched and the price difference is within a specified threshold.
+    - atom-fraud-total-formatting: Pattern for computing a total from a filtered set of rows, formatting the total as a currency string, and outputting it along with row references, handling the empty-set case gracefully.
+    - product-ambiguity-clarification: When querying for a product by descriptive attributes, ensure uniqueness; if multiple products match, request clarification from the user before proceeding with any aggregation or computation.
+    - avoid-false-positives-product-name-like: Avoid false positives in product availability checks by using exact matching or additional constraints instead of overly broad LIKE patterns.
+    - catalog-file-path-pattern: Path pattern for product catalog JSON files in the system
+    - product-verification-not-found-outcome: When verifying a product's existence and a specific property, if the product is not found, return a negative answer with OUTCOME_OK instead of OUTCOME_NONE_UNSUPPORTED.
+    - normalized-catalogue-product-matching: Normalize both sides when matching or counting catalogue products to avoid misses from formatting and case differences.
+    - product_claim_verification_no_with_sku: Method to verify a product claim by checking if a base product exists and whether its properties match required values; if product exists but claim is absent, answer '<NO>' with the SKU.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["receipt-total-comparison-matched-set", "receipt-catalog-price-comparison"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · INVESTIGATE · 6046ms · tokens 909/106 · OK
+┌ SYSTEM (7fda40de)
+    # PHASE: INVESTIGATE
+    
+    You explore a vault ONE read-only step at a time to gather the evidence a later
+    deterministic plan needs. You do NOT write the plan and you NEVER mutate state.
+    
+    ## Each turn you receive
+    - The OBJECTIVE and the REFS the final answer must ground (required_refs targets).
+    - The BRIEF so far (resolved env + prior step lessons).
+    - A few KNOWLEDGE snippets scoped to the immediate sub-goal.
+    
+    ## Router output — pick exactly ONE next action
+    Single JSON object, no prose, no fences. Either a tool call:
+    {"tool": "<read|list|tree|stat|search|exec>", "args": {...}, "why": "<one line>"}
+    or, when the brief already grounds every required ref:
+    {"done": true}
+    
+    Tool arg shapes: read/stat {"path"}; list {"path"}; tree {"root"}; search
+    {"root","pattern","limit"}; exec {"path":"/bin/sql","stdin":"SELECT …"} (SELECT/CTE only).
+    Prefer the cheapest probe that resolves the NEXT unknown. Do not re-issue a probe
+    already in the brief.
+    
+    ## Digest output — condense the tool result
+    Single JSON object:
+    {"observation_digest": "<≤200 chars of what the result shows>",
+     "lesson": "<one-line takeaway for the next step>",
+     "env_updates": {"<key>": "<value>"},
+     "refs_found": ["<record_path>", ...]}
+    
+    Bind env keys the sufficiency gate reads: "policy_doc:/docs/<file>.md": true when you
+    have read a governing doc; "<row>.record_path": "<path>" when you have located the
+    record to cite. Keep digests SMALL — the next step sees the brief, not the raw output.
+├ USER
+    OBJECTIVE:
+    Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.
+    
+    REQUIRED_REFS:
+    
+    
+    KNOWLEDGE (scoped to this step):
+    - To compare the total price of products from an old receipt (excluding VAT) with today's total price, first parse the receipt text to extract SKU, quantity, and unit price for each line. Then, join these parsed items with a current price table (e.g., product_variants) using an INNER JOIN on SKU to retain only products that exist in both sources. Compute the old total as SUM(parsed.quantity * parsed.unit_price) and the current total as SUM(parsed.quantity * current.price) from this joined result set. Finally, compare the absolute difference of these two totals against the threshold. This avoids the error of including old items that are no longer available, which would inflate the old total and cause a false 'exceeds threshold' outcome.
+    - 1. Read the receipt text from a file or input source.
+    2. Extract individual items from the receipt text, each containing a product identifier (e.g., SKU) and a price (in cents or smallest currency unit). This extraction may require fuzzy matching or OCR post-processing.
+    3. Query the product catalog (e.g., database) to retrieve all product variants with their identifiers and current prices.
+    4. Parse the catalog data into a structured list of records (identifier, price).
+    5. Sum the prices of all extracted receipt items to obtain the old total.
+    6. Collect the unique product identifiers from the receipt items.
+    7. Filter the catalog records to only those identifiers present in the receipt.
+    8. Sum the prices of the matched catalog records to obtain the current total.
+    9. Count the number of matched catalog records; compare with the number of unique receipt identifiers to detect any missing products (i.e., products on the receipt not found in the catalog).
+    10. Compute the absolute difference between the old total and the current total.
+    11. Convert the difference to the desired currency unit (e.g., divide cents by 100 to get EUR).
+    12. If the difference is within the allowed threshold (e.g., 3 EUR) and there are zero missing products, the comparison is successful; otherwise, it fails.
+    13. Return an appropriate outcome with the computed difference and missing count.
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "list", "args": {"path": "/uploads/"}, "why": "List files in /uploads/ to find the old receipt file."}
+
+  · [List /uploads/] -> <empty>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · INVESTIGATE · 2304ms · tokens 506/380 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    GOAL:
+    Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.
+    
+    TOOL: list {'path': '/uploads/'}
+    
+    RAW_RESULT (condense this):
+    [name: "receipt_ocr_avtxiaWc.txt"
+    path: "/uploads/receipt_ocr_avtxiaWc.txt"
+    kind: NODE_KIND_FILE
+    content_type: "text/plain"
+    ]
+    
+    Return the digest JSON.
+└ ASSISTANT
+    {
+      "observation_digest": "Single file: receipt_ocr_avtxiaWc.txt in /uploads/",
+      "lesson": "Found the receipt file; need to read its contents to get product list and old total.",
+      "env_updates": {
+        "receipt_path": "/uploads/receipt_ocr_avtxiaWc.txt"
+      },
+      "refs_found": ["/uploads/receipt_ocr_avtxiaWc.txt"]
+    }
+
+  · [investigate_stop] {"reason": "sufficient", "data_paths_total": 0, "data_paths_probed": 0, "seq": 13}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · PLAN · 36815ms · tokens 5219/7689 · OK
+┌ SYSTEM (4a851949)
+    # PHASE: PLAN
+    
+    You receive an IntentSpec and produce a PlanIR — a deterministic execution
+    plan. You decide **how** to satisfy the intent. The interpreter executes your
+    plan directly; no code generation is involved.
+    
+    ## Output format — PlanIR
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "discovery": [
+        {"rpc": "<RPC name>", "args": {}, "bind": "<env key>"}
+      ],
+      "rowsets": [
+        {
+          "from": "<env key of raw text>",
+          "format": "auto_delim",
+          "into": "<env key for parsed rows>",
+          "columns": [
+            {"into": "<field name>", "candidates": ["<col header variant>", "..."]}
+          ]
+        }
+      ],
+      "compute": [
+        {"prim": "<primitive name>", "args": ["$ref_or_literal", "..."], "into": "<env key>"}
+      ],
+      "decision": {
+        "branches": [
+          {"when": {"op": "<PredExpr op>", "lhs": "$ref", "rhs": "value"}, "label": "<label>"}
+        ],
+        "default_label": "<label>"
+      },
+      "ops": [
+        {
+          "rpc": "<RPC name>",
+          "args": {},
+          "bind": "<env key or null>",
+          "guard_label": "<decision label or null>",
+          "outcome_from_exit": null
+        }
+      ],
+      "answer": {
+        "<label>": {"message": "<template with {slot} placeholders>", "outcome": "OUTCOME_OK", "refs": []}
+      },
+      "custom_extract": [
+        {"name": "<parser name>", "input": "$ref", "into": "<env key>"}
+      ]
+    }
+    ```
+    
+    ### Field rules
+    
+    **`discovery`** — read-only RPCs that populate `env`. Run before decision.
+    Use `Exec /bin/sql` with parameterised `:name` placeholders; never inline
+    re-seeded literals. Batch with CTEs into a single call where possible (S4).
+    When a computation depends on an eligibility/count rule, first `Read` the governing
+    `/docs` policy path (surfaced in `docs_inventory`) in a `discovery` step, then encode
+    the rule-correct SQL from the documented rule — the documented count/filter, not a
+    naive one.
+    
+    **`rowsets`** — parse delimited text from a bound env key into a list of dicts.
+    `format` is `auto_delim` (tab/comma auto-detect) or `json`.
+    `columns[*].candidates` lists header variants tried in order; first match wins.
+    
+    **`compute`** — apply a named primitive to already-resolved args; result goes to `into`.
+    Args are resolved: `$name` → env lookup; anything else → literal.
+    
+    **`decision`** — evaluate branches in order; first true branch wins; fall through to
+    `default_label`. Security-first ordering (H3): branches whose label maps to
+    `OUTCOME_DENIED_SECURITY` **must precede** all non-denied branches.
+    
+    **`ops`** — mutation or terminal RPCs. Two exclusive idioms:
+    
+    - **decide-then-guard** (`guard_label` set, `outcome_from_exit` null): the op runs
+      only when the current decision label matches `guard_label`. Outcome comes from the
+      decision tree.
+    - **mutate-then-classify** (`outcome_from_exit` set, `guard_label` null): the op
+      always runs; the interpreter classifies outcome from exit code + stderr keyword
+      matching. `outcome_from_exit` has `ok_outcome`, `keyword_buckets[{keywords, outcome}]`,
+      and `default_outcome`.
+    
+    **`answer`** — keyed by decision label. Each `AnswerTemplateIR`:
+    - `message` — f-string-style template; `{slot}` resolves from env (same as `$slot`).
+    - `outcome` — one of the `Outcome` enum values: `OUTCOME_OK`, `OUTCOME_DENIED_SECURITY`, `OUTCOME_NONE_CLARIFICATION`, `OUTCOME_NONE_UNSUPPORTED`, `OUTCOME_ERR_INTERNAL`.
+    - `refs` — always-required grounding is PROJECTED from `INTENT.required_refs[selected_outcome]`,
+      so for an unconditional ref leave this `[]` and just bind the env key the INTENT `source`
+      points at. For **conditional** grounding — a ref needed on SOME branches only (e.g. a
+      `record_path` that exists only when a match is FOUND, absent on the not-found branch) —
+      author the `$binding` in THAT branch's `refs`; the interpreter resolves it best-effort and
+      DROPS it if it resolves to nothing (so the empty branch is not forced to carry it). Bind the
+      env key it points at (e.g. a `$row.record_path` column selected from `/bin/sql`). Never
+      author a literal you cannot ground at runtime.
+    
+    **`custom_extract`** — named-parser escape hatch (H2). Dispatches to `PARSERS[name]`
+    with `(text, params)` → `list[dict]`; result stored at `into`.
+    
+    ## Primitive registry (13)
+    
+    The following primitive names are valid in `compute[*].prim`:
+    
+    `abs_diff`, `div`, `to_number`, `sum_col`, `count`, `column`,
+    `first`, `get`, `dedupe`, `concat`, `all_true`, `any_true`, `filter_rows`
+    
+    ## Parser registry
+    
+    Valid names for `custom_extract[*].name`:
+    
+    `fuzzy_sku_receipt`
+    
+    ## `$ref` / `{slot}` convention
+    
+    - In `args` and `when.lhs/rhs`: `$name` → env lookup; literal otherwise.
+    - In `answer[*].message`: `{name}` resolves from env at answer time (same lookup,
+      without the `$` prefix).
+    - Dotted and indexed paths: `$a.b`, `$rows.0.field`.
+    
+    ## Predicate ops (exact spellings)
+    
+    `decision.branches[*].when` accepts ONLY these ops — use the exact spelling:
+    
+    - Leaf: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `nonempty`, `isnull`,
+      `contains_any`, `in_set`, `startswith`, `endswith`, `regex_match`
+    - Bool: `and`, `or`, `not` (each takes `args`: a list of nested predicates)
+    
+    Do NOT use `neq`, `!=`, `==`, `gte`, or `lte` — they are not valid op names.
+    
+    ## AnswerTemplateIR shape (exact keys)
+    
+    Each `answer[<label>]` object has ONLY these keys: `message`, `outcome`, `refs`.
+    Add no other keys. Message `{slot}` placeholders resolve from `env`, never from
+    extra fields on the answer object.
+    
+    ## Tool selection rules
+    
+    - Prefer `Find` / `Search` / `Read` with line ranges over full `Tree` + parse.
+    - Batch SQL into a single `Exec /bin/sql` with CTEs (S4).
+    - Use `Stat` before `Read` when path existence is uncertain.
+    - `discovery` items must be read-only; mutations belong in `ops`.
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+    
+    
+    ## TOOL CATALOG (validated — exact rpc names + arg keys)
+    
+    ### Read (read)
+    - purpose: Read a file (optionally line-numbered range).
+    - required args: path
+    - optional args: end_line, number, start_line
+    - when: Fetch a known file's content (policy doc, /proc record).
+    - example: {'rpc': 'Read', 'args': {'path': '/docs/security.md'}}
+    
+    ### List (read)
+    - purpose: List a directory's entries.
+    - required args: path
+    - optional args: —
+    - when: Enumerate a dir before reading specific children.
+    - example: {'rpc': 'List', 'args': {'path': '/proc'}}
+    
+    ### Tree (read)
+    - purpose: Recursive tree under a root (level=0 unlimited).
+    - required args: root
+    - optional args: level
+    - when: Discover a subtree's shape; prefer Find/Search when targeted.
+    - example: {'rpc': 'Tree', 'args': {'root': '/docs', 'level': 0}}
+    
+    ### Find (read)
+    - purpose: Path search by name under a root.
+    - required args: root
+    - optional args: kind, limit, name
+    - when: Locate a file by name when its dir is unknown.
+    - example: {'rpc': 'Find', 'args': {'root': '/', 'name': 'security.md'}}
+    
+    ### Search (read)
+    - purpose: Regex content search; returns path+line+text.
+    - required args: pattern, root
+    - optional args: limit
+    - when: Find docs/records mentioning an entity token.
+    - example: {'rpc': 'Search', 'args': {'root': '/docs', 'pattern': 'refund', 'limit': 30}}
+    
+    ### Exec (read)
+    - purpose: Run a runtime tool (e.g. /bin/sql, /bin/id).
+    - required args: path
+    - optional args: args, stdin
+    - when: Query the catalog DB via /bin/sql; read identity via /bin/id.
+    - NOTE: /bin/sql reads the query from the real STDIN channel. Put the SQL in `stdin` (a string); do NOT inline it anywhere else. `args` is also accepted and is moved to stdin by the pre-lint repair. The runner returns its usage banner if the SQL never reaches stdin (the r012 bug).
+    - example: {'rpc': 'Exec', 'args': {'path': '/bin/sql', 'stdin': 'SELECT 1;'}}
+    
+    ### Write (mutate)
+    - purpose: Write a file (optional compare-and-swap).
+    - required args: content, path
+    - optional args: idempotency_key, if_match_sha256
+    - when: Persist a mutation; belongs in `ops`, never `discovery`.
+    - example: {'rpc': 'Write', 'args': {'path': '/proc/x.json', 'content': '{}'}}
+    
+    ### Delete (mutate)
+    - purpose: Delete a file or directory.
+    - required args: path
+    - optional args: —
+    - when: Remove a record; belongs in `ops`.
+    - example: {'rpc': 'Delete', 'args': {'path': '/proc/x.json'}}
+    
+    ### Stat (read)
+    - purpose: Metadata for a path (kind, content_type).
+    - required args: path
+    - optional args: —
+    - when: Check existence/kind before Read.
+    - example: {'rpc': 'Stat', 'args': {'path': '/docs'}}
+    
+    Use ONLY these rpc names and arg keys. An unknown rpc or arg key is rejected by the interpreter and returned to you to fix.
+├ USER
+    INTENT_SPEC:
+    {
+      "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "receipt_file_path": "Find the single file in /uploads/ using Find RPC with pattern '*', then bind the path.",
+        "receipt_content": "Read the file at receipt_file_path using Read RPC.",
+        "old_total_cents": "Parse receipt_content to extract the old total price in cents (excluding VAT).",
+        "line_items": "Parse receipt_content to extract a list of objects each with product_sku and quantity.",
+        "current_total_cents": "For each line item, look up price_cents from product_variants WHERE product_sku = $item.sku, multiply by quantity, sum to get current total in cents.",
+        "difference_cents": "Compute absolute difference between old_total_cents and current_total_cents."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "nonempty",
+            "lhs": "$old_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$current_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$difference_cents",
+            "rhs": 100,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The difference is {difference_cents} cents, which is {within} 1 EUR.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": []
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - receipt_path: /uploads/receipt_ocr_avtxiaWc.txt
+    ## STEP_LESSONS
+    1. [list] Single file: receipt_ocr_avtxiaWc.txt in /uploads/ -> Found the receipt file; need to read its contents to get product list and old total. refs=['/uploads/receipt_ocr_avtxiaWc.txt']
+    
+    LEARNED_RULES (active):
+      - [r018] Always ensure that any rowset produced by a custom_extract is defined before the compute section that references it. If the PlanIR structure requires custom_extract after compute, do not reference such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid forward references.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+      - [r019] Never apply the catalog path constraint to files in /uploads/; that constraint is only for catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a Read RPC on the given path.
+      - [r020] When the instruction says 'the single file in /uploads/' or similar, use a Find RPC with a pattern like '*' to locate the file, and bind the result. Then use the bound path directly in a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return directory entries or require additional filtering, leading to a 'read failed: is a directory' error.
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Read",
+          "args": {
+            "path": "/uploads/receipt_ocr_avtxiaWc.txt"
+          },
+          "bind": "receipt_text"
+        }
+      ],
+      "custom_extract": [
+        {
+          "name": "fuzzy_sku_receipt",
+          "input": "$receipt_text",
+          "into": "parsed_receipt"
+        }
+      ],
+      "compute": [
+        {
+          "prim": "get",
+          "args": [
+            "$parsed_receipt",
+            0
+          ],
+          "into": "receipt_data"
+        },
+        {
+          "prim": "get",
+          "args": [
+            "$receipt_data",
+            "total_cents"
+          ],
+          "into": "old_total_cents"
+        },
+        {
+          "prim": "get",
+          "args": [
+            "$receipt_data",
+            "items_json"
+          ],
+          "into": "items_json_str"
+        },
+        {
+          "prim": "concat",
+          "args": [
+            "WITH items AS (SELECT value->>'sku' AS sku, CAST(value->>'qty' AS INTEGER) AS qty FROM json_each('",
+            "$items_json_str",
+            "')) SELECT SUM(pv.price_cents * items.qty) FROM items JOIN product_variants pv ON items.sku = pv.product_sku"
+          ],
+          "into": "current_total_query"
+        },
+        {
+          "prim": "to_number",
+          "args": [
+            "$current_total_result"
+          ],
+          "into": "current_total_cents"
+        },
+        {
+          "prim": "abs_diff",
+          "args": [
+            "$old_total_cents",
+            "$current_total_cents"
+          ],
+          "into": "difference_cents"
+        }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "and",
+              "args": [
+                {
+                  "op": "nonempty",
+                  "lhs": "$old_total_cents",
+                  "rhs": null
+                },
+                {
+                  "op": "nonempty",
+                  "lhs": "$current_total_cents",
+                  "rhs": null
+                },
+                {
+                  "op": "le",
+                  "lhs": "$difference_cents",
+                  "rhs": 100
+                }
+              ]
+            },
+            "label": "ok"
+          }
+        ],
+        "default_label": "unsupported"
+      },
+      "ops": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "$current_total_query"
+          },
+          "bind": "current_total_result",
+          "guard_label": null,
+          "outcome_from_exit": null
+        }
+      ],
+      "answer": {
+        "ok": {
+          "message": "The difference is {difference_cents} cents, which is within 1 EUR.",
+          "outcome": "OUTCOME_OK",
+          "refs": []
+        },
+        "unsupported": {
+          "message": "The difference could not be computed or exceeds 1 EUR.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      }
+    }
+
+  · [gate] {"cycle": 1, "step_type": "LINT", "passed": true, "reason": "", "seq": 16}
+  · [Read /uploads/receipt_ocr_avtxiaWc.txt] -> POWERTOOL GRAZ LEND
+                    mach ich selbst
+      ----------------------------------------
+      
+          PowerTool Graz Lend Handels GmbH
+                  Werkzeugstrasse 1
+                         Graz
+      
+                       QUITTUNG
+      #DT  2061    
+      #ORD 8063  - POS-WFF. 6-   01.09.2022
+      ANZ  ARTIKEL                  BETRAG
+                                      EUR
+       3 Bondex Garden Classic .*   277,50
+         Einzelpreis EUR                92,50
+         Art.Nr. PNT-3APVSF7J        
+         inkl. MwSt 10,00%         27,75
+         .......................
+       1 Wiha VDE VDE 13X-B49 W.     78,00
+         Art.Nr. HND-2FFOGA9T        
+         inkl. MwSt 10,00%          7,80
+         .......................
+       1 Fischer SX SX 7UY-G03 .     56,00
+         Art.Nr. F5T-2I7GNA88        
+         inkl. MwSt 10,00%          5,60
+       3 5chneider Electric Hea.    350,97
+         Einzelpreis EUR               116,99
+         Art.Nr. ELC-2UKGDA7Y        
+         inkl. MwSt 10,00%         35,09
+       2 Metabo Brushless BS 1O.   1399,00
+         Einzelpreis EUR               699,50
+         Art.Nr. PWR-2AKHB0DM   … [+445 chars]
+  · [gate] {"cycle": 1, "step_type": "INTERPRET", "passed": false, "reason": "interpret: compute step 'concat' failed: <lambda>() t
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · LEARN · 36809ms · tokens 1886/1830 · OK
+┌ SYSTEM (dc81071f)
+    # PHASE: LEARN (Plan-IR)
+    
+    You diagnose a failed interpreter cycle and produce a corrective rule for the
+    PLAN phase (which emits a PlanIR — structured data, never code). You may also
+    deactivate stale rules and request additional pre-phase deep-reads.
+    
+    ## Inputs
+    
+    - `TOOL_PLAN` — the frozen IntentSpec JSON for this run (WHAT/why; do not change it)
+    - `ERROR` — failure string (`plan:`, `interpret:`, `verify:`, `real_vm:`)
+    - `OBSERVED_RPC_OUTPUTS` — stdout/content captured from the failed run's RPCs
+      (present when the cycle reached execution). Use it to see WHY a ref was empty:
+      a table missing, a column misnamed, a listing that returned nothing.
+    - `SCRIPT_CODE` — the failing **PlanIR JSON** (the candidate "how")
+    - `EXISTING_RULES` — active IR rules from prior cycles/runs
+    
+    ## Output format
+    
+    Single JSON object — no prose, no markdown fences:
+    
+    ```json
+    {
+      "rule_content": "<starts with Never|Always|Use|Do not|When|If|Prefer>",
+      "agents_md_anchor": "<#section> or null",
+      "reasoning": "<diagnosis: verbatim error, root cause, failing PlanIR fragment, rule linkage>",
+      "deactivate_ids": ["rXXX"],
+      "deactivate_reason": "<why obsolete> or null",
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+    ```
+    
+    ## Rules
+    
+    - `rule_content` must describe a PLAN technique — how to shape the PlanIR
+      (discovery steps, rowsets, decision branches, ref projection) so the next
+      cycle grounds correctly. NOT a domain conclusion, NOT a literal task value.
+    - `rule_content` must be task-agnostic — never embed a re-seeded literal
+      (SKU, id, city, date).
+    - `prephase_deep_read` (optional): list table names or absolute literal paths the
+      pre-phase MUST read next run because grounding needed data it did not surface
+      (a table named only by synonym, or a literal directory the instruction named).
+      These are read EAGERLY next run (Tier-2 deep-read set) — they self-tune the
+      pre-phase, so PREFER them over baking a value into a rule. Leave `[]` when the
+      failure is purely a PlanIR-shape bug.
+    - Skip (`skip: true`) only if an existing rule already covers this.
+    - Use `deactivate_ids` when the new rule strictly supersedes prior ones — set `deactivate_reason`.
+    - Length: `rule_content` >= 20 chars; must start with a listed lead verb.
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "receipt_file_path": "Find the single file in /uploads/ using Find RPC with pattern '*', then bind the path.",
+        "receipt_content": "Read the file at receipt_file_path using Read RPC.",
+        "old_total_cents": "Parse receipt_content to extract the old total price in cents (excluding VAT).",
+        "line_items": "Parse receipt_content to extract a list of objects each with product_sku and quantity.",
+        "current_total_cents": "For each line item, look up price_cents from product_variants WHERE product_sku = $item.sku, multiply by quantity, sum to get current total in cents.",
+        "difference_cents": "Compute absolute difference between old_total_cents and current_total_cents."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "nonempty",
+            "lhs": "$old_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$current_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$difference_cents",
+            "rhs": 100,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The difference is {difference_cents} cents, which is {within} 1 EUR.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": []
+      }
+    }
+    
+    ERROR:
+    interpret: compute step 'concat' failed: <lambda>() takes 2 positional arguments but 3 were given
+    CONTRACT: concat(a, b): both args must be list[dict] rows (parse Exec output via rowsets first)
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Read","args":{"path":"/uploads/receipt_ocr_avtxiaWc.txt"},"bind":"receipt_text"}],"rowsets":[],"compute":[{"prim":"get","args":["$parsed_receipt",0],"into":"receipt_data"},{"prim":"get","args":["$receipt_data","total_cents"],"into":"old_total_cents"},{"prim":"get","args":["$receipt_data","items_json"],"into":"items_json_str"},{"prim":"concat","args":["WITH items AS (SELECT value->>'sku' AS sku, CAST(value->>'qty' AS INTEGER) AS qty FROM json_each('","$items_json_str","')) SELECT SUM(pv.price_cents * items.qty) FROM items JOIN product_variants pv ON items.sku = pv.product_sku"],"into":"current_total_query"},{"prim":"to_number","args":["$current_total_result"],"into":"current_total_cents"},{"prim":"abs_diff","args":["$old_total_cents","$current_total_cents"],"into":"difference_cents"}],"decision":{"branches":[{"when":{"op":"and","lhs":null,"rhs":null,"args":[{"op":"nonempty","lhs":"$old_total_cents","rhs":null,"args":[]},{"op":"nonempty","lhs":"$current_total_cents","rhs":null,"args":[]},{"op":"le","lhs":"$difference_cents","rhs":100,"args":[]}]},"label":"ok"}],"default_label":"unsupported"},"ops":[{"rpc":"Exec","args":{"path":"/bin/sql","stdin":"$current_total_query"},"bind":"current_total_result","guard_label":null,"outcome_from_exit":null}],"answer":{"ok":{"message":"The difference is {difference_cents} cents, which is within 1 EUR.","outcome":"OUTCOME_OK","refs":[]},"unsupported":{"message":"The difference could not be computed or exceeds 1 EUR.","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]}},"custom_extract":[{"name":"fuzzy_sku_receipt","input":"$receipt_text","into":"parsed_receipt"}]}
+    ```
+    
+    EXISTING_RULES:
+      - [r018] Always ensure that any rowset produced by a custom_extract is defined before the compute section that references it. If the PlanIR structure requires custom_extract after compute, do not reference such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid forward references.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+      - [r019] Never apply the catalog path constraint to files in /uploads/; that constraint is only for catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a Read RPC on the given path.
+      - [r020] When the instruction says 'the single file in /uploads/' or similar, use a Find RPC with a pattern like '*' to locate the file, and bind the result. Then use the bound path directly in a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return directory entries or require additional filtering, leading to a 'read failed: is a directory' error.
+└ ASSISTANT
+    {
+      "rule_content": "Never pass more than two arguments to the concat primitive in a compute step. When constructing a SQL query string that requires concatenating a prefix, a variable, and a suffix, use two concat steps: first concat the prefix and the variable, then concat the result with the suffix.",
+      "agents_md_anchor": null,
+      "reasoning": "Error: 'interpret: compute step 'concat' failed: <lambda>() takes 2 positional arguments but 3 were given'. Root cause: The PlanIR compute step used concat with three arguments (prefix, $items_json_str, suffix), but the concat primitive only accepts exactly two arguments (a and b). The failing fragment is the compute step: {\"prim\":\"concat\",\"args\":[\"WITH items AS (SELECT value->>'sku' AS sku, CAST(value->>'qty' AS INTEGER) AS qty FROM json_each('\",\"$items_json_str\",\"')) SELECT SUM(pv.price_cents * items.qty) FROM items JOIN product_variants pv ON items.sku = pv.product_sku\"],\"into\":\"current_total_query\"}. This new rule prevents such malformed concat usage by requiring two-step concatenation when three parts are needed.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · PLAN · 665448ms · tokens 5341/11482 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    INTENT_SPEC:
+    {
+      "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "receipt_file_path": "Find the single file in /uploads/ using Find RPC with pattern '*', then bind the path.",
+        "receipt_content": "Read the file at receipt_file_path using Read RPC.",
+        "old_total_cents": "Parse receipt_content to extract the old total price in cents (excluding VAT).",
+        "line_items": "Parse receipt_content to extract a list of objects each with product_sku and quantity.",
+        "current_total_cents": "For each line item, look up price_cents from product_variants WHERE product_sku = $item.sku, multiply by quantity, sum to get current total in cents.",
+        "difference_cents": "Compute absolute difference between old_total_cents and current_total_cents."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "nonempty",
+            "lhs": "$old_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$current_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$difference_cents",
+            "rhs": 100,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The difference is {difference_cents} cents, which is {within} 1 EUR.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": []
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - receipt_path: /uploads/receipt_ocr_avtxiaWc.txt
+    ## STEP_LESSONS
+    1. [list] Single file: receipt_ocr_avtxiaWc.txt in /uploads/ -> Found the receipt file; need to read its contents to get product list and old total. refs=['/uploads/receipt_ocr_avtxiaWc.txt']
+    
+    LEARNED_RULES (active):
+      - [r018] Always ensure that any rowset produced by a custom_extract is defined before the compute section that references it. If the PlanIR structure requires custom_extract after compute, do not reference such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid forward references.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+      - [r019] Never apply the catalog path constraint to files in /uploads/; that constraint is only for catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a Read RPC on the given path.
+      - [r020] When the instruction says 'the single file in /uploads/' or similar, use a Find RPC with a pattern like '*' to locate the file, and bind the result. Then use the bound path directly in a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return directory entries or require additional filtering, leading to a 'read failed: is a directory' error.
+      - [in-session] Never pass more than two arguments to the concat primitive in a compute step. When constructing a SQL query string that requires concatenating a prefix, a variable, and a suffix, use two concat steps: first concat the prefix and the variable, then concat the result with the suffix.
+    
+    PREVIOUS_ERROR:
+    interpret: compute step 'concat' failed: <lambda>() takes 2 positional arguments but 3 were given
+    CONTRACT: concat(a, b): both args must be list[dict] rows (parse Exec output via rowsets first)
+└ ASSISTANT
+    {
+      "discovery": [
+        {"rpc": "Read", "args": {"path": "$receipt_path"}, "bind": "receipt_content"}
+      ],
+      "rowsets": [],
+      "custom_extract": [
+        {"name": "fuzzy_sku_receipt", "input": "$receipt_content", "into": "parsed_receipt"}
+      ],
+      "compute": [
+        {"prim": "first", "args": ["$parsed_receipt"], "into": "first_row"},
+        {"prim": "get", "args": ["$first_row", "old_total_cents"], "into": "old_total_cents"},
+        {"prim": "get", "args": ["$first_row", "current_total_cents"], "into": "current_total_cents"},
+        {"prim": "abs_diff", "args": ["$old_total_cents", "$current_total_cents"], "into": "difference_cents"}
+      ],
+      "decision": {
+        "branches": [
+          {"when": {"op": "isnull", "lhs": "$old_total_cents", "rhs": null}, "label": "missing_data"},
+          {"when": {"op": "isnull", "lhs": "$current_total_cents", "rhs": null}, "label": "missing_data"},
+          {"when": {"op": "le", "lhs": "$difference_cents", "rhs": 100}, "label": "ok"}
+        ],
+        "default_label": "not_ok"
+      },
+      "ops": [],
+      "answer": {
+        "ok": {"message": "The difference is {difference_cents} cents, which is within 1 EUR.", "outcome": "OUTCOME_OK", "refs": []},
+        "missing_data": {"message": "Could not parse receipt data.", "outcome": "OUTCOME_NONE_UNSUPPORTED", "refs": []},
+        "not_ok": {"message": "The difference is {difference_cents} cents, which exceeds 1 EUR.", "outcome": "OUTCOME_NONE_UNSUPPORTED", "refs": []}
+      }
+    }
+
+  · [gate] {"cycle": 2, "step_type": "LINT", "passed": true, "reason": "", "seq": 22}
+  · [gate] {"cycle": 2, "step_type": "INTERPRET", "passed": false, "reason": "real_vm: read failed: is a directory", "seq": 23}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · LEARN · 19150ms · tokens 1790/2352 · OK
+┌ SYSTEM (dc81071f) — same as above
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "receipt_file_path": "Find the single file in /uploads/ using Find RPC with pattern '*', then bind the path.",
+        "receipt_content": "Read the file at receipt_file_path using Read RPC.",
+        "old_total_cents": "Parse receipt_content to extract the old total price in cents (excluding VAT).",
+        "line_items": "Parse receipt_content to extract a list of objects each with product_sku and quantity.",
+        "current_total_cents": "For each line item, look up price_cents from product_variants WHERE product_sku = $item.sku, multiply by quantity, sum to get current total in cents.",
+        "difference_cents": "Compute absolute difference between old_total_cents and current_total_cents."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "nonempty",
+            "lhs": "$old_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$current_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$difference_cents",
+            "rhs": 100,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The difference is {difference_cents} cents, which is {within} 1 EUR.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": []
+      }
+    }
+    
+    ERROR:
+    real_vm: read failed: is a directory
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Read","args":{"path":"$receipt_path"},"bind":"receipt_content"}],"rowsets":[],"compute":[{"prim":"first","args":["$parsed_receipt"],"into":"first_row"},{"prim":"get","args":["$first_row","old_total_cents"],"into":"old_total_cents"},{"prim":"get","args":["$first_row","current_total_cents"],"into":"current_total_cents"},{"prim":"abs_diff","args":["$old_total_cents","$current_total_cents"],"into":"difference_cents"}],"decision":{"branches":[{"when":{"op":"isnull","lhs":"$old_total_cents","rhs":null,"args":[]},"label":"missing_data"},{"when":{"op":"isnull","lhs":"$current_total_cents","rhs":null,"args":[]},"label":"missing_data"},{"when":{"op":"le","lhs":"$difference_cents","rhs":100,"args":[]},"label":"ok"}],"default_label":"not_ok"},"ops":[],"answer":{"ok":{"message":"The difference is {difference_cents} cents, which is within 1 EUR.","outcome":"OUTCOME_OK","refs":[]},"missing_data":{"message":"Could not parse receipt data.","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]},"not_ok":{"message":"The difference is {difference_cents} cents, which exceeds 1 EUR.","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]}},"custom_extract":[{"name":"fuzzy_sku_receipt","input":"$receipt_content","into":"parsed_receipt"}]}
+    ```
+    
+    EXISTING_RULES:
+      - [r018] Always ensure that any rowset produced by a custom_extract is defined before the compute section that references it. If the PlanIR structure requires custom_extract after compute, do not reference such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid forward references.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+      - [r019] Never apply the catalog path constraint to files in /uploads/; that constraint is only for catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a Read RPC on the given path.
+      - [r020] When the instruction says 'the single file in /uploads/' or similar, use a Find RPC with a pattern like '*' to locate the file, and bind the result. Then use the bound path directly in a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return directory entries or require additional filtering, leading to a 'read failed: is a directory' error.
+      - [in-session] Never pass more than two arguments to the concat primitive in a compute step. When constructing a SQL query string that requires concatenating a prefix, a variable, and a suffix, use two concat steps: first concat the prefix and the variable, then concat the result with the suffix.
+└ ASSISTANT
+    {
+      "rule_content": "Always use a Find RPC with a pattern like '*' to locate a file when the instruction specifies a file in a directory (e.g., /uploads/). Bind the result to a variable and use that variable as the path in the Read RPC. Do not use a List RPC or the directory path directly, as that may cause a 'read failed: is a directory' error.",
+      "agents_md_anchor": null,
+      "reasoning": "The error 'real_vm: read failed: is a directory' occurred because the plan attempted to read a directory path directly instead of first locating the file via a Find RPC. The plan's discovery step used a Read RPC on $receipt_path, which was bound to the directory path /uploads/ (or similar) rather than a specific file. The existing rule r020 advises using Find with pattern '*', but the plan did not include a Find step. This rule reinforces that requirement and clarifies the consequence of omitting it.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 3 · PLAN · 75946ms · tokens 5387/7853 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    INTENT_SPEC:
+    {
+      "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "receipt_file_path": "Find the single file in /uploads/ using Find RPC with pattern '*', then bind the path.",
+        "receipt_content": "Read the file at receipt_file_path using Read RPC.",
+        "old_total_cents": "Parse receipt_content to extract the old total price in cents (excluding VAT).",
+        "line_items": "Parse receipt_content to extract a list of objects each with product_sku and quantity.",
+        "current_total_cents": "For each line item, look up price_cents from product_variants WHERE product_sku = $item.sku, multiply by quantity, sum to get current total in cents.",
+        "difference_cents": "Compute absolute difference between old_total_cents and current_total_cents."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "nonempty",
+            "lhs": "$old_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$current_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$difference_cents",
+            "rhs": 100,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The difference is {difference_cents} cents, which is {within} 1 EUR.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": []
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - receipt_path: /uploads/receipt_ocr_avtxiaWc.txt
+    ## STEP_LESSONS
+    1. [list] Single file: receipt_ocr_avtxiaWc.txt in /uploads/ -> Found the receipt file; need to read its contents to get product list and old total. refs=['/uploads/receipt_ocr_avtxiaWc.txt']
+    
+    LEARNED_RULES (active):
+      - [r018] Always ensure that any rowset produced by a custom_extract is defined before the compute section that references it. If the PlanIR structure requires custom_extract after compute, do not reference such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid forward references.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+      - [r019] Never apply the catalog path constraint to files in /uploads/; that constraint is only for catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a Read RPC on the given path.
+      - [r020] When the instruction says 'the single file in /uploads/' or similar, use a Find RPC with a pattern like '*' to locate the file, and bind the result. Then use the bound path directly in a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return directory entries or require additional filtering, leading to a 'read failed: is a directory' error.
+      - [in-session] Never pass more than two arguments to the concat primitive in a compute step. When constructing a SQL query string that requires concatenating a prefix, a variable, and a suffix, use two concat steps: first concat the prefix and the variable, then concat the result with the suffix.
+      - [in-session] Always use a Find RPC with a pattern like '*' to locate a file when the instruction specifies a file in a directory (e.g., /uploads/). Bind the result to a variable and use that variable as the path in the Read RPC. Do not use a List RPC or the directory path directly, as that may cause a 'read failed: is a directory' error.
+    
+    PREVIOUS_ERROR:
+    real_vm: read failed: is a directory
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Read",
+          "args": {
+            "path": "/uploads/receipt_ocr_avtxiaWc.txt"
+          },
+          "bind": "receipt_text"
+        }
+      ],
+      "rowsets": [],
+      "compute": [
+        {
+          "prim": "column",
+          "args": [
+            "$receipt_rows",
+            "old_total_cents"
+          ],
+          "into": "old_total_cents_list"
+        },
+        {
+          "prim": "first",
+          "args": [
+            "$old_total_cents_list"
+          ],
+          "into": "old_total_cents"
+        },
+        {
+          "prim": "column",
+          "args": [
+            "$receipt_rows",
+            "current_total_cents"
+          ],
+          "into": "current_total_cents_list"
+        },
+        {
+          "prim": "first",
+          "args": [
+            "$current_total_cents_list"
+          ],
+          "into": "current_total_cents"
+        },
+        {
+          "prim": "abs_diff",
+          "args": [
+            "$old_total_cents",
+            "$current_total_cents"
+          ],
+          "into": "difference_cents"
+        }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "le",
+              "lhs": "$difference_cents",
+              "rhs": 100
+            },
+            "label": "within"
+          }
+        ],
+        "default_label": "not_within"
+      },
+      "ops": [],
+      "answer": {
+        "within": {
+          "message": "The difference is {difference_cents} cents, which is within 1 EUR.",
+          "outcome": "OUTCOME_OK",
+          "refs": []
+        },
+        "not_within": {
+          "message": "The difference is {difference_cents} cents, which exceeds 1 EUR.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": [
+        {
+          "name": "fuzzy_sku_receipt",
+          "input": "$receipt_text",
+          "into": "receipt_rows"
+        }
+      ]
+    }
+
+  · [gate] {"cycle": 3, "step_type": "LINT", "passed": true, "reason": "", "seq": 26}
+  · [Read /uploads/receipt_ocr_avtxiaWc.txt] -> POWERTOOL GRAZ LEND
+                    mach ich selbst
+      ----------------------------------------
+      
+          PowerTool Graz Lend Handels GmbH
+                  Werkzeugstrasse 1
+                         Graz
+      
+                       QUITTUNG
+      #DT  2061    
+      #ORD 8063  - POS-WFF. 6-   01.09.2022
+      ANZ  ARTIKEL                  BETRAG
+                                      EUR
+       3 Bondex Garden Classic .*   277,50
+         Einzelpreis EUR                92,50
+         Art.Nr. PNT-3APVSF7J        
+         inkl. MwSt 10,00%         27,75
+         .......................
+       1 Wiha VDE VDE 13X-B49 W.     78,00
+         Art.Nr. HND-2FFOGA9T        
+         inkl. MwSt 10,00%          7,80
+         .......................
+       1 Fischer SX SX 7UY-G03 .     56,00
+         Art.Nr. F5T-2I7GNA88        
+         inkl. MwSt 10,00%          5,60
+       3 5chneider Electric Hea.    350,97
+         Einzelpreis EUR               116,99
+         Art.Nr. ELC-2UKGDA7Y        
+         inkl. MwSt 10,00%         35,09
+       2 Metabo Brushless BS 1O.   1399,00
+         Einzelpreis EUR               699,50
+         Art.Nr. PWR-2AKHB0DM   … [+445 chars]
+═══ ANSWER (cycle 3) ═══
+  msg='The difference is 0 cents, which is within 1 EUR.'  OUTCOME_OK  refs=[]
+
+  · [gate] {"cycle": 3, "step_type": "INTERPRET", "passed": true, "reason": "", "seq": 29}
+  · [gate] {"cycle": 3, "step_type": "VERIFY", "passed": false, "reason": "success_criteria[OUTCOME_OK][0] failed: {'op': 'nonempty
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 3 · LEARN · 61134ms · tokens 2157/1991 · OK
+┌ SYSTEM (dc81071f) — same as above
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "receipt_file_path": "Find the single file in /uploads/ using Find RPC with pattern '*', then bind the path.",
+        "receipt_content": "Read the file at receipt_file_path using Read RPC.",
+        "old_total_cents": "Parse receipt_content to extract the old total price in cents (excluding VAT).",
+        "line_items": "Parse receipt_content to extract a list of objects each with product_sku and quantity.",
+        "current_total_cents": "For each line item, look up price_cents from product_variants WHERE product_sku = $item.sku, multiply by quantity, sum to get current total in cents.",
+        "difference_cents": "Compute absolute difference between old_total_cents and current_total_cents."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "nonempty",
+            "lhs": "$old_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$current_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$difference_cents",
+            "rhs": 100,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The difference is {difference_cents} cents, which is {within} 1 EUR.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": []
+      }
+    }
+    
+    ERROR:
+    verify: success_criteria[OUTCOME_OK][0] failed: {'op': 'nonempty', 'lhs': '$old_total_cents', 'rhs': None, 'args': []}
+    
+    OBSERVED_RPC_OUTPUTS:
+    [Read /uploads/receipt_ocr_avtxiaWc.txt] POWERTOOL GRAZ LEND
+                  mach ich selbst
+    ----------------------------------------
+    
+        PowerTool Graz Lend Handels GmbH
+                Werkzeugstrasse 1
+                       Graz
+    
+                     QUITTUNG
+    #DT  2061    
+    #ORD 8063  - POS-WFF. 6-   01.09.2022
+    ANZ  ARTIKEL                  BETRAG
+                                    EUR
+     3 Bondex Garden Classic .*   277,50
+       Einzelpreis EUR                92,50
+       Art.Nr. PNT-3APVSF7J        
+       inkl. MwSt 10,00%         27,75
+       .......................
+     1 Wiha VDE VDE 13X-B49 W.     78,00
+       Art.Nr. HND-2FFOGA9T        
+       inkl. MwSt 10,00%          7,80
+       .......................
+     1 Fischer SX SX 7UY-G03 .     56,00
+       Art.Nr. F5T-2I7GNA88        
+       inkl. MwSt 10,00%          5,60
+     3 5chneider Electric Hea.    350,97
+       Einzelpreis EUR    
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Read","args":{"path":"/uploads/receipt_ocr_avtxiaWc.txt"},"bind":"receipt_text"}],"rowsets":[],"compute":[{"prim":"column","args":["$receipt_rows","old_total_cents"],"into":"old_total_cents_list"},{"prim":"first","args":["$old_total_cents_list"],"into":"old_total_cents"},{"prim":"column","args":["$receipt_rows","current_total_cents"],"into":"current_total_cents_list"},{"prim":"first","args":["$current_total_cents_list"],"into":"current_total_cents"},{"prim":"abs_diff","args":["$old_total_cents","$current_total_cents"],"into":"difference_cents"}],"decision":{"branches":[{"when":{"op":"le","lhs":"$difference_cents","rhs":100,"args":[]},"label":"within"}],"default_label":"not_within"},"ops":[],"answer":{"within":{"message":"The difference is {difference_cents} cents, which is within 1 EUR.","outcome":"OUTCOME_OK","refs":[]},"not_within":{"message":"The difference is {difference_cents} cents, which exceeds 1 EUR.","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]}},"custom_extract":[{"name":"fuzzy_sku_receipt","input":"$receipt_text","into":"receipt_rows"}]}
+    ```
+    
+    EXISTING_RULES:
+      - [r018] Always ensure that any rowset produced by a custom_extract is defined before the compute section that references it. If the PlanIR structure requires custom_extract after compute, do not reference such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid forward references.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+      - [r019] Never apply the catalog path constraint to files in /uploads/; that constraint is only for catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a Read RPC on the given path.
+      - [r020] When the instruction says 'the single file in /uploads/' or similar, use a Find RPC with a pattern like '*' to locate the file, and bind the result. Then use the bound path directly in a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return directory entries or require additional filtering, leading to a 'read failed: is a directory' error.
+      - [in-session] Never pass more than two arguments to the concat primitive in a compute step. When constructing a SQL query string that requires concatenating a prefix, a variable, and a suffix, use two concat steps: first concat the prefix and the variable, then concat the result with the suffix.
+      - [in-session] Always use a Find RPC with a pattern like '*' to locate a file when the instruction specifies a file in a directory (e.g., /uploads/). Bind the result to a variable and use that variable as the path in the Read RPC. Do not use a List RPC or the directory path directly, as that may cause a 'read failed: is a directory' error.
+└ ASSISTANT
+    {
+      "rule_content": "",
+      "agents_md_anchor": null,
+      "reasoning": "The verify failure (nonempty $old_total_cents) is caused by the PlanIR placing custom_extract after compute, so $receipt_rows is undefined when compute tries to extract columns. Existing rule r018 already mandates that custom_extract must be placed before compute if compute references its output. The plan violated that rule, leading to empty old_total_cents. No new rule needed.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": true,
+      "skip_reason": "Existing rule r018 already covers the ordering requirement; the failure is due to non-compliance, not a missing rule.",
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · PLAN · 63872ms · tokens 5726/7298 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    INTENT_SPEC:
+    {
+      "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "receipt_file_path": "Find the single file in /uploads/ using Find RPC with pattern '*', then bind the path.",
+        "receipt_content": "Read the file at receipt_file_path using Read RPC.",
+        "old_total_cents": "Parse receipt_content to extract the old total price in cents (excluding VAT).",
+        "line_items": "Parse receipt_content to extract a list of objects each with product_sku and quantity.",
+        "current_total_cents": "For each line item, look up price_cents from product_variants WHERE product_sku = $item.sku, multiply by quantity, sum to get current total in cents.",
+        "difference_cents": "Compute absolute difference between old_total_cents and current_total_cents."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "nonempty",
+            "lhs": "$old_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$current_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$difference_cents",
+            "rhs": 100,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The difference is {difference_cents} cents, which is {within} 1 EUR.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": []
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - receipt_path: /uploads/receipt_ocr_avtxiaWc.txt
+    ## STEP_LESSONS
+    1. [list] Single file: receipt_ocr_avtxiaWc.txt in /uploads/ -> Found the receipt file; need to read its contents to get product list and old total. refs=['/uploads/receipt_ocr_avtxiaWc.txt']
+    
+    LEARNED_RULES (active):
+      - [r018] Always ensure that any rowset produced by a custom_extract is defined before the compute section that references it. If the PlanIR structure requires custom_extract after compute, do not reference such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid forward references.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+      - [r019] Never apply the catalog path constraint to files in /uploads/; that constraint is only for catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a Read RPC on the given path.
+      - [r020] When the instruction says 'the single file in /uploads/' or similar, use a Find RPC with a pattern like '*' to locate the file, and bind the result. Then use the bound path directly in a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return directory entries or require additional filtering, leading to a 'read failed: is a directory' error.
+      - [in-session] Never pass more than two arguments to the concat primitive in a compute step. When constructing a SQL query string that requires concatenating a prefix, a variable, and a suffix, use two concat steps: first concat the prefix and the variable, then concat the result with the suffix.
+      - [in-session] Always use a Find RPC with a pattern like '*' to locate a file when the instruction specifies a file in a directory (e.g., /uploads/). Bind the result to a variable and use that variable as the path in the Read RPC. Do not use a List RPC or the directory path directly, as that may cause a 'read failed: is a directory' error.
+    
+    OBSERVED_RPC_OUTPUTS:
+    [Read /uploads/receipt_ocr_avtxiaWc.txt] POWERTOOL GRAZ LEND
+                  mach ich selbst
+    ----------------------------------------
+    
+        PowerTool Graz Lend Handels GmbH
+                Werkzeugstrasse 1
+                       Graz
+    
+                     QUITTUNG
+    #DT  2061    
+    #ORD 8063  - POS-WFF. 6-   01.09.2022
+    ANZ  ARTIKEL                  BETRAG
+                                    EUR
+     3 Bondex Garden Classic .*   277,50
+       Einzelpreis EUR                92,50
+       Art.Nr. PNT-3APVSF7J        
+       inkl. MwSt 10,00%         27,75
+       .......................
+     1 Wiha VDE VDE 13X-B49 W.     78,00
+       Art.Nr. HND-2FFOGA9T        
+       inkl. MwSt 10,00%          7,80
+       .......................
+     1 Fischer SX SX 7UY-G03 .     56,00
+       Art.Nr. F5T-2I7GNA88        
+       inkl. MwSt 10,00%          5,60
+     3 5chneider Electric Hea.    350,97
+       Einzelpreis EUR    
+    
+    PREVIOUS_ERROR:
+    verify: success_criteria[OUTCOME_OK][0] failed: {'op': 'nonempty', 'lhs': '$old_total_cents', 'rhs': None, 'args': []}
+└ ASSISTANT
+    {
+      "discovery": [
+        {"rpc": "Find", "args": {"root": "/uploads", "name": "*", "limit": 1}, "bind": "receipt_path"},
+        {"rpc": "Read", "args": {"path": "$receipt_path"}, "bind": "receipt_raw"}
+      ],
+      "rowsets": [],
+      "compute": [
+        {"prim": "column", "args": ["$parsed_items", "product_sku"], "into": "sku_array"},
+        {"prim": "column", "args": ["$parsed_items", "quantity"], "into": "qty_array"},
+        {"prim": "column", "args": ["$parsed_items", "line_total_cents"], "into": "line_total_array"},
+        {"prim": "column", "args": ["$parsed_items", "vat_cents"], "into": "vat_array"},
+        {"prim": "sum_col", "args": ["$line_total_array"], "into": "sum_line_total"},
+        {"prim": "sum_col", "args": ["$vat_array"], "into": "sum_vat"},
+        {"prim": "abs_diff", "args": ["$sum_line_total", "$sum_vat"], "into": "old_total_cents"},
+        {"prim": "concat", "args": ["(", "'", "$sku_array.0", "'", ",", "$qty_array.0", ")"], "into": "pair0"},
+        {"prim": "concat", "args": [",(", "'", "$sku_array.1", "'", ",", "$qty_array.1", ")"], "into": "pair1"},
+        {"prim": "concat", "args": [",(", "'", "$sku_array.2", "'", ",", "$qty_array.2", ")"], "into": "pair2"},
+        {"prim": "concat", "args": [",(", "'", "$sku_array.3", "'", ",", "$qty_array.3", ")"], "into": "pair3"},
+        {"prim": "concat", "args": ["VALUES ", "$pair0", "$pair1", "$pair2", "$pair3"], "into": "values_clause"},
+        {"prim": "concat", "args": ["SELECT SUM(pv.price_cents * item.qty) FROM product_variants pv JOIN (", "$values_clause", ") AS item(sku,qty) ON pv.product_sku = item.sku;"], "into": "current_total_sql"},
+        {"prim": "abs_diff", "args": ["$old_total_cents", "$current_total_cents"], "into": "difference_cents"}
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "and",
+              "args": [
+                {"op": "nonempty", "lhs": "$old_total_cents", "rhs": null},
+                {"op": "nonempty", "lhs": "$current_total_cents", "rhs": null},
+                {"op": "le", "lhs": "$difference_cents", "rhs": 100}
+              ]
+            },
+            "label": "ok"
+          }
+        ],
+        "default_label": "not_ok"
+      },
+      "ops": [
+        {
+          "rpc": "Exec",
+          "args": {"path": "/bin/sql", "stdin": "$current_total_sql"},
+          "bind": "current_total_cents",
+          "guard_label": null,
+          "outcome_from_exit": null
+        }
+      ],
+      "answer": {
+        "ok": {
+          "message": "The difference is {difference_cents} cents, which is within 1 EUR.",
+          "outcome": "OUTCOME_OK",
+          "refs": []
+        },
+        "not_ok": {
+          "message": "The difference is {difference_cents} cents, which is not within 1 EUR.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": [
+        {"name": "fuzzy_sku_receipt", "input": "$receipt_raw", "into": "parsed_items"}
+      ]
+    }
+
+  · [gate] {"cycle": 4, "step_type": "LINT", "passed": true, "reason": "", "seq": 33}
+  · [Find /uploads] -> <empty>
+  · [gate] {"cycle": 4, "step_type": "INTERPRET", "passed": false, "reason": "real_vm: bad argument type for built-in operation", "
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 4 · LEARN · 28085ms · tokens 2249/3304 · OK
+┌ SYSTEM (dc81071f) — same as above
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Determine whether the total price (excluding VAT) of the products listed in the old receipt in /uploads/ would be within 1 EUR of the old total if sold at current prices.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "receipt_file_path": "Find the single file in /uploads/ using Find RPC with pattern '*', then bind the path.",
+        "receipt_content": "Read the file at receipt_file_path using Read RPC.",
+        "old_total_cents": "Parse receipt_content to extract the old total price in cents (excluding VAT).",
+        "line_items": "Parse receipt_content to extract a list of objects each with product_sku and quantity.",
+        "current_total_cents": "For each line item, look up price_cents from product_variants WHERE product_sku = $item.sku, multiply by quantity, sum to get current total in cents.",
+        "difference_cents": "Compute absolute difference between old_total_cents and current_total_cents."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_DENIED_SECURITY",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "nonempty",
+            "lhs": "$old_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$current_total_cents",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$difference_cents",
+            "rhs": 100,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "The difference is {difference_cents} cents, which is {within} 1 EUR.",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": []
+      }
+    }
+    
+    ERROR:
+    real_vm: bad argument type for built-in operation
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Find","args":{"root":"/uploads","name":"*","limit":1},"bind":"receipt_path"},{"rpc":"Read","args":{"path":"$receipt_path"},"bind":"receipt_raw"}],"rowsets":[],"compute":[{"prim":"column","args":["$parsed_items","product_sku"],"into":"sku_array"},{"prim":"column","args":["$parsed_items","quantity"],"into":"qty_array"},{"prim":"column","args":["$parsed_items","line_total_cents"],"into":"line_total_array"},{"prim":"column","args":["$parsed_items","vat_cents"],"into":"vat_array"},{"prim":"sum_col","args":["$line_total_array"],"into":"sum_line_total"},{"prim":"sum_col","args":["$vat_array"],"into":"sum_vat"},{"prim":"abs_diff","args":["$sum_line_total","$sum_vat"],"into":"old_total_cents"},{"prim":"concat","args":["(","'","$sku_array.0","'",",","$qty_array.0",")"],"into":"pair0"},{"prim":"concat","args":[",(","'","$sku_array.1","'",",","$qty_array.1",")"],"into":"pair1"},{"prim":"concat","args":[",(","'","$sku_array.2","'",",","$qty_array.2",")"],"into":"pair2"},{"prim":"concat","args":[",(","'","$sku_array.3","'",",","$qty_array.3",")"],"into":"pair3"},{"prim":"concat","args":["VALUES ","$pair0","$pair1","$pair2","$pair3"],"into":"values_clause"},{"prim":"concat","args":["SELECT SUM(pv.price_cents * item.qty) FROM product_variants pv JOIN (","$values_clause",") AS item(sku,qty) ON pv.product_sku = item.sku;"],"into":"current_total_sql"},{"prim":"abs_diff","args":["$old_total_cents","$current_total_cents"],"into":"difference_cents"}],"decision":{"branches":[{"when":{"op":"and","lhs":null,"rhs":null,"args":[{"op":"nonempty","lhs":"$old_total_cents","rhs":null,"args":[]},{"op":"nonempty","lhs":"$current_total_cents","rhs":null,"args":[]},{"op":"le","lhs":"$difference_cents","rhs":100,"args":[]}]},"label":"ok"}],"default_label":"not_ok"},"ops":[{"rpc":"Exec","args":{"path":"/bin/sql","stdin":"$current_total_sql"},"bind":"current_total_cents","guard_label":null,"outcome_from_exit":null}],"answer":{"ok":{"message":"The difference is {difference_cents} cents, which is within 1 EUR.","outcome":"OUTCOME_OK","refs":[]},"not_ok":{"message":"The difference is {difference_cents} cents, which is not within 1 EUR.","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]}},"custom_extract":[{"name":"fuzzy_sku_receipt","input":"$receipt_raw","into":"parsed_items"}]}
+    ```
+    
+    EXISTING_RULES:
+      - [r018] Always ensure that any rowset produced by a custom_extract is defined before the compute section that references it. If the PlanIR structure requires custom_extract after compute, do not reference such rowsets in compute; instead, parse the data using a rowsets step or restructure the plan to avoid forward references.
+      - [v015] VERDICT score=0.0: expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+      - [r019] Never apply the catalog path constraint to files in /uploads/; that constraint is only for catalog data. When the instruction specifies a receipt file in /uploads/, read it directly using a Read RPC on the given path.
+      - [r020] When the instruction says 'the single file in /uploads/' or similar, use a Find RPC with a pattern like '*' to locate the file, and bind the result. Then use the bound path directly in a Read RPC. Do not use a List RPC to list the directory and then extract a path, as List may return directory entries or require additional filtering, leading to a 'read failed: is a directory' error.
+      - [in-session] Never pass more than two arguments to the concat primitive in a compute step. When constructing a SQL query string that requires concatenating a prefix, a variable, and a suffix, use two concat steps: first concat the prefix and the variable, then concat the result with the suffix.
+      - [in-session] Always use a Find RPC with a pattern like '*' to locate a file when the instruction specifies a file in a directory (e.g., /uploads/). Bind the result to a variable and use that variable as the path in the Read RPC. Do not use a List RPC or the directory path directly, as that may cause a 'read failed: is a directory' error.
+└ ASSISTANT
+    {
+      "rule_content": "Never use dot notation (e.g., $array.0) to access elements of an array in a compute primitive. When building a SQL VALUES clause from a rowset, always use a series of concat steps each with exactly two arguments, and reference the rowset columns directly (e.g., $rowset.column) rather than extracting columns into separate arrays. This prevents 'bad argument type' errors from concat receiving non-string arguments or too many arguments.",
+      "agents_md_anchor": null,
+      "reasoning": "The error 'real_vm: bad argument type for built-in operation' occurred because the compute section used concat with more than two arguments (violating existing rule) and used dot notation to access array elements (e.g., $sku_array.0), which are not valid string arguments. The PlanIR attempted to build a SQL VALUES clause by concatenating many pieces, including array indices, causing type errors. The corrective rule prevents these patterns.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+════════════════════════════════════════════════════════════════════════
+RESULT  OUTCOME_NONE_UNSUPPORTED  score=0.0  cycles=4  tokens 25889/37381  1035877ms
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+════════════════════════════════════════════════════════════════════════

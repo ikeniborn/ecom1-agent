@@ -1,9 +1,12 @@
 {
-  "objective": "Determine the total available today quantity of the specified Black+Decker cordless drill driver product across all Vienna store locations.",
+  "objective": "Compute the total available today quantity of a specific product (Extension Cable from Hager, HAG 1RH-81U, Gray, 2m) across all PowerTool stores in Graz.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_sku": "the product_sku of the product variant matching brand 'Black+Decker', product family name 'Black+Decker Home GTC 3PT-1Y9 Cordless Drill Driver', and having properties: voltage = '20 V', battery platform = '20v-system', kit contents = 'starter kit'",
-    "vienna_stores": "all stores where city = 'Vienna'"
+    "product_sku": "Find the product_sku by querying product_variants with brand='Hager' and product_family_name containing 'HAG 1RH-81U', then joining product_variant_properties to match property_key='Color Family' with value 'Gray' and property_key='Length' with value '2 m'.",
+    "graz_store_ids": "Select store_id from stores where city='Graz'",
+    "total_available": "Sum available_today_quantity from store_inventory where store_id in $graz_store_ids and product_sku = $product_sku",
+    "product_record_path": "Select record_path from product_variants where product_sku = $product_sku",
+    "store_record_paths": "Select record_path from stores where city='Graz'"
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -14,38 +17,47 @@
     "OUTCOME_OK": [
       {
         "op": "ge",
-        "lhs": "$count",
+        "lhs": "$total_available",
         "rhs": 0,
         "args": []
       },
       {
         "op": "nonempty",
-        "lhs": "$product.record_path",
+        "lhs": "$product_sku",
         "rhs": null,
         "args": []
       },
       {
         "op": "nonempty",
-        "lhs": "$stores",
+        "lhs": "$product_record_path",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$store_record_paths",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Count: {count}"
+    "msg_skeleton": "answer: {total_available}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product.record_path"
+        "source": "$product_record_path"
       },
       {
         "kind": "record_path",
         "path": null,
-        "source": "$stores"
+        "source": "$store_record_paths"
       }
     ]
   }

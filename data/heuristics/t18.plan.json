@@ -4,12 +4,39 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH vienna_stores AS (\n  SELECT store_id, record_path\n  FROM stores\n  WHERE LOWER(TRIM(city)) = 'vienna'\n)\nSELECT\n  vs.store_id,\n  vs.record_path,\n  COALESCE(si.available_today_quantity, 0) AS available_today_quantity\nFROM vienna_stores vs\nLEFT JOIN store_inventory si ON si.store_id = vs.store_id AND si.product_sku = 'G-MP-IC5-GU6-BV'\nORDER BY vs.store_id;"
+        "stdin": "WITH product AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  WHERE LOWER(TRIM(pv.brand)) = LOWER(TRIM('Metabo'))\n    AND LOWER(TRIM(pv.series)) = LOWER(TRIM('Metabo Brushless BS 1OW-IK5 Cordless Drill Driver'))\n),\nprops AS (\n  SELECT pvp.product_sku\n  FROM product_variant_properties pvp\n  WHERE pvp.product_sku IN (SELECT product_sku FROM product)\n    AND (\n      (LOWER(TRIM(pvp.property_key)) = LOWER(TRIM('voltage')) AND LOWER(TRIM(pvp.property_value_text)) = LOWER(TRIM('18 V')))\n      OR (LOWER(TRIM(pvp.property_key)) = LOWER(TRIM('battery platform')) AND LOWER(TRIM(pvp.property_value_text)) = LOWER(TRIM('18v-system')))\n      OR (LOWER(TRIM(pvp.property_key)) = LOWER(TRIM('kit contents')) AND LOWER(TRIM(pvp.property_value_text)) = LOWER(TRIM('bare tool')))\n    )\n  GROUP BY pvp.product_sku\n  HAVING COUNT(DISTINCT pvp.property_key) = 3\n)\nSELECT p.product_sku, p.record_path\nFROM product p\nWHERE p.product_sku IN (SELECT product_sku FROM props);"
+      },
+      "bind": "product_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT s.store_id, s.record_path, COALESCE(si.available_today_quantity, 0) AS available_today_quantity\nFROM stores s\nLEFT JOIN store_inventory si ON s.store_id = si.store_id AND si.product_sku = $product_sku\nWHERE LOWER(TRIM(s.city)) = LOWER(TRIM('Graz'))\nORDER BY s.store_id;"
       },
       "bind": "inventory_raw"
     }
   ],
   "rowsets": [
+    {
+      "from_": "product_raw",
+      "format": "auto_delim",
+      "into": "product_rows",
+      "columns": [
+        {
+          "into": "product_sku",
+          "candidates": [
+            "product_sku"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    },
     {
       "from_": "inventory_raw",
       "format": "auto_delim",
@@ -38,6 +65,29 @@
   ],
   "compute": [
     {
+      "prim": "first",
+      "args": [
+        "$product_rows"
+      ],
+      "into": "product_first_row"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_first_row",
+        "product_sku"
+      ],
+      "into": "product_sku"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_first_row",
+        "record_path"
+      ],
+      "into": "product_record_path"
+    },
+    {
       "prim": "sum_col",
       "args": [
         "$inventory_rows",
@@ -55,13 +105,23 @@
     }
   ],
   "decision": {
-    "branches": [],
-    "default_label": "ok"
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$product_sku",
+          "rhs": null,
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
+    "default_label": "unsupported"
   },
   "ops": [],
   "answer": {
     "ok": {
-      "message": "count: {total_available}",
+      "message": "answer={total_available}",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
@@ -75,6 +135,11 @@
           "source": "$store_record_paths"
         }
       ]
+    },
+    "unsupported": {
+      "message": "Product not found",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
     }
   },
   "custom_extract": []

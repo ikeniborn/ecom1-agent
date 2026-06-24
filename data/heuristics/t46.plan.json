@@ -1,26 +1,114 @@
 {
-  "discovery": [],
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/discounts.md"
+      },
+      "bind": "policy_doc_discounts"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "policy_doc_security"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH customer AS (SELECT customer_id, customer_email FROM customer_accounts WHERE customer_email = 'matthias.schuster+986@icloud.com'), employee AS (SELECT employee_id FROM employee_accounts WHERE employee_id = NULL), basket AS (SELECT basket_id, record_path, basket_status, discount_percent, discount_reason_code, discount_issuer_employee_id FROM shopping_baskets WHERE customer_id = (SELECT customer_id FROM customer) AND basket_status = 'active' ORDER BY basket_created_at DESC LIMIT 1), subtotal AS (SELECT COALESCE(SUM(sbi.requested_quantity * pv.price_cents), 0) AS subtotal_cents FROM shopping_basket_items sbi JOIN product_variants pv ON sbi.product_sku = pv.product_sku WHERE sbi.basket_id = (SELECT basket_id FROM basket)) SELECT (SELECT customer_id FROM customer) AS customer_id, (SELECT customer_email FROM customer) AS customer_email, (SELECT employee_id FROM employee) AS discount_issuer_employee_id, (SELECT basket_id FROM basket) AS basket_id, (SELECT record_path FROM basket) AS basket_record_path, (SELECT basket_status FROM basket) AS basket_status, (SELECT discount_percent FROM basket) AS existing_discount_percent, (SELECT subtotal_cents FROM subtotal) AS subtotal_cents, CASE WHEN (SELECT subtotal_cents FROM subtotal) >= 15000 THEN 10 ELSE 5 END AS allowed_discount_percent;"
+      },
+      "bind": "sql_result"
+    }
+  ],
   "rowsets": [],
   "compute": [
     {
-      "prim": "first",
+      "prim": "get",
       "args": [
-        []
+        "$sql_result",
+        "customer_id"
       ],
-      "into": "caller_employee_role"
+      "into": "$customer_id"
     },
     {
-      "prim": "first",
+      "prim": "get",
       "args": [
-        [
-          "Caller is not a store associate"
-        ]
+        "$sql_result",
+        "customer_email"
       ],
-      "into": "denial_reason"
+      "into": "$customer_email"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$sql_result",
+        "discount_issuer_employee_id"
+      ],
+      "into": "$discount_issuer_employee_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$sql_result",
+        "basket_id"
+      ],
+      "into": "$basket_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$sql_result",
+        "basket_record_path"
+      ],
+      "into": "$basket_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$sql_result",
+        "basket_status"
+      ],
+      "into": "$basket_status"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$sql_result",
+        "existing_discount_percent"
+      ],
+      "into": "$existing_discount_percent"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$sql_result",
+        "subtotal_cents"
+      ],
+      "into": "$subtotal_cents"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$sql_result",
+        "allowed_discount_percent"
+      ],
+      "into": "$allowed_discount_percent"
     }
   ],
   "decision": {
     "branches": [
+      {
+        "when": {
+          "op": "isnull",
+          "lhs": "$discount_issuer_employee_id",
+          "rhs": null,
+          "args": []
+        },
+        "label": "denied_security"
+      },
       {
         "when": {
           "op": "or",
@@ -29,33 +117,82 @@
           "args": [
             {
               "op": "isnull",
-              "lhs": "$caller_employee_role",
+              "lhs": "$basket_id",
               "rhs": null,
               "args": []
             },
             {
               "op": "ne",
-              "lhs": "$caller_employee_role",
-              "rhs": "store_associate",
+              "lhs": "$basket_status",
+              "rhs": "active",
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$existing_discount_percent",
+              "rhs": null,
               "args": []
             }
           ]
         },
-        "label": "denied"
+        "label": "unsupported"
       }
     ],
-    "default_label": "denied"
+    "default_label": "ok"
   },
-  "ops": [],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH basket AS (SELECT basket_id FROM shopping_baskets WHERE basket_id = '$basket_id'), allowed AS (SELECT $allowed_discount_percent AS pct) UPDATE shopping_baskets SET discount_percent = (SELECT pct FROM allowed), discount_reason_code = 'service_recovery', discount_issuer_employee_id = $discount_issuer_employee_id WHERE basket_id = (SELECT basket_id FROM basket);"
+      },
+      "bind": null,
+      "guard_label": "ok",
+      "outcome_from_exit": null
+    }
+  ],
   "answer": {
-    "denied": {
-      "message": "Discount cannot be applied: {denial_reason}",
+    "denied_security": {
+      "message": "Cannot apply discount: employee not authorized.",
       "outcome": "OUTCOME_DENIED_SECURITY",
       "refs": [
         {
           "kind": "policy_doc",
           "path": "/docs/security.md",
           "source": null
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "Cannot apply discount: basket not eligible (not found, not active, or already has discount).",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
+        }
+      ]
+    },
+    "ok": {
+      "message": "Applied {allowed_discount_percent}% service_recovery discount to basket {basket_id} for customer {customer_email}.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
+        },
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$basket_record_path"
         }
       ]
     }

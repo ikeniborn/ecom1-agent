@@ -1,61 +1,133 @@
 entries:
 - agents_md_anchor: null
-  content: Do not use 'column' on a single row; use 'get' to extract a field from a single row.
+  content: Do not use 'column' on a single row; use 'get' to extract a field from
+    a single row.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r005
-  reasoning: 'Error: ''column'' expects list[dict]; use ''get'' for a single row. Root cause: PlanIR used
-    ''first'' to reduce rows to a single row, then applied ''column'' to that row. The contract requires
-    ''get'' for single-row field extraction. Failing PlanIR fragment: compute steps after ''first'' used
-    ''column'' on $row.'
-  status: active
+  reasoning: 'Error: ''column'' expects list[dict]; use ''get'' for a single row.
+    Root cause: PlanIR used ''first'' to reduce rows to a single row, then applied
+    ''column'' to that row. The contract requires ''get'' for single-row field extraction.
+    Failing PlanIR fragment: compute steps after ''first'' used ''column'' on $row.'
+  status: inactive
   surface: ir
 - agents_md_anchor: '#security'
-  content: When the IntentSpec contains a security constraint, the PlanIR must include a discovery step
-    to resolve the identity fact and a decision branch that evaluates the deny condition, with a deny
-    outcome only when the condition is true, and a default branch that proceeds to the main objective.
+  content: When the IntentSpec contains a security constraint, the PlanIR must include
+    a discovery step to resolve the identity fact and a decision branch that evaluates
+    the deny condition, with a deny outcome only when the condition is true, and a
+    default branch that proceeds to the main objective.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r006
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. Root cause: PlanIR produced
-    a hardcoded deny outcome without checking the user''s identity. The IntentSpec includes a security
-    constraint that denies guests, but the plan must first discover the identity and then conditionally
-    deny only if the user is a guest; otherwise, it should retrieve the transaction. The failing PlanIR
-    fragment: decision with no branches and default_label ''deny'', no discovery for identity. Existing
-    rule r004 permits identity-based deny conditions when explicitly required, but the plan omitted the
-    required identity check entirely.'
-  status: active
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. Root
+    cause: PlanIR produced a hardcoded deny outcome without checking the user''s identity.
+    The IntentSpec includes a security constraint that denies guests, but the plan
+    must first discover the identity and then conditionally deny only if the user
+    is a guest; otherwise, it should retrieve the transaction. The failing PlanIR
+    fragment: decision with no branches and default_label ''deny'', no discovery for
+    identity. Existing rule r004 permits identity-based deny conditions when explicitly
+    required, but the plan omitted the required identity check entirely.'
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Access denied: guests cannot view payment details.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: Do not set the default_label to 'deny' when a security constraint is present; instead, set
-    it to a label that proceeds to the main objective (e.g., 'proceed').
+  content: Do not set the default_label to 'deny' when a security constraint is present;
+    instead, set it to a label that proceeds to the main objective (e.g., 'proceed').
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r007
-  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. The PlanIR decision has
-    only a deny branch for guest identity and a default_label of ''deny'', causing all non-guest identities
-    to also be denied. The IntentSpec requires deny only when identity.kind is guest, so the default branch
-    must lead to the main objective (retrieving payment details). Failing PlanIR fragment: decision.default_label
-    = ''deny''. Existing rule r006 already states the default branch should proceed to the main objective,
-    but the plan violated it; this new rule explicitly forbids using ''deny'' as the default label in
-    security-constrained plans.'
+  reasoning: 'Error: grader expected OUTCOME_OK, got OUTCOME_DENIED_SECURITY. The
+    PlanIR decision has only a deny branch for guest identity and a default_label
+    of ''deny'', causing all non-guest identities to also be denied. The IntentSpec
+    requires deny only when identity.kind is guest, so the default branch must lead
+    to the main objective (retrieving payment details). Failing PlanIR fragment: decision.default_label
+    = ''deny''. Existing rule r006 already states the default branch should proceed
+    to the main objective, but the plan violated it; this new rule explicitly forbids
+    using ''deny'' as the default label in security-constrained plans.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always ensure that the refs provided in the answer block have source strings
+    that exactly match the required refs'' source strings from the IntentSpec. If
+    the required ref source is a path like ''$result.record_path'', the plan must
+    produce a ref with that exact source, typically by using a compute step that binds
+    the extracted value to that name (e.g., ''into'': ''$result.record_path'').'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''$result.record_path'']
+    on OK answer''. Root cause: The PlanIR compute step binds the extracted record_path
+    to variable ''$record_path'', but the answer refs use source ''$record_path'',
+    while the required ref expects source ''$result.record_path''. The interpreter
+    cannot find a ref named ''$result.record_path''. The fix is to bind to ''$result.record_path''
+    and update answer refs accordingly. This is a new rule not covered by existing
+    rules (r005, r006, r007).'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: 'When using an Exec RPC to run a SQL command and the rowset format is ''json'',
+    ensure the command includes flags to produce JSON output (e.g., for psql: ''-H
+    -t -A --json'') or change the rowset format to ''text'' with appropriate column
+    mapping and delimiters.'
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$result.record_path'''']
+    on OK answer''. The PlanIR uses Exec to run ''SELECT ... FROM payment_transactions
+    ...'' and parses the result as JSON (rowset format ''json''). The default output
+    of /bin/sql is plain text, not JSON, so the rowset produces no rows. The compute
+    step ''get'' on the first row then fails to bind ''$result.record_path'', leaving
+    the required ref unresolved. The fix is to match the output format to the rowset
+    format.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always include a decision branch that checks whether a rowset from a query
+    is empty before using its fields as required refs; if empty, produce an outcome
+    that does not require those refs and provide the correct refs for that outcome
+    as specified in the IntentSpec. Additionally, ensure that the source string of
+    each ref in the answer block exactly matches the required ref's source string
+    from the IntentSpec, without relying on variables that may be unbound.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r010
+  reasoning: Error 'unresolved required ref(s) [''$result.record_path''] on OK answer'
+    indicates the plan attempted to produce OUTCOME_OK but the required ref was never
+    bound. The SQL query may have returned no rows or parsing failed, leaving $payment_rows
+    empty; first() on empty list returned null, so get() failed to bind $result.record_path.
+    The plan lacks a decision branch to check for empty rowset before proceeding.
+    Also, the deny ref uses $security_policy_path (from record_path) but IntentSpec
+    requires policy_doc with source '/docs/security.md'. Existing rules (r006, r007)
+    are followed but do not cover empty rowset. In-session rule about exact ref source
+    match is violated. New rule addresses both issues.
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-22'
-  outcome: OUTCOME_DENIED_SECURITY
+  cycles_used: 3
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t55

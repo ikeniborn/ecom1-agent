@@ -1,61 +1,96 @@
 entries:
 - agents_md_anchor: null
-  content: When a parameter value is a literal string, use a compute step with prim 'literal' to bind
-    it; never use 'concat' for a single literal.
+  content: When a parameter value is a literal string, use a compute step with prim
+    'literal' to bind it; never use 'concat' for a single literal.
   created: '2026-06-22'
   deactivated_reason: null
   id: r003
-  reasoning: 'The interpret error ''concat: missing 1 required positional argument: b'' occurred because
-    the plan used concat with a single string argument ''pay_005''. The concat primitive requires two
-    list[dict] rows arguments. The intended operation was to bind the literal payment_id to a variable
-    for the answer template. The correct primitive is ''literal'', which takes a single string and produces
-    a row with that value. This rule prevents misuse of concat for literal binding.'
+  reasoning: 'The interpret error ''concat: missing 1 required positional argument:
+    b'' occurred because the plan used concat with a single string argument ''pay_005''.
+    The concat primitive requires two list[dict] rows arguments. The intended operation
+    was to bind the literal payment_id to a variable for the answer template. The
+    correct primitive is ''literal'', which takes a single string and produces a row
+    with that value. This rule prevents misuse of concat for literal binding.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Do not use a rowset with format 'json' on discovery RPC output that is not valid JSON; instead,
-    use a compute step to extract the required fields.
+  content: Do not use a rowset with format 'json' on discovery RPC output that is
+    not valid JSON; instead, use a compute step to extract the required fields.
   created: '2026-06-22'
   deactivated_reason: null
   id: r004
-  reasoning: 'ERROR: verify: I3: security constraint ''/docs/security.md#customer-ownership'' deny_when
-    holds but outcome is ''OUTCOME_NONE_UNSUPPORTED''. Root cause: The PlanIR used a rowset with format
-    ''json'' to parse the output of /bin/id, which returns unstructured text (e.g., ''user: cust_014\nroles:
-    customer''). This caused the identity kind extraction to fail, leading to a null value that did not
-    match the ''guest'' branch, defaulting to ''unsupported''. The constraint check, however, correctly
-    identified the caller as a guest (likely from raw output), triggering the deny condition. The existing
-    rule r001 advises using a compute step for unstructured text, but the script used a rowset instead.
-    This new rule explicitly forbids using ''json'' rowset format on non-JSON output.'
+  reasoning: 'ERROR: verify: I3: security constraint ''/docs/security.md#customer-ownership''
+    deny_when holds but outcome is ''OUTCOME_NONE_UNSUPPORTED''. Root cause: The PlanIR
+    used a rowset with format ''json'' to parse the output of /bin/id, which returns
+    unstructured text (e.g., ''user: cust_014\nroles: customer''). This caused the
+    identity kind extraction to fail, leading to a null value that did not match the
+    ''guest'' branch, defaulting to ''unsupported''. The constraint check, however,
+    correctly identified the caller as a guest (likely from raw output), triggering
+    the deny condition. The existing rule r001 advises using a compute step for unstructured
+    text, but the script used a rowset instead. This new rule explicitly forbids using
+    ''json'' rowset format on non-JSON output.'
   status: active
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Refund request denied: unauthenticated guest'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: When a decision tree includes a branch for a deny_when condition, also include a branch for
-    the opposite condition leading to an outcome that permits the action; do not use a default label that
-    always denies.
+  content: When a decision tree includes a branch for a deny_when condition, also
+    include a branch for the opposite condition leading to an outcome that permits
+    the action; do not use a default label that always denies.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: r005 forces a 'permitted' branch even when the outcome_space
+    does not include a permitted outcome, leading to verify failure. This new rule
+    supersedes it.
   id: r005
-  reasoning: Grader expected OUTCOME_OK but plan produced OUTCOME_DENIED_SECURITY. The plan's decision
-    tree had only a branch for identity.kind eq 'guest' leading to denied, and a default label also denied.
-    Thus, even for authenticated users, the outcome was denied. The plan must include a branch for the
-    false case (non-guest) leading to a permissive outcome (e.g., OUTCOME_OK).
+  reasoning: Grader expected OUTCOME_OK but plan produced OUTCOME_DENIED_SECURITY.
+    The plan's decision tree had only a branch for identity.kind eq 'guest' leading
+    to denied, and a default label also denied. Thus, even for authenticated users,
+    the outcome was denied. The plan must include a branch for the false case (non-guest)
+    leading to a permissive outcome (e.g., OUTCOME_OK).
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the outcome_space contains only a single outcome (e.g., OUTCOME_DENIED_SECURITY)
+    and does not include a success outcome like OUTCOME_OK, the decision tree must
+    not include any branch that produces an outcome not in that space; the default
+    label must also produce an outcome within the space, or the tree should be structured
+    to always produce the only allowed outcome.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: verify: I2: outcome ''OUTCOME_OK'' not in outcome_space [''OUTCOME_DENIED_SECURITY''].
+    Root cause: PlanIR decision tree had a default branch ''permitted'' producing
+    OUTCOME_OK, which is not in the outcome_space. The outcome_space only contains
+    OUTCOME_DENIED_SECURITY, so the tree should only produce that outcome. Existing
+    rule r005 forced inclusion of a ''permitted'' branch, which is invalid here. New
+    rule prevents such invalid branches when outcome_space is restricted.'
   status: active
   surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_NONE_UNSUPPORTED, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 0
-  date: '2026-06-22'
+  cycles_used: 2
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t43

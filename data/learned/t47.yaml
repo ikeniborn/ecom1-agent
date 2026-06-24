@@ -1,62 +1,174 @@
 entries:
 - agents_md_anchor: null
-  content: When a success_criteria for an outcome includes a nonempty check on a field, the PlanIR answer
-    branch for that outcome must include that field with a nonempty value.
+  content: When a success_criteria for an outcome includes a nonempty check on a field,
+    the PlanIR answer branch for that outcome must include that field with a nonempty
+    value.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r003
-  reasoning: The verify step failed because the success_criteria for OUTCOME_DENIED_SECURITY required
-    '$answer.denial_reason' to be nonempty, but the PlanIR answer branches only contained 'message' and
-    'outcome', omitting 'denial_reason'. The root cause is a missing required field in the answer structure.
-    This rule ensures that any field validated by success_criteria is explicitly populated in the corresponding
+  reasoning: The verify step failed because the success_criteria for OUTCOME_DENIED_SECURITY
+    required '$answer.denial_reason' to be nonempty, but the PlanIR answer branches
+    only contained 'message' and 'outcome', omitting 'denial_reason'. The root cause
+    is a missing required field in the answer structure. This rule ensures that any
+    field validated by success_criteria is explicitly populated in the corresponding
     answer branch.
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: '#plan'
-  content: When the task objective mentions specific data sources (e.g., product descriptions, catalogue
-    items), the PlanIR must include discovery steps that read those data sources and attach their record_paths
-    to the answer branch, even if the outcome is a denial, because the grader may require them.
+  content: When the task objective mentions specific data sources (e.g., product descriptions,
+    catalogue items), the PlanIR must include discovery steps that read those data
+    sources and attach their record_paths to the answer branch, even if the outcome
+    is a denial, because the grader may require them.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r004
   reasoning: 'Error: ''grader: answer missing required reference ''/proc/catalog/Ryobi/PWR-RZ0VIO7N.json''''.
-    The TOOL_PLAN''s required_refs for OUTCOME_DENIED_SECURITY only list a policy_doc, but the grader
-    expects a reference to a product catalogue item. The task objective mentions product descriptions
-    and catalogue items, so the PlanIR should have included discovery steps to read those data sources
-    and attach their record_paths to the answer branch, even though the outcome is a denial. Existing
-    rule r001 only covers when required_refs explicitly include record_paths, which they did not. This
-    new rule ensures that all data sources implied by the objective are discovered and referenced.'
-  status: active
+    The TOOL_PLAN''s required_refs for OUTCOME_DENIED_SECURITY only list a policy_doc,
+    but the grader expects a reference to a product catalogue item. The task objective
+    mentions product descriptions and catalogue items, so the PlanIR should have included
+    discovery steps to read those data sources and attach their record_paths to the
+    answer branch, even though the outcome is a denial. Existing rule r001 only covers
+    when required_refs explicitly include record_paths, which they did not. This new
+    rule ensures that all data sources implied by the objective are discovered and
+    referenced.'
+  status: inactive
   surface: ir
 - agents_md_anchor: '# compute'
-  content: When using a compute step to bind a literal string to a variable for use in answer refs, use
-    the 'literal' primitive with the string as its argument, not 'concat'. The 'concat' primitive requires
-    two rowsets (list[dict]) as arguments and cannot be used with a single literal path.
+  content: When using a compute step to bind a literal string to a variable for use
+    in answer refs, use the 'literal' primitive with the string as its argument, not
+    'concat'. The 'concat' primitive requires two rowsets (list[dict]) as arguments
+    and cannot be used with a single literal path.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r005
-  reasoning: 'ERROR: interpret: compute step ''concat'' failed: <lambda>() missing 1 required positional
-    argument: ''b''. The PlanIR compute step: {"prim":"concat","args":["/docs/security.md"],"into":"policy_doc_path"}.
-    Concat expects two rowsets (list[dict]), but only one literal path was provided. The intent was to
-    bind a variable to a path string for the answer ref. The correct primitive is ''literal'' with args
-    containing the string, not ''concat''.'
-  status: active
+  reasoning: 'ERROR: interpret: compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. The PlanIR compute step: {"prim":"concat","args":["/docs/security.md"],"into":"policy_doc_path"}.
+    Concat expects two rowsets (list[dict]), but only one literal path was provided.
+    The intent was to bind a variable to a path string for the answer ref. The correct
+    primitive is ''literal'' with args containing the string, not ''concat''.'
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/Gardena/GRD-2A0SEGFS.json'
   source: verdict
-  status: active
-  submitted_message: 'Access denied: guest users cannot perform store-specific inventory checks.'
+  status: inactive
+  submitted_message: 'Access denied: guest users cannot perform store-specific inventory
+    checks.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
+- agents_md_anchor: '#security.md > data-access'
+  content: When the security policy requires running /bin/id to determine identity,
+    the PlanIR must include a discovery step to run /bin/id and bind the result to
+    $identity.kind before any decision branch that depends on identity.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: PlanIR did not
+    include a step to run /bin/id to populate $identity.kind, so the deny_when condition
+    ($identity.kind != employee) evaluated to false (or undefined), causing the verify
+    step to see no predicate holding. The security policy explicitly states ''Run
+    /bin/id before performing any action that depends on customer/user/actor identity
+    or permissions.'' The PlanIR must include that RPC and bind its output to $identity.kind.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'When extracting a field from a specific row of a rowset, use two compute
+    steps: first, use ''get'' with the rowset and the row index to bind the row dict,
+    then use ''get'' on that dict with the field name to bind the field value.'
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: 'Error: interpret: compute step ''get'' failed: <lambda>() takes 2 positional
+    arguments but 3 were given. The PlanIR compute step used `{"prim":"get","args":["$catalogue_rows",0,"record_path"]}`
+    which passes three arguments (list, index, key) to the ''get'' primitive, which
+    expects exactly two (obj, key). The root cause is that the PlanIR attempted to
+    index into the rowset list and extract a field in a single ''get'' call, which
+    is invalid. The correct technique is to first retrieve the row dict using `get($catalogue_rows,
+    0)` in one compute step, then retrieve the field from that dict using `get($first_row,
+    "record_path")` in a second compute step. This rule ensures the ''get'' primitive
+    is called with the correct arity and avoids the runtime error.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a constraint in the TOOL_PLAN defines a deny_when predicate, the PlanIR's
+    decision branch for the denied outcome must use the exact same condition (same
+    lhs, op, rhs) as the constraint's deny_when, not a different variable or expression.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR decision
+    branch uses `$identity.kind` in its when clause, but the constraint''s deny_when
+    predicate uses `$_facts.identity.kind`. The verify step evaluates the declared
+    predicate against the system facts; since the PlanIR''s condition does not match
+    the declared predicate, the system sees no valid deny_when predicate holding,
+    resulting in a spurious over-refusal. Failing PlanIR fragment: `{"when":{"op":"ne","lhs":"$identity.kind","rhs":"employee"},"label":"denied"}`.
+    The constraint''s deny_when is `{"op":"ne","lhs":"$_facts.identity.kind","rhs":"employee"}`.
+    No existing rule covers this mismatch; a new rule is needed to enforce alignment
+    between PlanIR decision conditions and constraint deny_when predicates.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a security constraint's deny_when predicate references a field that
+    is not guaranteed to be populated by the pre-phase (e.g., $identity.kind), the
+    PlanIR must include a discovery step to populate that field before the decision
+    branch, to ensure the condition evaluation matches the verifier's predicate check
+    and avoid spurious over-refusal.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Error: ''verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal)''. The PlanIR''s decision branch
+    condition is `$_facts.identity.kind != "employee"`, but no discovery step populates
+    $identity.kind (e.g., by running /bin/id). With $identity.kind undefined, the
+    runtime''s `ne` operator treats it as not equal to ''employee'', making the condition
+    true and triggering the denied branch. However, the verifier evaluates the same
+    predicate in the context of undefined $identity.kind and considers it false (field
+    not set). This mismatch causes a spurious over-refusal. Existing rule [in-session]
+    already mandates the discovery step for /bin/id, but the PlanIR violated it. The
+    new rule generalizes this requirement to any security deny_when predicate referencing
+    a non-default field.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a security constraint's deny_when predicate references a fact field
+    (e.g., $_facts.identity.kind), the PlanIR's decision branch condition must use
+    that exact fact field reference, not a derived variable, to ensure the verifier
+    can match the predicate and avoid spurious over-refusal.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: PlanIR decision
+    branch used condition ne $identity_kind employee, but constraint''s deny_when
+    uses ne $_facts.identity.kind employee. The verifier checks the constraint''s
+    predicate against facts; since the PlanIR condition differs, the verifier finds
+    no matching predicate and flags over-refusal. The existing rule [in-session] about
+    using exact condition exists but was not followed; this new rule reinforces using
+    the fact field reference directly.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/cleaning/cleaning_liquids/CLN-240Z4M8K.json'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-22'
+  cycles_used: 5
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 prephase_deep_read:

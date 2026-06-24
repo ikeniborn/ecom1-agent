@@ -1,37 +1,120 @@
 {
   "discovery": [
     {
-      "rpc": "Exec",
+      "rpc": "Read",
       "args": {
-        "path": "/bin/id"
+        "path": "/docs/security.md"
       },
-      "bind": "identity_raw"
+      "bind": "policy_security"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/checkout.md"
+      },
+      "bind": "policy_checkout"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/payments/3ds.md"
+      },
+      "bind": "policy_3ds"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT record_path FROM shopping_baskets WHERE basket_id = 'basket_244';"
+        "stdin": "SELECT * FROM shopping_baskets WHERE basket_id = 'basket_226';"
       },
       "bind": "basket_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT * FROM payment_transactions WHERE basket_id = 'basket_226';"
+      },
+      "bind": "payment_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "identity_raw",
-      "format": "json",
-      "into": "identity",
-      "columns": []
-    },
-    {
       "from_": "basket_raw",
       "format": "auto_delim",
-      "into": "basket_list",
+      "into": "basket_rows",
       "columns": [
+        {
+          "into": "basket_id",
+          "candidates": [
+            "basket_id"
+          ]
+        },
         {
           "into": "record_path",
           "candidates": [
             "record_path"
+          ]
+        },
+        {
+          "into": "customer_id",
+          "candidates": [
+            "customer_id"
+          ]
+        },
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "basket_status",
+          "candidates": [
+            "basket_status"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "payment_raw",
+      "format": "auto_delim",
+      "into": "payment_rows",
+      "columns": [
+        {
+          "into": "payment_id",
+          "candidates": [
+            "payment_id"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "payment_status",
+          "candidates": [
+            "payment_status"
+          ]
+        },
+        {
+          "into": "three_ds_status",
+          "candidates": [
+            "three_ds_status"
+          ]
+        },
+        {
+          "into": "three_ds_attempts",
+          "candidates": [
+            "three_ds_attempts"
+          ]
+        },
+        {
+          "into": "three_ds_max_attempts",
+          "candidates": [
+            "three_ds_max_attempts"
           ]
         }
       ]
@@ -41,65 +124,139 @@
     {
       "prim": "first",
       "args": [
-        "$basket_list"
+        "$basket_rows"
       ],
       "into": "basket"
     },
     {
       "prim": "first",
       "args": [
-        "basket_244"
+        "$payment_rows"
       ],
-      "into": "basket_id"
+      "into": "payment"
     },
     {
-      "prim": "first",
+      "prim": "to_number",
       "args": [
-        "OUTCOME_DENIED_SECURITY"
+        "$payment.three_ds_attempts"
       ],
-      "into": "outcome"
+      "into": "attempts_num"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$payment.three_ds_max_attempts"
+      ],
+      "into": "max_attempts_num"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "eq",
-          "lhs": "$identity.kind",
-          "rhs": "guest",
-          "args": []
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "eq",
+              "lhs": "$_facts.identity.kind",
+              "rhs": "customer",
+              "args": []
+            },
+            {
+              "op": "ne",
+              "lhs": "$basket.customer_id",
+              "rhs": "$_facts.identity.customer_id",
+              "args": []
+            }
+          ]
         },
-        "label": "denied"
+        "label": "security_denied"
       },
       {
         "when": {
-          "op": "nonempty",
-          "lhs": "$identity.kind",
+          "op": "and",
+          "lhs": null,
           "rhs": null,
+          "args": [
+            {
+              "op": "eq",
+              "lhs": "$basket.basket_status",
+              "rhs": "checked_out",
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$payment.payment_status",
+              "rhs": "requires_3ds_action",
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$payment.three_ds_status",
+              "rhs": "failed",
+              "args": []
+            },
+            {
+              "op": "lt",
+              "lhs": "$attempts_num",
+              "rhs": "$max_attempts_num",
+              "args": []
+            }
+          ]
+        },
+        "label": "success"
+      },
+      {
+        "when": {
+          "op": "eq",
+          "lhs": 1,
+          "rhs": 1,
           "args": []
         },
-        "label": "denied"
+        "label": "unsupported"
       }
     ],
-    "default_label": "denied"
+    "default_label": "unsupported"
   },
   "ops": [],
   "answer": {
-    "denied": {
-      "message": "Checkout recovery for basket {basket_id}: {outcome}.",
+    "security_denied": {
+      "message": "Access denied: basket {basket_id} does not belong to your session.",
       "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
+    },
+    "success": {
+      "message": "Checkout for basket {basket_id} has been recovered. Payment transaction {payment_id} status: {payment_status}.",
+      "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "policy_doc",
-          "path": "/docs/security.md",
+          "path": "/docs/payments/3ds.md",
+          "source": null
+        },
+        {
+          "kind": "policy_doc",
+          "path": "/docs/checkout.md",
           "source": null
         },
         {
           "kind": "record_path",
           "path": null,
           "source": "$basket.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$payment.record_path"
         }
       ]
+    },
+    "unsupported": {
+      "message": "Cannot recover checkout for basket {basket_id}: conditions not met (basket status: {basket.basket_status}, payment status: {payment.payment_status}, 3DS status: {payment.three_ds_status}).",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
     }
   },
   "custom_extract": []

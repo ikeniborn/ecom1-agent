@@ -5,7 +5,7 @@ entries:
     with variable substitution directly in the Exec step's stdin field, or use a dedicated
     string-formatting primitive if available.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r007
   reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes
     2 positional arguments but 3 were given. CONTRACT: concat(a, b): both args must
@@ -19,13 +19,13 @@ entries:
     using a template (e.g., stdin: "SELECT ... WHERE customer_id = ''$cid'' AND ...")
     or use a string-formatting primitive if the toolset provides one. This rule prevents
     future misuse of concat for string assembly.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Do not re-resolve identity facts in the PlanIR; use the pre-resolved $_facts.identity.kind
     directly in decision branches.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r008
   reasoning: 'verify: I3: security constraint ''#security-guest-checkout-denied''
     deny_when holds but outcome is ''OUTCOME_NONE_UNSUPPORTED'', not DENIED_SECURITY.
@@ -38,7 +38,7 @@ entries:
     causing the branch to not fire and default to OUTCOME_NONE_UNSUPPORTED, violating
     the constraint. The PlanIR must not re-resolve identity; it must use the pre-resolved
     $_facts.identity.kind directly.'
-  status: active
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
@@ -60,7 +60,7 @@ entries:
     the objective's target entity) in the answer's refs array, even if the answer
     shape does not explicitly require it.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r009
   reasoning: 'The grader reported: ''answer missing required reference ''/proc/baskets/basket_152.json''''.
     The PlanIR discovered the newest open basket and placed a record ref with path
@@ -71,7 +71,7 @@ entries:
     but the interpreter only includes what the answer shape explicitly requires. The
     corrective rule ensures that discovered record refs are always included in the
     answer, regardless of the answer shape.'
-  status: active
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-23'
@@ -116,21 +116,147 @@ entries:
   surface: ir
 - content: null
   created: '2026-06-23'
+  deactivated_reason: superseded by newer verdict
   id: v017
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/baskets/basket_019.json'
   source: verdict
-  status: active
+  status: inactive
   submitted_message: 'Unable to checkout: guest identity cannot have an account. Please
     log in as a customer.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/checkout.md
   - /docs/security.md
+- agents_md_anchor: null
+  content: Always include a decision branch that checks whether the primary discovery
+    step returned a non-null result before referencing fields of that record in answer
+    refs. If the record is absent, route to an outcome that does not require those
+    fields, or use a conditional ref that resolves to null.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: 'Error: ''verify: I1: required ref source(s) [''''$basket.record_path'''']
+    did not resolve on OUTCOME_DENIED_SECURITY answer (resolve-before-cite)''. Root
+    cause: The PlanIR''s decision only checks identity kind, not whether the basket
+    discovery returned a result. The compute step ''first'' on an empty rowset yields
+    null, so $basket.record_path cannot be resolved. The answer refs unconditionally
+    include $basket.record_path, causing verification failure. Failing PlanIR fragment:
+    decision has only one branch (deny_security) and its answer refs include {"kind":"record_path","source":"$basket.record_path"}.
+    Rule linkage: Existing rule g001 describes the read-only discovery pattern but
+    does not mandate an existence check before referencing the record''s fields. This
+    new rule fills that gap.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the actual parameter values from the TOOL_PLAN params (e.g.,
+    $customer_id) in SQL queries by interpolating the pre-resolved fact value into
+    the Exec step's stdin field; never hardcode NULL or omit the parameter. Additionally,
+    when the TOOL_PLAN has multiple constraints that can deny, the decision must include
+    branches for each deny condition and an explicit allow branch, not a single branch
+    with a default that always denies.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r011
+  reasoning: 'Error: verify I1 required ref source ''$basket.record_path'' did not
+    resolve on OUTCOME_DENIED_SECURITY. Root cause: the SQL query in the PlanIR used
+    ''customer_id = NULL'' instead of the actual customer_id from $_facts.identity.customer_id,
+    causing the basket_raw query to return no rows, so $basket was null and its record_path
+    could not be resolved. Additionally, the decision only has one branch (identity.kind
+    != customer) with default_label ''deny_security'', which would incorrectly deny
+    even for customers, ignoring the availability constraint. The PlanIR must use
+    parameter values from the TOOL_PLAN params and structure decisions to cover all
+    constraints.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always interpolate the actual parameter values from TOOL_PLAN.params (e.g.,
+    $customer_id) into SQL queries in the Exec step's stdin field, using the pre-resolved
+    fact values, and never hardcode NULL or other placeholders. Additionally, always
+    place a null-check branch for the primary discovered record as the first decision
+    branch after the compute step, before any identity-based or availability-based
+    branches, to ensure that answer refs depending on the record are only used when
+    the record exists; if the record is null, route to an outcome that does not require
+    fields from that record, or use conditional refs that resolve to null.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r012
+  reasoning: 'Error: verify: I1: required ref source(s) [''$basket.record_path'']
+    did not resolve on OUTCOME_DENIED_SECURITY answer. Root cause: (1) The SQL query
+    in the discovery step hardcodes ''WHERE b.customer_id IS NULL'' instead of using
+    the actual $customer_id from params, so for a customer the query returns no rows
+    and $basket becomes null. (2) The decision branch for deny_security (identity.kind
+    != ''customer'') is placed before any null-check branch, so when the identity
+    is not customer, the branch is taken even though $basket is null, causing the
+    ref $basket.record_path to fail. The fix requires using the actual parameter value
+    in the SQL and reordering decision branches so that a null-basket check precedes
+    the identity check, ensuring refs only resolve when the record exists.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v018
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always include a discovery step that attempts to find the target record
+    (e.g., most recent open basket) using any available context (e.g., session customer
+    ID) before falling back to clarification. The decision must have a branch for
+    successful discovery (leading to OUTCOME_OK) and a default branch for clarification
+    when discovery returns no record. The discovery step should be a SQL query that
+    selects the record with appropriate ordering and limit, and the compute step should
+    bind the result.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r013
+  reasoning: The plan is clarify-only (no discovery steps) but the outcome_space includes
+    OUTCOME_OK, which the interpreter considers reachable. The plan must attempt grounded
+    discovery before clarifying. The corrective rule ensures that the plan includes
+    a discovery step to find the basket using any available context, with a decision
+    branch for success (OUTCOME_OK) and a fallback to clarification.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never include a Read RPC with a literal path that is not a known table
+    or document; use Exec SQL to query known tables. When the TOOL_PLAN requires asking
+    for a customer identifier (OUTCOME_NONE_CLARIFICATION), the PlanIR must not include
+    any discovery steps that depend on that identifier; instead, the plan should first
+    present the clarification answer and stop, deferring discovery to a subsequent
+    cycle after the identifier is provided.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r014
+  reasoning: 'Error ''real_vm: read failed: not found'' on first discovery step Read
+    at ''/customer/guest''. That path does not exist in the data model. The TOOL_PLAN
+    requires asking for a customer identifier, but the plan prematurely attempts to
+    read a non-existent path. The plan should not include any discovery steps that
+    depend on an unprovided identifier; it should first ask for the identifier and
+    stop. Additionally, the plan should never use a literal path that is not known
+    to exist; instead, use Exec SQL to query known tables.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v019
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-23'
-  outcome: OUTCOME_DENIED_SECURITY
+  cycles_used: 2
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t50

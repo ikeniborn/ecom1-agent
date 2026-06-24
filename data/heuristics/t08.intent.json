@@ -1,9 +1,11 @@
 {
-  "objective": "Verify whether the catalogue contains a Sormat Universal S-KA GGR-F8A anchor with specified properties and check for an extra length claim of 50 mm; if base product exists but extra claim absent, answer <NO> with SKU.",
+  "objective": "Verify the catalogue claim about the Fiskars Manual Garden Tool in the Fiskars Smart FSK 2WT-RQL line having tool type soil cultivator, length 900 mm, and tool type pruning saw, and if the base product exists but the pruning saw claim is absent, answer with <NO> and the checked SKU.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "base_product_lookup": "Find product_variants row where brand = 'Sormat' and (series = 'Universal S-KA GGR-F8A' or model = 'Universal S-KA GGR-F8A' or product_name contains 'Universal S-KA GGR-F8A') and there exist product_variant_properties with property_key = 'anchor_type' and property_value_text = 'frame fixing', property_key = 'diameter' and property_value_text = '8 mm', property_key = 'length' and property_value_text = '60 mm', property_key = 'pack_count' and property_value_text = '100 pcs'. Return the product_sku and record_path.",
-    "extra_claim_check": "For the found product_sku, check if there exists a product_variant_property with property_key = 'length' and property_value_text = '50 mm'. Return boolean."
+    "product_family_lookup": "Find product_family_id from product_families where brand='Fiskars', series='Smart FSK 2WT-RQL', model='Manual Garden Tool'",
+    "variant_lookup": "Find product_sku, record_path, product_name from product_variants where product_family_id = $product_family_id",
+    "base_attributes_check": "Check product_variant_properties for tool_type='soil cultivator' and length='900 mm' for the found SKU",
+    "extra_claim_check": "Check product_variant_properties for tool_type='pruning saw' for the found SKU"
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -14,27 +16,58 @@
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$base_sku",
+        "lhs": "$sku",
         "rhs": null,
         "args": []
       },
       {
-        "op": "eq",
-        "lhs": "$extra_claim_present",
-        "rhs": false,
-        "args": []
+        "op": "or",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "and",
+            "lhs": null,
+            "rhs": null,
+            "args": [
+              {
+                "op": "eq",
+                "lhs": "$extra_claim_found",
+                "rhs": false,
+                "args": []
+              },
+              {
+                "op": "contains_any",
+                "lhs": "$answer",
+                "rhs": [
+                  "<NO>"
+                ],
+                "args": []
+              }
+            ]
+          },
+          {
+            "op": "eq",
+            "lhs": "$extra_claim_found",
+            "rhs": true,
+            "args": []
+          }
+        ]
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "<NO> Checked SKU: {sku}"
+    "msg_skeleton": "Answer: {result} SKU: {sku}",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
   },
   "required_refs": {
     "OUTCOME_OK": [
       {
         "kind": "record_path",
         "path": null,
-        "source": "$base_product.record_path"
+        "source": "$product_record_path"
       }
     ]
   }

@@ -3,54 +3,24 @@
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/checkout.md"
-      },
-      "bind": "checkout_policy_doc"
-    },
-    {
-      "rpc": "Read",
-      "args": {
         "path": "/docs/security.md"
       },
-      "bind": "security_policy_doc"
+      "bind": "security_policy"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "args": [],
-        "stdin": ".mode tabs\nSELECT hex(randomblob(16)) AS payment_id;"
+        "stdin": "WITH basket AS (SELECT basket_status, store_id, customer_id, record_path FROM shopping_baskets WHERE basket_id = 'basket_051'), items AS (SELECT product_sku, requested_quantity FROM shopping_basket_items WHERE basket_id = 'basket_051'), inventory AS (SELECT si.product_sku, si.available_today_quantity FROM store_inventory si WHERE si.store_id = (SELECT store_id FROM basket)), issues AS (SELECT COUNT(*) AS issue_count FROM items i LEFT JOIN inventory inv ON i.product_sku = inv.product_sku WHERE inv.product_sku IS NULL OR i.requested_quantity > inv.available_today_quantity), store_customer AS (SELECT s.is_open, s.city AS store_city, c.home_city FROM stores s, customer_accounts c WHERE s.store_id = (SELECT store_id FROM basket) AND c.customer_id = (SELECT customer_id FROM basket)) SELECT b.basket_status, b.store_id, b.customer_id, b.record_path, i.issue_count, sc.is_open, sc.store_city, sc.home_city FROM basket b, issues i, store_customer sc;"
       },
-      "bind": "raw_payment_id"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "args": [],
-        "stdin": ".mode tabs\nSELECT b.basket_status, b.store_id, b.record_path AS basket_record_path, c.customer_id, c.record_path AS customer_record_path, (SELECT SUM(pv.price_cents * bi.requested_quantity) FROM shopping_basket_items bi JOIN product_variants pv ON bi.product_sku = pv.product_sku WHERE bi.basket_id = 'basket_010') AS total_amount_cents, (SELECT COUNT(*) FROM payment_transactions WHERE basket_id = 'basket_010' AND payment_status = 'completed') AS existing_completed_payments, (SELECT COUNT(*) FROM shopping_basket_items bi WHERE bi.basket_id = 'basket_010' AND NOT EXISTS (SELECT 1 FROM store_inventory si WHERE si.store_id = b.store_id AND si.product_sku = bi.product_sku AND si.available_today_quantity >= bi.requested_quantity)) AS out_of_stock_items, s.latitude AS store_latitude, s.longitude AS store_longitude FROM shopping_baskets b JOIN customer_accounts c ON b.customer_id = c.customer_id JOIN stores s ON b.store_id = s.store_id WHERE b.basket_id = 'basket_010' AND c.customer_id = 'cust_070';"
-      },
-      "bind": "raw_check_data"
+      "bind": "basket_info_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "raw_payment_id",
+      "from_": "basket_info_raw",
       "format": "auto_delim",
-      "into": "payment_id_rowset",
-      "columns": [
-        {
-          "into": "payment_id",
-          "candidates": [
-            "payment_id"
-          ]
-        }
-      ]
-    },
-    {
-      "from_": "raw_check_data",
-      "format": "auto_delim",
-      "into": "check_data",
+      "into": "basket_info",
       "columns": [
         {
           "into": "basket_status",
@@ -65,325 +35,132 @@
           ]
         },
         {
-          "into": "basket_record_path",
-          "candidates": [
-            "basket_record_path"
-          ]
-        },
-        {
           "into": "customer_id",
           "candidates": [
             "customer_id"
           ]
         },
         {
-          "into": "customer_record_path",
+          "into": "record_path",
           "candidates": [
-            "customer_record_path"
+            "record_path"
           ]
         },
         {
-          "into": "total_amount_cents",
+          "into": "issue_count",
           "candidates": [
-            "total_amount_cents"
+            "issue_count"
           ]
         },
         {
-          "into": "existing_completed_payments",
+          "into": "is_open",
           "candidates": [
-            "existing_completed_payments"
+            "is_open"
           ]
         },
         {
-          "into": "out_of_stock_items",
+          "into": "store_city",
           "candidates": [
-            "out_of_stock_items"
+            "store_city"
           ]
         },
         {
-          "into": "store_latitude",
+          "into": "home_city",
           "candidates": [
-            "store_latitude"
-          ]
-        },
-        {
-          "into": "store_longitude",
-          "candidates": [
-            "store_longitude"
+            "home_city"
           ]
         }
       ]
     }
   ],
-  "compute": [
-    {
-      "prim": "first",
-      "args": [
-        "$payment_id_rowset"
-      ],
-      "into": "payment_id_dict"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$payment_id_dict",
-        "payment_id"
-      ],
-      "into": "payment_id"
-    },
-    {
-      "prim": "count",
-      "args": [
-        "$check_data"
-      ],
-      "into": "check_data_count"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$check_data",
-        "basket_status"
-      ],
-      "into": "basket_status_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$basket_status_list"
-      ],
-      "into": "basket_status"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$check_data",
-        "existing_completed_payments"
-      ],
-      "into": "existing_completed_payments_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$existing_completed_payments_list"
-      ],
-      "into": "existing_completed_payments"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$existing_completed_payments"
-      ],
-      "into": "existing_completed_payments_num"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$check_data",
-        "out_of_stock_items"
-      ],
-      "into": "out_of_stock_items_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$out_of_stock_items_list"
-      ],
-      "into": "out_of_stock_items"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$out_of_stock_items"
-      ],
-      "into": "out_of_stock_items_num"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$check_data",
-        "total_amount_cents"
-      ],
-      "into": "total_amount_cents_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$total_amount_cents_list"
-      ],
-      "into": "total_amount_cents"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$total_amount_cents"
-      ],
-      "into": "total_amount_cents_num"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$check_data",
-        "store_id"
-      ],
-      "into": "store_id_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$store_id_list"
-      ],
-      "into": "store_id"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$check_data",
-        "store_latitude"
-      ],
-      "into": "store_latitude_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$store_latitude_list"
-      ],
-      "into": "store_latitude"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$store_latitude"
-      ],
-      "into": "store_latitude_num"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$check_data",
-        "store_longitude"
-      ],
-      "into": "store_longitude_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$store_longitude_list"
-      ],
-      "into": "store_longitude"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$store_longitude"
-      ],
-      "into": "store_longitude_num"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$check_data",
-        "customer_record_path"
-      ],
-      "into": "customer_record_path_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$customer_record_path_list"
-      ],
-      "into": "customer_record_path"
-    }
-  ],
+  "compute": [],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "eq",
-          "lhs": "$check_data_count",
-          "rhs": 0,
+          "op": "ne",
+          "lhs": "$basket_info.0.home_city",
+          "rhs": "$basket_info.0.store_city",
           "args": []
         },
-        "label": "denied"
+        "label": "security_denied"
       },
       {
         "when": {
           "op": "eq",
-          "lhs": "$basket_status",
-          "rhs": "completed",
+          "lhs": "$basket_info.0.basket_status",
+          "rhs": "checked_out",
           "args": []
         },
-        "label": "denied"
+        "label": "already_checked_out"
       },
       {
         "when": {
           "op": "gt",
-          "lhs": "$existing_completed_payments_num",
+          "lhs": "$basket_info.0.issue_count",
           "rhs": 0,
           "args": []
         },
-        "label": "denied"
+        "label": "insufficient_inventory"
       },
       {
         "when": {
-          "op": "gt",
-          "lhs": "$out_of_stock_items_num",
+          "op": "eq",
+          "lhs": "$basket_info.0.is_open",
           "rhs": 0,
           "args": []
         },
-        "label": "denied"
+        "label": "store_closed"
       }
     ],
-    "default_label": "ok"
+    "default_label": "proceed_checkout"
   },
   "ops": [
     {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "args": [],
-        "stdin": "BEGIN TRANSACTION; INSERT INTO payment_transactions (payment_id, record_path, basket_id, is_archived_basket_reference, customer_id, store_id, payment_amount_cents, payment_currency, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude, three_ds_status, three_ds_failure_reason, three_ds_attempts, three_ds_max_attempts) VALUES ('$payment_id', '$payment.record_path', 'basket_010', 0, 'cust_070', '$store_id', $total_amount_cents_num, 'USD', 'completed', datetime('now'), 'disabled', 'disabled', $store_latitude_num, $store_longitude_num, NULL, NULL, 0, 0); UPDATE shopping_baskets SET basket_status = 'completed' WHERE basket_id = 'basket_010'; COMMIT;"
-      },
-      "bind": null,
-      "guard_label": "ok",
-      "outcome_from_exit": null
-    },
-    {
       "rpc": "Write",
       "args": {
-        "path": "$payment.record_path",
-        "content": "$payment_record_json_str"
+        "path": "/finalization/basket_051",
+        "content": "{}"
       },
       "bind": null,
-      "guard_label": "ok",
+      "guard_label": "proceed_checkout",
       "outcome_from_exit": null
     }
   ],
   "answer": {
-    "ok": {
-      "message": "Checkout completed for basket {basket_id}. Payment ID: {payment_id}.",
+    "security_denied": {
+      "message": "Security policy denied checkout for guest customer.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
+    },
+    "already_checked_out": {
+      "message": "Basket {basket_id} is already checked out.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "insufficient_inventory": {
+      "message": "Insufficient inventory for basket {basket_id}.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "store_closed": {
+      "message": "Store is closed.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "proceed_checkout": {
+      "message": "Checkout completed for basket {basket_id} for customer {customer_id}.",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "policy_doc",
-          "path": "/docs/checkout.md",
-          "source": null
+          "path": "/docs/checkout.md"
         },
         {
           "kind": "record_path",
-          "path": null,
-          "source": "$payment.record_path"
-        },
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$customer.record_path"
+          "path": "$basket_info.0.record_path"
         }
       ]
-    },
-    "denied": {
-      "message": "Checkout denied for basket {basket_id}. Reason: security policy violation.",
-      "outcome": "OUTCOME_DENIED_SECURITY",
-      "refs": []
     }
   },
   "custom_extract": []

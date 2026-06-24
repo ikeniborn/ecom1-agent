@@ -1,32 +1,42 @@
 {
-  "objective": "Determine whether the store carries the Heco TopFix GTU-YPJ Wood and Drywall Screw with screw type drywall screw.",
+  "objective": "Determine if the catalogue contains a product variant matching the described Nut Bolt and Washer from Heco with brand 'Heco', series containing 'Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer', fastener type 'bolt', and diameter '8 mm'.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_lookup_method": "Use normalized case-insensitive tokenized matching (ILIKE) on product_variants: brand ILIKE '%Heco%', series ILIKE '%TopFix%', model ILIKE '%GTU-YPJ%', product_name ILIKE '%Wood%Drywall%Screw%', and join product_variant_properties to check property_key = 'screw type' and property_value_text ILIKE '%drywall screw%'. Return the first matching product_sku and record_path."
+    "brand": "literal 'Heco'",
+    "series": "literal 'Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer'",
+    "fastener_type": "literal 'bolt'",
+    "diameter": "literal '8 mm'",
+    "method": "Lookup from product_variants using normalized case-insensitive matching on brand and series, and verify existence of product_variant_properties with property_key 'fastener_type' and value 'bolt', and property_key 'diameter' and value '8 mm'."
   },
   "outcome_space": [
     "OUTCOME_OK",
     "OUTCOME_NONE_UNSUPPORTED"
   ],
-  "constraints": [],
+  "constraints": [
+    {
+      "anchor": "LEARNED_RULES",
+      "rule": "To answer ‘do you carry product X’, resolve the product using NORMALIZED / case-insensitive tokenized matching (ILIKE on the key tokens of brand + kind + descriptive attributes) on the product catalogue table — do NOT use exact full-string `series =` equality.",
+      "security": false,
+      "deny_when": null,
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    }
+  ],
   "success_criteria": {
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$record.product_sku",
-        "rhs": null,
-        "args": []
-      },
-      {
-        "op": "nonempty",
-        "lhs": "$record.record_path",
+        "lhs": "$product_sku",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "We carry {product_name} (SKU: {product_sku}).",
+    "msg_skeleton": "Product {product_name} (SKU: {product_sku}) is available in the catalogue.",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -36,7 +46,7 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$record.record_path"
+        "source": "$product_variant.record_path"
       }
     ],
     "OUTCOME_NONE_UNSUPPORTED": []

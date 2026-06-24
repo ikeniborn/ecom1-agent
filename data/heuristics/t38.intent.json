@@ -1,8 +1,12 @@
 {
-  "objective": "Identify all archived payment records that are fraudulent according to the fraud criteria in the payments/3DS policy, and cite each record's path.",
+  "objective": "Find and cite payment records in archived payment history that are part of a confirmed fraud incident.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "fraud_identification_method": "Discover distinct payment_status and three_ds_status for archived payments (is_archived_basket_reference=1), then read /docs/payments/3ds.md for criteria that flag a payment as fraudulent, and select rows matching those criteria. Apply customer-ownership filter only if requester is a customer (here guest, so no filter)."
+    "marking_discovery": "SELECT DISTINCT payment_status, three_ds_status FROM payment_transactions WHERE is_archived_basket_reference = 1",
+    "fraud_criteria": "Read /docs/payments/3ds.md to determine the criteria that flag a payment as fraudulent (e.g., specific payment_status and three_ds_status values)",
+    "fraud_records": "SELECT record_path, payment_id, payment_status, three_ds_status FROM payment_transactions WHERE is_archived_basket_reference = 1 AND payment_status IN (<discovered fraud statuses>) AND three_ds_status IN (<discovered fraud 3ds statuses>)",
+    "fraud_record_paths": "list of record_path values from the selected fraud payment records",
+    "fraud_count": "number of fraud records found"
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -12,21 +16,15 @@
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "ge",
-        "lhs": "$answer.count",
-        "rhs": 1,
-        "args": []
-      },
-      {
         "op": "nonempty",
-        "lhs": "$answer.record_paths",
+        "lhs": "$fraud_record_paths",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Identified {count} fraudulent archived payment records: {record_paths}",
+    "msg_skeleton": "Found {fraud_count} fraudulent payment record(s): {fraud_record_paths}",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -41,9 +39,8 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$record.record_path"
+        "source": "$fraud_record_paths"
       }
-    ],
-    "OUTCOME_NONE_UNSUPPORTED": []
+    ]
   }
 }

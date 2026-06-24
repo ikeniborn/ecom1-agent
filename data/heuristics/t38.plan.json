@@ -5,45 +5,43 @@
       "args": {
         "path": "/docs/payments/3ds.md"
       },
-      "bind": "policy_3ds"
-    },
-    {
-      "rpc": "Read",
-      "args": {
-        "path": "/docs/security.md"
-      },
-      "bind": "policy_security"
-    },
-    {
-      "rpc": "Read",
-      "args": {
-        "path": "/docs/checkout.md"
-      },
-      "bind": "policy_checkout"
+      "bind": "policy_content"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT DISTINCT payment_status, three_ds_status FROM payment_transactions WHERE is_archived_basket_reference = 1;"
+        "stdin": ".mode csv\nSELECT DISTINCT payment_status, three_ds_status FROM payment_transactions WHERE is_archived_basket_reference = 1;"
       },
-      "bind": "archived_statuses_raw"
+      "bind": "marking_raw"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT record_path FROM payment_transactions WHERE is_archived_basket_reference = 1 AND (payment_status = 'fraud' OR three_ds_status = 'failed');"
+        "stdin": ".mode csv\nSELECT record_path, payment_id, payment_status, three_ds_status FROM payment_transactions WHERE is_archived_basket_reference = 1 AND payment_status = 'requires_3ds_action' AND three_ds_status = 'failed';"
       },
-      "bind": "fraud_records_raw"
+      "bind": "fraud_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "archived_statuses_raw",
+      "from_": "fraud_raw",
       "format": "auto_delim",
-      "into": "archived_statuses",
+      "into": "fraud_rows",
       "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        },
+        {
+          "into": "payment_id",
+          "candidates": [
+            "payment_id"
+          ]
+        },
         {
           "into": "payment_status",
           "candidates": [
@@ -57,72 +55,58 @@
           ]
         }
       ]
-    },
-    {
-      "from_": "fraud_records_raw",
-      "format": "auto_delim",
-      "into": "record",
-      "columns": [
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
-          ]
-        }
-      ]
     }
   ],
   "compute": [
     {
       "prim": "count",
       "args": [
-        "$record"
+        "$fraud_rows"
       ],
-      "into": "count"
+      "into": "fraud_count"
     },
     {
       "prim": "column",
       "args": [
-        "$record",
+        "$fraud_rows",
         "record_path"
       ],
-      "into": "record_path_list"
-    },
-    {
-      "prim": "concat",
-      "args": [
-        "$record_path_list",
-        ", "
-      ],
-      "into": "record_paths"
+      "into": "fraud_record_paths"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "ge",
-          "lhs": "$count",
-          "rhs": 1,
+          "op": "nonempty",
+          "lhs": "$fraud_record_paths",
+          "rhs": null,
           "args": []
         },
-        "label": "ok"
+        "label": "found"
       }
     ],
-    "default_label": "none_unsupported"
+    "default_label": "not_found"
   },
   "ops": [],
   "answer": {
-    "ok": {
-      "message": "Identified {count} fraudulent archived payment records: {record_paths}",
+    "found": {
+      "message": "Found {fraud_count} fraudulent payment record(s): {fraud_record_paths}",
       "outcome": "OUTCOME_OK",
       "refs": [
-        "$policy_3ds",
-        "$record"
+        {
+          "kind": "policy_doc",
+          "path": "/docs/payments/3ds.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "source": "$fraud_record_paths"
+        }
       ]
     },
-    "none_unsupported": {
-      "message": "No fraudulent archived payment records found.",
+    "not_found": {
+      "message": "No fraudulent payment records found.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

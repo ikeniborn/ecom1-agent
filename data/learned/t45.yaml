@@ -1,63 +1,103 @@
 entries:
 - agents_md_anchor: null
-  content: When a rowset is expected to contain exactly one row and you need to extract a field from it
-    using an index (e.g., '0.field'), always set the rowset format to 'json' (not 'auto_delim') to ensure
-    the result is always a list, even for a single row.
+  content: When a rowset is expected to contain exactly one row and you need to extract
+    a field from it using an index (e.g., '0.field'), always set the rowset format
+    to 'json' (not 'auto_delim') to ensure the result is always a list, even for a
+    single row.
   created: '2026-06-22'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
   id: r015
   reasoning: 'Error: ''grader: answer missing required reference ''/proc/catalog/Bahco/HND-2O9KS4GG.json''''.
-    Root cause: The rowset ''store_result'' was parsed with format ''auto_delim'', which for a single-row
-    SQL result likely produced a single object instead of a list. The subsequent compute step ''get''
-    with path ''0.record_path'' failed to extract the value because the rowset was not indexable, leaving
-    ''$store_record_path'' empty. Consequently, the answer ref for ''record_path'' was missing or had
-    a null path, causing the grader to report the required reference as missing. Failing PlanIR fragment:
-    rowsets[0] format ''auto_delim'' and compute step ''get'' with args [''$store_result'', ''0.record_path''].'
-  status: active
+    Root cause: The rowset ''store_result'' was parsed with format ''auto_delim'',
+    which for a single-row SQL result likely produced a single object instead of a
+    list. The subsequent compute step ''get'' with path ''0.record_path'' failed to
+    extract the value because the rowset was not indexable, leaving ''$store_record_path''
+    empty. Consequently, the answer ref for ''record_path'' was missing or had a null
+    path, causing the grader to report the required reference as missing. Failing
+    PlanIR fragment: rowsets[0] format ''auto_delim'' and compute step ''get'' with
+    args [''$store_result'', ''0.record_path''].'
+  status: inactive
   surface: ir
 - content: null
   created: '2026-06-22'
+  deactivated_reason: superseded by newer verdict
   id: v015
   score: 0.0
   score_detail:
   - answer missing required reference '/proc/catalog/hand_tools/pliers_wrenches/HND-HINAM6H9.json'
   source: verdict
-  status: active
-  submitted_message: 'Access denied: guest users are not authorized to perform this operation.'
+  status: inactive
+  submitted_message: 'Access denied: guest users are not authorized to perform this
+    operation.'
   submitted_outcome: OUTCOME_DENIED_SECURITY
   submitted_refs:
   - /docs/security.md
 - agents_md_anchor: null
-  content: Never omit the OUTCOME_OK answer branch when the TOOL_PLAN defines success criteria for it;
-    always include the required refs for that outcome.
+  content: Never omit the OUTCOME_OK answer branch when the TOOL_PLAN defines success
+    criteria for it; always include the required refs for that outcome.
   created: '2026-06-22'
   deactivated_reason: null
   id: r016
   reasoning: 'The error ''grader: answer missing required reference ''/proc/catalog/hand_tools/pliers_wrenches/HND-HINAM6H9.json''''
-    occurred because the PlanIR only contained a decision for security and an answer for OUTCOME_DENIED_SECURITY,
-    completely ignoring the main objective and its required refs for OUTCOME_OK. The script code had no
-    discovery, rowsets, compute, or answer for the OK outcome, so the answer lacked the required record_path
-    ref. The root cause is that the PlanIR failed to implement the task''s objective, defaulting to denied.
-    The rule ensures that the PlanIR always includes the OUTCOME_OK branch and its required refs when
-    the TOOL_PLAN defines success criteria for it.'
+    occurred because the PlanIR only contained a decision for security and an answer
+    for OUTCOME_DENIED_SECURITY, completely ignoring the main objective and its required
+    refs for OUTCOME_OK. The script code had no discovery, rowsets, compute, or answer
+    for the OK outcome, so the answer lacked the required record_path ref. The root
+    cause is that the PlanIR failed to implement the task''s objective, defaulting
+    to denied. The rule ensures that the PlanIR always includes the OUTCOME_OK branch
+    and its required refs when the TOOL_PLAN defines success criteria for it.'
   status: active
   surface: ir
 - agents_md_anchor: null
-  content: Always include a valid decision tree in the PlanIR; the decision field must be a dictionary
-    with at least a 'type' key and appropriate branches, never null or missing.
+  content: Always include a valid decision tree in the PlanIR; the decision field
+    must be a dictionary with at least a 'type' key and appropriate branches, never
+    null or missing.
   created: '2026-06-22'
   deactivated_reason: null
   id: r017
-  reasoning: 'The error ''plan: PLAN: validation failed: 1 validation error for PlanIR decision Input
-    should be a valid dictionary or instance of DecisionTree [type=model_type, input_value=None, input_type=NoneType]''
-    indicates the PlanIR had a null or missing decision field. The script code is empty, so the PLAN phase
-    emitted a PlanIR without a proper decision tree. This rule ensures the PLAN phase always constructs
-    a valid decision structure.'
+  reasoning: 'The error ''plan: PLAN: validation failed: 1 validation error for PlanIR
+    decision Input should be a valid dictionary or instance of DecisionTree [type=model_type,
+    input_value=None, input_type=NoneType]'' indicates the PlanIR had a null or missing
+    decision field. The script code is empty, so the PLAN phase emitted a PlanIR without
+    a proper decision tree. This rule ensures the PLAN phase always constructs a valid
+    decision structure.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When extracting a scalar value from a single-row rowset, after setting
+    the rowset format to 'json', use a column extraction to obtain the list, then
+    use an index operation (e.g., '0') to extract the first element, and use that
+    scalar as the ref source; never use the list directly as a ref source.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r018
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$store.record_path'''']
+    on OK answer''. The PlanIR computed $store_record_path via column extraction from
+    a rowset with format ''auto_delim''. When the SQL returns exactly one row, auto_delim
+    may produce a single object instead of a list, causing column extraction to fail.
+    Even if format were ''json'' (as rule r015 prescribes), column extraction returns
+    a list, but the answer ref uses that list directly as a record_path source. The
+    interpreter cannot resolve a list to a scalar path, hence the unresolved ref.
+    The root cause is that the script did not extract the first element from the list.
+    The fix requires two steps: (1) set rowset format to ''json'' (r015), (2) add
+    an index compute step to get the scalar value, then use that scalar in the ref.
+    This new rule complements r015 by specifying the full pattern for scalar extraction.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v016
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/catalog/Festool/STO-33WC58QK.json'
+  source: verdict
+  status: active
+  submitted_message: Unable to process request.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
   cycles_used: 2
-  date: '2026-06-22'
+  date: '2026-06-24'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t45
