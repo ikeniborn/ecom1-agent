@@ -51,8 +51,9 @@ _OLLAMA_KEY = os.environ.get("ECOM_OLLAMA_API_KEY") or "ollama"
 _CC_ENABLED = os.environ.get("ECOM_CC_ENABLED") == "1"  # Claude Code tier (iclaude subprocess)
 
 # FIX-215: explicit HTTP timeout — OpenAI SDK defaults to 600s; Ollama local can hang
-# silently on stuck sockets (observed 40+ min hang during COPRO). Read-timeout 180s keeps
-# us under TASK_TIMEOUT_S and lets TRANSIENT_KWS retry loop recover from stalled requests.
+# silently on stuck sockets (observed 40+ min hang during COPRO). Read-timeout default 120s
+# with _MAX_RETRIES bounds the worst-case call to 120*(2+1)=360s, under TASK_TIMEOUT_S (600s);
+# the TRANSIENT_KWS retry loop recovers from stalled requests within that budget.
 _DEFAULT_HTTP_READ_TIMEOUT_S = 120.0
 try:
     _HTTP_READ_TIMEOUT_S = float(os.environ.get("ECOM_LLM_HTTP_READ_TIMEOUT_S", str(_DEFAULT_HTTP_READ_TIMEOUT_S)))
