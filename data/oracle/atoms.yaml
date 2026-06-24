@@ -1,0 +1,124 @@
+- id: access_control_decision_allow_when_authorized
+  description: Ensure decision logic grants access when the security policy permits and the requested
+    resource exists, avoiding default denial that blocks authorized queries.
+  domain:
+  - security
+  - access_control
+  - decision_logic
+  content: When constructing a decision tree for a request, first evaluate the relevant security policy
+    (e.g., read the policy document and check the user's permissions). If the policy grants the required
+    permission and the target resource is found (e.g., a product record path is non‑empty), route the
+    flow to an explicit "allow" branch that returns the data. Only route to a "deny" branch when the policy
+    explicitly forbids the action or when the resource is missing. Place the security check before any
+    resource‑existence check and avoid using a generic default‑deny that could trigger for authorized
+    cases.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: e544ec396769e334bd290983716719fac6de1e03f19b2612c347edc8e3580d33
+  source_task: t01
+  polarity: anti_pattern
+- id: catalog-product-existence-check
+  description: Reusable pattern for safely determining whether a product variant exists in a catalog using
+    a SQL query and returning a generic success/failure outcome without exposing sensitive record identifiers.
+  domain:
+  - SQL
+  - catalog-management
+  - product-lookup
+  - security‑aware‑responses
+  content: "### Overview\nA generic, security‑conscious method to verify the presence of a product variant\
+    \ in a catalog. The method runs a parameterised SQL query, extracts the primary key (or any unique\
+    \ identifier) if any rows are returned, and maps the result to a high‑level outcome (`OUTCOME_OK`\
+    \ for found, `OUTCOME_NOT_FOUND` for missing). No raw identifiers are exposed in the response.\n\n\
+    ### Steps\n1. **Define Query Parameters**\n   ```sql\n   SELECT unique_id\n   FROM product_variants\n\
+    \   WHERE brand = :brand\n     AND product_name ILIKE :product_name_pattern\n     AND line_name =\
+    \ :line_name\n     AND cleaner_type = :cleaner_type;\n   ```\n   *Use named parameters (`:param`)\
+    \ to avoid SQL injection.*\n\n2. **Execute Query**\n   - Use a safe execution primitive (e.g., `Exec`\
+    \ RPC) that accepts the query and a map of parameter values.\n   - Capture the result set in a temporary\
+    \ binding (e.g., `sql_output`).\n\n3. **Parse Result Set**\n   - Convert the raw output to a structured\
+    \ rowset (auto‑delimited or JSON).\n   - Extract the column containing the unique identifier into\
+    \ a list, e.g., `product_ids`.\n\n4. **Determine Existence**\n   - If `product_ids` is non‑empty →\
+    \ set `found = true`.\n   - Otherwise → `found = false`.\n\n5. **Map to Outcome**\n   ```json\n  \
+    \ {\n     \"found\": {\n       \"message\": \"Product exists.\",\n       \"outcome\": \"OUTCOME_OK\"\
+    \n     },\n     \"not_found\": {\n       \"message\": \"Product not found.\",\n       \"outcome\"\
+    : \"OUTCOME_NOT_FOUND\"\n     }\n   }\n   ```\n   *Never include the raw identifier (`unique_id`)\
+    \ in the public message; keep it internal if needed for downstream processing.*\n\n6. **Return Decision**\n\
+    \   - Use a decision block that branches on the boolean `found` value.\n   - The default branch should\
+    \ be the `not_found` case.\n\n### Pseudocode Example\n```json\n{\n  \"discovery\": [\n    {\n    \
+    \  \"rpc\": \"Exec\",\n      \"args\": {\n        \"path\": \"/bin/sql\",\n        \"stdin\": \"SELECT\
+    \ unique_id FROM product_variants WHERE brand = :brand AND product_name ILIKE :name_pat AND line_name\
+    \ = :line AND cleaner_type = :type;\",\n        \"params\": {\n          \"brand\": \"<BRAND>\",\n\
+    \          \"name_pat\": \"%<PRODUCT_NAME>%\",\n          \"line\": \"<LINE_NAME>\",\n          \"\
+    type\": \"<CLEANER_TYPE>\"\n        }\n      },\n      \"bind\": \"sql_output\"\n    }\n  ],\n  \"\
+    rowsets\": [\n    {\n      \"from_\": \"sql_output\",\n      \"format\": \"auto_delim\",\n      \"\
+    into\": \"product\",\n      \"columns\": [{\"into\": \"unique_id\", \"candidates\": [\"unique_id\"\
+    ]}]\n    }\n  ],\n  \"compute\": [\n    {\"prim\": \"column\", \"args\": [\"$product\", \"unique_id\"\
+    ], \"into\": \"product_ids\"},\n    {\"prim\": \"nonempty\", \"args\": [\"$product_ids\"], \"into\"\
+    : \"found\"}\n  ],\n  \"decision\": {\n    \"branches\": [\n      {\"when\": {\"op\": \"eq\", \"lhs\"\
+    : \"$found\", \"rhs\": true}, \"label\": \"found\"}\n    ],\n    \"default_label\": \"not_found\"\n\
+    \  },\n  \"answer\": {\n    \"found\": {\"message\": \"Product exists.\", \"outcome\": \"OUTCOME_OK\"\
+    },\n    \"not_found\": {\"message\": \"Product not found.\", \"outcome\": \"OUTCOME_NOT_FOUND\"}\n\
+    \  }\n}\n```\n\n### Security Considerations\n- **Parameterisation** prevents injection attacks.\n\
+    - **Outcome abstraction** avoids leaking internal identifiers.\n- **Default denial** (`OUTCOME_NOT_FOUND`)\
+    \ is safe; only a generic success message is emitted when a match is confirmed.\n\nThis atom can be\
+    \ reused for any catalog lookup by substituting the placeholder values with the appropriate context‑specific\
+    \ data."
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: a532fd5789dc65a2b8435380812a6a595e9d2e22b15044a822ab36ad25fa726f
+  source_task: t01
+  polarity: anti_pattern
+- id: safe_product_existence_check
+  description: Method for verifying whether a product (or any record) exists in a catalogue/database while
+    preventing leakage of internal identifiers or paths in the response.
+  domain:
+  - database
+  - security
+  - policy_enforcement
+  content: "When you need to confirm the presence of a specific product:\n1. Formulate a query that returns\
+    \ only a boolean or count, e.g., `SELECT EXISTS(SELECT 1 FROM product_variants WHERE brand = ? AND\
+    \ product_name ILIKE ? AND series ILIKE ? AND properties ILIKE ?);` or `SELECT COUNT(*) FROM product_variants\
+    \ WHERE …;`.\n2. Execute the query and capture the result in a scalar variable (e.g., `found`).\n\
+    3. Do **not** bind or expose any raw record identifiers, paths, or other internal data to the answer\
+    \ payload.\n4. Map the scalar result to a generic outcome:\n   - If `found` is true (or count > 0)\
+    \ → return a success message such as \"Product found\" with `OUTCOME_OK`.\n   - If `found` is false\
+    \ (or count = 0) → return a generic failure message such as \"Product not found\" with `OUTCOME_DENIED_SECURITY`\
+    \ (or another appropriate denial outcome).\n5. Reference only policy documentation or non‑sensitive\
+    \ metadata in the response; omit any fields that could reveal internal storage details.\n6. Ensure\
+    \ the decision logic uses a simple non‑empty check on the boolean/count result rather than inspecting\
+    \ bound record paths.\n\nBy following these steps you satisfy the security policy that forbids exposing\
+    \ internal catalogue paths while still providing the required existence check."
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 552636ba66d9ab096a9f0363c5b4c1219f63e58b769c4fa3007033a9be5197c4
+  source_task: t01
+  polarity: anti_pattern
+- id: sql_check_product_existence
+  description: Reusable method to verify whether a product with specific attributes exists in a catalog
+    by joining product variant and property tables and applying filtered criteria.
+  domain:
+  - SQL
+  - Data Retrieval
+  - Catalog Management
+  - Security
+  content: "Use a parameterized query that joins the product_variants table with the product_variant_properties\
+    \ table on the SKU, then filter on the desired attributes (e.g., brand, product name pattern, product\
+    \ family name, property key, and property value). Example pattern:\n\n```sql\nSELECT pv.record_path\n\
+    FROM product_variants pv\nJOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku\n\
+    WHERE pv.brand = ?\n  AND pv.product_name LIKE ?\n  AND pv.product_family_id = (\n        SELECT product_family_id\n\
+    \        FROM product_families\n        WHERE product_family_name = ?\n      )\n  AND pvp.property_key\
+    \ = ?\n  AND pvp.property_value_text = ?;\n```\n\nReplace the placeholders with the appropriate values\
+    \ at execution time. This approach avoids hard‑coding values, mitigates SQL injection risks, and respects\
+    \ access‑control policies."
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 859dee2087da02fb896033d02375b7a8ea957cdb1c24a514dff20d2ea2a19145
+  source_task: t01
+  polarity: anti_pattern

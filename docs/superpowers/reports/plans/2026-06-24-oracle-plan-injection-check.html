@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Проверка плана — Oracle → PLAN injection</title>
+<style>
+  :root[data-theme="dark"]{
+    --bg:#0f1419; --panel:#1a212b; --panel2:#222c38; --fg:#e6edf3; --muted:#9aa7b4;
+    --line:#30404f; --accent:#4ea1ff; --ok:#3fb950; --warn:#d29922; --crit:#f85149;
+    --info:#58a6ff; --chip:#2d3b4a; --after:#1d3326;
+  }
+  :root[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#eef2f6; --fg:#1f2328; --muted:#5a6671;
+    --line:#d0d7de; --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --crit:#cf222e;
+    --info:#0969da; --chip:#e6ecf2; --after:#e6f6ec;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 22px 60px;}
+  header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+    border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:8px;}
+  h1{font-size:22px;margin:0 0 4px;}
+  h2{font-size:18px;margin:34px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+  h3{font-size:14px;margin:20px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .sub{color:var(--muted);font-size:13.5px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.86em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  table{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:13.5px;}
+  th,td{text-align:left;padding:8px 10px;border:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel2);font-weight:600;}
+  tr:nth-child(even) td{background:var(--panel);}
+  .pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;}
+  .b-ok{background:var(--ok);color:#fff} .b-warn{background:var(--warn);color:#fff}
+  .tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:12px;font-weight:600;background:var(--chip);color:var(--fg);}
+  .ok{color:var(--ok)} .warn{color:var(--warn)} .info{color:var(--info)}
+  button#tg{cursor:pointer;background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+    border-radius:8px;padding:7px 13px;font-size:13px;}
+  .verdict{display:inline-flex;align-items:center;gap:8px;font-size:16px;font-weight:700;
+    background:var(--after);color:var(--ok);padding:8px 16px;border-radius:10px;border:1px solid var(--ok);}
+  .summary-cards{display:flex;gap:12px;flex-wrap:wrap}
+  .card{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:6px 0}
+  .card .n{font-size:24px;font-weight:700}
+  .muted{color:var(--muted)}
+  figure{margin:0}
+  .legend{color:var(--muted);font-size:12.5px;margin:4px 0 0}
+  .yes{color:var(--ok);font-weight:700} .blank{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Проверка плана — Oracle → PLAN injection</h1>
+      <div class="sub">2026-06-24 · plan_hash <code>40271f6328a47a9b</code> · spec_hash <code>de8fd57ee094020d</code></div>
+    </div>
+    <button id="tg" onclick="(function(){var r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';})()">🌓 Тема</button>
+  </header>
+
+  <div class="summary-cards">
+    <div class="card"><div class="muted">Вердикт</div><div class="n ok">OK</div></div>
+    <div class="card"><div class="muted">CRITICAL open</div><div class="n">0</div></div>
+    <div class="card"><div class="muted">WARNING open</div><div class="n warn">1</div></div>
+    <div class="card"><div class="muted">INFO open</div><div class="n">0</div></div>
+  </div>
+
+  <!-- ===================== БЛОК 1 ===================== -->
+  <h2>1. Резюме плана</h2>
+  <p class="sub"><strong>Goal:</strong> oracle-атомы доходят до PLAN при <code>ECOM_INVESTIGATE_ENABLED=1</code> — снять guard, заполнявший <code>oracle_atoms</code> только в INVESTIGATE-off ветке. Один Task, 6 шагов (TDD).</p>
+  <table>
+    <thead><tr><th>Шаг</th><th>Действие</th><th>DoD / критерий готовности</th></tr></thead>
+    <tbody>
+      <tr><td>Step 1</td><td>Падающий тест <code>test_run_pipeline_injects_oracle_atoms_into_plan</code> (мок <code>_new_oracle→retrieve=[ATOM-SENTINEL]</code>, спай <code>fake_run_plan</code> ловит <code>oracle_atoms</code>)</td><td>Тест-код добавлен в <code>tests/test_pipeline_investigate.py</code></td></tr>
+      <tr><td>Step 2</td><td>Прогон теста → FAIL</td><td><code>assert [] == ['ATOM-SENTINEL']</code> (guard оставляет пустым)</td></tr>
+      <tr><td>Step 3</td><td>Снять guard в <code>agent/pipeline.py:312-318</code> — убрать <code>if not _investigate_on:</code>, retrieve в обоих режимах</td><td>Показан before/after код</td></tr>
+      <tr><td>Step 4</td><td>Прогон нового теста → PASS</td><td>PASS</td></tr>
+      <tr><td>Step 5</td><td>Регресс-прогон <code>test_pipeline_investigate.py</code> + <code>test_pipeline_v2.py</code> + <code>test_oracle_retrieve.py</code></td><td>Все PASS, существующие тесты зелёные</td></tr>
+      <tr><td>Step 6</td><td>Commit (<code>agent/pipeline.py</code> + tests)</td><td>Коммит создан</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===================== БЛОК 2 ===================== -->
+  <h2>2. Схемы зависимостей и пересечений</h2>
+
+  <h3>Граф зависимостей шагов (M→N = результат M используется в N)</h3>
+  <figure>
+  <svg viewBox="0 0 880 120" width="100%" role="img" aria-label="Граф зависимостей шагов">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+      </marker>
+      <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-opacity="0.35"/>
+      </filter>
+      <style>
+        .nd rect{fill:var(--panel);stroke:var(--line);stroke-width:1.2;filter:url(#ds)}
+        .nd text{fill:var(--fg);font:12px sans-serif;text-anchor:middle}
+        .nd .s{fill:var(--muted);font:10px sans-serif}
+        .ed{stroke:var(--accent);stroke-width:1.8;fill:none;marker-end:url(#arr)}
+      </style>
+    </defs>
+    <path class="ed" d="M128,52 L150,52"/>
+    <path class="ed" d="M268,52 L290,52"/>
+    <path class="ed" d="M408,52 L430,52"/>
+    <path class="ed" d="M548,52 L570,52"/>
+    <path class="ed" d="M688,52 L710,52"/>
+    <g class="nd">
+      <rect x="20" y="30" rx="8" width="108" height="44"/><text x="74" y="50">Step 1</text><text class="s" x="74" y="66" text-anchor="middle">тест</text>
+      <rect x="160" y="30" rx="8" width="108" height="44"/><text x="214" y="50">Step 2</text><text class="s" x="214" y="66" text-anchor="middle">FAIL</text>
+      <rect x="300" y="30" rx="8" width="108" height="44"/><text x="354" y="50">Step 3</text><text class="s" x="354" y="66" text-anchor="middle">фикс</text>
+      <rect x="440" y="30" rx="8" width="108" height="44"/><text x="494" y="50">Step 4</text><text class="s" x="494" y="66" text-anchor="middle">PASS</text>
+      <rect x="580" y="30" rx="8" width="108" height="44"/><text x="634" y="50">Step 5</text><text class="s" x="634" y="66" text-anchor="middle">регресс</text>
+      <rect x="720" y="30" rx="8" width="108" height="44"/><text x="774" y="50">Step 6</text><text class="s" x="774" y="66" text-anchor="middle">commit</text>
+    </g>
+  </svg>
+  <div class="legend">Линейная цепочка 1→2→3→4→5→6. Циклов нет, нарушений порядка нет.</div>
+  </figure>
+
+  <h3>Пересечения по артефактам (артефакт → шаги)</h3>
+  <table>
+    <thead><tr><th>Артефакт</th><th>Step 1</th><th>Step 3</th><th>Step 5</th><th>Step 6</th></tr></thead>
+    <tbody>
+      <tr><td><code>tests/test_pipeline_investigate.py</code></td><td class="yes">создаёт</td><td class="blank">—</td><td class="yes">прогон</td><td class="yes">commit</td></tr>
+      <tr><td><code>agent/pipeline.py</code></td><td class="blank">—</td><td class="yes">правит</td><td class="yes">прогон</td><td class="yes">commit</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Покрытие требований спеки (требование → шаги)</h3>
+  <table>
+    <thead><tr><th>Требование</th><th>Шаги</th></tr></thead>
+    <tbody>
+      <tr><td>R1 / R3 / R4 / R6 — root cause + fix</td><td>Step 3, Step 4</td></tr>
+      <tr><td>R5 — investigate-канал не тронут</td><td>Step 5 (регресс-guard)</td></tr>
+      <tr><td>R7 — safety try/except, <code>_oracle</code> не расходуется</td><td>сохранено в Step 3</td></tr>
+      <tr><td>SC1 — oracle-блок в PLAN-трейсе</td><td>Verification (ручной trace t51)</td></tr>
+      <tr><td>SC2 / SC3 — нет регресса, тесты зелёные</td><td>Step 5</td></tr>
+      <tr><td>R2 / R9 / R10 — red herring / rejected B / out of scope</td><td>no task by design</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===================== БЛОК 3 ===================== -->
+  <h2>3. Результаты проверки</h2>
+
+  <h3>Фазы</h3>
+  <table>
+    <thead><tr><th>Фаза</th><th>Статус</th><th>Заметка</th></tr></thead>
+    <tbody>
+      <tr><td>structure</td><td><span class="pill b-ok">passed</span></td><td>Плейсхолдеров / дубль-шагов нет; нумерация Step 1–6 сплошная.</td></tr>
+      <tr><td>coverage</td><td><span class="pill b-ok">passed</span></td><td>Явная карта Spec→Task; R2/R9/R10 корректно no-task; реализуемые покрыты.</td></tr>
+      <tr><td>dependencies</td><td><span class="pill b-ok">passed</span></td><td>Линейный порядок 1→6; артефакты создаются до использования; циклов нет.</td></tr>
+      <tr><td>verifiability</td><td><span class="pill b-ok">passed</span></td><td>У каждого шага DoD: код / команда / ожидаемый вывод.</td></tr>
+      <tr><td>consistency</td><td><span class="pill b-ok">passed</span></td><td>Новый файл.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Findings</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Severity</th><th>Секция</th><th>Описание</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>F-001</td>
+        <td><span class="pill b-warn">WARNING</span></td>
+        <td>Task 1 / Step 5</td>
+        <td>После снятия guard <code>run_pipeline</code> вызывает <code>_oracle.retrieve(instruction)</code> в обоих режимах. Существующий <code>test_run_pipeline_builds_brief_then_plan</code> НЕ мокает <code>_new_oracle</code> → пост-фикс триггерит реальный <code>retrieve()</code> = попытка Ollama-embed. Сбой глотается <code>try/except</code> (<code>oracle_atoms=[]</code>, <code>_oracle=None</code>), тест зелёный, но входит скрытый network I/O. Non-blocking; при медленности/флаках добавить <code>monkeypatch _new_oracle</code> в этот тест.</td>
+        <td><span class="tag">open</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Сводка</h3>
+  <p>
+    <span class="pill" style="background:var(--crit);color:#fff">CRITICAL open: 0</span>
+    &nbsp;<span class="pill b-warn">WARNING open: 1</span>
+    &nbsp;<span class="pill" style="background:var(--chip);color:var(--fg)">INFO open: 0</span>
+  </p>
+  <p><span class="verdict">✓ Вердикт: OK</span></p>
+
+  <h3>Chain</h3>
+  <div class="sub">intent <code>null</code> → spec <code>2026-06-24-oracle-plan-injection-design.md</code> → plan <code>2026-06-24-oracle-plan-injection.md</code></div>
+
+  <p class="sub" style="margin-top:30px">Артефакт IDD-проверки · сгенерирован навыком <code>check-plan</code> → <code>html-report</code>.</p>
+</div>
+</body>
+</html>
