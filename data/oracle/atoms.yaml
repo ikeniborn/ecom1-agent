@@ -1,0 +1,334 @@
+- id: include-required-references
+  description: Ensure that the answer includes all required references, such as document paths specified
+    in the task or error feedback.
+  domain:
+  - answer-construction
+  - task-execution
+  content: When constructing the final answer, check the task description and any error feedback for required
+    references (e.g., document paths). If a reference is required, include it in the `refs` array of the
+    answer object. If no references are required, the array may be empty. This prevents errors due to
+    missing mandatory references.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 057b8230bef620477c7aa30c5a411918352f15815eb95d950afa127b9fe53637
+  source_task: t10
+  polarity: anti_pattern
+- id: atom-count-items-by-category-sql
+  description: A reusable method to count items belonging to a specific category in a relational database
+    using SQL JOIN and WHERE clause, extracting the count, validating it, and formatting the output.
+  domain:
+  - database-query
+  - data-retrieval
+  - sql
+  content: 'To count items of a specific category:
+
+    1. Construct a SQL query that joins the items table with the categories table on the category identifier.
+
+    2. Use a WHERE clause to filter rows where the category name equals the target category.
+
+    3. Apply COUNT(*) to get the total number of matching items.
+
+    4. Execute the query and capture the result set.
+
+    5. Extract the count value from the first row and column of the result.
+
+    6. Convert the extracted value to a numeric type if necessary.
+
+    7. Validate that the count is non-negative; if negative, treat as an error or unsupported case.
+
+    8. Format the output message by embedding the count into a predefined template (e.g., ''<COUNT:{count}>'').'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 6c971e6b51abeff692fbbfbdddbbc41a1cbaccef1b6f489e77558d5afe19a98d
+  source_task: t10
+  polarity: anti_pattern
+- id: sql-count-by-category
+  description: Method to count items of a specific category in a relational database using SQL JOIN and
+    COUNT
+  domain:
+  - data-query
+  - sql
+  - product-catalogue
+  content: To count the number of items belonging to a particular category in a database where items and
+    categories are stored in separate tables linked by a foreign key, perform an inner join between the
+    items table and the categories table on the category identifier column. Filter the result by the desired
+    category name using a WHERE clause, then apply the COUNT aggregate function to obtain the total count.
+    This pattern is reusable for any item-category relationship.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 32c222d38b77e5e12ae26cf69d30aa8c18538a9ccb9080881f380006e1bd6339
+  source_task: t10
+  polarity: anti_pattern
+- id: count_products_by_kind_and_city
+  description: Count distinct product SKUs of a given kind that are available in open stores in a specified
+    city.
+  domain:
+  - data_retrieval
+  - sql
+  - inventory
+  - catalogue
+  content: To count distinct products of a specific kind that are available in open stores in a given
+    city, execute a SQL query that joins product_variants, store_inventory, and stores tables. Filter
+    by product_kind_id, city, store is_open flag, and available_today_quantity > 0. Use SELECT COUNT(DISTINCT
+    product_variants.product_sku) ... . Handle cases where the result is null or negative by returning
+    a clarification message. Otherwise, output the count.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 62a53b304be88187d9f862a9b3198afe22dacbe8734f5c9deee97ef464ecb239
+  source_task: t10
+  polarity: method
+- id: count_available_products_by_category_and_location
+  description: Count distinct products of a given category that are available in a specific location with
+    positive inventory and store open.
+  domain:
+  - data_querying
+  - sql
+  content: To count distinct products of a specific category that are available in a specific location,
+    join product variants with product kinds on product_kind_id, filter by product_kind_name, and ensure
+    existence of inventory records for the product in stores of the given location where the store is
+    open and the available quantity is greater than zero. Use COUNT(DISTINCT product_sku) to get the count.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: bd8ecf99500e3378ce0c93c9810bf0424442fcf48f175c0edbb8d82c6d58a3b8
+  source_task: t10
+  polarity: method
+- id: catalogue-counting-include-ref
+  description: When counting catalogue products by a specific attribute, include a reference to the documentation
+    that defines the counting criteria.
+  domain:
+  - catalogue management
+  - product data
+  - reporting
+  content: Always include a reference to the authoritative documentation (e.g., specification, rule set)
+    that defines the criteria for counting catalogue products, such as product kind definitions or counting
+    rules. This ensures traceability and validation of the count.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 085f77887df0bd3f3d90d69e2b7b6ec1aa825083aff472f2154744d95652091a
+  source_task: t10
+  polarity: anti_pattern
+- id: sql-count-products-by-kind
+  description: Count the number of catalogue products that belong to a specific product kind.
+  domain:
+  - SQL
+  - Database
+  - Analytics
+  - Reporting
+  content: '```sql
+
+    -- Replace {{product_kind}} with the desired product kind name (e.g., ''Work Jacket'')
+
+    SELECT COUNT(*) AS product_count
+
+    FROM product_variants v
+
+    JOIN product_kinds k ON v.product_kind_id = k.product_kind_id
+
+    WHERE k.product_kind_name = ''{{product_kind}}'';
+
+    ```
+
+    **Explanation**
+
+    1. **Join** `product_variants` with `product_kinds` on the foreign‑key `product_kind_id` to associate
+    each variant with its kind.
+
+    2. **Filter** rows where `product_kind_name` matches the target kind (parameterized as `{{product_kind}}`).
+
+    3. **Aggregate** using `COUNT(*)` to obtain the total number of matching catalogue products.
+
+    4. The result column is aliased as `product_count` for easy extraction in downstream code.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: b63e4f51980f6a46ddd4905b45411e559cae4c56b0a094e37d582a26e3594bd3
+  source_task: t10
+  polarity: anti_pattern
+- id: count_products_by_kind
+  description: Count the number of catalogue products that belong to a specific product kind.
+  domain:
+  - SQL
+  - catalogue
+  - product
+  - analytics
+  content: 'SELECT COUNT(*) AS count
+
+    FROM product_variants v
+
+    JOIN product_kinds k ON v.product_kind_id = k.product_kind_id
+
+    WHERE k.product_kind_name = ''<PRODUCT_KIND>'';'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 2b97bf3b3c54fe9c40a17b504f6c4c6cf64cae9e312633aa9d6d9e89d962cffb
+  source_task: t10
+  polarity: anti_pattern
+- id: sql-count-available-skus-by-kind-and-location
+  description: Count distinct product SKUs of a given product kind that are available in open stores of
+    a specific city.
+  domain:
+  - SQL
+  - Data Retrieval
+  - Inventory Management
+  content: "Use Common Table Expressions (CTEs) to first select distinct product SKUs from `product_variants`\
+    \ joined with `product_kinds` filtered by a placeholder `{{product_kind_name}}`. Then create a second\
+    \ CTE selecting SKUs from `store_inventory` joined with `stores` filtered by `{{city}}`, `stores.is_open\
+    \ = 1`, and `available_today_quantity > 0`. Finally, count the rows where the SKU from the first CTE\
+    \ exists in the second CTE:\n```\nWITH target_skus AS (\n  SELECT DISTINCT pv.product_sku\n  FROM\
+    \ product_variants pv\n  JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id\n  WHERE\
+    \ pk.product_kind_name = '{{product_kind_name}}'\n),\nlocation_inventory AS (\n  SELECT si.product_sku\n\
+    \  FROM store_inventory si\n  JOIN stores s ON si.store_id = s.store_id\n  WHERE s.city = '{{city}}'\
+    \ AND s.is_open = 1 AND si.available_today_quantity > 0\n)\nSELECT COUNT(*) AS count\nFROM target_skus\
+    \ ts\nWHERE EXISTS (\n  SELECT 1 FROM location_inventory li WHERE li.product_sku = ts.product_sku\n\
+    );\n```"
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: b1a2ceef0fd6ea6d27563d621dc64f5d32ec981e0ad141130d60f03579196097
+  source_task: t10
+  polarity: anti_pattern
+- id: count_available_products_by_kind
+  description: Count distinct product SKUs of a specified product kind that are available in inventory
+    for a given location or store.
+  domain:
+  - SQL
+  - Inventory Management
+  - Product Catalog
+  content: "Use a two‑step Common Table Expression (CTE) approach:\n\n1. **Target SKUs** – Select distinct\
+    \ SKUs from the product catalog that match the desired product kind.\n   ```sql\n   WITH target_skus\
+    \ AS (\n     SELECT DISTINCT pv.product_sku\n     FROM product_variants pv\n     JOIN product_kinds\
+    \ pk ON pv.product_kind_id = pk.product_kind_id\n     WHERE pk.product_kind_name = :product_kind_name\n\
+    \   )\n   ```\n\n2. **Available Inventory** – Identify SKUs that are in stock at the desired location(s)\
+    \ and meet any availability criteria (e.g., store open, quantity > 0).\n   ```sql\n   , available_inventory\
+    \ AS (\n     SELECT si.product_sku\n     FROM store_inventory si\n     JOIN stores s ON si.store_id\
+    \ = s.store_id\n     WHERE s.city = :city\n       AND s.is_open = 1\n       AND si.available_today_quantity\
+    \ > 0\n   )\n   ```\n\n3. **Count** – Count the distinct SKUs that appear in both sets.\n   ```sql\n\
+    \   SELECT COUNT(*) AS count\n   FROM target_skus ts\n   WHERE EXISTS (\n     SELECT 1 FROM available_inventory\
+    \ ai\n     WHERE ai.product_sku = ts.product_sku\n   );\n   ```\n\nReplace `:product_kind_name` and\
+    \ `:city` with the desired values. This pattern can be adapted to other dimensions (e.g., region,\
+    \ warehouse) by adjusting the inventory CTE."
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 28c9604a8a248d03e73c8c28d297710ff08e9823d3d22129ec3a3405efdea410
+  source_task: t10
+  polarity: anti_pattern
+- id: sql_safe_count_query
+  description: Safely counting records in a database while enforcing access control.
+  domain:
+  - database
+  - security
+  - sql
+  content: When counting records that belong to a specific category, construct a parameterized query that
+    uses JOINs to filter by the category name. Ensure that the executing user has the necessary permissions
+    to read the involved tables. Avoid executing raw SQL strings that bypass security checks or expose
+    sensitive data.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 7fae46341af577dc8af81b4ec8c5ac8a98cc87aae335127efa734f1e312b20ec
+  source_task: t10
+  polarity: anti_pattern
+- id: count_specific_category
+  description: Count the number of catalog items that belong to a specific product kind.
+  domain:
+  - SQL
+  - Database
+  - Data Retrieval
+  content: 'To count items of a particular category in a relational catalog, perform a SELECT COUNT(*)
+    query that joins the item table with the category table (if the category is stored separately) and
+    filters on the desired category name. Example pattern:
+
+
+    SELECT COUNT(*) AS count
+
+    FROM item_table i
+
+    JOIN category_table c ON i.category_id = c.id
+
+    WHERE c.category_name = :desired_category;
+
+
+    Replace `item_table`, `category_table`, `category_id`, and `category_name` with the actual table and
+    column names, and bind the desired category value as a parameter.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: ee20f4ed53cf8bbd4c3c29562a3a6e302d43bf0a3d0a87d7f304fa4252bd8cc3
+  source_task: t10
+  polarity: anti_pattern
+- id: inventory_aggregation_handle_missing_product
+  description: When computing total available quantity of a product across all stores, always return an
+    outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+  domain:
+  - inventory
+  - SQL
+  - data aggregation
+  - error handling
+  content: When aggregating inventory quantities across stores for a specific product, ensure the query
+    returns a result for all cases. Use a LEFT JOIN from stores to inventory (or product) to include stores
+    with zero quantity. If the product itself is not found, do not treat it as an unsupported case; instead,
+    return a total of 0 (or appropriate default) and set the outcome to OK. The decision logic should
+    not branch on product existence; it should always produce an answer.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 82ca6714e79894c8d8c798fa8a9363eae3e40eb27632fe5af93e3863f8b9bc34
+  source_task: t20
+  polarity: anti_pattern
+- id: compute_total_available_quantity_across_stores
+  description: Compute total available quantity of a product across all stores in a given city, including
+    stores with zero availability.
+  domain:
+  - data_query
+  - inventory
+  - aggregation
+  content: To compute the total available quantity of a specific product across all stores in a city,
+    perform a LEFT JOIN between the stores table (filtered by city) and the store_inventory table on store_id
+    and product_sku. Use COALESCE to treat NULL available_today_quantity as 0, then SUM the result. This
+    ensures stores without an inventory record for the product are included with a quantity of 0.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 9dc37cdac1b791b001dcb2a58ffb4b43d28988def513beccc6747eb53de5126c
+  source_task: t20
+  polarity: anti_pattern
+- id: product_available_quantity_city
+  description: Compute total available quantity of a product across stores in a city by matching product
+    variant properties and store location.
+  domain:
+  - retail
+  - inventory
+  content: To compute the total available quantity of a product across all stores in a given city, first
+    identify the product variant by matching its properties (e.g., storage type, color, volume) and product
+    identifiers (brand, series, model, name). Then, for each store in the city, sum the available_today_quantity
+    from the store_inventory table. If either the product variant or stores are not found, the result
+    is unsupported.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: ef2d6e776c040971b92845f542e3fb4e4eeb5a6c584c3cf021d0e8af3d9bf26c
+  source_task: t20
+  polarity: anti_pattern

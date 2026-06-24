@@ -1,0 +1,127 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH product AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'storage_type' AND pvp1.property_value_text = 'tool bag' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'color_family' AND pvp2.property_value_text = 'Gray' JOIN product_variant_properties pvp3 ON pv.product_sku = pvp3.product_sku AND pvp3.property_key = 'volume' AND (pvp3.property_value_text = '8' OR pvp3.property_value_text = '8 l') WHERE pv.brand = 'Milwaukee' AND pv.series = 'M12' AND pv.model = 'M12 2TN-F66' AND pv.product_name LIKE '%Tool Box and Bag%' LIMIT 1) SELECT p.product_sku, p.record_path, COALESCE(SUM(si.available_today_quantity), 0) AS total_count FROM product p CROSS JOIN stores s LEFT JOIN store_inventory si ON s.store_id = si.store_id AND si.product_sku = p.product_sku WHERE s.city = 'Graz' GROUP BY p.product_sku, p.record_path;"
+      },
+      "bind": "product_total_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT record_path FROM stores WHERE city = 'Graz';"
+      },
+      "bind": "store_paths_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "$product_total_raw.stdout",
+      "format": "json",
+      "into": "product_total_parsed",
+      "columns": []
+    },
+    {
+      "from_": "$store_paths_raw.stdout",
+      "format": "json",
+      "into": "store_paths_parsed",
+      "columns": []
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$product_total_parsed"
+      ],
+      "into": "product_total_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_total_row",
+        "product_sku"
+      ],
+      "into": "product_sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_total_row",
+        "record_path"
+      ],
+      "into": "product.record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_total_row",
+        "total_count"
+      ],
+      "into": "total_count"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$store_paths_parsed",
+        "record_path"
+      ],
+      "into": "store_record_paths"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$product_sku",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$store_paths_parsed",
+              "rhs": null,
+              "args": []
+            }
+          ]
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "unsupported"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "count: {total_count}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store_record_paths"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "Unable to compute total available quantity because product or stores not found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

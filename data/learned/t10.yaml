@@ -1,0 +1,385 @@
+entries:
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/catalogue-addenda/2024-07-17-reporting-hammers-measuring-cutting-graz.md'
+  source: verdict
+  status: inactive
+  submitted_message: <COUNT:20>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - Answer should be "<COUNT:2>"
+  source: verdict
+  status: inactive
+  submitted_message: <COUNT:3>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/policy-updates/2025-10-08-catalogue-reporting-wiper-blades-vienna.md
+- agents_md_anchor: null
+  content: When the answer shape is a numeric format (e.g., `%d`), ensure the answer
+    message is a number, not a string.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r001
+  reasoning: The verify step failed because the answer message was a string '3' while
+    the success criteria used a numeric comparison (ge 0). The answer shape in the
+    intent is '%d', indicating a numeric answer. The script produced a string via
+    `{count}`. The root cause is a mismatch between the answer message type and the
+    expected numeric format. The rule instructs the PLAN phase to produce a numeric
+    answer message when the answer shape is numeric.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the answer shape is a numeric format (e.g., `%d`), use a compute step
+    to cast the rowset value to an integer and set the answer message to that integer;
+    never use string interpolation for numeric answers.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r002
+  reasoning: The verify step failed with 'ge' comparison on '$answer' because the
+    answer message was the string '1' (from interpolation '{cnt}'), not a number.
+    The success criteria requires numeric comparison. The existing in-session rule
+    warns about this but was not specific enough to prevent string interpolation.
+    The PlanIR must produce a numeric answer via a compute step.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Never use the concat primitive with a single argument; concat requires
+    exactly two arguments, each being a list[dict] (rowset). For creating a reference
+    to a literal path, use a 'ref' step or include the path directly in the answer's
+    refs list.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r003
+  reasoning: 'Error: interpret compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. The PlanIR compute step used concat with
+    a single string argument (the policy doc path) instead of two list[dict] rowsets.
+    The concat primitive expects two rowsets to combine. The root cause is a misunderstanding
+    of the concat contract. This rule prevents future misuse by clarifying the correct
+    usage and alternative for literal refs.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When the success_criteria references a variable (e.g., $count), the PlanIR
+    must include a compute or ops step that sets a variable with that exact name to
+    the computed value, and the answer message must reference that variable.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r004
+  reasoning: 'verify failure: success_criteria[OUTCOME_OK][0] failed because $count
+    variable not found. Root cause: PlanIR compute step set variable ''count_num''
+    instead of ''count'', so success criteria could not evaluate $count >= 0. Failing
+    PlanIR fragment: compute step sets ''count_num'', answer message uses ''{count_num}''.
+    Existing rules r001/r002 ensure numeric answer format but do not enforce variable
+    name alignment with success criteria. New rule ensures the PlanIR sets the exact
+    variable name expected by success_criteria.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/current-updates/catalogue-counting-2025-10-08-work-jackets-linz.md'
+  source: verdict
+  status: inactive
+  submitted_message: <COUNT:3>
+  submitted_outcome: OUTCOME_OK
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a required reference is a field of a sampled record (e.g., $sample_row.record_path),
+    the PLAN must create a variable that holds the whole record (sample_row) and then
+    reference its field, rather than creating a scalar variable whose name contains
+    a dot. Use a compute step that maps the first row of the sample rowset into a
+    dict variable (into "sample_row"), or use a ref primitive to bind the column value
+    to a variable named "sample_row" and then reference $sample_row.record_path in
+    the answer refs list. Never name a variable with a dot; always keep the dot as
+    a field accessor on a dict variable.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r005
+  reasoning: 'diagnosis: interpret error – unresolved ref $sample_row.record_path.
+    Root cause: PLAN created scalar variable "sample_row.record_path" via compute,
+    so the placeholder $sample_row.record_path could not be resolved. Failing PlanIR
+    fragment: compute step with into "sample_row.record_path" and answer refs referencing
+    "$sample_row.record_path". Rule linkage: ensures required refs are satisfied by
+    proper variable shaping.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required reference is expressed as a dotted field accessor (e.g.,
+    $sample_row.record_path), the PLAN must create a dict variable named exactly the
+    prefix (sample_row) that contains the full row record, and the answer's refs list
+    must reference the field via the dotted accessor on that variable; do not create
+    a separate scalar variable for the field value.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r006
+  reasoning: 'diagnosis: interpret error – unresolved required ref [''$sample_row.record_path''];
+    root cause: PLAN generated a scalar variable sample_record_path and referenced
+    it directly, while required_refs expects a dict variable sample_row with a .record_path
+    field; failing PlanIR fragment: compute step ''first'' into ''first_sample_row''
+    then ''get'' into ''sample_record_path'' and answer.refs uses ''$sample_record_path''.
+    The rule links the missing reference to the need for a dict variable and proper
+    dotted ref in answer.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When a required reference is expressed as a dotted field accessor on a
+    sampled record (e.g., $sample_row.record_path), ensure that the rowset column
+    definition uses the exact field name expected by the accessor (record_path) and
+    that the compute step preserving the first row does not rename that field; the
+    dict variable must contain a key matching the accessor name.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r007
+  reasoning: 'diagnosis: interpret error unresolved required ref [''$sample_row.record_path''];
+    root cause: rowset column was mapped to ''sample_path'' instead of ''record_path'',
+    so the dict variable sample_row lacks a ''record_path'' field; rule linkage: adds
+    explicit naming requirement for columns referenced via dotted accessors.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- agents_md_anchor: null
+  content: When a success_criteria expression references $result.<field>, the PLAN
+    must create a dict variable named result that contains that field as a key, and
+    the answer must reference $result.<field> (e.g., $result.count). Use a rowset‑to‑dict
+    compute step (or a ref primitive) to bind the first row of the relevant rowset
+    into a variable called result, preserving the original column names, rather than
+    emitting a scalar variable with a different name.
+  created: '2026-06-24'
+  deactivated_reason: r008 is too generic and does not explicitly forbid extracting
+    fields into separate scalars before verification; the new rule supersedes it with
+    clearer guidance.
+  id: r008
+  reasoning: 'diagnosis: verify failure because $result.count is undefined; PlanIR
+    created scalar variable result_count instead of dict result with field count.
+    The success_criteria expects $result.count, so the PLAN must shape the compute
+    step to produce a dict result containing the count column.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v006
+  score: 0.0
+  score_detail:
+  - no answer provided
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: ''
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always bind the first row of a rowset directly to a dict variable named
+    result that preserves the original column names, and reference any needed fields
+    in success_criteria and answer messages via $result.<field> (e.g., $result.count).
+    Do not extract fields into separate scalar variables before the verification step;
+    the answer template placeholders must use the same $result.<field> reference.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r009
+  reasoning: 'diagnosis: success_criteria[OUTCOME_OK][0] failed because $result.count
+    was undefined. The PlanIR created a scalar ''count'' via a ''get'' primitive after
+    a ''first'' step, discarding the dict result needed for $result.count. The answer
+    message also referenced a separate scalar placeholder {count} instead of $result.count.
+    The rule enforces preserving the dict result and using $result.<field> consistently.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v007
+  score: 0.0
+  score_detail:
+  - Answer should be "[QTY:1]"
+  source: verdict
+  status: inactive
+  submitted_message: '[QTY:]'
+  submitted_outcome: OUTCOME_OK
+  submitted_refs:
+  - /docs/policy-updates/2025-10-08-catalogue-reporting-pipe-fittings-linz.md
+  - 'path: "/docs/policy-updates/2025-10-08-catalogue-reporting-pipe-fittings-linz.md"
+
+    content_type: "text/markdown"
+
+    content: "# Catalogue Count Reporting Update\n\nOperating day: 2025-10-08\nWorkflow:
+    catalogue product-kind count questions\nRequested product kind: Pipe Fitting\nRequested
+    product_kind_id: pipe_fittings\n\nFor today\''s count report, count only catalogue
+    SKUs for the requested product\nkind that have at least one current inventory
+    row in an open PowerTool store in\nLinz with available_today_quantity greater
+    than 0. Count each SKU once even if it is\navailable in multiple Linz branches.\n"
+
+    sha256: "17bfd1d0b9377dd84f7f1d7d28e1c0cfd026a486c5a916324af8f8ff720d9e6a"
+
+    '
+- agents_md_anchor: null
+  content: Always create a SQL query rowset that computes the count from product_families
+    and product_categories, bind the first row to a dict variable named result, and
+    reference $result.count in success_criteria and answer.
+  created: '2026-06-24'
+  deactivated_reason: 'capped (re-bloat guard: keep newest 3; pin to protect)'
+  id: r010
+  reasoning: The PlanIR incorrectly used the policy_doc as the data source for the
+    rowset, resulting in an empty rowset and a null count. The success criteria then
+    failed because $result.count was null. The intended count must be obtained via
+    a database query using the SQL provided in the TOOL_PLAN params. The new rule
+    instructs the planner to generate a SQL query RPC, bind its first row to result,
+    and use $result.count for verification and answer formatting.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always use a rowset with format 'auto' and columns mapping to capture the
+    count from a SQL Exec that returns a single column, binding the first row to a
+    dict variable named result, and reference $result.count in success_criteria and
+    answer.
+  created: '2026-06-24'
+  deactivated_reason: These rules reference $result.count directly in success_criteria
+    and answer, which is incompatible with the current PlanIR that casts to $count.
+    The new rule supersedes them by standardizing on $count.
+  id: r011
+  reasoning: The failure occurs because the Exec output for the count query does not
+    include a header row, so the auto_delim rowset cannot map the value to the column
+    name 'count', leaving $result.count null and causing the ge 0 check to fail. The
+    new rule forces the rowset to use format 'auto' with an explicit columns mapping
+    so that the single numeric value is correctly bound to $result.count. This aligns
+    with the policy that counts product records by product_kind_id and ensures the
+    success criteria and answer reference the correct field.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always create a SQL query rowset that counts products with product_kind_id
+    matching the requested kind, bind the first row to a dict variable named result,
+    and reference $result.count in success_criteria and answer.
+  created: '2026-06-24'
+  deactivated_reason: These rules reference $result.count directly in success_criteria
+    and answer, which is incompatible with the current PlanIR that casts to $count.
+    The new rule supersedes them by standardizing on $count.
+  id: r012
+  reasoning: The PlanIR failed because it only read the policy doc and produced no
+    SQL rowset, leaving $result.count undefined. The success criteria require a non‑negative
+    count, which fails when $result.count is null. The new rule instructs the planner
+    to generate a SQL rowset that performs the required count on the product table
+    using the product_kind_id specified in the policy, ensuring $result.count is populated.
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v008
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v009
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: inactive
+  submitted_message: Access denied
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/checkout.md
+  - /docs/security.md
+- agents_md_anchor: null
+  content: Prefer use format 'auto' for SQL Exec rowsets that return a single column,
+    binding the first row to a dict variable named result, and mapping the column
+    to count.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r013
+  reasoning: The plan used format 'auto_delim' for a single-column SQL Exec that outputs
+    a header and a value. The auto_delim parser misinterpreted the output, leaving
+    $result.count empty, causing the success_criteria ge 0 to fail. Rule r011 specifies
+    using format 'auto' for such cases, but the plan violated it. This new rule enforces
+    the correct format and column mapping, ensuring $result.count is populated.
+  status: active
+  surface: ir
+- agents_md_anchor: '#sql-rowset-cast'
+  content: Prefer use format 'auto' for SQL Exec rowsets that return a single column,
+    bind the first row to a dict variable named result, cast the count column to an
+    integer, and reference $result.count in success_criteria and answer.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r014
+  reasoning: The failure shows $result.count was not a numeric value (likely a string),
+    causing the ge comparison to fail. The current PlanIR uses format 'auto_delim',
+    which may leave the count as a string. By switching to format 'auto' and explicitly
+    casting the count to an integer, the comparison will succeed. This rule supersedes
+    r011, which did not include the cast.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Prefer use the variable $count for success_criteria and answer, ensuring
+    it is cast to an integer before comparison. Use a compute step that casts $result.count
+    to a number and stores it in $count, then reference $count in all success_criteria,
+    decision branches, and answer formatting.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r015
+  reasoning: The failure occurs because success_criteria refers to $result.count,
+    which is a string returned by the SQL Exec. The comparison ge with rhs 0 expects
+    a numeric type, causing the check to fail. The PlanIR already computes $count
+    from $result.count, and decision uses $count, but success_criteria and answer
+    still use $result.count. The new rule aligns all references to the numeric $count
+    variable, ensuring type consistency and passing the success criteria.
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  id: v010
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
+last_run:
+  cycles_used: 3
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
+task_id: t10

@@ -1,0 +1,152 @@
+entries:
+- agents_md_anchor: null
+  content: Always perform entity lookups (e.g., product, store) in separate discovery
+    steps before using them in joins or aggregations. This ensures that if an entity
+    is not found, the decision branch can correctly detect the missing entity and
+    branch to the unsupported outcome, avoiding verification failures from empty results.
+  created: '2026-06-24'
+  deactivated_reason: Superseded by new rule that additionally requires a decision
+    branch to handle missing entities.
+  id: r001
+  reasoning: The error shows success_criteria[OUTCOME_OK][0] (ge $answer >= 0) failed,
+    but the observed RPC output shows answer=0. This contradiction suggests that the
+    decision branch incorrectly went to 'ok' even though product_sku was empty (NULL).
+    The root cause is that the single SQL query uses scalar subqueries that return
+    NULL when the product is not found, but the decision condition nonempty on $product_sku
+    did not correctly evaluate to false, causing the ok branch to be taken. The PlanIR
+    should split the lookup into separate steps to ensure the decision can reliably
+    detect missing entities.
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When extracting a field from a single row (e.g., after using 'first' or
+    'get' to obtain a single dict), use the 'get' primitive instead of 'column' to
+    avoid type errors.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: interpret: compute step ''column'' failed: ''column'' expects
+    list[dict]; use ''get'' for a single row. Root cause: In the compute section,
+    ''first'' returns a single dict, but ''column'' was applied to it. The PlanIR
+    fragment: {"prim":"first","args":["$parsed_rows"],"into":"row"} followed by {"prim":"column","args":["$row","product_sku"],"into":"product_sku"}.
+    The fix is to use ''get'' instead of ''column'' for single-row field extraction.
+    This rule ensures correct primitive usage in the PLAN phase.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never apply 'first' or 'column' directly to the result of an Exec RPC.
+    The Exec RPC returns an ExecResponse object, not a list. To access the rows, first
+    extract the 'stdout' field using 'get', then parse the JSON string into a list
+    using 'parse_json', then apply 'first' or 'column' on that list.
+  created: '2026-06-24'
+  deactivated_reason: r003 is too narrow; it only covers 'first' and 'column' but
+    not rowsets. The new rule covers all uses of Exec RPC output.
+  id: r003
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable when applying ''first''
+    to discovery result. Root cause: PlanIR uses a single Exec RPC discovery step
+    and then applies ''first'' directly to the ExecResponse object, which is not a
+    list. The ExecResponse contains stdout (JSON string) and other fields. The correct
+    pattern is to extract ''stdout'' via ''get'', parse JSON to a list, then use ''first''.
+    This rule prevents similar type errors.'
+  status: inactive
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: Product not found in Graz stores.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always use the exact variable names specified in the plan's required_refs
+    as the source in answer refs. Do not rename them; assign the computed values to
+    variables with those exact names.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$product_record.record_path'',
+    ''$store_records''] on OK answer. The PlanIR script defines answer refs with source
+    ''$product_record_path_value'' and ''$store_record_paths_list'', but the plan''s
+    required_refs expect ''$product_record.record_path'' and ''$store_records''. The
+    interpreter looks for variables with those exact names and cannot find them. The
+    script must assign the computed values to variables named exactly as in required_refs,
+    e.g., $product_record.record_path and $store_records, and use those in the answer
+    refs.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the 'stdout' field from an Exec RPC response using the 'get'
+    primitive before using it in rowsets or compute steps. The ExecResponse object
+    is not a string and cannot be parsed directly; first obtain the stdout string,
+    then parse it with 'parse_json' if it is JSON, or use it directly in rowsets if
+    it is delimited text.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: unresolved required ref ''$product_record.record_path'' because
+    $product_record was never set. Root cause: the PlanIR binds the entire ExecResponse
+    to ''raw_result'' and then uses it directly in rowsets (from_: ''raw_result'').
+    The rowsets step expects a string variable containing the data, not an ExecResponse
+    object. Consequently, parsed_rows is empty, ''first'' returns nothing, and $product_record
+    is undefined. This violates the principle that Exec RPC output must be unwrapped
+    before parsing. The existing rule r003 only warns against applying ''first'' or
+    ''column'' directly to Exec result, but does not cover rowsets. A new rule is
+    needed to explicitly require extraction of stdout before any parsing step.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always perform entity lookups (e.g., product, store) in separate discovery
+    steps, each with its own Exec RPC, and then use a decision branch to check if
+    the entity was found (non-empty) before proceeding to compute the answer. If the
+    entity is not found, branch to the unsupported outcome. This ensures that required
+    refs from the entity are only used when the entity exists, avoiding unresolved
+    ref errors.
+  created: '2026-06-24'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$product_record.record_path'']
+    on OK answer. Root cause: The PlanIR combined product, store, and total lookups
+    into a single Exec RPC and did not include a decision branch to check if the product
+    was found. When the product SKU lookup returned no rows (product not found), the
+    variable $product_record.record_path was never assigned, but the answer refs required
+    it. The plan''s success criteria require nonempty product_sku, so the correct
+    behavior is to branch to OUTCOME_NONE_UNSUPPORTED. The existing rule r001 advises
+    separate discovery steps but does not explicitly require a decision branch. This
+    new rule supersedes r001 by adding the decision branch requirement.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
+  id: v002
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- content: null
+  created: '2026-06-24'
+  id: v003
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Unable to compute total available quantity because product or
+    stores not found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+last_run:
+  cycles_used: 1
+  date: '2026-06-24'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
+task_id: t20
