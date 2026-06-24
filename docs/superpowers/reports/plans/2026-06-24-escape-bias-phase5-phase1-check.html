@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>check-plan · Escape-bias Phase 5 + Phase 1</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#171c24; --panel2:#1d242e; --ink:#e6edf3; --mut:#9aa7b4;
+    --line:#2b3440; --accent:#4ea1ff; --ok:#3fb950; --warn:#d29922; --crit:#f85149;
+    --info:#6e7681; --chip:#22303f; --node:#1d242e; --nodeln:#37506e;
+  }
+  html[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#f0f3f6; --ink:#1c2128; --mut:#57606a;
+    --line:#d0d7de; --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --crit:#cf222e;
+    --info:#8c959f; --chip:#eaeef2; --node:#ffffff; --nodeln:#9fc3ef;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 80px}
+  header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+  h1{font-size:23px;margin:0 0 2px}
+  h2{font-size:19px;margin:34px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  h3{font-size:14px;margin:20px 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+  .sub{color:var(--mut);font-size:13px}
+  .verdict{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:15px;
+    padding:6px 14px;border-radius:999px;background:rgba(63,185,80,.13);color:var(--ok);border:1px solid var(--ok)}
+  table{width:100%;border-collapse:collapse;margin:10px 0;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;font-size:13.5px}
+  th{background:var(--panel2);color:var(--mut);font-weight:600;font-size:12.5px}
+  tr:last-child td{border-bottom:none}
+  code{background:var(--chip);padding:1px 6px;border-radius:5px;font-size:12px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid}
+  .c-ok{color:var(--ok);border-color:var(--ok);background:rgba(63,185,80,.1)}
+  .c-info{color:var(--info);border-color:var(--info);background:var(--chip)}
+  .c-p5{color:var(--warn);border-color:var(--warn);background:rgba(210,153,34,.1)}
+  .c-p1{color:var(--accent);border-color:var(--accent);background:rgba(78,161,255,.1)}
+  .toggle{cursor:pointer;background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:7px 12px;font-size:13px}
+  .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;
+    padding:10px 14px;margin:12px 0;color:var(--mut);font-size:13.5px}
+  figure{margin:14px 0}
+  svg{width:100%;height:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .gnode rect{fill:var(--node);stroke:var(--nodeln);stroke-width:1.4}
+  .gnode text{fill:var(--ink);font:12px sans-serif}
+  .gnode .t2{fill:var(--mut);font-size:10px}
+  .gedge{stroke:var(--nodeln);stroke-width:1.7;fill:none}
+  .gedge-lbl{fill:var(--mut);font:10px sans-serif}
+  .matrix td.hit{background:rgba(78,161,255,.16);color:var(--accent);font-weight:700;text-align:center}
+  .matrix td.mid{text-align:center;color:var(--mut)}
+  .legend{font-size:12.5px;color:var(--mut);margin-top:6px}
+  footer{margin-top:40px;color:var(--mut);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Проверка плана — Escape-bias Phase 5 + Phase 1</h1>
+    <div class="sub">Per-task timeout (Фаза 5) + resolve-or-prove: два слоя (Фаза 1)</div>
+    <div class="sub">2026-06-24 · ветка <code>determinism</code> · <code>plan_hash e0c468667ada7984</code> · <code>spec_hash 5447cff2d00861e3</code></div>
+  </div>
+  <button class="toggle" onclick="(function(h){h.dataset.theme=h.dataset.theme==='light'?'dark':'light'})(document.documentElement)">◐ Тема</button>
+</header>
+
+<div style="margin:10px 0"><span class="verdict">● Вердикт: OK — план готов к реализации</span></div>
+<div class="note">Цепочка IDD: <code>intent → null</code> → spec → plan. 7 задач, TDD, реальный код + точные пути + per-step команды проверки.</div>
+
+<!-- BLOCK 1 -->
+<h2>1 · Резюме плана — задачи и критерии готовности (DoD)</h2>
+<table>
+  <thead><tr><th>Задача</th><th>Фаза</th><th>Файлы</th><th>DoD</th></tr></thead>
+  <tbody>
+    <tr><td><b>1</b> Per-task wall-clock deadline</td><td><span class="chip c-p5">Ф5</span></td><td><code>main.py</code> · <code>test_run_deadline.py</code></td><td>Тест: коллекция не блокируется на зависшем таске (&lt;10с), 3 быстрых собраны, зависший исключён → PASS</td></tr>
+    <tr><td><b>2</b> Bounded retry/timeout budget</td><td><span class="chip c-p5">Ф5</span></td><td><code>agent/llm.py</code></td><td>Constants-test: <code>read_timeout × (max_retries+1) ≤ 400</code> → PASS (120×3=360)</td></tr>
+    <tr><td><b>3</b> <code>resolve.py</code>: normalize / relax_sql / prose-parse</td><td><span class="chip c-p1">Ф1</span></td><td><code>agent/resolve.py</code> · <code>test_resolve.py</code></td><td>Юнит: unit-suffix/case strip; relax text + numeric fallback; prose-literal; noop без equality → PASS</td></tr>
+    <tr><td><b>4</b> Interpreter auto-relax (seat A)</td><td><span class="chip c-p1">Ф1</span></td><td><code>agent/interpreter.py</code> · <code>test_interpreter_relax.py</code></td><td>0-строчный <code>/bin/sql</code> discovery ретраится relaxed; результат связан в env → PASS</td></tr>
+    <tr><td><b>5</b> Descriptor-probe (seat B)</td><td><span class="chip c-p1">Ф1</span></td><td><code>resolve.py</code> · <code>investigate.py</code> · 2 теста</td><td>Prose-params → (columns, properties); probe связывает <code>resolved_*</code> и <code>resolved:$src</code> в Brief.env → PASS</td></tr>
+    <tr><td><b>6</b> <code>sufficient()</code> требует резолв</td><td><span class="chip c-p1">Ф1</span></td><td><code>agent/investigate.py</code></td><td>record_path ref не grounded без <code>resolved:$src</code> → False; с ним → True → PASS</td></tr>
+    <tr><td><b>7</b> Trace-верификация + scored slice</td><td><span class="chip c-p1">Ф1</span></td><td>—</td><td>t20 завершается без зависа, один из seat'ов сработал, исход ≠ UNSUPPORTED; slice печатает grader-скоры</td></tr>
+  </tbody>
+</table>
+
+<!-- BLOCK 2 -->
+<h2>2 · Зависимости и пересечения</h2>
+
+<h3>Граф зависимостей задач (M→N = результат M используется в N; циклов нет)</h3>
+<figure>
+<svg viewBox="0 0 980 300" role="img" aria-label="Граф зависимостей задач">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--nodeln)"></path>
+    </marker>
+  </defs>
+  <g>
+    <path class="gedge" marker-end="url(#arr)" d="M210,90 L330,90"></path>
+    <text class="gedge-lbl" x="225" y="80">relax_sql</text>
+    <path class="gedge" marker-end="url(#arr)" d="M210,100 L330,175"></path>
+    <text class="gedge-lbl" x="220" y="150">helpers</text>
+    <path class="gedge" marker-end="url(#arr)" d="M490,175 L610,175"></path>
+    <text class="gedge-lbl" x="505" y="165">resolved:$src</text>
+    <path class="gedge" marker-end="url(#arr)" d="M770,120 L800,160 M460,205 L780,250 M790,140 L790,235"></path>
+    <text class="gedge-lbl" x="600" y="255">всё → верификация</text>
+  </g>
+  <g class="gnode">
+    <g transform="translate(60,70)"><rect width="150" height="42" rx="9"></rect><text x="10" y="18">T3 resolve.py</text><text class="t2" x="10" y="34">normalize/relax/prose</text></g>
+    <g transform="translate(330,68)"><rect width="150" height="42" rx="9"></rect><text x="10" y="18">T4 interpreter</text><text class="t2" x="10" y="34">auto-relax (seat A)</text></g>
+    <g transform="translate(330,154)"><rect width="160" height="42" rx="9"></rect><text x="10" y="18">T5 probe (seat B)</text><text class="t2" x="10" y="34">resolve_product + bind</text></g>
+    <g transform="translate(610,154)"><rect width="160" height="42" rx="9"></rect><text x="10" y="18">T6 sufficient()</text><text class="t2" x="10" y="34">requires resolved</text></g>
+    <g transform="translate(700,235)"><rect width="170" height="42" rx="9"></rect><text x="10" y="18">T7 verify (scored)</text><text class="t2" x="10" y="34">t20 + slice</text></g>
+    <g transform="translate(60,235)"><rect width="150" height="42" rx="9"></rect><text x="10" y="18">T1 deadline</text><text class="t2" x="10" y="34">Ф5 · независим</text></g>
+    <g transform="translate(230,235)"><rect width="150" height="42" rx="9"></rect><text x="10" y="18">T2 retry budget</text><text class="t2" x="10" y="34">Ф5 · независим</text></g>
+  </g>
+</svg>
+<div class="legend">Цепь Ф1: T3 → T4 (импорт relax_sql) → T5 (resolve_product + пишет <code>resolved:$src</code>) → T6 (читает <code>resolved:$src</code>). T1/T2 (Ф5) независимы и идут первыми. T7 верифицирует всё. Циклов / нарушений порядка нет.</div>
+</figure>
+
+<h3>Пересечения по файлам (какие задачи трогают один артефакт)</h3>
+<table class="matrix">
+  <thead><tr><th>Файл</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>T6</th></tr></thead>
+  <tbody>
+    <tr><td><code>main.py</code></td><td class="hit">✓</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td></tr>
+    <tr><td><code>agent/llm.py</code></td><td class="mid">·</td><td class="hit">✓</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td></tr>
+    <tr><td><code>agent/resolve.py</code></td><td class="mid">·</td><td class="mid">·</td><td class="hit">✓</td><td class="mid">·</td><td class="hit">✓</td><td class="mid">·</td></tr>
+    <tr><td><code>agent/interpreter.py</code></td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="hit">✓</td><td class="mid">·</td><td class="mid">·</td></tr>
+    <tr><td><code>agent/investigate.py</code></td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="mid">·</td><td class="hit">✓</td><td class="hit">✓</td></tr>
+  </tbody>
+</table>
+<div class="legend">Перекрытия: <code>resolve.py</code> создаётся в T3, дополняется в T5; <code>investigate.py</code> трогают T5 (probe) и T6 (sufficient) — последовательно, без конфликта. Остальные файлы — по одной задаче.</div>
+
+<!-- BLOCK 3 -->
+<h2>3 · Результаты проверки</h2>
+<table>
+  <thead><tr><th>Фаза</th><th>Статус</th><th>Комментарий</th></tr></thead>
+  <tbody>
+    <tr><td>structure</td><td><span class="chip c-ok">passed</span></td><td>Нет плейсхолдеров; задачи 1–7 и шаги последовательны; заголовки уникальны</td></tr>
+    <tr><td>coverage</td><td><span class="chip c-ok">passed</span></td><td>Ф5→T1-2, Ф1(seat A)→T3-4, Ф1(seat B)→T3,T5, sufficient→T6, no-give-up→T4+T6; Ф2-4 спека явно отложены</td></tr>
+    <tr><td>dependencies</td><td><span class="chip c-ok">passed</span></td><td>T3→T4→T5→T6 порядок верен; все существующие символы (<code>_payload</code>, <code>interpret</code>, <code>_run_single_task</code>, <code>RefSpec</code>…) проверены; циклов нет</td></tr>
+    <tr><td>verifiability</td><td><span class="chip c-ok">passed</span></td><td>У каждого шага run-команда + ожидаемый PASS/FAIL/вывод; T7 — verification-only с явными наблюдениями</td></tr>
+    <tr><td>consistency</td><td><span class="chip c-ok">passed</span></td><td>Идентификаторы (<code>relax_sql</code>, <code>_collect_with_deadline</code>, <code>resolved:$src</code>, <code>_rows_in_payload</code>) согласованы между задачами</td></tr>
+  </tbody>
+</table>
+
+<h3>Findings</h3>
+<table>
+  <thead><tr><th>ID</th><th>Severity</th><th>Секция</th><th>Текст</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>F-001</td><td><span class="chip c-info">INFO</span></td><td>Task 2</td><td>Хинт <code>grep range(3)</code> не сматчит — реальный цикл <code>range(max_retries+1)</code> с дефолтом <code>max_retries:int=3</code> (llm.py:359 ×3 транспорта)</td><td><span class="chip c-ok">fixed</span> → Step 3 переписан</td></tr>
+    <tr><td>F-002</td><td><span class="chip c-info">INFO</span></td><td>Task 3</td><td>Stub <code>_RelaxVM</code> ставит <code>exit_code</code>, <code>_FakeVM</code>/<code>_VM</code> — нет; согласовано с consuming-кодом</td><td><span class="chip c-ok">accepted</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Сводка</h3>
+<table>
+  <thead><tr><th>CRITICAL open</th><th>WARNING open</th><th>INFO open</th><th>Итог</th></tr></thead>
+  <tbody><tr><td>0</td><td>0</td><td>0</td><td><span class="chip c-ok">OK</span></td></tr></tbody>
+</table>
+
+<div class="note">Chain: <code>intent (null) → docs/superpowers/specs/2026-06-24-escape-bias-elimination-design.md → docs/superpowers/plans/2026-06-24-escape-bias-phase5-phase1.md</code>.
+Следующий шаг — реализация (subagent-driven или inline executing-plans), Фаза 5 первой.</div>
+
+<footer>
+Сгенерировано навыком html-report · self-contained, offline · тёмная/светлая темы.
+Источник — прогон <code>check-plan</code> (clean-context субагент) против спеки.
+</footer>
+</div>
+</body>
+</html>

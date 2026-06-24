@@ -2,7 +2,7 @@
 chain:
   intent: null
 review:
-  spec_hash: de80843a2502353f
+  spec_hash: 5447cff2d00861e3
   last_run: 2026-06-24
   phases:
     structure:    { status: passed }
@@ -14,7 +14,7 @@ review:
       phase: clarity
       severity: INFO
       section: "## Success criteria"
-      section_hash: fd8064800467ada4
+      section_hash: 859b062e7500c48e
       text: >-
         "PLAN input tokens per call drop materially" (and the Phase-3 verify
         line) uses the vague term "materially" without a numeric threshold.
@@ -103,33 +103,48 @@ clean scored measurement is possible.
 
 ### Phase 1 — Resolve-or-prove (bucket B1, ~14 tasks; highest leverage)
 
-Make key-entity resolution a **verified, deterministic** step that runs before PLAN and proves
-existence (or proves genuine absence) instead of guessing.
+Make key-entity resolution a **verified, deterministic** step that proves existence (or proves
+genuine absence) via normalization, instead of accepting an exact-match miss as "not found".
+**Two seats** (decided after inspecting real data — see below):
 
-- **Normalized resolution probe** (new helper, e.g. `agent/resolve.py`): given the entity
-  descriptors INTENT already extracts (brand / series / model / property key-values), resolve
-  candidate `product_sku` / `record_path` with **progressive relaxation**, all general data
-  hygiene (no task-specific values):
-  1. exact equality;
-  2. normalized equality — `trim`, case-fold, collapse internal whitespace, and unit-suffix
-     normalization on `property_value_text` (`'8 l'`↔`'8'`, `'1000 ml'`↔`'1000'`, `'900 mm'`↔
-     `'900'`) applied symmetrically to query literal and column;
-  3. token-subset `LIKE` on `product_name` / descriptor tokens as a last resort.
-  Bind the first non-empty candidate set into `Brief.env` (real SKU + record_path) so PLAN
-  builds its aggregation against a *known-resolving* entity.
-- **`investigate.sufficient()` no longer punts.** A required_ref whose source is a
-  `record_path` for a key entity must be **actually resolved** by the probe; if unresolved,
-  sufficiency is false → an extra probe/relaxation step runs (within the step budget) before
-  the investigator may stop.
-- **No "0 rows ⇒ does not exist" for a presumed-existing entity.** When
-  `intent.desired_outcome == OUTCOME_OK` and `required_refs[OK]` includes a key-entity
-  `record_path`, an empty resolve must not short-circuit to `UNSUPPORTED`; it triggers the
-  relaxation ladder first. `UNSUPPORTED` is permitted only after the ladder is exhausted.
+**(a) Interpreter auto-relaxation — primary.** When a read-only `/bin/sql` discovery step PLAN
+already wrote returns **0 data rows**, the interpreter retries that same query once with relaxed
+equality predicates (general data hygiene, all in `agent/resolve.py:relax_sql`):
+- text equality `X = 'lit'` → `LOWER(TRIM(X)) = '<normalized lit>'` (case-fold, whitespace
+  collapse, trailing unit-token strip: `'8 l'→'8'`, `'1000 ml'→'1000'`);
+- numeric fallback: a `property_value_text = '<num> <unit>'` predicate also matches the
+  schema's dedicated numeric column — rewrite to `(… OR property_value_number = <num>)`
+  (deterministic `property_value_text`→`property_value_number` substitution).
 
-**Verify:** unit tests for `resolve.py` on synthetic rows with formatting/case/unit-suffix
-skew (assert relaxation finds the row exact-match misses); a pipeline test that an OK-task with
-a format-skewed product no longer submits `UNSUPPORTED`; trace check on t20 → resolves the
-Milwaukee SKU and computes a count.
+If the relaxed query still returns nothing, the empty result stands (genuine absence). This seat
+needs **no descriptor re-derivation** and works for any entity PLAN resolves with an equality
+filter — it operates on the SQL PLAN already targeted at the real schema.
+
+**(b) INVESTIGATE descriptor-probe — fallback.** A best-effort probe (`agent/resolve.py`) that
+parses the literal out of INTENT's prose params (`"literal 'Sika' from instruction"` → `Sika`),
+maps free-form keys to schema columns (`product_variants.brand/series/model`,
+`product_families.product_family_name`) and properties, then resolves with the same relaxation +
+numeric-column ladder, binding `resolved_*` keys into `Brief.env` for PLAN.
+
+> **Design note (load-bearing):** the original "probe re-derives the descriptors INTENT extracts"
+> framing assumed structured params. Inspection of persisted `*.intent.json` shows `params` is a
+> FLAT dict of prose strings (`"product_brand": "literal 'Sika' from instruction"`), and the
+> schema exposes `product_variant_properties.property_value_number` (a clean numeric column) plus
+> `product_families.product_family_name` (the "line" name) distinct from `product_variants.product_name`.
+> Hence the primary seat is interpreter auto-relaxation of PLAN's own query; the prose-parsing
+> probe is the fallback.
+
+- **`investigate.sufficient()` no longer punts.** A required_ref whose source is a `record_path`
+  for a key entity must be **actually resolved** (probe-bound `resolved:{source}` in `Brief.env`)
+  before the investigator may stop.
+- **No "0 rows ⇒ does not exist" for a presumed-existing entity.** Realized by the auto-relaxation
+  retry: an empty resolving query is relaxed before its result feeds a decision/`UNSUPPORTED`
+  branch. `UNSUPPORTED` survives only after relaxation also yields nothing.
+
+**Verify:** unit tests for `normalize_value` / `relax_sql` (text-normalize + numeric fallback);
+an interpreter test that a 0-row `/bin/sql` discovery step is retried relaxed and binds the row;
+a probe test on prose params; trace check on a B1 product task → resolves the SKU and computes
+the answer (outcome `OUTCOME_OK`).
 
 ### Phase 2 — No ungrounded denial (bucket B2, ~10 tasks)
 
