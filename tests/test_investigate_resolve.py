@@ -39,3 +39,12 @@ def test_probe_never_raises_on_bad_intent():
     run_resolution_probe(_VM(), None, brief)   # None intent -> descriptors_from_intent would AttributeError
     # no exception; a lesson note records the failure
     assert any("resolve" in (n.lesson or "").lower() for n in brief.notes)
+
+
+from agent.investigate import sufficient
+
+
+def test_sufficient_requires_resolved_record_path():
+    intent = _intent()
+    assert sufficient(intent, {}) is False
+    assert sufficient(intent, {"resolved:$product.record_path": "/proc/p.json"}) is True

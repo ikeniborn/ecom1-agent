@@ -215,15 +215,18 @@ def is_stalled(result: str, signature: str, seen_signatures: set[str]) -> bool:
 
 
 def sufficient(intent, env: dict) -> bool:
-    """True when every investigator-groundable required_ref for the desired outcome is
-    grounded in env. Refs whose grounding is PLAN's responsibility (e.g. record_path
-    resolved from a $source) are skipped — the investigator cannot ground them and must
-    not block on them."""
+    """True when every required_ref for the desired outcome is grounded. Doc refs use their
+    env_key; record_path refs are grounded only when the resolution probe bound
+    `resolved:{source}` — the key entity must actually resolve before stopping."""
     outcome = intent.desired_outcome
     refs = (intent.required_refs or {}).get(outcome, [])
     for ref in refs:
+        if ref.kind == "record_path" and ref.source:
+            if not env.get(f"resolved:{ref.source}"):
+                return False
+            continue
         g = ref.grounded(env)
-        if g is None:            # PLAN produces this ref (e.g. record_path) — not the investigator's job
+        if g is None:
             continue
         if not g:
             return False

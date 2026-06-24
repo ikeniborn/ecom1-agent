@@ -161,12 +161,14 @@ def test_sufficient_false_when_refs_unbound():
 
 
 def test_sufficient_true_when_all_refs_grounded():
-    env = {"policy_doc:/docs/security.md": True, "row.record_path": "/payments/p_1.json"}
+    # record_path now requires "resolved:{source}" key (Task 6 contract)
+    env = {"policy_doc:/docs/security.md": True, "resolved:$row.record_path": "/payments/p_1.json"}
     assert sufficient(_intent_with_refs(), env=env)
 
 
-def test_sufficient_true_when_only_policy_doc_grounded_record_path_ungrounded():
-    # L3: record_path is PLAN-produced — sufficient() must not block on it.
+def test_sufficient_true_when_policy_doc_and_record_path_both_resolved():
+    # Task 6 contract: record_path is only grounded when the resolution probe bound
+    # "resolved:{source}"; both refs must be present for sufficient() to return True.
     intent = IntentSpec(
         objective="cite fraud payments",
         desired_outcome="OUTCOME_OK",
@@ -177,8 +179,24 @@ def test_sufficient_true_when_only_policy_doc_grounded_record_path_ungrounded():
             RefSpec(kind="record_path", source="$row.record_path"),
         ]},
     )
-    env = {"policy_doc:/docs/security.md": True}   # record_path NOT in env
+    env = {"policy_doc:/docs/security.md": True, "resolved:$row.record_path": "/payments/p_1.json"}
     assert sufficient(intent, env) is True
+
+
+def test_sufficient_false_when_only_policy_doc_grounded_record_path_unresolved():
+    # Task 6 contract: an unresolved record_path now blocks sufficiency.
+    intent = IntentSpec(
+        objective="cite fraud payments",
+        desired_outcome="OUTCOME_OK",
+        outcome_space=["OUTCOME_OK"],
+        answer_shape={},
+        required_refs={"OUTCOME_OK": [
+            RefSpec(kind="policy_doc", path="/docs/security.md"),
+            RefSpec(kind="record_path", source="$row.record_path"),
+        ]},
+    )
+    env = {"policy_doc:/docs/security.md": True}   # record_path NOT resolved
+    assert sufficient(intent, env) is False
 
 
 def test_sufficient_true_when_no_required_refs():
@@ -187,15 +205,16 @@ def test_sufficient_true_when_no_required_refs():
     assert sufficient(intent, env={})
 
 
-def test_sufficient_true_when_only_record_path_refs():
-    """required_refs with ONLY a PLAN-produced record_path ref must not block the
-    investigator (record_path is groundable only by a PLAN rowset, never by reads)."""
+def test_sufficient_true_when_only_record_path_refs_resolved():
+    """Task 6 contract: a record_path ref is grounded only when the resolution probe
+    bound resolved:{source} in env (was: skipped as PLAN-produced, i.e. always True)."""
     intent = IntentSpec(
         objective="x", desired_outcome="OUTCOME_OK", outcome_space=["OUTCOME_OK"],
         answer_shape={},
         required_refs={"OUTCOME_OK": [RefSpec(kind="record_path", source="$row.record_path")]},
     )
-    assert sufficient(intent, env={}) is True
+    assert sufficient(intent, env={}) is False   # unresolved → blocks
+    assert sufficient(intent, env={"resolved:$row.record_path": "/proc/r.json"}) is True
 
 
 import agent.investigate as inv
@@ -269,9 +288,10 @@ def test_investigate_stops_on_sufficiency(monkeypatch):
     monkeypatch.setattr(inv, "digest",
                         lambda goal, tool, args, observation, escalate: (
                             Note(tool=tool, args=args, lesson="cite it"),
-                            {"policy_doc:/docs/security.md": True, "row.record_path": "/payments/p_1.json"}))
+                            # Task 6: record_path key is now "resolved:{source}" so sufficient() sees it
+                            {"policy_doc:/docs/security.md": True, "resolved:$row.record_path": "/payments/p_1.json"}))
     brief = inv.investigate(vm, intent, seed=None, oracle=None, max_steps=6)
-    assert brief.env["row.record_path"] == "/payments/p_1.json"
+    assert brief.env["resolved:$row.record_path"] == "/payments/p_1.json"
     assert len(brief.notes) == 1            # stopped right after sufficiency met
 
 
