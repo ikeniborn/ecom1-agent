@@ -82,10 +82,10 @@ def descriptors_from_intent(intent) -> tuple[dict, dict]:
 def run_resolution_probe(vm, intent, brief: "Brief") -> None:
     """Best-effort key-entity resolution (descriptor-probe fallback). Binds resolved SKU /
     record_path into brief.env so PLAN builds against a known-resolving entity. Never raises."""
-    cols, props = descriptors_from_intent(intent)
-    if not cols and not props:
-        return
     try:
+        cols, props = descriptors_from_intent(intent)
+        if not cols and not props:
+            return
         rows = _resolve.resolve_product(vm, columns=cols, properties=props)
     except Exception as e:
         brief.notes.append(Note(goal="resolve product", lesson=f"resolve error: {e}"))

@@ -31,3 +31,11 @@ def test_probe_binds_resolved_record_path():
     run_resolution_probe(_VM(), _intent(), brief)
     assert brief.env.get("resolved_product_record_path") == "/proc/products/sku-9.json"
     assert brief.env.get("resolved:$product.record_path") == "/proc/products/sku-9.json"
+
+
+def test_probe_never_raises_on_bad_intent():
+    """Best-effort contract: a malformed intent must not raise out of the probe."""
+    brief = Brief()
+    run_resolution_probe(_VM(), None, brief)   # None intent -> descriptors_from_intent would AttributeError
+    # no exception; a lesson note records the failure
+    assert any("resolve" in (n.lesson or "").lower() for n in brief.notes)
