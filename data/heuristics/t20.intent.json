@@ -1,31 +1,31 @@
 {
-  "objective": "Compute the total number of units of a specific product available today across all PowerTool stores in Vienna, including stores with zero availability.",
+  "objective": "Determine the total number of units of a specific product available today across all PowerTool branches in Graz, including branches with zero availability.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_brand": "literal 'Sika' from instruction",
-    "product_family_name": "literal 'Sika Weatherproof Sikaflex 1JG-02A Sealant' from instruction",
-    "sealant_type": "literal 'silicone sealant' from instruction",
-    "color_family": "literal 'Gray' from instruction",
-    "volume": "literal '100 ml' from instruction",
-    "city": "literal 'Vienna' from instruction"
+    "product_sku": "lookup from product_variants matching brand='Wurth', series='Wurth Universal ZEBRA 2RS-7GT Wood and Drywall Screw', and properties: screw type wood screw, diameter 3 mm, length 30 mm, drive type torx. Use product_variant_properties to verify properties.",
+    "product": "lookup product_variants row for product_sku",
+    "graz_stores": "lookup from stores WHERE city='Graz'",
+    "graz_store_paths": "extract record_path from each store in graz_stores",
+    "available_quantities": "for each store in graz_stores, lookup store_inventory for product_sku, default 0 if not found, sum"
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_NONE_UNSUPPORTED"
+    "OUTCOME_NONE_UNSUPPORTED",
+    "OUTCOME_DENIED_SECURITY"
   ],
   "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$product.record_path",
+        "lhs": "$product_sku",
         "rhs": null,
         "args": []
       },
       {
-        "op": "ge",
-        "lhs": "$count",
-        "rhs": 0,
+        "op": "nonempty",
+        "lhs": "$graz_stores",
+        "rhs": null,
         "args": []
       }
     ]
@@ -46,7 +46,7 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$store_record_paths"
+        "source": "$graz_store_paths"
       }
     ]
   }

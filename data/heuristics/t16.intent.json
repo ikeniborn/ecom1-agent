@@ -1,71 +1,18 @@
 {
-  "objective": "Determine how many of the six specified products have at least 2 items available in the central Bratislava PowerTool shop today.",
+  "objective": "Count how many of the six specified products have at least 1 item available today in the central Linz hardware branch.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "store_lookup": "SELECT store_id, record_path FROM stores WHERE city = 'Bratislava' AND store_name LIKE '%PowerTool%'",
-    "product_definitions": [
-      {
-        "brand": "Bosch",
-        "series": "Bosch Compact IXO G9T-QOS",
-        "model": "Cordless Drill Driver",
-        "properties": {
-          "voltage": "12 V",
-          "battery platform": "12v-system",
-          "kit contents": "case"
-        }
-      },
-      {
-        "brand": "Stanley",
-        "series": "Stanley Professional SX 3OT-GPF",
-        "model": "Hammer Measuring and Cutting Tool",
-        "properties": {
-          "tool type": "utility knife",
-          "length": "150 mm"
-        }
-      },
-      {
-        "brand": "Heco",
-        "series": "Heco Heavy Duty HECO 6IT-PBI",
-        "model": "Anchor and Wall Plug",
-        "properties": {
-          "anchor type": "frame fixing",
-          "diameter": "6 mm",
-          "length": "40 mm"
-        }
-      },
-      {
-        "brand": "Mellerud",
-        "series": "Mellerud Concentrate MEL PWG-BFQ",
-        "model": "Cleaning Liquid",
-        "properties": {
-          "cleaner type": "drain cleaner",
-          "volume": "5000 ml"
-        }
-      },
-      {
-        "brand": "Bondex",
-        "series": "Bondex Weather Shield Garden 2IA-K10",
-        "model": "Wood Stain and Deck Oil",
-        "properties": {
-          "product type": "primer",
-          "color family": "Gray"
-        }
-      },
-      {
-        "brand": "Legrand",
-        "series": "Legrand Eco LG 3KP-P51",
-        "model": "LED Bulb",
-        "properties": {
-          "wattage": "10 W",
-          "luminous flux": "1521 lm"
-        }
-      }
-    ],
-    "inventory_check_method": "For each product, find product_sku from product_variants WHERE brand = $product.brand AND series = $product.series AND model = $product.model, then verify all specified properties exist in product_variant_properties, then check store_inventory WHERE store_id = $store_id AND product_sku = $sku AND available_today_quantity >= 2"
+    "store": "Lookup from stores table where city='Linz' and store_name contains 'hardware' or 'Central Linz Hardware' (use pattern matching to find the specific store).",
+    "product_1": "Identify SKU from product_variants and product_variant_properties where brand='Tork', series='Tork Wiping W', model='2RU-ZDO', and properties include cleaning_type='sponge' and pack_count='3 pcs'.",
+    "product_2": "Identify SKU from product_variants and product_variant_properties where brand='Sikkens', series='Sikkens Exterior SIK ZRP-H5X', model='ZRP-H5X', and properties include product_type='wood sealer' and color_family='Brown'.",
+    "product_3": "Identify SKU from product_variants and product_variant_properties where brand='Sikkens', series='Sikkens Exterior Cetol 3CU-TSJ', model='3CU-TSJ', and properties include product_type='wood stain' and color_family='White'.",
+    "product_4": "Identify SKU from product_variants and product_variant_properties where brand='Bernardo', series='Bernardo Professional TK 2DM-OB7', model='2DM-OB7', and properties include machine_type='bench grinder' and voltage='230 V'.",
+    "product_5": "Identify SKU from product_variants and product_variant_properties where brand='Michelin', series='Michelin Compact Radius ONB-OGX', model='ONB-OGX', and properties include product_type='battery charger', voltage='12 V', and current='4 A'.",
+    "product_6": "Identify SKU from product_variants and product_variant_properties where brand='Karcher', series='Karcher Professional WD 1V2-NV2', model='1V2-NV2', and properties include cleaner_type='glass cleaner' and volume='2500 ml'."
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_DENIED_SECURITY"
+    "OUTCOME_NONE_UNSUPPORTED"
   ],
   "constraints": [],
   "success_criteria": {
@@ -86,6 +33,12 @@
             "lhs": "$count",
             "rhs": 6,
             "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$store.record_path",
+            "rhs": null,
+            "args": []
           }
         ]
       }
@@ -100,14 +53,39 @@
   "required_refs": {
     "OUTCOME_OK": [
       {
-        "kind": "policy_doc",
-        "path": "/docs/security.md",
-        "source": null
+        "kind": "record_path",
+        "path": null,
+        "source": "$store.record_path"
       },
       {
         "kind": "record_path",
         "path": null,
-        "source": "$store.record_path"
+        "source": "$product_1.record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_2.record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_3.record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_4.record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_5.record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$product_6.record_path"
       }
     ]
   }

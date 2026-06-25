@@ -4,16 +4,16 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH target_kind AS (\n  SELECT product_kind_id FROM product_kinds WHERE product_kind_name = 'Work Trousers'\n),\nlinz_stores AS (\n  SELECT store_id FROM stores WHERE city = 'Linz' AND is_open = 1 AND store_name LIKE '%PowerTool%'\n),\neligible_inventory AS (\n  SELECT DISTINCT product_sku FROM store_inventory WHERE store_id IN (SELECT store_id FROM linz_stores) AND available_today_quantity > 0\n)\nSELECT COUNT(DISTINCT v.product_sku) AS count\nFROM product_variants v\nJOIN target_kind k ON v.product_kind_id = k.product_kind_id\nWHERE v.product_sku IN (SELECT product_sku FROM eligible_inventory);"
+        "stdin": "SELECT COUNT(*) AS count FROM product_variants WHERE product_kind_id = (SELECT product_kind_id FROM product_kinds WHERE product_kind_name = 'Wiper Blade')"
       },
-      "bind": "raw_result"
+      "bind": "raw_output"
     }
   ],
   "rowsets": [
     {
-      "from_": "raw_result",
+      "from_": "raw_output",
       "format": "auto_delim",
-      "into": "result",
+      "into": "rows",
       "columns": [
         {
           "into": "count",
@@ -25,6 +25,13 @@
     }
   ],
   "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "result"
+    },
     {
       "prim": "to_number",
       "args": [
@@ -45,18 +52,13 @@
         "label": "ok"
       }
     ],
-    "default_label": "unsupported"
+    "default_label": "ok"
   },
   "ops": [],
   "answer": {
     "ok": {
-      "message": "<COUNT:{count}>",
+      "message": "{count}",
       "outcome": "OUTCOME_OK",
-      "refs": []
-    },
-    "unsupported": {
-      "message": "Unable to count work trousers.",
-      "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }
   },

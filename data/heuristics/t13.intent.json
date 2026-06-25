@@ -1,98 +1,58 @@
 {
-  "objective": "Count how many of the four specified products have at least 1 unit available in the central Innsbruck PowerTool shop today.",
+  "objective": "Count how many of the five specified products have at least 2 items available today at the central Ljubljana hardware branch.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "store_city": "Innsbruck",
-    "store_name_pattern": "%PowerTool%",
-    "products": [
-      {
-        "brand": "Heco",
-        "series": "Heco Zinc Plated TopFix GTU-YPJ",
-        "model": "Wood and Drywall Screw",
-        "properties": [
-          {
-            "key": "screw type",
-            "value": "wood screw"
-          },
-          {
-            "key": "diameter",
-            "value": "6 mm"
-          }
-        ]
-      },
-      {
-        "brand": "Ajax",
-        "series": "Ajax Eco Classic 25C-DXE",
-        "model": "Cleaning Liquid",
-        "properties": [
-          {
-            "key": "cleaner type",
-            "value": "degreaser"
-          }
-        ]
-      },
-      {
-        "brand": "Heco",
-        "series": "Heco Zinc Plated HECO 3DW-64B",
-        "model": "Nut Bolt and Washer",
-        "properties": [
-          {
-            "key": "fastener type",
-            "value": "threaded rod"
-          }
-        ]
-      },
-      {
-        "brand": "Heco",
-        "series": "Heco Zinc Plated TopFix GTU-YPJ",
-        "model": "Wood and Drywall Screw",
-        "properties": [
-          {
-            "key": "screw type",
-            "value": "wood screw"
-          },
-          {
-            "key": "diameter",
-            "value": "3 mm"
-          }
-        ]
-      }
-    ]
+    "store_id": "lookup from stores WHERE city = 'Ljubljana' AND store_name LIKE '%central%hardware%branch%'",
+    "product_skus": "for each of the five product descriptions, find product_sku by joining product_variants and product_variant_properties where brand, series (or product_family_name), and property_key/property_value_text match the description: 1) brand='Heco', series='Heco Zinc Plated TopFix GTU-YPJ Wood and Drywall Screw', property_key='screw_type', property_value_text='drywall screw'; 2) brand='Festool', series='Festool Stackable SYS 3JJ-9LM Tool Box and Bag', property_key='storage_type', property_value_text='tool bag'; 3) same brand/series, property_key='storage_type', property_value_text='parts case'; 4) brand='Ajax', series='Ajax Eco Classic 25C-DXE Cleaning Liquid', property_key='cleaner_type', property_value_text='floor cleaner'; 5) same brand/series, property_key='cleaner_type', property_value_text='degreaser'"
   },
   "outcome_space": [
     "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY",
     "OUTCOME_NONE_UNSUPPORTED"
   ],
   "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "ge",
-        "lhs": "$count",
-        "rhs": 0,
+        "op": "nonempty",
+        "lhs": "$store_id",
+        "rhs": null,
         "args": []
       },
       {
-        "op": "le",
-        "lhs": "$count",
-        "rhs": 4,
+        "op": "eq",
+        "lhs": "$product_skus_count",
+        "rhs": 5,
         "args": []
+      },
+      {
+        "op": "and",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          },
+          {
+            "op": "le",
+            "lhs": "$count",
+            "rhs": 5,
+            "args": []
+          }
+        ]
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "%d products",
+    "msg_skeleton": "{count} products",
     "kind": "",
     "columns": [],
     "rows_from": ""
   },
   "required_refs": {
-    "OUTCOME_OK": [
-      {
-        "kind": "record_path",
-        "path": null,
-        "source": "$store.record_path"
-      }
-    ]
+    "OUTCOME_OK": []
   }
 }

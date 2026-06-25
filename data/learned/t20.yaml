@@ -134,19 +134,85 @@ entries:
   submitted_refs: []
 - content: null
   created: '2026-06-24'
+  deactivated_reason: superseded by newer verdict
   id: v003
   score: 0.0
   score_detail:
   - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
   source: verdict
-  status: active
+  status: inactive
   submitted_message: Unable to compute total available quantity because product or
     stores not found.
   submitted_outcome: OUTCOME_NONE_UNSUPPORTED
   submitted_refs: []
+- content: null
+  created: '2026-06-25'
+  deactivated_reason: superseded by newer verdict
+  id: v004
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: inactive
+  submitted_message: Unsupported
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
+- agents_md_anchor: null
+  content: Always use the exact dotted variable name from the plan's required_refs
+    (e.g., $product.record_path) as the source in answer refs, and assign the computed
+    value to a variable with that exact name (including dots) in the compute step.
+    Additionally, perform entity lookups in separate discovery steps with decision
+    branches to ensure the entity exists before using its record_path.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''$product.record_path'']
+    on OK answer''. Root cause: The answer refs used source ''$product_record_path''
+    instead of the required ''$product.record_path'', violating r004. Also, the script
+    did not perform a separate product entity lookup with a decision branch (violating
+    r006), which would have defined the variable with the correct dotted name and
+    ensured it is only used when the entity exists. The failing PlanIR fragment is
+    the answer section: ''refs'':[{''source'':''$product_record_path''},...]. The
+    new rule reinforces both r004 and r006 with specific guidance on dotted variable
+    naming.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always set the parent variable (e.g., product) to a dict containing the
+    field when the required_refs source is a dotted path (e.g., $product.record_path),
+    rather than setting a flat variable with the dotted name. Additionally, perform
+    entity lookups in separate discovery steps with decision branches to ensure the
+    entity exists before using its record_path.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$product.record_path'''']
+    on OK answer''. Root cause: The PlanIR sets a flat variable named ''product.record_path''
+    via compute step, but the interpreter expects a variable named ''product'' that
+    is a dict with a field ''record_path'' (dotted path resolution). This mismatch
+    causes the variable to be unresolved. Additionally, the plan combines product
+    lookup and inventory in one SQL query without a decision branch to check if the
+    product exists, violating r006. The fix: assign the entire product row (dict)
+    to variable ''product'', then use ''$product.record_path'' in answer refs. Also
+    separate entity lookups and add decision branches per r006.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v005
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: 'Unable to determine total: product or stores not found.'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /docs/merchant-continuity-and-critical-incidents.md
+  - /docs/store-associate-exception-handbook.md
 last_run:
-  cycles_used: 1
-  date: '2026-06-24'
+  cycles_used: 3
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t20

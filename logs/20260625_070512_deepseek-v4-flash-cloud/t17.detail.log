@@ -1,0 +1,2661 @@
+════════════════════════════════════════════════════════════════════════
+TASK t17  ·  model=deepseek-v4-flash:cloud
+  I can visit any PowerTool branch in Graz today. Across every Graz branch, including branches with 0 availability, how many units of product (the Tool Box and Bag from Festool in the Festool Stackable SYS 3JJ-9LM Tool Box and Bag line that has storage type tool bag) are available today? Answer exactly as "answer=%d" and cite every city store record plus the product record.
+════════════════════════════════════════════════════════════════════════
+
+  · [Exec /bin/sql] -> sql
+      CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+      CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+      CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+      CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+      CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+      CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+      CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+      CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+      CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+      CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+      CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+      CREATE INDEX payment_transactions_status_idx ON paym… [+6147 chars]
+  · [Exec /bin/id] [MUTATED] -> user: anonymous
+      roles: GUEST
+  · [Tree /docs] -> <empty>
+═══ PRE-PHASE FACTS ═══
+docs_inventory (11):
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+gather_status: {"schema": "ok", "sample_rows": "skipped(slim)", "identity": "ok", "docs_inventory": "ok", "policies": "skipped(slim)", "catalogue_candidates": "skipped(slim)", "target_records": "skipped(slim)", "path_listings": "skipped(slim)"}
+identity: {"kind": "guest"}
+schema:
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(… [+5146 chars]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · RERANK · 13961ms · tokens 472/1187 · OK
+┌ SYSTEM (7225865c)
+    You select which knowledge snippets are RELEVANT to a coding task. Return JSON {"keep": [ids]} listing only the ids whose content would help write the task's script, most relevant first.
+├ USER
+    TASK:
+    I can visit any PowerTool branch in Graz today. Across every Graz branch, including branches with 0 availability, how many units of product (the Tool Box and Bag from Festool in the Festool Stackable SYS 3JJ-9LM Tool Box and Bag line that has storage type tool bag) are available today? Answer exactly as "answer=%d" and cite every city store record plus the product record.
+    
+    CANDIDATE KNOWLEDGE:
+    - compute_total_available_quantity_across_stores: Compute total available quantity of a product across all stores in a given city, including stores with zero availability.
+    - product_available_quantity_city: Compute total available quantity of a product across stores in a city by matching product variant properties and store location.
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - count_available_products_by_category_and_location: Count distinct products of a given category that are available in a specific location with positive inventory and store open.
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    - sql-count-by-category: Method to count items of a specific category in a relational database using SQL JOIN and COUNT
+    
+    Return at most 4 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": [1, 2, 7]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INTENT · 45414ms · tokens 4015/3681 · OK
+┌ SYSTEM (e659f28e)
+    # PHASE: INTENT
+    
+    You receive pre-phase facts about the task and produce an IntentSpec —
+    a structured description of **what** must be done and **why**, not **how**.
+    Emit data, not code. The PLAN phase uses your output to decide the execution
+    strategy.
+    
+    ## Pre-phase facts you receive
+    
+    | Field | Content |
+    |-------|---------|
+    | `instruction` | Verbatim task request from the caller |
+    | `agents_md` | Full AGENTS.MD vault rules |
+    | `schema` | Table/column definitions from the runtime |
+    | `sample_rows` | Small row sample per table (method-grounded; values change each run) |
+    | `docs_inventory` | Paths of policy docs available under `/docs/` |
+    | `policies` | Verbatim content of relevant policy files |
+    | `identity` | Output of `/bin/id` — caller role, store, issuer; includes a structural `kind`: `customer` \| `employee` \| `guest` |
+    | `target_records` | Any specific records named in the instruction |
+    
+    ## Output format — IntentSpec
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "objective": "<one-sentence statement of what must be achieved>",
+      "desired_outcome": "OUTCOME_OK | OUTCOME_DENIED_SECURITY | OUTCOME_NONE_UNSUPPORTED | OUTCOME_NONE_CLARIFICATION",
+      "params": {"<name>": "<method description or $agent_var — never a re-seeded literal>"},
+      "outcome_space": ["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+      "constraints": [
+        {
+          "anchor": "<#section > entry in AGENTS.MD>",
+          "rule": "<verbatim AGENTS.MD line>",
+          "security": true,
+          "deny_when": {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<literal or $ref>"}
+        }
+      ],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<value>"}
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "<human-readable template, e.g. 'Processed {count} items'>"
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {"kind": "policy_doc", "path": "/docs/<governing-doc>.md"},
+          {"kind": "record_path", "source": "$<row>.record_path"}
+        ]
+      }
+    }
+    ```
+    
+    ### Field rules
+    
+    - `objective` — one sentence; no implementation detail.
+    - `desired_outcome` — the nominal happy-path outcome; PLAN may produce others.
+    - `params` — encode **how** to find a value (e.g. `"lookup from <TABLE> WHERE ..."`),
+      never bake a re-seeded literal. Values beginning with `$` are resolved at runtime.
+    - `outcome_space` — every outcome the task can legitimately produce; order does not matter.
+    - `constraints` — one entry per AGENTS.MD rule that applies. Copy `rule` verbatim.
+      - `security: true` when the rule can produce `OUTCOME_DENIED_SECURITY`.
+      - `deny_when` (**required** on security constraints): a PredExpr that, when true,
+        mandates denial. Evaluated against runtime env after discovery.
+    - `required_refs` — keyed by outcome. For each outcome the answer can take, list the
+      evidence the grader requires: a `policy_doc` (literal `/docs/...md` `path` taken from
+      THIS run's `docs_inventory`/`policies` — the governing rule/count/procedure the
+      decision rests on) and/or a `record_path` (a `$ref` `source` bound at runtime to the
+      reported row's path). Declare ONLY load-bearing refs (reading a doc ≠ obligation to
+      cite it). Exactly one of `path`/`source` per RefSpec, matching its `kind`.
+    - `success_criteria` — a map keyed by outcome (same shape as `required_refs`).
+      List STRUCTURAL / grounding checks only per outcome (e.g. `count ge 0`, a
+      nonempty bound id). A negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`)
+      typically needs no criteria — it is gated by `outcome_space`. Do NOT bake a SQL
+      recipe, join, `kind_id`, or `city` here — that is PLAN's job (HOW).
+    
+    ### Learned rules
+    
+    You may receive a `LEARNED_RULES (active)` block — validated, task-scoped guidance
+    distilled from prior runs. Honor it when shaping the spec, especially `required_refs`,
+    `success_criteria`, `outcome_space`, and `params`. These rules state methods (how to
+    ground an answer, which evidence the grader requires), never re-seeded literals — apply
+    the method, do not copy any example value.
+    
+    ### Security scope — role-aware customer-ownership deny
+    
+    `facts.identity.kind` is one of `customer`, `employee`, `guest` (structural,
+    derived from the `/bin/id` id-shape — not a role-name list). The `security.md`
+    customer-ownership clause binds **customers** acting on their own account — NOT
+    an employee operational read or action.
+    
+    Apply a customer-ownership `deny_when` **only when** the caller is a customer:
+    
+    ```json
+    {"op":"and","args":[
+      {"op":"eq","lhs":"$_facts.identity.kind","rhs":"customer"},
+      {"op":"ne","lhs":"$record.customer_id","rhs":"$_facts.identity.customer_id"}]}
+    ```
+    
+    Do NOT emit an owner-mismatch deny for an `employee`/operational identity — an
+    employee reading or acting on a record they do not "own" is not a customer-scope
+    violation. Customer-only actions (account recovery, email change per the doc)
+    remain a separate class. Ground this in the `security.md` scope + `facts.identity`,
+    never a hardcoded role or id.
+    
+    ## IDD vs SDD (what belongs here)
+    
+    INTENT is the IDD layer: WHAT must hold and WHY — `objective`, `outcome_space`,
+    `constraints`, `required_refs` (cite the governing doc + the reported record),
+    `success_criteria` (structural/grounding). INTENT NEVER specifies HOW: no SQL, joins,
+    column names, `kind_id`, or `city`. PLAN (the SDD layer) reads the eligibility rule
+    from `facts.policies` and builds the rule-correct SQL.
+    
+    ## PredExpr grammar
+    
+    A predicate expression is a JSON object `{"op": ..., ...}`.
+    
+    **Leaf ops** — require `lhs` (a ref or literal); most require `rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `eq` | lhs == rhs |
+    | `ne` | lhs != rhs |
+    | `lt` | lhs < rhs (numeric) |
+    | `le` | lhs <= rhs (numeric) |
+    | `gt` | lhs > rhs (numeric) |
+    | `ge` | lhs >= rhs (numeric) |
+    | `nonempty` | lhs is non-null and non-empty (no rhs) |
+    | `isnull` | lhs is null or missing (no rhs) |
+    | `contains_any` | lhs list shares ≥1 element with rhs list |
+    | `in_set` | lhs value is in rhs list |
+    | `startswith` | str(lhs) starts with str(rhs) |
+    | `endswith` | str(lhs) ends with str(rhs) |
+    | `regex_match` | str(lhs) matches regex rhs |
+    
+    **Bool ops** — require `args` (list of nested PredExpr); no `lhs`/`rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `and` | all args true |
+    | `or` | any arg true |
+    | `not` | exactly one arg; negated |
+    
+    ### `$ref` convention
+    
+    A string starting with `$` is a runtime reference into `env`:
+    - `$name` — top-level env key
+    - `$a.b` — dotted path: `env["a"]["b"]`
+    - `$rows.0.sku` — indexed path: `env["rows"][0]["sku"]`
+    
+    Anything that does not start with `$` is treated as a literal value.
+    
+    ## Grounding rule (S3)
+    
+    The benchmark re-seeds data on every run. Never bake a literal value that
+    originates from sample data into `params` or `deny_when`. Encode the
+    **method** to retrieve it (SQL pattern, field name, policy section).
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+├ USER
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INSTRUCTION:
+    I can visit any PowerTool branch in Graz today. Across every Graz branch, including branches with 0 availability, how many units of product (the Tool Box and Bag from Festool in the Festool Stackable SYS 3JJ-9LM Tool Box and Bag line that has storage type tool bag) are available today? Answer exactly as "answer=%d" and cite every city store record plus the product record.
+└ ASSISTANT
+    ```json
+    {
+      "objective": "Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "product_sku": "Lookup from product_variants WHERE brand='Festool' AND series='Festool Stackable SYS 3JJ-9LM Tool Box and Bag' AND model='Tool Box and Bag', then verify in product_variant_properties that property_key='storage type' AND property_value_text='tool bag' for that SKU.",
+        "graz_stores": "Query stores WHERE city='Graz' to obtain list of store_ids and record_paths.",
+        "available_today_sum": "For each store in graz_stores, sum available_today_quantity from store_inventory WHERE product_sku = $product_sku AND store_id = $store_id. If no row exists, treat as 0. Sum across all stores."
+      },
+      "outcome_space": ["OUTCOME_OK", "OUTCOME_NONE_UNSUPPORTED"],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {"op": "ge", "lhs": "$store_count", "rhs": 1},
+          {"op": "nonempty", "lhs": "$product_sku"},
+          {"op": "ge", "lhs": "$answer", "rhs": 0}
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "answer=%d"
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {"kind": "record_path", "source": "$product_record_path"},
+          {"kind": "record_path", "source": "$store_record_paths"}
+        ]
+      }
+    }
+    ```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · RERANK · 31192ms · tokens 433/672 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.
+    
+    CANDIDATE KNOWLEDGE:
+    - compute_total_available_quantity_across_stores: Compute total available quantity of a product across all stores in a given city, including stores with zero availability.
+    - product_available_quantity_city: Compute total available quantity of a product across stores in a city by matching product variant properties and store location.
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    - count_available_products_by_category_and_location: Count distinct products of a given category that are available in a specific location with positive inventory and store open.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    - sql-count-by-category: Method to count items of a specific category in a relational database using SQL JOIN and COUNT
+    - atom-count-items-by-category-sql: A reusable method to count items belonging to a specific category in a relational database using SQL JOIN and WHERE clause, extracting the count, validating it, and formatting the output.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": [1, 3]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 12587ms · tokens 456/201 · OK
+┌ SYSTEM (7fda40de)
+    # PHASE: INVESTIGATE
+    
+    You explore a vault ONE read-only step at a time to gather the evidence a later
+    deterministic plan needs. You do NOT write the plan and you NEVER mutate state.
+    
+    ## Each turn you receive
+    - The OBJECTIVE and the REFS the final answer must ground (required_refs targets).
+    - The BRIEF so far (resolved env + prior step lessons).
+    - A few KNOWLEDGE snippets scoped to the immediate sub-goal.
+    
+    ## Router output — pick exactly ONE next action
+    Single JSON object, no prose, no fences. Either a tool call:
+    {"tool": "<read|list|tree|stat|search|exec>", "args": {...}, "why": "<one line>"}
+    or, when the brief already grounds every required ref:
+    {"done": true}
+    
+    Tool arg shapes: read/stat {"path"}; list {"path"}; tree {"root"}; search
+    {"root","pattern","limit"}; exec {"path":"/bin/sql","stdin":"SELECT …"} (SELECT/CTE only).
+    Prefer the cheapest probe that resolves the NEXT unknown. Do not re-issue a probe
+    already in the brief.
+    
+    ## Digest output — condense the tool result
+    Single JSON object:
+    {"observation_digest": "<≤200 chars of what the result shows>",
+     "lesson": "<one-line takeaway for the next step>",
+     "env_updates": {"<key>": "<value>"},
+     "refs_found": ["<record_path>", ...]}
+    
+    Bind env keys the sufficiency gate reads: "policy_doc:/docs/<file>.md": true when you
+    have read a governing doc; "<row>.record_path": "<path>" when you have located the
+    record to cite. Keep digests SMALL — the next step sees the brief, not the raw output.
+├ USER
+    OBJECTIVE:
+    Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.
+    
+    REQUIRED_REFS:
+    record_path:$product_record_path; record_path:$store_record_paths
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "list", "args": {"path": "/"}, "why": "Explore the root directory to understand the available data structure and locate store/product records."}
+
+  · [List /] -> <empty>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 16052ms · tokens 554/194 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    GOAL:
+    Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.
+    
+    TOOL: list {'path': '/'}
+    
+    RAW_RESULT (condense this):
+    [name: "AGENTS.MD"
+    path: "/AGENTS.MD"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "bin"
+    path: "/bin"
+    kind: NODE_KIND_DIR
+    , name: "docs"
+    path: "/docs"
+    kind: NODE_KIND_DIR
+    , name: "proc"
+    path: "/proc"
+    kind: NODE_KIND_DIR
+    , name: "run"
+    path: "/run"
+    kind: NODE_KIND_DIR
+    ]
+    
+    Return the digest JSON.
+└ ASSISTANT
+    {
+      "observation_digest": "Root directory contains AGENTS.MD, bin, docs, proc, run.",
+      "lesson": "AGENTS.MD likely contains instructions or context for the task.",
+      "env_updates": {},
+      "refs_found": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · RERANK · 17084ms · tokens 356/364 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    AGENTS.MD likely contains instructions or context for the task.
+    
+    CANDIDATE KNOWLEDGE:
+    - include-required-references: Ensure that the answer includes all required references, such as document paths specified in the task or error feedback.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    - sql_safe_count_query: Safely counting records in a database while enforcing access control.
+    - atom-count-items-by-category-sql: A reusable method to count items belonging to a specific category in a relational database using SQL JOIN and WHERE clause, extracting the count, validating it, and formatting the output.
+    - sql-count-by-category: Method to count items of a specific category in a relational database using SQL JOIN and COUNT
+    - count_products_by_kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_specific_category: Count the number of catalog items that belong to a specific product kind.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["include-required-references", "catalogue-counting-include-ref"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 32959ms · tokens 629/156 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    OBJECTIVE:
+    Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.
+    
+    REQUIRED_REFS:
+    record_path:$product_record_path; record_path:$store_record_paths
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> AGENTS.MD likely contains instructions or context for the task.
+    
+    KNOWLEDGE (scoped to this step):
+    - When constructing the final answer, check the task description and any error feedback for required references (e.g., document paths). If a reference is required, include it in the `refs` array of the answer object. If no references are required, the array may be empty. This prevents errors due to missing mandatory references.
+    - Always include a reference to the authoritative documentation (e.g., specification, rule set) that defines the criteria for counting catalogue products, such as product kind definitions or counting rules. This ensures traceability and validation of the count.
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "read", "args": {"path": "AGENTS.MD"}}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · RERANK · 15083ms · tokens 408/411 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    
+    CANDIDATE KNOWLEDGE:
+    - include-required-references: Ensure that the answer includes all required references, such as document paths specified in the task or error feedback.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - sql_safe_count_query: Safely counting records in a database while enforcing access control.
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    - compute_total_available_quantity_across_stores: Compute total available quantity of a product across all stores in a given city, including stores with zero availability.
+    - atom-count-items-by-category-sql: A reusable method to count items belonging to a specific category in a relational database using SQL JOIN and WHERE clause, extracting the count, validating it, and formatting the output.
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["include-required-references"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 13003ms · tokens 608/130 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    OBJECTIVE:
+    Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.
+    
+    REQUIRED_REFS:
+    record_path:$product_record_path; record_path:$store_record_paths
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> AGENTS.MD likely contains instructions or context for the task.
+    2. []  -> step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    
+    KNOWLEDGE (scoped to this step):
+    - When constructing the final answer, check the task description and any error feedback for required references (e.g., document paths). If a reference is required, include it in the `refs` array of the answer object. If no references are required, the array may be empty. This prevents errors due to missing mandatory references.
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "list", "args": {"path": "/"}, "why": "List root directory to see structure and find AGENTS.MD or other relevant files."}
+
+  · [List /] -> <empty>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 20248ms · tokens 608/164 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    OBJECTIVE:
+    Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.
+    
+    REQUIRED_REFS:
+    record_path:$product_record_path; record_path:$store_record_paths
+    
+    INVESTIGATION_BRIEF:
+    ## STEP_LESSONS
+    1. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> AGENTS.MD likely contains instructions or context for the task.
+    2. []  -> step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    
+    KNOWLEDGE (scoped to this step):
+    - When constructing the final answer, check the task description and any error feedback for required references (e.g., document paths). If a reference is required, include it in the `refs` array of the answer object. If no references are required, the array may be empty. This prevents errors due to missing mandatory references.
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "list", "args": {"root": "/"}, "why": "List root directory to understand the filesystem structure and locate relevant data files."}
+
+  · [List ] -> <empty>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 18955ms · tokens 548/343 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    GOAL:
+    step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    
+    TOOL: list {'root': '/'}
+    
+    RAW_RESULT (condense this):
+    [name: "AGENTS.MD"
+    path: "/AGENTS.MD"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "bin"
+    path: "/bin"
+    kind: NODE_KIND_DIR
+    , name: "docs"
+    path: "/docs"
+    kind: NODE_KIND_DIR
+    , name: "proc"
+    path: "/proc"
+    kind: NODE_KIND_DIR
+    , name: "run"
+    path: "/run"
+    kind: NODE_KIND_DIR
+    ]
+    
+    Return the digest JSON.
+└ ASSISTANT
+    {
+      "observation_digest": "Root directory contains: AGENTS.MD (file), bin, docs, proc, run (directories).",
+      "lesson": "Use absolute path '/AGENTS.MD' to read the file.",
+      "env_updates": {
+        "root:/AGENTS.MD": true,
+        "root:/docs": true
+      },
+      "refs_found": ["/AGENTS.MD"]
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · RERANK · 27339ms · tokens 368/214 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    Use absolute path '/AGENTS.MD' to read the file.
+    
+    CANDIDATE KNOWLEDGE:
+    - include-required-references: Ensure that the answer includes all required references, such as document paths specified in the task or error feedback.
+    - sql_safe_count_query: Safely counting records in a database while enforcing access control.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - sql-count-by-category: Method to count items of a specific category in a relational database using SQL JOIN and COUNT
+    - atom-count-items-by-category-sql: A reusable method to count items belonging to a specific category in a relational database using SQL JOIN and WHERE clause, extracting the count, validating it, and formatting the output.
+    - compute_total_available_quantity_across_stores: Compute total available quantity of a product across all stores in a given city, including stores with zero availability.
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    - count_specific_category: Count the number of catalog items that belong to a specific product kind.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["include-required-references"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 41962ms · tokens 683/154 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    OBJECTIVE:
+    Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.
+    
+    REQUIRED_REFS:
+    record_path:$product_record_path; record_path:$store_record_paths
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - root:/AGENTS.MD: True
+    - root:/docs: True
+    ## STEP_LESSONS
+    1. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> AGENTS.MD likely contains instructions or context for the task.
+    2. []  -> step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    3. [list] Root directory contains: AGENTS.MD (file), bin, docs, proc, run (directories). -> Use absolute path '/AGENTS.MD' to read the file. refs=['/AGENTS.MD']
+    
+    KNOWLEDGE (scoped to this step):
+    - When constructing the final answer, check the task description and any error feedback for required references (e.g., document paths). If a reference is required, include it in the `refs` array of the answer object. If no references are required, the array may be empty. This prevents errors due to missing mandatory references.
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "read", "args": {"path": "/AGENTS.MD"}, "why": "Read the AGENTS.MD file to understand the task context and locate product/store data."}
+
+  · [Read /AGENTS.MD] -> # Founding principles of Agentic E-Commerce OS System (v2/PROD)
+      
+      
+      0. This is not a generic shop folder: it is the live working memory of the PowerTools agentic OS. Every employee, contractor, and assistant touching this system should prioritize a bandwidth-aligned review of the creation story at [/docs/powertools-agentic-os-origin-story.md](/docs/powertools-agentic-os-origin-story.md) so the legacy is not accidentally flattened into mere procedure.
+      1. readme.md files take role of agents.md. Trust them, follow the chain of command.
+      2. All paths are / rooted (pass as such to tools and OS ops).
+      
+      ## Key locations
+      
+      - Catalogue is in proc/catalog, stores are in proc/stores
+      - Employee profiles are in proc/employees
+      - Customer profiles are in proc/customers, baskets are in proc/baskets, payments are in proc/payments
+      - Tools are in `/bin`, they have `--help` arg to describe capabilities especially 
+      - Commerce policies are in `docs`, including checkout, discounts, payments, returns, and security… [+1354 chars]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 32849ms · tokens 948/566 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    GOAL:
+    Use absolute path '/AGENTS.MD' to read the file.
+    
+    TOOL: read {'path': '/AGENTS.MD'}
+    
+    RAW_RESULT (condense this):
+    # Founding principles of Agentic E-Commerce OS System (v2/PROD)
+    
+    
+    0. This is not a generic shop folder: it is the live working memory of the PowerTools agentic OS. Every employee, contractor, and assistant touching this system should prioritize a bandwidth-aligned review of the creation story at [/docs/powertools-agentic-os-origin-story.md](/docs/powertools-agentic-os-origin-story.md) so the legacy is not accidentally flattened into mere procedure.
+    1. readme.md files take role of agents.md. Trust them, follow the chain of command.
+    2. All paths are / rooted (pass as such to tools and OS ops).
+    
+    ## Key locations
+    
+    - Catalogue is in proc/catalog, stores are in proc/stores
+    - Employee profiles are in proc/employees
+    - Customer profiles are in proc/customers, baskets are in proc/baskets, payments are in proc/payments
+    - Tools are in `/bin`, they have `--help` arg to describe capabilities especially 
+    - Commerce policies are in `docs`, including checkout, discounts, payments, returns, and security
+    
+    ## Important tools
+    
+    - see sql tool that takes SQLite query as stdin. It operates with the state of the entire catalogue at the start of the session. Query `sqlite_schema` to see the schema, for example `/bin/sql 'select name, sql from sqlite_schema where sql is not null order by type, name;'`. Note that inventory lives only in SQL projections
+    - id tool returns identity of the user/customer/guest under which we are running current request.
+    - use discount tool to manage basket discounts
+    - use payments tool to manage payment workflow state and supported refund approval/finalization
+    
+    ## Important things
+    
+    - When responding with reference - provide full path in the repo to the object.
+    - When you apply a policy from `docs`, include that policy document as a grounding reference in the final response.
+    - When a request is ambiguous and you ask for clarification, reference all concrete candidate objects that make it ambiguous.
+    - When answering yes/no questions - include <YES> or <NO> tokens in the response. This is how the agent will know how to style the response.
+    - When answering availability questions - answer should reference products that are available, but should not reference unavailable products. Same with stores.
+    - When starting work, make sure to run tree -L 2 on docs folder. It also makes sense to pull current date and id context
+    
+    
+    Return the digest JSON.
+└ ASSISTANT
+    {
+      "observation_digest": "Read /AGENTS.MD: outlines system principles, key locations (catalog, stores, employees, etc.), tools (sql, id, discount, payments), and important rules for referencing.",
+      "lesson": "System is agentic OS; policies in /docs; use /bin/sql for queries; reference full paths.",
+      "env_updates": {
+        "policy_doc:/AGENTS.MD": true
+      },
+      "refs_found": [
+        "/AGENTS.MD"
+      ]
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · RERANK · 34748ms · tokens 379/472 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    System is agentic OS; policies in /docs; use /bin/sql for queries; reference full paths.
+    
+    CANDIDATE KNOWLEDGE:
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - sql_safe_count_query: Safely counting records in a database while enforcing access control.
+    - sql-count-by-category: Method to count items of a specific category in a relational database using SQL JOIN and COUNT
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - include-required-references: Ensure that the answer includes all required references, such as document paths specified in the task or error feedback.
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    - count_specific_category: Count the number of catalog items that belong to a specific product kind.
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["include-required-references", "catalogue-counting-include-ref"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 21754ms · tokens 818/213 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    OBJECTIVE:
+    Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.
+    
+    REQUIRED_REFS:
+    record_path:$product_record_path; record_path:$store_record_paths
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - root:/AGENTS.MD: True
+    - root:/docs: True
+    - policy_doc:/AGENTS.MD: True
+    ## STEP_LESSONS
+    1. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> AGENTS.MD likely contains instructions or context for the task.
+    2. []  -> step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    3. [list] Root directory contains: AGENTS.MD (file), bin, docs, proc, run (directories). -> Use absolute path '/AGENTS.MD' to read the file. refs=['/AGENTS.MD']
+    4. [read] Read /AGENTS.MD: outlines system principles, key locations (catalog, stores, employees, etc.), tools (sql, id, discount, payments), and important rules for referencing. -> System is agentic OS; policies in /docs; use /bin/sql for queries; reference full paths. refs=['/AGENTS.MD']
+    
+    KNOWLEDGE (scoped to this step):
+    - When constructing the final answer, check the task description and any error feedback for required references (e.g., document paths). If a reference is required, include it in the `refs` array of the answer object. If no references are required, the array may be empty. This prevents errors due to missing mandatory references.
+    - Always include a reference to the authoritative documentation (e.g., specification, rule set) that defines the criteria for counting catalogue products, such as product kind definitions or counting rules. This ensures traceability and validation of the count.
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "list", "path": "/catalog"}
+
+  · [List ] -> <empty>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 33385ms · tokens 547/323 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    GOAL:
+    System is agentic OS; policies in /docs; use /bin/sql for queries; reference full paths.
+    
+    TOOL: list {}
+    
+    RAW_RESULT (condense this):
+    [name: "AGENTS.MD"
+    path: "/AGENTS.MD"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "bin"
+    path: "/bin"
+    kind: NODE_KIND_DIR
+    , name: "docs"
+    path: "/docs"
+    kind: NODE_KIND_DIR
+    , name: "proc"
+    path: "/proc"
+    kind: NODE_KIND_DIR
+    , name: "run"
+    path: "/run"
+    kind: NODE_KIND_DIR
+    ]
+    
+    Return the digest JSON.
+└ ASSISTANT
+    {
+      "observation_digest": "Root directory contains AGENTS.MD, bin, docs, proc, run.",
+      "lesson": "The docs directory is present; likely contains policy files. Next step should list /docs to find policy documents.",
+      "env_updates": {},
+      "refs_found": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · RERANK · 17525ms · tokens 397/132 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    The docs directory is present; likely contains policy files. Next step should list /docs to find policy documents.
+    
+    CANDIDATE KNOWLEDGE:
+    - include-required-references: Ensure that the answer includes all required references, such as document paths specified in the task or error feedback.
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - sql_safe_count_query: Safely counting records in a database while enforcing access control.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_available_products_by_category_and_location: Count distinct products of a given category that are available in a specific location with positive inventory and store open.
+    - product_available_quantity_city: Compute total available quantity of a product across stores in a city by matching product variant properties and store location.
+    - compute_total_available_quantity_across_stores: Compute total available quantity of a product across all stores in a given city, including stores with zero availability.
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": []}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 29668ms · tokens 739/174 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    OBJECTIVE:
+    Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.
+    
+    REQUIRED_REFS:
+    record_path:$product_record_path; record_path:$store_record_paths
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - root:/AGENTS.MD: True
+    - root:/docs: True
+    - policy_doc:/AGENTS.MD: True
+    ## STEP_LESSONS
+    1. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> AGENTS.MD likely contains instructions or context for the task.
+    2. []  -> step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    3. [list] Root directory contains: AGENTS.MD (file), bin, docs, proc, run (directories). -> Use absolute path '/AGENTS.MD' to read the file. refs=['/AGENTS.MD']
+    4. [read] Read /AGENTS.MD: outlines system principles, key locations (catalog, stores, employees, etc.), tools (sql, id, discount, payments), and important rules for referencing. -> System is agentic OS; policies in /docs; use /bin/sql for queries; reference full paths. refs=['/AGENTS.MD']
+    5. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> The docs directory is present; likely contains policy files. Next step should list /docs to find policy documents.
+    
+    Choose the next read-only action (or {"done": true}).
+└ ASSISTANT
+    {"tool": "list", "args": {"path": "/docs"}, "why": "List /docs to find policy files that may describe how to locate product and store records."}
+
+  · [List /docs] -> <empty>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · INVESTIGATE · 52074ms · tokens 863/599 · OK
+┌ SYSTEM (7fda40de) — same as above
+├ USER
+    GOAL:
+    The docs directory is present; likely contains policy files. Next step should list /docs to find policy documents.
+    
+    TOOL: list {'path': '/docs'}
+    
+    RAW_RESULT (condense this):
+    [name: "checkout.md"
+    path: "/docs/checkout.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "discounts.md"
+    path: "/docs/discounts.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "merchant-continuity-and-critical-incidents.md"
+    path: "/docs/merchant-continuity-and-critical-incidents.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "os-and-tooling-incidents-and-workarounds.md"
+    path: "/docs/os-and-tooling-incidents-and-workarounds.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "payments"
+    path: "/docs/payments"
+    kind: NODE_KIND_DIR
+    , name: "powertools-agentic-os-origin-story.md"
+    path: "/docs/powertools-agentic-os-origin-story.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "README.md"
+    path: "/docs/README.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "returns.md"
+    path: "/docs/returns.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "security.md"
+    path: "/docs/security.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "store-associate-exception-handbook.md"
+    path: "/docs/store-associate-exception-handbook.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    , name: "warehouse-systems-migration-runbook.md"
+    path: "/docs/warehouse-systems-migration-runbook.md"
+    kind: NODE_KIND_FILE
+    content_type: "text/markdown"
+    ]
+    
+    Return the digest JSON.
+└ ASSISTANT
+    {
+      "observation_digest": "Found 11 items in /docs: 10 markdown files and 1 subdirectory 'payments'.",
+      "lesson": "The /docs directory contains policy files; next step should read relevant ones based on objective.",
+      "env_updates": {"docs_listed": true},
+      "refs_found": [
+        "/docs/checkout.md",
+        "/docs/discounts.md",
+        "/docs/merchant-continuity-and-critical-incidents.md",
+        "/docs/os-and-tooling-incidents-and-workarounds.md",
+        "/docs/payments",
+        "/docs/powertools-agentic-os-origin-story.md",
+        "/docs/README.md",
+        "/docs/returns.md",
+        "/docs/security.md",
+        "/docs/store-associate-exception-handbook.md",
+        "/docs/warehouse-systems-migration-runbook.md"
+      ]
+    }
+
+  · [Exec /bin/sql] -> product_sku,record_path
+  · [Exec /bin/sql] -> product_sku,record_path
+  · [investigate_stop] {"reason": "budget", "data_paths_total": 0, "data_paths_probed": 0, "seq": 36}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · PLAN · 53038ms · tokens 5335/5729 · OK
+┌ SYSTEM (4a851949)
+    # PHASE: PLAN
+    
+    You receive an IntentSpec and produce a PlanIR — a deterministic execution
+    plan. You decide **how** to satisfy the intent. The interpreter executes your
+    plan directly; no code generation is involved.
+    
+    ## Output format — PlanIR
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "discovery": [
+        {"rpc": "<RPC name>", "args": {}, "bind": "<env key>"}
+      ],
+      "rowsets": [
+        {
+          "from": "<env key of raw text>",
+          "format": "auto_delim",
+          "into": "<env key for parsed rows>",
+          "columns": [
+            {"into": "<field name>", "candidates": ["<col header variant>", "..."]}
+          ]
+        }
+      ],
+      "compute": [
+        {"prim": "<primitive name>", "args": ["$ref_or_literal", "..."], "into": "<env key>"}
+      ],
+      "decision": {
+        "branches": [
+          {"when": {"op": "<PredExpr op>", "lhs": "$ref", "rhs": "value"}, "label": "<label>"}
+        ],
+        "default_label": "<label>"
+      },
+      "ops": [
+        {
+          "rpc": "<RPC name>",
+          "args": {},
+          "bind": "<env key or null>",
+          "guard_label": "<decision label or null>",
+          "outcome_from_exit": null
+        }
+      ],
+      "answer": {
+        "<label>": {"message": "<template with {slot} placeholders>", "outcome": "OUTCOME_OK", "refs": []}
+      },
+      "custom_extract": [
+        {"name": "<parser name>", "input": "$ref", "into": "<env key>"}
+      ]
+    }
+    ```
+    
+    ### Field rules
+    
+    **`discovery`** — read-only RPCs that populate `env`. Run before decision.
+    Use `Exec /bin/sql` with parameterised `:name` placeholders; never inline
+    re-seeded literals. Batch with CTEs into a single call where possible (S4).
+    When a computation depends on an eligibility/count rule, first `Read` the governing
+    `/docs` policy path (surfaced in `docs_inventory`) in a `discovery` step, then encode
+    the rule-correct SQL from the documented rule — the documented count/filter, not a
+    naive one.
+    
+    **`rowsets`** — parse delimited text from a bound env key into a list of dicts.
+    `format` is `auto_delim` (tab/comma auto-detect) or `json`.
+    `columns[*].candidates` lists header variants tried in order; first match wins.
+    
+    **`compute`** — apply a named primitive to already-resolved args; result goes to `into`.
+    Args are resolved: `$name` → env lookup; anything else → literal.
+    
+    **`decision`** — evaluate branches in order; first true branch wins; fall through to
+    `default_label`. Security-first ordering (H3): branches whose label maps to
+    `OUTCOME_DENIED_SECURITY` **must precede** all non-denied branches.
+    
+    **`ops`** — mutation or terminal RPCs. Two exclusive idioms:
+    
+    - **decide-then-guard** (`guard_label` set, `outcome_from_exit` null): the op runs
+      only when the current decision label matches `guard_label`. Outcome comes from the
+      decision tree.
+    - **mutate-then-classify** (`outcome_from_exit` set, `guard_label` null): the op
+      always runs; the interpreter classifies outcome from exit code + stderr keyword
+      matching. `outcome_from_exit` has `ok_outcome`, `keyword_buckets[{keywords, outcome}]`,
+      and `default_outcome`.
+    
+    **`answer`** — keyed by decision label. Each `AnswerTemplateIR`:
+    - `message` — f-string-style template; `{slot}` resolves from env (same as `$slot`).
+    - `outcome` — one of the `Outcome` enum values: `OUTCOME_OK`, `OUTCOME_DENIED_SECURITY`, `OUTCOME_NONE_CLARIFICATION`, `OUTCOME_NONE_UNSUPPORTED`, `OUTCOME_ERR_INTERNAL`.
+    - `refs` — always-required grounding is PROJECTED from `INTENT.required_refs[selected_outcome]`,
+      so for an unconditional ref leave this `[]` and just bind the env key the INTENT `source`
+      points at. For **conditional** grounding — a ref needed on SOME branches only (e.g. a
+      `record_path` that exists only when a match is FOUND, absent on the not-found branch) —
+      author the `$binding` in THAT branch's `refs`; the interpreter resolves it best-effort and
+      DROPS it if it resolves to nothing (so the empty branch is not forced to carry it). Bind the
+      env key it points at (e.g. a `$row.record_path` column selected from `/bin/sql`). Never
+      author a literal you cannot ground at runtime.
+    
+    **`custom_extract`** — named-parser escape hatch (H2). Dispatches to `PARSERS[name]`
+    with `(text, params)` → `list[dict]`; result stored at `into`.
+    
+    ## Primitive registry (13)
+    
+    The following primitive names are valid in `compute[*].prim`:
+    
+    `abs_diff`, `div`, `to_number`, `sum_col`, `count`, `column`,
+    `first`, `get`, `dedupe`, `concat`, `all_true`, `any_true`, `filter_rows`
+    
+    ## Parser registry
+    
+    Valid names for `custom_extract[*].name`:
+    
+    `fuzzy_sku_receipt`
+    
+    ## `$ref` / `{slot}` convention
+    
+    - In `args` and `when.lhs/rhs`: `$name` → env lookup; literal otherwise.
+    - In `answer[*].message`: `{name}` resolves from env at answer time (same lookup,
+      without the `$` prefix).
+    - Dotted and indexed paths: `$a.b`, `$rows.0.field`.
+    
+    ## Predicate ops (exact spellings)
+    
+    `decision.branches[*].when` accepts ONLY these ops — use the exact spelling:
+    
+    - Leaf: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `nonempty`, `isnull`,
+      `contains_any`, `in_set`, `startswith`, `endswith`, `regex_match`
+    - Bool: `and`, `or`, `not` (each takes `args`: a list of nested predicates)
+    
+    Do NOT use `neq`, `!=`, `==`, `gte`, or `lte` — they are not valid op names.
+    
+    ## AnswerTemplateIR shape (exact keys)
+    
+    Each `answer[<label>]` object has ONLY these keys: `message`, `outcome`, `refs`.
+    Add no other keys. Message `{slot}` placeholders resolve from `env`, never from
+    extra fields on the answer object.
+    
+    ## Tool selection rules
+    
+    - Prefer `Find` / `Search` / `Read` with line ranges over full `Tree` + parse.
+    - Batch SQL into a single `Exec /bin/sql` with CTEs (S4).
+    - Use `Stat` before `Read` when path existence is uncertain.
+    - `discovery` items must be read-only; mutations belong in `ops`.
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+    
+    
+    ## TOOL CATALOG (validated — exact rpc names + arg keys)
+    
+    ### Read (read)
+    - purpose: Read a file (optionally line-numbered range).
+    - required args: path
+    - optional args: end_line, number, start_line
+    - when: Fetch a known file's content (policy doc, /proc record).
+    - example: {'rpc': 'Read', 'args': {'path': '/docs/security.md'}}
+    
+    ### List (read)
+    - purpose: List a directory's entries.
+    - required args: path
+    - optional args: —
+    - when: Enumerate a dir before reading specific children.
+    - example: {'rpc': 'List', 'args': {'path': '/proc'}}
+    
+    ### Tree (read)
+    - purpose: Recursive tree under a root (level=0 unlimited).
+    - required args: root
+    - optional args: level
+    - when: Discover a subtree's shape; prefer Find/Search when targeted.
+    - example: {'rpc': 'Tree', 'args': {'root': '/docs', 'level': 0}}
+    
+    ### Find (read)
+    - purpose: Path search by name under a root.
+    - required args: root
+    - optional args: kind, limit, name
+    - when: Locate a file by name when its dir is unknown.
+    - example: {'rpc': 'Find', 'args': {'root': '/', 'name': 'security.md'}}
+    
+    ### Search (read)
+    - purpose: Regex content search; returns path+line+text.
+    - required args: pattern, root
+    - optional args: limit
+    - when: Find docs/records mentioning an entity token.
+    - example: {'rpc': 'Search', 'args': {'root': '/docs', 'pattern': 'refund', 'limit': 30}}
+    
+    ### Exec (read)
+    - purpose: Run a runtime tool (e.g. /bin/sql, /bin/id).
+    - required args: path
+    - optional args: args, stdin
+    - when: Query the catalog DB via /bin/sql; read identity via /bin/id.
+    - NOTE: /bin/sql reads the query from the real STDIN channel. Put the SQL in `stdin` (a string); do NOT inline it anywhere else. `args` is also accepted and is moved to stdin by the pre-lint repair. The runner returns its usage banner if the SQL never reaches stdin (the r012 bug).
+    - example: {'rpc': 'Exec', 'args': {'path': '/bin/sql', 'stdin': 'SELECT 1;'}}
+    
+    ### Write (mutate)
+    - purpose: Write a file (optional compare-and-swap).
+    - required args: content, path
+    - optional args: idempotency_key, if_match_sha256
+    - when: Persist a mutation; belongs in `ops`, never `discovery`.
+    - example: {'rpc': 'Write', 'args': {'path': '/proc/x.json', 'content': '{}'}}
+    
+    ### Delete (mutate)
+    - purpose: Delete a file or directory.
+    - required args: path
+    - optional args: —
+    - when: Remove a record; belongs in `ops`.
+    - example: {'rpc': 'Delete', 'args': {'path': '/proc/x.json'}}
+    
+    ### Stat (read)
+    - purpose: Metadata for a path (kind, content_type).
+    - required args: path
+    - optional args: —
+    - when: Check existence/kind before Read.
+    - example: {'rpc': 'Stat', 'args': {'path': '/docs'}}
+    
+    Use ONLY these rpc names and arg keys. An unknown rpc or arg key is rejected by the interpreter and returned to you to fix.
+├ USER
+    INTENT_SPEC:
+    {
+      "objective": "Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "product_sku": "Lookup from product_variants WHERE brand='Festool' AND series='Festool Stackable SYS 3JJ-9LM Tool Box and Bag' AND model='Tool Box and Bag', then verify in product_variant_properties that property_key='storage type' AND property_value_text='tool bag' for that SKU.",
+        "graz_stores": "Query stores WHERE city='Graz' to obtain list of store_ids and record_paths.",
+        "available_today_sum": "For each store in graz_stores, sum available_today_quantity from store_inventory WHERE product_sku = $product_sku AND store_id = $store_id. If no row exists, treat as 0. Sum across all stores."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$store_count",
+            "rhs": 1,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$product_sku",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "ge",
+            "lhs": "$answer",
+            "rhs": 0,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "answer=%d",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$product_record_path"
+          },
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store_record_paths"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - root:/AGENTS.MD: True
+    - root:/docs: True
+    - policy_doc:/AGENTS.MD: True
+    - docs_listed: True
+    ## STEP_LESSONS
+    1. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> AGENTS.MD likely contains instructions or context for the task.
+    2. []  -> step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    3. [list] Root directory contains: AGENTS.MD (file), bin, docs, proc, run (directories). -> Use absolute path '/AGENTS.MD' to read the file. refs=['/AGENTS.MD']
+    4. [read] Read /AGENTS.MD: outlines system principles, key locations (catalog, stores, employees, etc.), tools (sql, id, discount, payments), and important rules for referencing. -> System is agentic OS; policies in /docs; use /bin/sql for queries; reference full paths. refs=['/AGENTS.MD']
+    5. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> The docs directory is present; likely contains policy files. Next step should list /docs to find policy documents.
+    6. [list] Found 11 items in /docs: 10 markdown files and 1 subdirectory 'payments'. -> The /docs directory contains policy files; next step should read relevant ones based on objective. refs=['/docs/checkout.md', '/docs/discounts.md', '/docs/merchant-continuity-and-critical-incidents.md', '/docs/os-and-tooling-incidents-and-workarounds.md', '/docs/payments', '/docs/powertools-agentic-os-origin-story.md', '/docs/README.md', '/docs/returns.md', '/docs/security.md', '/docs/store-associate-exception-handbook.md', '/docs/warehouse-systems-migration-runbook.md']
+    7. []  -> product unresolved after relaxation
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH product AS (SELECT pv.product_sku, pv.record_path AS product_record_path FROM product_variants pv WHERE pv.brand = 'Festool' AND pv.series = 'Stackable SYS 3-9' AND pv.model = 'Tool Box and Bag' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'storage type' AND pvp.property_value_text = 'tool bag') LIMIT 1), graz_stores AS (SELECT store_id, record_path FROM stores WHERE city = 'Graz'), inventory_sum AS (SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total_available FROM graz_stores gs LEFT JOIN store_inventory si ON si.store_id = gs.store_id AND si.product_sku = (SELECT product_sku FROM product)) SELECT (SELECT product_sku FROM product) AS product_sku, (SELECT product_record_path FROM product) AS product_record_path, (SELECT total_available FROM inventory_sum) AS total_available, (SELECT json_group_array(record_path) FROM graz_stores) AS store_record_paths, (SELECT COUNT(*) FROM graz_stores) AS store_count;"
+          },
+          "bind": "raw_query_result"
+        }
+      ],
+      "rowsets": [
+        {
+          "from": "raw_query_result",
+          "format": "auto_delim",
+          "into": "parsed_query_result",
+          "columns": [
+            { "into": "product_sku", "candidates": ["product_sku"] },
+            { "into": "product_record_path", "candidates": ["product_record_path"] },
+            { "into": "total_available", "candidates": ["total_available"] },
+            { "into": "store_record_paths", "candidates": ["store_record_paths"] },
+            { "into": "store_count", "candidates": ["store_count"] }
+          ]
+        }
+      ],
+      "compute": [
+        { "prim": "first", "args": ["$parsed_query_result"], "into": "first_row" },
+        { "prim": "column", "args": ["$first_row", "product_sku"], "into": "product_sku" },
+        { "prim": "column", "args": ["$first_row", "product_record_path"], "into": "product_record_path" },
+        { "prim": "column", "args": ["$first_row", "total_available"], "into": "total_available_str" },
+        { "prim": "to_number", "args": ["$total_available_str"], "into": "total_available" },
+        { "prim": "column", "args": ["$first_row", "store_count"], "into": "store_count_str" },
+        { "prim": "to_number", "args": ["$store_count_str"], "into": "store_count" },
+        { "prim": "column", "args": ["$first_row", "store_record_paths"], "into": "store_record_paths" }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "or",
+              "args": [
+                { "op": "isnull", "lhs": "$product_sku", "rhs": null },
+                { "op": "eq", "lhs": "$store_count", "rhs": 0 }
+              ]
+            },
+            "label": "unsupported"
+          }
+        ],
+        "default_label": "ok"
+      },
+      "ops": [],
+      "answer": {
+        "ok": {
+          "message": "answer={total_available}",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            { "kind": "record_path", "path": null, "source": "$product_record_path" },
+            { "kind": "record_path", "path": null, "source": "$store_record_paths" }
+          ]
+        },
+        "unsupported": {
+          "message": "Product not found or no stores in Graz.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 1, "step_type": "LINT", "passed": true, "reason": "", "seq": 39}
+  · [Exec /bin/sql] -> product_sku,product_record_path,total_available,store_record_paths,store_count
+      ,,0,"[""/proc/stores/store_graz_jakomini.json"",""/proc/stores/store_graz_lend.json""]",2
+  · [gate] {"cycle": 1, "step_type": "INTERPRET", "passed": false, "reason": "interpret: compute step 'column' failed: 'column' exp
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · LEARN · 38875ms · tokens 1934/556 · OK
+┌ SYSTEM (dc81071f)
+    # PHASE: LEARN (Plan-IR)
+    
+    You diagnose a failed interpreter cycle and produce a corrective rule for the
+    PLAN phase (which emits a PlanIR — structured data, never code). You may also
+    deactivate stale rules and request additional pre-phase deep-reads.
+    
+    ## Inputs
+    
+    - `TOOL_PLAN` — the frozen IntentSpec JSON for this run (WHAT/why; do not change it)
+    - `ERROR` — failure string (`plan:`, `interpret:`, `verify:`, `real_vm:`)
+    - `OBSERVED_RPC_OUTPUTS` — stdout/content captured from the failed run's RPCs
+      (present when the cycle reached execution). Use it to see WHY a ref was empty:
+      a table missing, a column misnamed, a listing that returned nothing.
+    - `SCRIPT_CODE` — the failing **PlanIR JSON** (the candidate "how")
+    - `EXISTING_RULES` — active IR rules from prior cycles/runs
+    
+    ## Output format
+    
+    Single JSON object — no prose, no markdown fences:
+    
+    ```json
+    {
+      "rule_content": "<starts with Never|Always|Use|Do not|When|If|Prefer>",
+      "agents_md_anchor": "<#section> or null",
+      "reasoning": "<diagnosis: verbatim error, root cause, failing PlanIR fragment, rule linkage>",
+      "deactivate_ids": ["rXXX"],
+      "deactivate_reason": "<why obsolete> or null",
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+    ```
+    
+    ## Rules
+    
+    - `rule_content` must describe a PLAN technique — how to shape the PlanIR
+      (discovery steps, rowsets, decision branches, ref projection) so the next
+      cycle grounds correctly. NOT a domain conclusion, NOT a literal task value.
+    - `rule_content` must be task-agnostic — never embed a re-seeded literal
+      (SKU, id, city, date).
+    - `prephase_deep_read` (optional): list table names or absolute literal paths the
+      pre-phase MUST read next run because grounding needed data it did not surface
+      (a table named only by synonym, or a literal directory the instruction named).
+      These are read EAGERLY next run (Tier-2 deep-read set) — they self-tune the
+      pre-phase, so PREFER them over baking a value into a rule. Leave `[]` when the
+      failure is purely a PlanIR-shape bug.
+    - Skip (`skip: true`) only if an existing rule already covers this.
+    - Use `deactivate_ids` when the new rule strictly supersedes prior ones — set `deactivate_reason`.
+    - Length: `rule_content` >= 20 chars; must start with a listed lead verb.
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "product_sku": "Lookup from product_variants WHERE brand='Festool' AND series='Festool Stackable SYS 3JJ-9LM Tool Box and Bag' AND model='Tool Box and Bag', then verify in product_variant_properties that property_key='storage type' AND property_value_text='tool bag' for that SKU.",
+        "graz_stores": "Query stores WHERE city='Graz' to obtain list of store_ids and record_paths.",
+        "available_today_sum": "For each store in graz_stores, sum available_today_quantity from store_inventory WHERE product_sku = $product_sku AND store_id = $store_id. If no row exists, treat as 0. Sum across all stores."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$store_count",
+            "rhs": 1,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$product_sku",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "ge",
+            "lhs": "$answer",
+            "rhs": 0,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "answer=%d",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$product_record_path"
+          },
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store_record_paths"
+          }
+        ]
+      }
+    }
+    
+    ERROR:
+    interpret: compute step 'column' failed: 'column' expects list[dict]; use 'get' for a single row
+    CONTRACT: column(rows, col): arg must be list[dict] rows; use 'get' for a single row
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Exec","args":{"path":"/bin/sql","stdin":"WITH product AS (SELECT pv.product_sku, pv.record_path AS product_record_path FROM product_variants pv WHERE pv.brand = 'Festool' AND pv.series = 'Stackable SYS 3-9' AND pv.model = 'Tool Box and Bag' AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'storage type' AND pvp.property_value_text = 'tool bag') LIMIT 1), graz_stores AS (SELECT store_id, record_path FROM stores WHERE city = 'Graz'), inventory_sum AS (SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total_available FROM graz_stores gs LEFT JOIN store_inventory si ON si.store_id = gs.store_id AND si.product_sku = (SELECT product_sku FROM product)) SELECT (SELECT product_sku FROM product) AS product_sku, (SELECT product_record_path FROM product) AS product_record_path, (SELECT total_available FROM inventory_sum) AS total_available, (SELECT json_group_array(record_path) FROM graz_stores) AS store_record_paths, (SELECT COUNT(*) FROM graz_stores) AS store_count;"},"bind":"raw_query_result"}],"rowsets":[{"from_":"raw_query_result","format":"auto_delim","into":"parsed_query_result","columns":[{"into":"product_sku","candidates":["product_sku"]},{"into":"product_record_path","candidates":["product_record_path"]},{"into":"total_available","candidates":["total_available"]},{"into":"store_record_paths","candidates":["store_record_paths"]},{"into":"store_count","candidates":["store_count"]}]}],"compute":[{"prim":"first","args":["$parsed_query_result"],"into":"first_row"},{"prim":"column","args":["$first_row","product_sku"],"into":"product_sku"},{"prim":"column","args":["$first_row","product_record_path"],"into":"product_record_path"},{"prim":"column","args":["$first_row","total_available"],"into":"total_available_str"},{"prim":"to_number","args":["$total_available_str"],"into":"total_available"},{"prim":"column","args":["$first_row","store_count"],"into":"store_count_str"},{"prim":"to_number","args":["$store_count_str"],"into":"store_count"},{"prim":"column","args":["$first_row","store_record_paths"],"into":"store_record_paths"}],"decision":{"branches":[{"when":{"op":"or","lhs":null,"rhs":null,"args":[{"op":"isnull","lhs":"$product_sku","rhs":null,"args":[]},{"op":"eq","lhs":"$store_count","rhs":0,"args":[]}]},"label":"unsupported"}],"default_label":"ok"},"ops":[],"answer":{"ok":{"message":"answer={total_available}","outcome":"OUTCOME_OK","refs":[{"kind":"record_path","path":null,"source":"$product_record_path"},{"kind":"record_path","path":null,"source":"$store_record_paths"}]},"unsupported":{"message":"Product not found or no stores in Graz.","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]}},"custom_extract":[]}
+    ```
+    
+    EXISTING_RULES:
+    (none)
+└ ASSISTANT
+    {
+      "rule_content": "Always use 'get' to extract a field from a single row (result of 'first' or 'get' on a list), and use 'column' only on a list of dicts.",
+      "agents_md_anchor": null,
+      "reasoning": "Error: interpret compute step 'column' failed because 'column' expects list[dict] but received a single dict from 'first'. Root cause: PlanIR compute step used 'column' on '$first_row' (a single row) instead of 'get'. Failing fragment: {\"prim\":\"column\",\"args\":[\"$first_row\",\"product_sku\"],...}. Rule linkage: This rule prevents misuse of 'column' vs 'get' in compute steps.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · PLAN · 62319ms · tokens 5448/6127 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    INTENT_SPEC:
+    {
+      "objective": "Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "product_sku": "Lookup from product_variants WHERE brand='Festool' AND series='Festool Stackable SYS 3JJ-9LM Tool Box and Bag' AND model='Tool Box and Bag', then verify in product_variant_properties that property_key='storage type' AND property_value_text='tool bag' for that SKU.",
+        "graz_stores": "Query stores WHERE city='Graz' to obtain list of store_ids and record_paths.",
+        "available_today_sum": "For each store in graz_stores, sum available_today_quantity from store_inventory WHERE product_sku = $product_sku AND store_id = $store_id. If no row exists, treat as 0. Sum across all stores."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$store_count",
+            "rhs": 1,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$product_sku",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "ge",
+            "lhs": "$answer",
+            "rhs": 0,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "answer=%d",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$product_record_path"
+          },
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store_record_paths"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - root:/AGENTS.MD: True
+    - root:/docs: True
+    - policy_doc:/AGENTS.MD: True
+    - docs_listed: True
+    ## STEP_LESSONS
+    1. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> AGENTS.MD likely contains instructions or context for the task.
+    2. []  -> step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    3. [list] Root directory contains: AGENTS.MD (file), bin, docs, proc, run (directories). -> Use absolute path '/AGENTS.MD' to read the file. refs=['/AGENTS.MD']
+    4. [read] Read /AGENTS.MD: outlines system principles, key locations (catalog, stores, employees, etc.), tools (sql, id, discount, payments), and important rules for referencing. -> System is agentic OS; policies in /docs; use /bin/sql for queries; reference full paths. refs=['/AGENTS.MD']
+    5. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> The docs directory is present; likely contains policy files. Next step should list /docs to find policy documents.
+    6. [list] Found 11 items in /docs: 10 markdown files and 1 subdirectory 'payments'. -> The /docs directory contains policy files; next step should read relevant ones based on objective. refs=['/docs/checkout.md', '/docs/discounts.md', '/docs/merchant-continuity-and-critical-incidents.md', '/docs/os-and-tooling-incidents-and-workarounds.md', '/docs/payments', '/docs/powertools-agentic-os-origin-story.md', '/docs/README.md', '/docs/returns.md', '/docs/security.md', '/docs/store-associate-exception-handbook.md', '/docs/warehouse-systems-migration-runbook.md']
+    7. []  -> product unresolved after relaxation
+    
+    LEARNED_RULES (active):
+      - [in-session] Always use 'get' to extract a field from a single row (result of 'first' or 'get' on a list), and use 'column' only on a list of dicts.
+    
+    PREVIOUS_ERROR:
+    interpret: compute step 'column' failed: 'column' expects list[dict]; use 'get' for a single row
+    CONTRACT: column(rows, col): arg must be list[dict] rows; use 'get' for a single row
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH product AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand = 'Festool' AND pv.series = 'Stackable' AND pv.model = 'SYS 3-JL 9L Tool Box and Bag' AND pvp.property_key = 'storage type' AND pvp.property_value_text = 'tool bag' LIMIT 1), graz_stores AS (SELECT store_id, record_path FROM stores WHERE city = 'Graz'), store_count AS (SELECT COUNT(*) AS cnt FROM graz_stores), total_sum AS (SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total FROM store_inventory si WHERE si.product_sku IN (SELECT product_sku FROM product) AND si.store_id IN (SELECT store_id FROM graz_stores)) SELECT (SELECT product_sku FROM product) AS product_sku, (SELECT record_path FROM product) AS product_record_path, (SELECT cnt FROM store_count) AS store_count, (SELECT total FROM total_sum) AS total_available, (SELECT json_group_array(record_path) FROM graz_stores) AS store_record_paths;"
+          },
+          "bind": "result"
+        }
+      ],
+      "rowsets": [],
+      "compute": [
+        {
+          "prim": "first",
+          "args": ["$result"],
+          "into": "result_row"
+        },
+        {
+          "prim": "get",
+          "args": ["$result_row", "product_sku"],
+          "into": "product_sku"
+        },
+        {
+          "prim": "get",
+          "args": ["$result_row", "product_record_path"],
+          "into": "product_record_path"
+        },
+        {
+          "prim": "get",
+          "args": ["$result_row", "store_count"],
+          "into": "store_count"
+        },
+        {
+          "prim": "get",
+          "args": ["$result_row", "total_available"],
+          "into": "total_available"
+        },
+        {
+          "prim": "get",
+          "args": ["$result_row", "store_record_paths"],
+          "into": "store_record_paths"
+        }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "and",
+              "args": [
+                {"op": "nonempty", "lhs": "$product_sku", "rhs": null},
+                {"op": "ge", "lhs": "$store_count", "rhs": 1}
+              ]
+            },
+            "label": "ok"
+          }
+        ],
+        "default_label": "unsupported"
+      },
+      "ops": [],
+      "answer": {
+        "ok": {
+          "message": "answer={total_available}",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {"kind": "record_path", "path": null, "source": "$product_record_path"},
+            {"kind": "record_path", "path": null, "source": "$store_record_paths"}
+          ]
+        },
+        "unsupported": {
+          "message": "answer=0",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 2, "step_type": "LINT", "passed": true, "reason": "", "seq": 45}
+  · [Exec /bin/sql] -> product_sku,product_record_path,store_count,total_available,store_record_paths
+      ,,2,0,"[""/proc/stores/store_graz_jakomini.json"",""/proc/stores/store_graz_lend.json""]"
+  · [gate] {"cycle": 2, "step_type": "INTERPRET", "passed": false, "reason": "interpret: compute step 'first' failed: 'ExecResponse
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 2 · LEARN · 18843ms · tokens 1794/884 · OK
+┌ SYSTEM (dc81071f) — same as above
+├ USER
+    TOOL_PLAN:
+    {
+      "objective": "Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "product_sku": "Lookup from product_variants WHERE brand='Festool' AND series='Festool Stackable SYS 3JJ-9LM Tool Box and Bag' AND model='Tool Box and Bag', then verify in product_variant_properties that property_key='storage type' AND property_value_text='tool bag' for that SKU.",
+        "graz_stores": "Query stores WHERE city='Graz' to obtain list of store_ids and record_paths.",
+        "available_today_sum": "For each store in graz_stores, sum available_today_quantity from store_inventory WHERE product_sku = $product_sku AND store_id = $store_id. If no row exists, treat as 0. Sum across all stores."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$store_count",
+            "rhs": 1,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$product_sku",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "ge",
+            "lhs": "$answer",
+            "rhs": 0,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "answer=%d",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$product_record_path"
+          },
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store_record_paths"
+          }
+        ]
+      }
+    }
+    
+    ERROR:
+    interpret: compute step 'first' failed: 'ExecResponse' object is not subscriptable
+    CONTRACT: first(seq)
+    
+    SCRIPT_CODE:
+    ```python
+    {"discovery":[{"rpc":"Exec","args":{"path":"/bin/sql","stdin":"WITH product AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand = 'Festool' AND pv.series = 'Stackable' AND pv.model = 'SYS 3-JL 9L Tool Box and Bag' AND pvp.property_key = 'storage type' AND pvp.property_value_text = 'tool bag' LIMIT 1), graz_stores AS (SELECT store_id, record_path FROM stores WHERE city = 'Graz'), store_count AS (SELECT COUNT(*) AS cnt FROM graz_stores), total_sum AS (SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total FROM store_inventory si WHERE si.product_sku IN (SELECT product_sku FROM product) AND si.store_id IN (SELECT store_id FROM graz_stores)) SELECT (SELECT product_sku FROM product) AS product_sku, (SELECT record_path FROM product) AS product_record_path, (SELECT cnt FROM store_count) AS store_count, (SELECT total FROM total_sum) AS total_available, (SELECT json_group_array(record_path) FROM graz_stores) AS store_record_paths;"},"bind":"result"}],"rowsets":[],"compute":[{"prim":"first","args":["$result"],"into":"result_row"},{"prim":"get","args":["$result_row","product_sku"],"into":"product_sku"},{"prim":"get","args":["$result_row","product_record_path"],"into":"product_record_path"},{"prim":"get","args":["$result_row","store_count"],"into":"store_count"},{"prim":"get","args":["$result_row","total_available"],"into":"total_available"},{"prim":"get","args":["$result_row","store_record_paths"],"into":"store_record_paths"}],"decision":{"branches":[{"when":{"op":"and","lhs":null,"rhs":null,"args":[{"op":"nonempty","lhs":"$product_sku","rhs":null,"args":[]},{"op":"ge","lhs":"$store_count","rhs":1,"args":[]}]},"label":"ok"}],"default_label":"unsupported"},"ops":[],"answer":{"ok":{"message":"answer={total_available}","outcome":"OUTCOME_OK","refs":[{"kind":"record_path","path":null,"source":"$product_record_path"},{"kind":"record_path","path":null,"source":"$store_record_paths"}]},"unsupported":{"message":"answer=0","outcome":"OUTCOME_NONE_UNSUPPORTED","refs":[]}},"custom_extract":[]}
+    ```
+    
+    EXISTING_RULES:
+      - [in-session] Always use 'get' to extract a field from a single row (result of 'first' or 'get' on a list), and use 'column' only on a list of dicts.
+└ ASSISTANT
+    {
+      "rule_content": "Never apply `first` or `column` directly to the result of an Exec RPC; instead, first extract the rows using `rows` or `row` from the ExecResponse.",
+      "agents_md_anchor": null,
+      "reasoning": "Error: 'interpret: compute step 'first' failed: 'ExecResponse' object is not subscriptable'. Root cause: The PlanIR applies `first` directly to `$result`, which is an ExecResponse object, not a list. The `first` primitive expects a sequence (list) and tries to subscript it, causing the error. Failing PlanIR fragment: `{\"prim\":\"first\",\"args\":[\"$result\"],\"into\":\"result_row\"}`. The Exec RPC returns an ExecResponse; to access rows, one must use `rows` (to get a list of dicts) or `row` (to get the first row as a dict) before applying `first` or `column`. Existing rule about using 'get' after 'first' is correct but does not cover this initial extraction step.",
+      "deactivate_ids": [],
+      "deactivate_reason": null,
+      "skip": false,
+      "skip_reason": null,
+      "prephase_deep_read": []
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 3 · PLAN · 73840ms · tokens 5467/9696 · OK
+┌ SYSTEM (4a851949) — same as above
+├ USER
+    INTENT_SPEC:
+    {
+      "objective": "Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "product_sku": "Lookup from product_variants WHERE brand='Festool' AND series='Festool Stackable SYS 3JJ-9LM Tool Box and Bag' AND model='Tool Box and Bag', then verify in product_variant_properties that property_key='storage type' AND property_value_text='tool bag' for that SKU.",
+        "graz_stores": "Query stores WHERE city='Graz' to obtain list of store_ids and record_paths.",
+        "available_today_sum": "For each store in graz_stores, sum available_today_quantity from store_inventory WHERE product_sku = $product_sku AND store_id = $store_id. If no row exists, treat as 0. Sum across all stores."
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$store_count",
+            "rhs": 1,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$product_sku",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "ge",
+            "lhs": "$answer",
+            "rhs": 0,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "answer=%d",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$product_record_path"
+          },
+          {
+            "kind": "record_path",
+            "path": null,
+            "source": "$store_record_paths"
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## schema
+    sql
+    CREATE INDEX customer_accounts_city_idx ON customer_accounts(home_city)
+    CREATE INDEX customer_accounts_email_idx ON customer_accounts(customer_email)
+    CREATE INDEX employee_accounts_email_idx ON employee_accounts(employee_email)
+    CREATE INDEX employee_accounts_store_idx ON employee_accounts(store_id)
+    CREATE INDEX employee_role_assignments_role_idx ON employee_role_assignments(role_code)
+    CREATE INDEX payment_transaction_items_sku_idx ON payment_transaction_items(product_sku)
+    CREATE INDEX payment_transactions_basket_idx ON payment_transactions(basket_id)
+    CREATE INDEX payment_transactions_created_at_idx ON payment_transactions(payment_created_at)
+    CREATE INDEX payment_transactions_customer_idx ON payment_transactions(customer_id)
+    CREATE INDEX payment_transactions_device_fingerprint_idx ON payment_transactions(device_fingerprint)
+    CREATE INDEX payment_transactions_method_fingerprint_idx ON payment_transactions(payment_method_fingerprint)
+    CREATE INDEX payment_transactions_status_idx ON payment_transactions(payment_status)
+    CREATE INDEX payment_transactions_store_idx ON payment_transactions(store_id)
+    "CREATE INDEX product_variant_properties_key_text_idx ON product_variant_properties(property_key, property_value_text)"
+    CREATE INDEX product_variants_brand_idx ON product_variants(brand)
+    CREATE INDEX product_variants_kind_idx ON product_variants(product_kind_id)
+    CREATE INDEX return_requests_basket_idx ON return_requests(basket_id)
+    CREATE INDEX return_requests_customer_idx ON return_requests(customer_id)
+    CREATE INDEX return_requests_payment_idx ON return_requests(payment_id)
+    CREATE INDEX return_requests_status_idx ON return_requests(return_status)
+    CREATE INDEX shopping_basket_items_sku_idx ON shopping_basket_items(product_sku)
+    CREATE INDEX shopping_baskets_created_at_idx ON shopping_baskets(basket_created_at)
+    "CREATE INDEX shopping_baskets_customer_created_at_idx ON shopping_baskets(customer_id, basket_created_at)"
+    CREATE INDEX shopping_baskets_customer_idx ON shopping_baskets(customer_id)
+    CREATE INDEX shopping_baskets_store_idx ON shopping_baskets(store_id)
+    CREATE INDEX store_inventory_sku_idx ON store_inventory(product_sku)
+    CREATE INDEX store_inventory_store_idx ON store_inventory(store_id)
+    CREATE INDEX stores_city_idx ON stores(city)
+    "CREATE TABLE customer_accounts (
+    	customer_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_display_name TEXT NOT NULL,
+    	customer_email TEXT NOT NULL,
+    	home_city TEXT NOT NULL,
+    	home_latitude REAL NOT NULL,
+    	home_longitude REAL NOT NULL
+    )"
+    "CREATE TABLE employee_accounts (
+    	employee_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	employee_display_name TEXT NOT NULL,
+    	employee_email TEXT NOT NULL,
+    	job_title TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE employee_role_assignments (
+    	employee_id TEXT NOT NULL,
+    	role_code TEXT NOT NULL,
+    	PRIMARY KEY (employee_id, role_code),
+    	FOREIGN KEY (employee_id) REFERENCES employee_accounts(employee_id)
+    )"
+    "CREATE TABLE payment_transaction_items (
+    	payment_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	purchased_quantity INTEGER NOT NULL,
+    	item_unit_price_cents INTEGER NOT NULL,
+    	PRIMARY KEY (payment_id, line_number),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE payment_transactions (
+    	payment_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	is_archived_basket_reference INTEGER NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	payment_amount_cents INTEGER NOT NULL,
+    	payment_currency TEXT NOT NULL,
+    	payment_status TEXT NOT NULL,
+    	payment_created_at TEXT NOT NULL,
+    	payment_method_fingerprint TEXT NOT NULL,
+    	device_fingerprint TEXT NOT NULL,
+    	observed_latitude REAL NOT NULL,
+    	observed_longitude REAL NOT NULL,
+    	three_ds_status TEXT,
+    	three_ds_failure_reason TEXT,
+    	three_ds_attempts INTEGER,
+    	three_ds_max_attempts INTEGER,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE product_categories (
+    	product_category_id TEXT PRIMARY KEY,
+    	product_category_name TEXT NOT NULL,
+    	product_department TEXT NOT NULL
+    )"
+    "CREATE TABLE product_families (
+    	product_family_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_family_name TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE product_kinds (
+    	product_kind_id TEXT PRIMARY KEY,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_name TEXT NOT NULL
+    )"
+    "CREATE TABLE product_variant_properties (
+    	product_sku TEXT NOT NULL,
+    	property_key TEXT NOT NULL,
+    	property_value_text TEXT NOT NULL,
+    	property_value_number REAL,
+    	PRIMARY KEY (product_sku, property_key)
+    )"
+    "CREATE TABLE product_variants (
+    	product_sku TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	product_category_id TEXT NOT NULL,
+    	product_kind_id TEXT NOT NULL,
+    	product_family_id TEXT NOT NULL,
+    	brand TEXT NOT NULL,
+    	series TEXT NOT NULL,
+    	model TEXT NOT NULL,
+    	product_name TEXT NOT NULL,
+    	price_cents INTEGER NOT NULL,
+    	price_currency TEXT NOT NULL,
+    	properties TEXT NOT NULL
+    )"
+    "CREATE TABLE return_requests (
+    	return_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	basket_id TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	payment_id TEXT NOT NULL,
+    	return_status TEXT NOT NULL,
+    	return_reason_code TEXT NOT NULL,
+    	return_created_at TEXT NOT NULL,
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (payment_id) REFERENCES payment_transactions(payment_id)
+    )"
+    "CREATE TABLE shopping_basket_items (
+    	basket_id TEXT NOT NULL,
+    	line_number INTEGER NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	requested_quantity INTEGER NOT NULL,
+    	PRIMARY KEY (basket_id, line_number),
+    	FOREIGN KEY (basket_id) REFERENCES shopping_baskets(basket_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE shopping_baskets (
+    	basket_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	customer_id TEXT NOT NULL,
+    	store_id TEXT NOT NULL,
+    	basket_status TEXT NOT NULL,
+    	basket_created_at TEXT NOT NULL,
+    	discount_percent INTEGER,
+    	discount_reason_code TEXT,
+    	discount_issuer_employee_id TEXT,
+    	FOREIGN KEY (customer_id) REFERENCES customer_accounts(customer_id),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id)
+    )"
+    "CREATE TABLE store_inventory (
+    	store_id TEXT NOT NULL,
+    	product_sku TEXT NOT NULL,
+    	on_hand_quantity INTEGER NOT NULL,
+    	reserved_quantity INTEGER NOT NULL,
+    	available_today_quantity INTEGER NOT NULL,
+    	incoming_quantity INTEGER NOT NULL,
+    	next_arrival_in_days INTEGER,
+    	PRIMARY KEY (store_id, product_sku),
+    	FOREIGN KEY (store_id) REFERENCES stores(store_id),
+    	FOREIGN KEY (product_sku) REFERENCES product_variants(product_sku)
+    )"
+    "CREATE TABLE stores (
+    	store_id TEXT PRIMARY KEY,
+    	record_path TEXT NOT NULL,
+    	store_name TEXT NOT NULL,
+    	city TEXT NOT NULL,
+    	is_open INTEGER NOT NULL,
+    	latitude REAL NOT NULL,
+    	longitude REAL NOT NULL
+    )"
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - root:/AGENTS.MD: True
+    - root:/docs: True
+    - policy_doc:/AGENTS.MD: True
+    - docs_listed: True
+    ## STEP_LESSONS
+    1. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> AGENTS.MD likely contains instructions or context for the task.
+    2. []  -> step error: read failed: invalid path: path must be absolute: "AGENTS.MD"
+    3. [list] Root directory contains: AGENTS.MD (file), bin, docs, proc, run (directories). -> Use absolute path '/AGENTS.MD' to read the file. refs=['/AGENTS.MD']
+    4. [read] Read /AGENTS.MD: outlines system principles, key locations (catalog, stores, employees, etc.), tools (sql, id, discount, payments), and important rules for referencing. -> System is agentic OS; policies in /docs; use /bin/sql for queries; reference full paths. refs=['/AGENTS.MD']
+    5. [list] Root directory contains AGENTS.MD, bin, docs, proc, run. -> The docs directory is present; likely contains policy files. Next step should list /docs to find policy documents.
+    6. [list] Found 11 items in /docs: 10 markdown files and 1 subdirectory 'payments'. -> The /docs directory contains policy files; next step should read relevant ones based on objective. refs=['/docs/checkout.md', '/docs/discounts.md', '/docs/merchant-continuity-and-critical-incidents.md', '/docs/os-and-tooling-incidents-and-workarounds.md', '/docs/payments', '/docs/powertools-agentic-os-origin-story.md', '/docs/README.md', '/docs/returns.md', '/docs/security.md', '/docs/store-associate-exception-handbook.md', '/docs/warehouse-systems-migration-runbook.md']
+    7. []  -> product unresolved after relaxation
+    
+    LEARNED_RULES (active):
+      - [in-session] Always use 'get' to extract a field from a single row (result of 'first' or 'get' on a list), and use 'column' only on a list of dicts.
+      - [in-session] Never apply `first` or `column` directly to the result of an Exec RPC; instead, first extract the rows using `rows` or `row` from the ExecResponse.
+    
+    PREVIOUS_ERROR:
+    interpret: compute step 'first' failed: 'ExecResponse' object is not subscriptable
+    CONTRACT: first(seq)
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "WITH product AS (SELECT pv.product_sku, pv.record_path AS product_record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand = :brand AND pv.series = :series AND pv.model = :model AND pvp.property_key = :prop_key AND pvp.property_value_text = :prop_val LIMIT 1), stores_graz AS (SELECT store_id FROM stores WHERE city = :city), inventory_sum AS (SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total_available FROM stores_graz sg LEFT JOIN store_inventory si ON si.store_id = sg.store_id AND si.product_sku = (SELECT product_sku FROM product)) SELECT (SELECT product_sku FROM product) AS product_sku, (SELECT product_record_path FROM product) AS product_record_path, (SELECT total_available FROM inventory_sum) AS total_available, (SELECT COUNT(*) FROM stores_graz) AS store_count",
+            "args": {
+              "brand": "Festool",
+              "series": "Festool Stackable SYS 3JJ-9LM Tool Box and Bag",
+              "model": "Tool Box and Bag",
+              "prop_key": "storage type",
+              "prop_val": "tool bag",
+              "city": "Graz"
+            }
+          },
+          "bind": "product_inventory"
+        },
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": "SELECT store_id, record_path FROM stores WHERE city = :city",
+            "args": {
+              "city": "Graz"
+            }
+          },
+          "bind": "stores_result"
+        }
+      ],
+      "rowsets": [],
+      "compute": [
+        {
+          "prim": "get",
+          "args": ["$product_inventory", "rows"],
+          "into": "product_inventory_rows"
+        },
+        {
+          "prim": "first",
+          "args": ["$product_inventory_rows"],
+          "into": "product_inventory_row"
+        },
+        {
+          "prim": "get",
+          "args": ["$product_inventory_row", "product_sku"],
+          "into": "product_sku"
+        },
+        {
+          "prim": "get",
+          "args": ["$product_inventory_row", "product_record_path"],
+          "into": "product_record_path"
+        },
+        {
+          "prim": "get",
+          "args": ["$product_inventory_row", "total_available"],
+          "into": "total_available"
+        },
+        {
+          "prim": "get",
+          "args": ["$product_inventory_row", "store_count"],
+          "into": "store_count"
+        },
+        {
+          "prim": "get",
+          "args": ["$stores_result", "rows"],
+          "into": "stores_rows"
+        },
+        {
+          "prim": "column",
+          "args": ["$stores_rows", "record_path"],
+          "into": "store_record_paths"
+        }
+      ],
+      "decision": {
+        "branches": [
+          {
+            "when": {
+              "op": "and",
+              "args": [
+                {"op": "nonempty", "lhs": "$product_sku", "rhs": null},
+                {"op": "ge", "lhs": "$store_count", "rhs": 1}
+              ]
+            },
+            "label": "ok"
+          }
+        ],
+        "default_label": "unsupported"
+      },
+      "ops": [],
+      "answer": {
+        "ok": {
+          "message": "answer={total_available}",
+          "outcome": "OUTCOME_OK",
+          "refs": ["$product_record_path", "$store_record_paths"]
+        },
+        "unsupported": {
+          "message": "Unable to determine availability for the specified product in Graz.",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 3, "step_type": "LINT", "passed": true, "reason": "", "seq": 50}
+  · [Exec /bin/sql brand series model prop_key prop_val city] -> <empty>
+  · [Exec /bin/sql city] -> <empty>
+═══ ANSWER (cycle 3) ═══
+  msg='Unable to determine availability for the specified product in Graz.'  OUTCOME_NONE_UNSUPPORTED  refs=[]
+
+  · [gate] {"cycle": 3, "step_type": "INTERPRET", "passed": true, "reason": "", "seq": 54}
+  · [gate] {"cycle": 3, "step_type": "VERIFY", "passed": true, "reason": "", "seq": 55}
+════════════════════════════════════════════════════════════════════════
+RESULT  OUTCOME_NONE_UNSUPPORTED  score=0.0  cycles=3  tokens 20265/25233  809250ms
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+════════════════════════════════════════════════════════════════════════

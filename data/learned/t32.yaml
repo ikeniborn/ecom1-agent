@@ -3,7 +3,8 @@ entries:
   content: When using Exec RPC to run SQL, always extract the rows from the ExecResponse
     object before applying sequence operations like 'first' or 'column'.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: r001 is insufficiently specific; this new rule provides the
+    exact primitive to use for extracting rows from an ExecResponse.
   id: r001
   reasoning: 'Error: ''ExecResponse'' object is not subscriptable. Root cause: compute
     step ''first'' applied directly to ExecResponse object from Exec RPC. ExecResponse
@@ -11,11 +12,51 @@ entries:
     extract the rows (e.g., using a ''rows'' primitive or accessing the ''rows'' attribute)
     before using ''first''. Failing fragment: {"prim":"first","args":["$product_rows"],"into":"product"}.
     Rule ensures correct sequence handling.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'rows' primitive to extract the list of rows from an ExecResponse
+    object before applying sequence operations like 'first' or 'column'.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable when applying ''first''
+    directly to the result of an Exec RPC. Root cause: the PlanIR compute step used
+    ''first'' on ''$sql_result'' without first extracting the rows from the ExecResponse.
+    The existing rule r001 advises extraction but does not specify the required primitive.
+    The new rule explicitly mandates using the ''rows'' primitive, which produces
+    a list of rows that can then be safely indexed or sequenced.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always use the 'exec_rows' primitive to extract the rows list from an ExecResponse
+    after an Exec RPC, rather than applying the 'rows' primitive directly to the ExecResponse.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error ''interpret: compute step ''rows'' failed: ''rows'''' occurs because
+    the ''rows'' primitive is applied to an ExecResponse object, which is not a list
+    of rows. The Exec RPC returns an ExecResponse containing a ''rows'' field. The
+    correct approach is to use the ''exec_rows'' primitive to extract the rows list.
+    Existing rule r001 advises to extract rows before sequence operations but does
+    not specify the correct primitive, leading to the planner incorrectly using ''rows''.
+    This new rule supersedes r001 by providing the exact primitive to use.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: Product family not found
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 2
-  date: '2026-06-24'
-  outcome: OUTCOME_NONE_UNSUPPORTED
+  cycles_used: 3
+  date: '2026-06-25'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t32

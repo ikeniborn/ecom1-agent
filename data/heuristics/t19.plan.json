@@ -4,16 +4,24 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH product AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key='color family' AND pvp1.property_value_text='Blue' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key='size' AND pvp2.property_value_text='XL' WHERE pv.brand='Helly Hansen' AND pv.product_family_name='Helly Hansen Chelsea Evolution Kensington V83-TOZ Work Jacket') SELECT p.product_sku, p.record_path AS product_record_path, s.store_id, s.record_path AS store_record_path, COALESCE(inv.available_today_quantity, 0) AS available_today_quantity FROM product p CROSS JOIN stores s LEFT JOIN store_inventory inv ON s.store_id = inv.store_id AND inv.product_sku = p.product_sku WHERE s.city='Graz' ORDER BY s.store_id;"
+        "stdin": "SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp1 ON pv.product_sku = pvp1.product_sku AND pvp1.property_key = 'anchor_type' AND pvp1.property_value_text = 'frame fixing' JOIN product_variant_properties pvp2 ON pv.product_sku = pvp2.product_sku AND pvp2.property_key = 'diameter_mm' AND pvp2.property_value_text = '6' JOIN product_variant_properties pvp3 ON pv.product_sku = pvp3.product_sku AND pvp3.property_key = 'length_mm' AND pvp3.property_value_text = '30' WHERE pv.brand = 'Wurth' AND pv.series = 'Wurth Universal WU XLL-87U' AND pv.model = 'Anchor and Wall Plug';"
       },
-      "bind": "inventory_raw"
+      "bind": "product_data"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT s.record_path AS store_record_path, COALESCE(si.available_today_quantity, 0) AS available_today_quantity FROM stores s LEFT JOIN store_inventory si ON s.store_id = si.store_id AND si.product_sku = :sku WHERE s.city = 'Graz' ORDER BY s.store_id;"
+      },
+      "bind": "inventory_data"
     }
   ],
   "rowsets": [
     {
-      "from_": "inventory_raw",
+      "from_": "product_data",
       "format": "auto_delim",
-      "into": "inventory_rows",
+      "into": "product_rows",
       "columns": [
         {
           "into": "product_sku",
@@ -24,15 +32,16 @@
         {
           "into": "product_record_path",
           "candidates": [
-            "product_record_path"
+            "record_path"
           ]
-        },
-        {
-          "into": "store_id",
-          "candidates": [
-            "store_id"
-          ]
-        },
+        }
+      ]
+    },
+    {
+      "from_": "inventory_data",
+      "format": "auto_delim",
+      "into": "inventory_rows",
+      "columns": [
         {
           "into": "store_record_path",
           "candidates": [
@@ -50,19 +59,49 @@
   ],
   "compute": [
     {
+      "prim": "count",
+      "args": [
+        "$product_rows"
+      ],
+      "into": "product_count"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_rows",
+        "product_sku"
+      ],
+      "into": "sku_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$sku_list"
+      ],
+      "into": "product_sku"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_rows",
+        "product_record_path"
+      ],
+      "into": "prp_list"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$prp_list"
+      ],
+      "into": "product_record_path"
+    },
+    {
       "prim": "sum_col",
       "args": [
         "$inventory_rows",
         "available_today_quantity"
       ],
-      "into": "total_available_raw"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$total_available_raw"
-      ],
-      "into": "total_available"
+      "into": "total_qty"
     },
     {
       "prim": "column",
@@ -70,42 +109,39 @@
         "$inventory_rows",
         "store_record_path"
       ],
-      "into": "store_paths_list"
+      "into": "store_record_paths"
     },
     {
-      "prim": "first",
+      "prim": "count",
       "args": [
         "$inventory_rows"
       ],
-      "into": "first_row"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$first_row",
-        "product_record_path"
-      ],
-      "into": "product_record_path"
+      "into": "num_store_citations"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "nonempty",
-          "lhs": "$inventory_rows",
-          "rhs": null,
+          "op": "eq",
+          "lhs": "$product_count",
+          "rhs": 0,
           "args": []
         },
-        "label": "ok"
+        "label": "unsupported"
       }
     ],
-    "default_label": "unsupported"
+    "default_label": "found"
   },
   "ops": [],
   "answer": {
-    "ok": {
-      "message": "answer={total_available}",
+    "unsupported": {
+      "message": "Product not found or no stores in Graz.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "found": {
+      "message": "Total available today quantity: {total_qty}",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
@@ -116,14 +152,9 @@
         {
           "kind": "record_path",
           "path": null,
-          "source": "$store_paths_list"
+          "source": "$store_record_paths"
         }
       ]
-    },
-    "unsupported": {
-      "message": "Product variant not found",
-      "outcome": "OUTCOME_NONE_UNSUPPORTED",
-      "refs": []
     }
   },
   "custom_extract": []

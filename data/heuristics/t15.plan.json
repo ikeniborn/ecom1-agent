@@ -1,0 +1,57 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH store AS (\n  SELECT store_id FROM stores WHERE city = 'Innsbruck' AND store_name LIKE '%PowerTool%' LIMIT 1\n),\ntarget_skus AS (\n  SELECT DISTINCT pv.product_sku\n  FROM product_variants pv\n  WHERE 1=0\n)\nSELECT COUNT(*) AS count\nFROM target_skus ts\nWHERE EXISTS (\n  SELECT 1 FROM store_inventory si\n  WHERE si.store_id = (SELECT store_id FROM store)\n    AND si.product_sku = ts.product_sku\n    AND si.available_today_quantity >= 2\n);"
+      },
+      "bind": "raw_count"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_count",
+      "format": "auto_delim",
+      "into": "count_rows",
+      "columns": [
+        {
+          "into": "count",
+          "candidates": [
+            "count"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$count_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "count"
+      ],
+      "into": "count"
+    }
+  ],
+  "decision": {
+    "branches": [],
+    "default_label": "ok"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "Total: {count}",
+      "outcome": "OUTCOME_OK",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

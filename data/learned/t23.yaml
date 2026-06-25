@@ -1,6 +1,40 @@
+entries:
+- agents_md_anchor: null
+  content: Never use the `concat` primitive for string concatenation; `concat` is
+    defined for rowset concatenation (list[dict] rows) and expects exactly two arguments.
+    For string building, use `str_concat` or `format` primitives instead.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''compute step ''concat'' failed: <lambda>() takes 2 positional
+    arguments but 3 were given''. Root cause: The PlanIR uses `concat` primitive for
+    string concatenation (e.g., `["/proc/payments/","$payment_id",".json"]` with three
+    arguments), but `concat` is defined for rowset concatenation (list[dict] rows)
+    and expects exactly two arguments. The correct primitive for string concatenation
+    is `str_concat` or `format`. The failing fragment is the compute step with `"prim":"concat"`
+    and three args. This rule ensures the PLAN phase uses the appropriate primitive
+    for string operations.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer contains invalid reference '/proc/baskets/basket_008.json'
+  source: verdict
+  status: active
+  submitted_message: 'Checkout denied: basket does not belong to customer or is not
+    open.'
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /proc/customers/cust_028.json
+  - /proc/baskets/basket_008.json
+  - /docs/checkout.md
+  - /docs/security.md
 last_run:
-  cycles_used: 1
-  date: '2026-06-24'
-  outcome: OUTCOME_OK
-  status: success
+  cycles_used: 2
+  date: '2026-06-25'
+  outcome: OUTCOME_DENIED_SECURITY
+  status: failure
 task_id: t23

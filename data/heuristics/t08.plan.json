@@ -4,9 +4,10 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH matching_variant AS (\n  SELECT pv.record_path, pv.product_sku AS sku\n  FROM product_variants pv\n  JOIN product_families pf ON pv.product_family_id = pf.product_family_id\n  JOIN product_kinds pk ON pv.product_kind_id = pk.product_kind_id\n  WHERE pv.brand = 'Ceresit'\n    AND (pf.product_family_name = 'Ceresit CM CS 114-CVQ Tape and Foam' OR pv.series = 'Ceresit CM CS 114-CVQ Tape and Foam')\n    AND pk.product_kind_name = 'repair tape'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'color_family' AND pvp.property_value_text = 'Brown')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'length' AND pvp.property_value_text = '5 m')\n  LIMIT 1\n)\nSELECT mv.record_path, mv.sku,\n  CASE WHEN EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = mv.sku AND pvp.property_key = 'color_family' AND pvp.property_value_text = 'gray') THEN 1 ELSE 0 END AS extra_present\nFROM matching_variant mv;"
+        "args": [],
+        "stdin": "WITH kind AS (SELECT product_kind_id FROM product_kinds WHERE product_kind_name = :kind_name), family AS (SELECT product_family_id FROM product_families WHERE brand = :brand AND product_family_name = :family_name) SELECT v.product_sku, v.record_path FROM product_variants v JOIN kind k ON v.product_kind_id = k.product_kind_id JOIN family f ON v.product_family_id = f.product_family_id JOIN product_variant_properties p ON v.product_sku = p.product_sku WHERE p.property_key = :prop_key AND p.property_value_text = :prop_value LIMIT 1;\nMetabo\nCorded Angle Grinder\nMetabo Professional SBE 36U-EHD Corded Angle Grinder line\ndisc_diameter\n115 mm"
       },
-      "bind": "$product_rows"
+      "bind": "$product_result"
     }
   ],
   "rowsets": [],
@@ -14,125 +15,60 @@
     {
       "prim": "column",
       "args": [
-        "$product_rows",
+        "$product_result",
         "rows"
       ],
-      "into": "$rows_list"
+      "into": "$product_rows"
     },
     {
-      "prim": "get",
+      "prim": "first",
       "args": [
-        "$rows_list",
-        0
+        "$product_rows"
       ],
-      "into": "$product_variant"
+      "into": "$first_row"
     },
     {
-      "prim": "get",
+      "prim": "column",
       "args": [
-        "$product_variant",
+        "$first_row",
+        "product_sku"
+      ],
+      "into": "$found_sku"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$first_row",
         "record_path"
       ],
-      "into": "$record_path"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$product_variant",
-        "sku"
-      ],
-      "into": "$sku"
+      "into": "$product_record_path"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "and",
-          "lhs": null,
+          "op": "nonempty",
+          "lhs": "$found_sku",
           "rhs": null,
-          "args": [
-            {
-              "op": "not",
-              "lhs": null,
-              "rhs": null,
-              "args": [
-                {
-                  "op": "isnull",
-                  "lhs": "$product_variant",
-                  "rhs": null,
-                  "args": []
-                }
-              ]
-            },
-            {
-              "op": "eq",
-              "lhs": "$product_variant.extra_present",
-              "rhs": 1,
-              "args": []
-            }
-          ]
+          "args": []
         },
-        "label": "found_extra"
-      },
-      {
-        "when": {
-          "op": "and",
-          "lhs": null,
-          "rhs": null,
-          "args": [
-            {
-              "op": "not",
-              "lhs": null,
-              "rhs": null,
-              "args": [
-                {
-                  "op": "isnull",
-                  "lhs": "$product_variant",
-                  "rhs": null,
-                  "args": []
-                }
-              ]
-            },
-            {
-              "op": "eq",
-              "lhs": "$product_variant.extra_present",
-              "rhs": 0,
-              "args": []
-            }
-          ]
-        },
-        "label": "found_no_extra"
+        "label": "found"
       }
     ],
     "default_label": "not_found"
   },
   "ops": [],
   "answer": {
-    "found_extra": {
-      "message": "Product record: {record_path}. SKU: {sku}. Extra claim (color family gray) present: yes.",
+    "found": {
+      "message": "YES {found_sku}",
       "outcome": "OUTCOME_OK",
       "refs": [
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$record_path"
-        }
-      ]
-    },
-    "found_no_extra": {
-      "message": "Product record: {record_path}. SKU: {sku}. Extra claim (color family gray) present: no. If absent, answer: <NO> {sku}.",
-      "outcome": "OUTCOME_OK",
-      "refs": [
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$record_path"
-        }
+        "$product_record_path"
       ]
     },
     "not_found": {
-      "message": "Product not found.",
+      "message": "Product not found",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

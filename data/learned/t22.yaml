@@ -32,9 +32,120 @@ entries:
     queries.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When constructing a record path that combines a prefix and a variable,
+    use SQL string concatenation in the Exec step that generates the variable, rather
+    than using the concat primitive in compute steps.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() takes 2
+    positional arguments but 3 were given. Root cause: The concat primitive expects
+    exactly two arguments, both list[dict] rows, but the PlanIR used it with three
+    arguments: a string ''/payments/'', a variable reference ''$payment_id'', and
+    another string ''.json''. This violates the contract. The failing PlanIR fragment
+    is the compute step: {"prim":"concat","args":["/payments/","$payment_id",".json"],"into":"payment_record_path"}.
+    The correct approach is to construct the record path directly in the SQL query
+    that generates the payment_id, e.g., SELECT ''/payments/'' || hex(randomblob(16))
+    || ''.json'' AS payment_record_path. This avoids the misuse of concat and keeps
+    string concatenation in the SQL layer. Rule linkage: New rule to prevent using
+    concat for string concatenation.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a policy document prescribes an outcome that is not in the outcome_space,
+    map that branch to the closest allowed outcome, typically OUTCOME_NONE_CLARIFICATION
+    for unsupported conditions, and never use an outcome not in the outcome_space.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: verify: I2: outcome ''OUTCOME_NONE_UNSUPPORTED'' not in outcome_space
+    [''OUTCOME_OK'', ''OUTCOME_DENIED_SECURITY'', ''OUTCOME_NONE_CLARIFICATION''].
+    Root cause: the plan''s ''cannot_checkout'' branch used OUTCOME_NONE_UNSUPPORTED
+    as prescribed by /docs/checkout.md, but the TOOL_PLAN''s outcome_space does not
+    include that outcome. The plan must only emit outcomes from the allowed set. The
+    fix is to map unsupported conditions to OUTCOME_NONE_CLARIFICATION (or OUTCOME_DENIED_SECURITY
+    if security-related). No existing rule covers outcome-space compliance.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a discovery step executes a query that returns at most one row (e.g.,
+    SELECT by primary key or aggregate), use the 'get' primitive to extract fields
+    from that single row, not the 'column' primitive which expects a list of dicts.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: interpret: compute step ''column'' failed: ''column'' expects
+    list[dict]; use ''get'' for a single row. Root cause: The plan uses ''column''
+    on $basket_row, $existing_payment, and $current_time, which are single-row results
+    from Exec queries. The interpreter treats these as single dicts, not lists of
+    dicts. The fix is to use ''get'' for single-row extraction. This is a PlanIR shape
+    error.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a policy document prescribes an outcome that is not in the outcome_space,
+    map that branch to the closest allowed outcome, typically OUTCOME_NONE_CLARIFICATION
+    for unsupported conditions, and never use an outcome not in the outcome_space.
+    This includes the default_label in decision branches.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: verify failure because plan used OUTCOME_NONE_UNSUPPORTED which
+    is not in outcome_space [''OUTCOME_OK'', ''OUTCOME_DENIED_SECURITY'', ''OUTCOME_NONE_CLARIFICATION''].
+    The policy document prescribes that outcome, but the plan must map to an allowed
+    outcome. Existing rule [in-session] covers this but was not applied; new rule
+    supersedes it with explicit mention of default_label to ensure the default branch
+    also maps correctly.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always place decision branches that result in OUTCOME_DENIED_SECURITY before
+    any branch that does not result in OUTCOME_DENIED_SECURITY.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: ''interpret: security-first violation: a DENIED_SECURITY branch
+    follows a non-DENIED branch in the decision tree''. Root cause: The decision tree
+    in the PlanIR has a branch with label ''denied_security'' (outcome DENIED_SECURITY)
+    placed after ''basket_not_found'' (outcome OUTCOME_NONE_CLARIFICATION). The security-first
+    principle requires that security-denial branches be evaluated before any non-DENIED
+    branch to prevent bypassing security checks. Failing PlanIR fragment: decision.branches
+    array order. This new rule enforces correct ordering.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always capture the record_path from the result of an RPC that produces
+    a variable when a required ref for an answer branch has kind 'record_path' and
+    source is a variable path (e.g., $X.record_path). Include a compute step that
+    extracts the record_path from the RPC result and binds it to the expected variable
+    name.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: ''interpret: unresolved required ref(s) ["$payment.record_path"]
+    on OK answer''. The PlanIR has an ops step that binds ''payment_id'' from /bin/checkout,
+    but does not capture the record_path. The required refs for the proceed answer
+    include a record_path with source ''$payment.record_path''. The plan must include
+    a step to extract the record_path from the checkout result and make it available
+    as $payment.record_path. The root cause is that the planner omitted capturing
+    the record_path field from the RPC output.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/proc/baskets/basket_015.json'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 2
-  date: '2026-06-24'
+  cycles_used: 6
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 prephase_deep_read:

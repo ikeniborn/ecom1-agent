@@ -3,21 +3,22 @@ entries:
   content: Never use a path in the RPC name for Exec; use 'Exec' as the RPC and pass
     the SQL command in args.stdin.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: r001 recommends using 'Exec' RPC for SQL queries, which is incompatible
+    with the 'rows' primitive. The new rule supersedes it by requiring the 'sql' RPC.
   id: r001
   reasoning: 'Error: ''Exec /bin/sql'' not in catalog. Root cause: PlanIR discovery
     step used an invalid RPC name with a path. Valid RPCs are simple names (Exec,
     Delete, Find, List, Read, Search, Stat, Tree, Write). The correct form is ''rpc'':
     ''Exec'' with ''args'': {''stdin'': ''<SQL>''}. This rule prevents future invalid
     RPC names in PlanIR.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: 'Never pass two arguments to the ''first'' primitive; ''first'' only accepts
     a single sequence argument. To extract a column from a rows variable, use the
     ''column'' primitive with two arguments: the rows variable and the column name.'
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 10; pin to protect)'
   id: r002
   reasoning: 'Error: interpret: compute step ''first'' failed: <lambda>() takes 1
     positional argument but 2 were given. Root cause: PlanIR compute step used ''first''
@@ -25,13 +26,14 @@ entries:
     primitive. Failing fragment: {"prim":"first","args":["$inventory_rows","product_record_path"],"into":"product_record_path"}.
     The ''first'' primitive expects a single sequence; extracting a column requires
     ''column''. New rule prevents this misuse.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always use the 'rows' primitive to extract the rows list from an ExecResponse
     before applying 'first' or 'column' primitives.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by more comprehensive rule that explicitly forbids
+    rowsets and mandates sql RPC and rows primitive.
   id: r003
   reasoning: 'Error: ''ExecResponse'' object is not subscriptable at compute step
     ''first'' on ''$product_and_total''. Root cause: The PlanIR applies ''first''
@@ -42,7 +44,7 @@ entries:
     then apply ''first'' or ''column'' on that rows list. The existing rule about
     ''first'' taking one argument is correct but insufficient; it does not address
     the need to unwrap the ExecResponse.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always ensure that every outcome label in the decision branches maps to
@@ -51,7 +53,7 @@ entries:
     different outcome; instead, the default branch should produce the same outcome
     with an appropriate message.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 10; pin to protect)'
   id: r004
   reasoning: 'Error: verify I2: outcome ''OUTCOME_NONE_UNSUPPORTED'' not in outcome_space
     [''OUTCOME_OK'']. Root cause: The PlanIR decision has a default branch labeled
@@ -63,14 +65,14 @@ entries:
     branch that produces a different outcome; instead, the default should produce
     the singleton outcome with a fallback message, or the condition must be guaranteed
     to be true.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always use a string expression for the predicate in filter_rows (e.g.,
     'type = "total"') instead of a structured dict, because the interpreter expects
     a string that it can parse into a predicate object.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 10; pin to protect)'
   id: r005
   reasoning: 'Error: ''dict'' object has no attribute ''op'' at compute step ''filter_rows''.
     Root cause: the predicate argument is a JSON dict ({"op":"eq","lhs":"$type","rhs":"total"}),
@@ -78,7 +80,7 @@ entries:
     with attributes. The interpreter expects a string expression that it can parse
     into a predicate object. The failing PlanIR fragment is the second argument of
     the first filter_rows call. No existing rule covers this predicate format issue.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always include all required refs from the TOOL_PLAN's required_refs in
@@ -86,21 +88,23 @@ entries:
     defined in the compute section (e.g., extract record_path from the product row
     if required).
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by more specific rule that mandates exact variable
+    naming and row object creation to match required_refs source paths.
   id: r006
   reasoning: 'Error: interpret: unresolved required ref(s) [''$product.record_path'']
     on OK answer. Root cause: PlanIR answer block had refs: [] but TOOL_PLAN required_refs
     for OUTCOME_OK include $product.record_path and $vienna_stores. The compute section
     did not extract record_path from the product row, and the answer block omitted
     both refs. Rule ensures PlanIR always satisfies required_refs.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always use the 'rows' primitive on a variable that holds an ExecResponse
     before applying 'first' or 'column' primitives to that variable. The compute step
     that extracts rows must be the first operation on that variable after binding.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by more comprehensive rule that explicitly forbids
+    rowsets and mandates sql RPC and rows primitive.
   id: r007
   reasoning: 'Error: interpret compute step ''first'' failed: ''ExecResponse'' object
     is not subscriptable. Root cause: The PlanIR applied ''first'' directly to $product_info,
@@ -109,7 +113,7 @@ entries:
     and $vienna_stores_raw. The existing rule ''Always use the rows primitive...''
     was not followed. This new rule reinforces the required ordering: rows extraction
     must be the immediate next step after binding an Exec result.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always break down the discovery into separate steps for each logical entity
@@ -130,9 +134,201 @@ entries:
     each step simpler and less error-prone.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always break down complex SQL queries into separate discovery steps for
+    each logical entity to ensure each step can be validated independently and to
+    avoid SQL errors from missing columns or incorrect joins.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'The error ''interpret: compute step ''rows'' failed: ''rows'''' indicates
+    that the ''rows'' primitive could not extract rows from the ExecResponse bound
+    to $inventory_result. The most likely cause is that the complex SQL query in the
+    first discovery step failed (e.g., missing column, incorrect join, or syntax error),
+    causing the ExecResponse to have an error status instead of a ''rows'' field.
+    The PlanIR violates rule r008 by combining product, stores, and inventory into
+    a single SQL query, making it fragile and hard to debug. The corrective rule reinforces
+    breaking down discovery steps to isolate failures and ensure each ExecResponse
+    is successful before using ''rows''.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'sql' RPC to execute SQL queries when you need to extract
+    rows using the 'rows' primitive, because the 'sql' RPC returns a structured response
+    with a 'rows' field, whereas the 'Exec' RPC returns raw text that the 'rows' primitive
+    cannot process.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: ''interpret: compute step ''rows'' failed: ''rows''''. Root cause:
+    The discovery step uses ''Exec'' RPC to run a SQL query, which returns raw stdout
+    text, not a structured rows list. The compute step then applies the ''rows'' primitive
+    to the ExecResponse variable ($result_row), but the interpreter expects a structured
+    response with a ''rows'' field (as produced by the ''sql'' RPC). The ''rows''
+    primitive fails because the ExecResponse lacks that field. The failing PlanIR
+    fragment is the discovery step with ''rpc'':''Exec'' and the subsequent compute
+    step ''rows''. Existing rule r001 advises using ''Exec'' with path in args, but
+    for SQL queries the ''sql'' RPC is required to enable row extraction. This new
+    rule supersedes the implicit assumption that Exec works for SQL row extraction.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always name the row variables in the compute section exactly as required
+    by the required_refs source paths (e.g., $product_row, $store_row) and ensure
+    they are row objects (from rows variables) so that the path expression $product_row.record_path
+    resolves correctly.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Error: ''interpret: unresolved required ref(s) ["$product_row.record_path",
+    "$store_row.record_path"] on OK answer''. Root cause: The PlanIR answer block
+    defines refs with source "$product_record_path" and "$store_record_path", but
+    the TOOL_PLAN''s required_refs specify "$product_row.record_path" and "$store_row.record_path".
+    The interpreter expects variables named $product_row and $store_row that are row
+    objects with a record_path field. The script instead extracts scalar values into
+    differently named variables. The compute section does not create row objects for
+    product and store, so the required path expressions cannot be resolved. Existing
+    rule r006 (''Always include all required refs...'') is too vague about variable
+    naming and row object creation; this new rule supersedes it by providing the exact
+    naming and structure required.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'sql' RPC (not 'Exec') to execute SQL queries when the result
+    will be processed by the 'rows' primitive, because the 'sql' RPC returns a structured
+    response with a 'rows' field, whereas the 'Exec' RPC returns raw text that the
+    'rows' primitive cannot parse.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Error: ''interpret: compute step ''rows'' failed: ''rows''''. Root cause:
+    The discovery steps use ''Exec'' RPC with ''/bin/sql'' to run SQL queries, but
+    the ''rows'' primitive expects a structured response with a ''rows'' field, which
+    only the ''sql'' RPC provides. The ''Exec'' RPC returns raw text, causing the
+    ''rows'' primitive to fail. Failing PlanIR fragment: all three discovery steps
+    use ''rpc'':''Exec'' with ''args.stdin'' containing SQL. Rule linkage: Existing
+    [in-session] rule ''Always use the ''sql'' RPC...'' was not followed.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'sql' RPC (not 'Exec') to execute SQL queries when the result
+    will be processed by the 'rows' primitive, and always use the 'rows' primitive
+    (not 'get') to extract the rows list from the response.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$product_row.record_path'',
+    ''$store_row.record_path''] on OK answer. Root cause: The PlanIR used ''Exec''
+    RPC (path ''/bin/sql'') which returns raw text, not a structured response with
+    a ''rows'' field. Additionally, the compute section used ''get'' primitive with
+    ''rows'' instead of the ''rows'' primitive, which the interpreter does not recognize
+    for extracting rows. Consequently, $product_row and $store_row were never defined
+    as row objects with a record_path attribute, causing the required refs to be unresolved.
+    The existing rules [in-session] already advise using ''sql'' RPC and ''rows''
+    primitive, but the script violated them. This new rule reinforces the correct
+    technique.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the 'Exec' RPC for SQL queries; always use the 'sql' RPC to obtain
+    a structured response with a 'rows' field. Then always use the 'rows' primitive
+    (not 'get') to extract the rows list from the response. Using 'Exec' or 'get'
+    will cause the compute steps to fail, leaving required refs unresolved.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r014
+  reasoning: 'Error: ''interpret: unresolved required ref(s) ["$product_row.record_path",
+    "$store_row.record_path"] on OK answer''. Root cause: The PlanIR uses ''Exec''
+    RPC for SQL queries, which returns raw text, not a structured object with a ''rows''
+    field. The compute steps then use ''get'' to extract ''rows'' from the ExecResponse,
+    which fails (returns undefined). Consequently, ''product_rows'' and ''store_rows''
+    are undefined, ''first'' on them fails, ''product_row'' and ''store_row'' are
+    undefined, and extracting ''record_path'' from them fails, leaving the required
+    refs unresolved. Failing PlanIR fragment: discovery steps use ''Exec'' with SQL,
+    compute steps use ''get'' to extract rows. Existing rules r003 and in-session
+    rules already mandate using ''sql'' RPC and ''rows'' primitive, but the agent
+    violated both. This new rule reinforces the correct pattern with explicit consequence.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'sql' RPC (not 'Exec') to execute SQL queries in the discovery
+    section, because the 'rows' primitive requires a structured response with a 'rows'
+    field, whereas the 'Exec' RPC returns raw text that the 'rows' primitive cannot
+    parse.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r015
+  reasoning: 'Error: interpret: compute step ''rows'' failed: ''rows''. Root cause:
+    The discovery step uses ''Exec'' RPC with path ''/bin/sql'' to execute SQL queries.
+    The ''rows'' primitive expects a structured response with a ''rows'' field, but
+    ''Exec'' returns raw text. This causes the ''rows'' primitive to fail. The PlanIR
+    should use the ''sql'' RPC instead. Existing rule r001 incorrectly recommends
+    using ''Exec'' and should be deactivated. The in-session rules already advise
+    using ''sql'' RPC, but this rule formalizes it and supersedes r001.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'sql' RPC (not 'Exec') to execute SQL queries in the discovery
+    section, then use the 'rows' primitive to extract the rows list from the response,
+    then use 'first' to get the first row, and then use 'column' to extract a field
+    from that row. Do not rely on rowsets to produce a list that can be used directly
+    with 'first' or 'column' without the 'rows' primitive, as this leads to unresolved
+    required refs.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r016
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$product_row.record_path'''']
+    on OK answer''. The PlanIR used ''Exec'' RPC for SQL queries and rowsets to parse
+    the raw text into rows, then applied ''first'' directly on the rowsets variable.
+    The interpreter''s compute primitives expect the rows list to be obtained via
+    the ''rows'' primitive from a structured response (from ''sql'' RPC). Using ''Exec''
+    and rowsets does not produce a list that ''first'' can correctly process, leaving
+    the required ref unresolved. The fix is to use ''sql'' RPC and the ''rows'' primitive,
+    as already suggested by in-session rules but not followed.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'sql' RPC (not 'Exec') to execute SQL queries in the discovery
+    section, then use the 'rows' primitive to extract the rows list from the response,
+    then use 'first' to get the first row, and then use 'column' to extract a field
+    from that row. Never use rowsets to produce row variables that will be used with
+    'first' or 'column' primitives, as rowsets do not create row objects that support
+    attribute access (e.g., $product_row.record_path), leading to unresolved required
+    refs.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r017
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$product_row.record_path'''']
+    on OK answer''. Root cause: The PlanIR used rowsets to parse Exec output, but
+    rowsets do not produce row objects that support attribute access (like .record_path).
+    The required ref expects $product_row.record_path, but $product_row was created
+    via ''first'' on $product_rows, which came from rowsets. The rowsets mechanism
+    does not create the necessary row objects for the interpreter to resolve the path.
+    The correct approach is to use the ''sql'' RPC to get a structured response, then
+    use the ''rows'' primitive to extract rows, then ''first'' to get the first row,
+    then ''column'' to extract fields, or directly access attributes on the row object.
+    Failing PlanIR fragment: rowsets section (e.g., {''from_'':''product_raw'',''format'':''auto_delim'',''into'':''product_rows'',''columns'':...})
+    and compute section using ''first'' on those rowsets variables, and answer refs
+    expecting .record_path. Rule linkage: Existing rules [r003] and [r007] advise
+    using the ''rows'' primitive but do not explicitly forbid rowsets. The in-session
+    rule does forbid rowsets, but it is not yet a permanent rule. This new rule supersedes
+    the older ones and provides a clear directive.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
   cycles_used: 10
-  date: '2026-06-24'
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t18

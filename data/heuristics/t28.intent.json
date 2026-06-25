@@ -1,0 +1,106 @@
+{
+  "objective": "Verify that Philipp Lehmann is a manager at PowerTool Vienna Praterstern and that they approved a 5% service_recovery discount for basket_027.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "store_name": "PowerTool Vienna Praterstern",
+    "employee_display_name": "Philipp Lehmann",
+    "basket_id": "basket_027",
+    "discount_percent": 5,
+    "discount_reason_code": "service_recovery",
+    "subtotal_cents": 64200
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [
+    {
+      "anchor": "#security-guest-access",
+      "rule": "Guest users may not access employee or basket records.",
+      "security": true,
+      "deny_when": {
+        "op": "eq",
+        "lhs": "$_facts.identity.kind",
+        "rhs": "guest",
+        "args": []
+      },
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    }
+  ],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "and",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "eq",
+            "lhs": "$employee.store_id",
+            "rhs": "$store.store_id",
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$employee_role.role_code",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "eq",
+            "lhs": "$basket.discount_percent",
+            "rhs": 5,
+            "args": []
+          },
+          {
+            "op": "eq",
+            "lhs": "$basket.discount_reason_code",
+            "rhs": "service_recovery",
+            "args": []
+          },
+          {
+            "op": "eq",
+            "lhs": "$basket.discount_issuer_employee_id",
+            "rhs": "$employee.employee_id",
+            "args": []
+          }
+        ]
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "Verification result: {status}. Manager {employee_display_name} at {store_name} approved a {discount_percent}% service_recovery discount for basket {basket_id}.",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/discounts.md",
+        "source": null
+      },
+      {
+        "kind": "policy_doc",
+        "path": "/docs/store-associate-exception-handbook.md",
+        "source": null
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$employee.record_path"
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$basket.record_path"
+      }
+    ]
+  }
+}

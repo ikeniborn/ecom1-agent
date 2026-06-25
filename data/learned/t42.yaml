@@ -54,7 +54,9 @@ entries:
     deny_when in the IntentSpec's constraints array; always set the decision default_label
     to the allow branch.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: These rules incorrectly mandate setting the decision default_label
+    to the allow branch unconditionally, which causes invalid outcomes when the outcome_space
+    does not include OUTCOME_OK. The new rule supersedes them.
   id: r004
   reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
     deny_when predicate holds. Root cause: The PlanIR decision includes multiple deny_security
@@ -66,7 +68,7 @@ entries:
     existing rule (r001) advises using exact ref path and setting default_label to
     allow branch, but the PlanIR violated it by adding extra denial branches. The
     new rule supersedes r001 by also prohibiting addition of non-declared denial branches.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: '#security > discount-issuance'
   content: When implementing a security deny_when condition from the IntentSpec, do
@@ -74,7 +76,9 @@ entries:
     solely on the IntentSpec's security constraint and use the exact ref path from
     the constraint. Set the decision default_label to the allow branch.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: These rules incorrectly mandate setting the decision default_label
+    to the allow branch unconditionally, which causes invalid outcomes when the outcome_space
+    does not include OUTCOME_OK. The new rule supersedes them.
   id: r005
   reasoning: 'Error: verify I3 - outcome DENIED_SECURITY but no declared security
     deny_when predicate holds (spurious over-refusal). The PlanIR includes a Read
@@ -84,7 +88,7 @@ entries:
     to ''allow'', which is correct, but the unnecessary read may cause the system
     to misinterpret the security condition. Removing the read and relying on the IntentSpec''s
     ref path should prevent spurious over-refusal.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Never use the `get` primitive to extract a value from a ref path; ref paths
@@ -128,7 +132,9 @@ entries:
     Set the decision default_label to the allow branch that should be used when no
     guard matches (typically the fallback allow branch).
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: These rules incorrectly mandate setting the decision default_label
+    to the allow branch unconditionally, which causes invalid outcomes when the outcome_space
+    does not include OUTCOME_OK. The new rule supersedes them.
   id: r008
   reasoning: 'Error: ''verify: I3: outcome DENIED_SECURITY but no declared security
     deny_when predicate holds (spurious over-refusal)''. Root cause: The PlanIR added
@@ -143,7 +149,7 @@ entries:
     the allow branch'' was violated. This new rule reinforces that all non-security
     preconditions must be guard conditions on allow branches, superseding the prior
     rule.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: When the IntentSpec's security constraint uses $_facts.* (e.g., $_facts.identity.kind),
@@ -164,9 +170,85 @@ entries:
     for security conditions.'
   status: active
   surface: ir
+- agents_md_anchor: '#security'
+  content: Never add a decision branch that mirrors a security deny_when condition;
+    the interpreter will automatically enforce security constraints and produce the
+    DENIED_SECURITY outcome when the condition holds. The decision should only contain
+    allow branches for non-security preconditions.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR decision
+    included an explicit branch `when: ne $identity.kind employee, label denied_security`
+    that duplicated the security deny_when condition. The interpreter automatically
+    enforces security constraints; adding a duplicate branch caused DENIED_SECURITY
+    to be produced even though the security condition was false (identity.kind was
+    ''employee''). The failing fragment: the entire decision branch. This new rule
+    supersedes r004, r005, and r008 which allowed or implied such branches.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always include a decision branch for each security deny_when condition
+    declared in the IntentSpec's constraints array. The branch condition must use
+    the exact ref path from the constraint (e.g., $_facts.identity.kind) and compare
+    it to the deny_when value. The branch outcome must be OUTCOME_DENIED_SECURITY
+    and include all required refs from the IntentSpec's required_refs for that outcome.
+    Set the decision default_label to the allow branch only if the allow outcome is
+    in the outcome_space; otherwise, set the default_label to the deny branch or omit
+    the allow branch entirely.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Error: verify: I2: outcome ''OUTCOME_OK'' not in outcome_space [''OUTCOME_DENIED_SECURITY''].
+    Root cause: PlanIR had empty decision with default_label ''allow'', producing
+    OUTCOME_OK, but outcome_space only permits OUTCOME_DENIED_SECURITY. The security
+    deny_when condition (identity.kind != employee) was not checked. Existing rules
+    r004, r005, r008 incorrectly mandate default_label always set to allow branch,
+    which is invalid when allow outcome is not in space. New rule corrects by requiring
+    a decision branch for each security deny_when and setting default_label based
+    on outcome_space.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the IntentSpec's outcome_space contains only OUTCOME_DENIED_SECURITY
+    and no allow outcome, do not set the decision default_label to a branch that produces
+    DENIED_SECURITY. Instead, include a decision branch for each security deny_when
+    condition that produces DENIED_SECURITY when the condition holds, and set the
+    default_label to a branch that produces a non-DENIED_SECURITY outcome (e.g., an
+    error outcome) to avoid spurious over-refusal when the security condition does
+    not hold.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Verify error: ''outcome DENIED_SECURITY but no declared security deny_when
+    predicate holds (spurious over-refusal)''. The PlanIR set decision default_label
+    to ''deny_security'', which unconditionally produces DENIED_SECURITY. The security
+    deny_when condition (identity.kind != employee) is false because the caller is
+    employee, so no security predicate holds, yet the outcome is DENIED_SECURITY.
+    The root cause is that the default_label provides an unconditional path to DENIED_SECURITY.
+    The existing in-session rule ''Always include a decision branch for each security
+    deny_when condition... set the default_label to the deny branch or omit the allow
+    branch entirely'' directly caused this by instructing to set default_label to
+    the deny branch when no allow outcome exists. The new rule corrects this by requiring
+    the default_label to point to a non-DENIED_SECURITY outcome, ensuring that DENIED_SECURITY
+    is only reached via a branch whose condition matches a security deny_when predicate.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 10
-  date: '2026-06-24'
+  cycles_used: 4
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t42

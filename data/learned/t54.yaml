@@ -5,7 +5,8 @@ entries:
     kind (e.g., the user field or the first role) and use that extracted value in
     the condition, not the raw identity string.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by rule that explicitly requires the /bin/id discovery
+    step and correct variable path, preventing omission.
   id: r001
   reasoning: 'Error: verify phase reports ''I3: outcome DENIED_SECURITY but no declared
     security deny_when predicate holds (spurious over-refusal)''. The PlanIR decision
@@ -15,11 +16,49 @@ entries:
     (from roles). The PlanIR failed to extract the identity kind from the /bin/id
     output, causing a false positive deny. The rule must instruct to parse the identity
     kind (e.g., from the ''user:'' field or roles list) and use that in the condition.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#customer-account-modification'
+  content: When a security constraint has a deny_when predicate that references $_facts.identity.kind,
+    the PLAN must include a discovery step to run /bin/id and bind the output, then
+    parse the identity kind from the output (e.g., the user field or first role) and
+    use that extracted value in the decision branch condition, and the condition must
+    use the same variable path as the predicate's lhs (e.g., $identity.kind). Additionally,
+    the decision's default label must not be 'denied' unless the deny condition is
+    the only possible outcome; instead, set the default to a label that leads to a
+    non-denial outcome (e.g., 'allowed' or 'clarify') to avoid spurious over-refusal
+    when the condition is not met.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: PlanIR lacks a
+    discovery step to run /bin/id, so $identity.kind is undefined; the decision branch
+    condition cannot evaluate, and the default label ''denied'' triggers an unjustified
+    denial. The constraint''s deny_when predicate requires $_facts.identity.kind ==
+    ''guest'', but the PlanIR uses $identity.kind without binding it. Existing rule
+    r001 only mentions parsing /bin/id output but does not require the discovery step
+    itself, leading to omission. New rule ensures the discovery step is included,
+    the variable path matches the predicate, and the default label avoids over-refusal.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the PlanIR includes an Exec RPC, the PLAN must include a discovery
+    step that verifies the runtime is active (e.g., by running a simple command like
+    'echo ok') and if the RPC fails, set the outcome to a failure or retry.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: real_vm failed to load ecom runtime because trial is no longer
+    active. The PlanIR attempted an Exec RPC without first ensuring the runtime was
+    active. Root cause: the PlanIR did not include a step to check runtime status
+    before executing the RPC. This rule ensures that the PlanIR includes a runtime
+    health check to avoid such environmental failures.'
   status: active
   surface: ir
 last_run:
   cycles_used: 2
-  date: '2026-06-24'
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t54

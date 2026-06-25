@@ -20,9 +20,65 @@ entries:
     and avoid ''get'' without a key.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When a discovery step binds a single row (dict), use the 'get' primitive
+    (object, key) to extract scalar values; do not use 'column' which requires a list
+    of dicts.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''column'' expects list[dict]; use ''get'' for a single row.
+    Root cause: The SQL query returns a single row (dict) bound to $product_query_result,
+    but the compute step uses ''column'' on it, which expects a list of dicts. The
+    fix is to use ''get'' to extract the ''cnt'' value from the single row. This is
+    a PlanIR shape error: misapplication of ''column'' on a single-row result.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When extracting a field from a single row (dict), use the 'get' primitive
+    with two arguments (the row variable and the field name) instead of 'column',
+    which expects a list of dicts.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: interpret: compute step ''column'' failed: ''column'' expects
+    list[dict]; use ''get'' for a single row. Root cause: PlanIR compute step used
+    ''column'' on $product_variant_rows, which is a single dict (due to LIMIT 1 in
+    discovery). The correct primitive for extracting a field from a single dict is
+    ''get'' (object, key). The existing rule r001 correctly warns against using ''get''
+    with a single argument but does not address this misuse of ''column''. New rule
+    guides the planner to choose ''get'' when the input is a single row.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract the 'rows' field from an ExecResponse object before using
+    list primitives like 'first' or 'column'.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: interpret: compute step ''first'' failed: ''ExecResponse'' object
+    is not subscriptable. Root cause: The PlanIR''s discovery step binds the Exec
+    RPC result directly to `product_query_result`, but Exec RPC returns an ExecResponse
+    object, not a list. The subsequent `first` primitive expects a list and fails
+    when it tries to subscript the ExecResponse. The failing fragment: `{"prim":"first","args":["$product_query_result"],...}`.
+    The plan phase must be instructed to always extract the ''rows'' field from ExecResponse
+    before applying list operations.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: No matching product found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
-  cycles_used: 2
-  date: '2026-06-24'
+  cycles_used: 4
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t05

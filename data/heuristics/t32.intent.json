@@ -1,39 +1,76 @@
 {
-  "objective": "Verify whether the catalogue contains a product matching the description: Cleaning Liquid from Tork in the Tork Heavy Duty T 3NB-FIT Cleaning Liquid line with cleaner type multi surface cleaner and wifi-enabled.",
+  "objective": "Verify whether the catalogue contains a product variant matching the described Bosch Professional BBS 1P7-CG5 Automotive Charger and Bulb line with product type battery pack, voltage 12 V, current 16 A, and wifi-enabled, and report the exact product record or indicate absence with the checked SKU.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_search_method": "SELECT * FROM product_variants WHERE brand = 'Tork' AND product_name LIKE '%Cleaning Liquid%' AND (series = 'Tork Heavy Duty T 3NB-FIT Cleaning Liquid' OR model = 'Tork Heavy Duty T 3NB-FIT Cleaning Liquid')",
-    "property_check_method": "SELECT property_key, property_value_text FROM product_variant_properties WHERE product_sku = $product.sku AND property_key IN ('cleaner type', 'wifi-enabled')"
+    "family_name": "Bosch Professional BBS 1P7-CG5 Automotive Charger and Bulb line",
+    "type_key": "product type",
+    "type_value": "battery pack",
+    "voltage_key": "voltage",
+    "voltage_value": "12 V",
+    "current_key": "current",
+    "current_value": "16 A",
+    "wifi_key": "wifi-enabled",
+    "wifi_value": "yes",
+    "family_id": "lookup product_family_id from product_families where product_family_name equals family_name",
+    "matching_sku": "lookup product_sku from product_variants where product_family_id equals family_id and all required properties (type, voltage, current, wifi) are present in product_variant_properties",
+    "base_sku": "lookup product_sku from product_variants where product_family_id equals family_id and type, voltage, current properties are present but wifi is absent",
+    "matching_variant_record_path": "lookup record_path from product_variants where product_sku equals matching_sku",
+    "base_variant_record_path": "lookup record_path from product_variants where product_sku equals base_sku",
+    "answer_text": "construct final answer based on matching_sku and base_sku: if matching_sku nonempty, format as 'Found product: {matching_sku} - {product_name}'; else if base_sku nonempty, format as '<NO> {base_sku}'; else format as 'Product family not found'"
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_NONE_UNSUPPORTED"
+    "OUTCOME_NONE_UNSUPPORTED",
+    "OUTCOME_NONE_CLARIFICATION"
   ],
   "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$product",
+        "lhs": "$matching_sku",
         "rhs": null,
         "args": []
-      },
+      }
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
       {
-        "op": "eq",
-        "lhs": "$cleaner_type_value",
-        "rhs": "multi surface cleaner",
-        "args": []
-      },
+        "op": "and",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "nonempty",
+            "lhs": "$family_id",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "isnull",
+            "lhs": "$matching_sku",
+            "rhs": null,
+            "args": []
+          },
+          {
+            "op": "nonempty",
+            "lhs": "$base_sku",
+            "rhs": null,
+            "args": []
+          }
+        ]
+      }
+    ],
+    "OUTCOME_NONE_CLARIFICATION": [
       {
-        "op": "nonempty",
-        "lhs": "$wifi_enabled_property",
+        "op": "isnull",
+        "lhs": "$family_id",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Product record: {record_path}. {#if wifi_enabled_found}Claim matches.{else}<NO> {sku}{/if}",
+    "msg_skeleton": "{answer_text}",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -43,8 +80,16 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product.record_path"
+        "source": "$matching_variant_record_path"
       }
-    ]
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$base_variant_record_path"
+      }
+    ],
+    "OUTCOME_NONE_CLARIFICATION": []
   }
 }

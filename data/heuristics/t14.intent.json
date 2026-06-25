@@ -1,40 +1,61 @@
 {
-  "objective": "Count how many of the specified products have at least 4 items available in the north Graz PowerTool branch today.",
+  "objective": "Count how many of the specified products have at least 2 items available today at the Vienna Praterstern hardware store.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "store": "lookup from stores WHERE city='Graz' AND store_name LIKE '%PowerTool%' AND store_name LIKE '%north%'",
-    "product_specs": "list of product specifications extracted from the instruction, each containing brand, series, model, and a list of property key-value pairs. For each, find the product_sku by joining product_variants on brand, series, model and product_variant_properties on property_key and property_value_text."
+    "store": "lookup store by name 'Vienna Praterstern' and city 'Vienna' from stores table",
+    "product_1": "find product_sku and record_path from product_variants where brand='Gardena', series='Gardena Smart PowerMax 280-5FI Manual Garden Tool', model='Manual Garden Tool' and join product_variant_properties where property_key='tool type' and property_value_text='pruning saw'",
+    "product_2": "find product_sku and record_path from product_variants where brand='Viega', series='Viega Professional Sanpress 2OG-ENN Pipe Fitting', model='Pipe Fitting' and join product_variant_properties where property_key='fitting type' and property_value_text='pipe fitting' and property_key='diameter' and property_value_text='15 mm' and property_key='connection type' and property_value_text='threaded'",
+    "product_3": "find product_sku and record_path from product_variants where brand='Sika', series='Sika Professional Sika 28T-UV8 Sealant', model='Sealant' and join product_variant_properties where property_key='sealant type' and property_value_text='hybrid sealant' and property_key='color family' and property_value_text='Gray' and property_key='volume' and property_value_text='280 ml'",
+    "product_4": "find product_sku and record_path from product_variants where brand='Portwest', series='Portwest PW3 DX 3TU-ST2 Work Gloves', model='Work Gloves' and join product_variant_properties where property_key='size' and property_value_text='S'",
+    "product_5": "find product_sku and record_path from product_variants where brand='Ryobi', series='Ryobi Precision RLM 2KQ-R4C Cordless Saw and Sander', model='Cordless Saw and Sander' and join product_variant_properties where property_key='tool type' and property_value_text='planer'",
+    "product_6": "find product_sku and record_path from product_variants where brand='Portwest', series='Portwest PW3 DX 3TU-ST2 Work Gloves', model='Work Gloves' and join product_variant_properties where property_key='size' and property_value_text='M'"
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_DENIED_SECURITY"
+    "OUTCOME_NONE_UNSUPPORTED"
   ],
-  "constraints": [],
+  "constraints": [
+    {
+      "anchor": "#inventory-availability",
+      "rule": "must include a decision branch to handle the case where the store is not found.",
+      "security": false,
+      "deny_when": {
+        "op": "isnull",
+        "lhs": "$store",
+        "rhs": null,
+        "args": []
+      },
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    }
+  ],
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "and",
-        "lhs": null,
+        "op": "nonempty",
+        "lhs": "$store",
         "rhs": null,
-        "args": [
-          {
-            "op": "ge",
-            "lhs": "$count",
-            "rhs": 0,
-            "args": []
-          },
-          {
-            "op": "le",
-            "lhs": "$count",
-            "rhs": 6,
-            "args": []
-          }
-        ]
+        "args": []
+      },
+      {
+        "op": "ge",
+        "lhs": "$count",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "le",
+        "lhs": "$count",
+        "rhs": 6,
+        "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Count: %d",
+    "msg_skeleton": "result %d",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -43,7 +64,7 @@
     "OUTCOME_OK": [
       {
         "kind": "policy_doc",
-        "path": "/docs/security.md",
+        "path": "/docs/checkout.md",
         "source": null
       },
       {
@@ -54,32 +75,7 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product1.record_path"
-      },
-      {
-        "kind": "record_path",
-        "path": null,
-        "source": "$product2.record_path"
-      },
-      {
-        "kind": "record_path",
-        "path": null,
-        "source": "$product3.record_path"
-      },
-      {
-        "kind": "record_path",
-        "path": null,
-        "source": "$product4.record_path"
-      },
-      {
-        "kind": "record_path",
-        "path": null,
-        "source": "$product5.record_path"
-      },
-      {
-        "kind": "record_path",
-        "path": null,
-        "source": "$product6.record_path"
+        "source": "$satisfying_product_record_paths"
       }
     ]
   }

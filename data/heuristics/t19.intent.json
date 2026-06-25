@@ -1,30 +1,40 @@
 {
-  "objective": "Calculate the total number of units of a specific product variant available today across all stores in Graz, including stores with zero availability.",
+  "objective": "Determine the total available today quantity of a specific product (Anchor and Wall Plug from Wurth, Wurth Universal WU XLL-87U line, with anchor type frame fixing, diameter 6 mm, length 30 mm) across all PowerTool branches in Graz, including branches with zero availability, and report the sum with citations of each store record and the product record.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_sku": "lookup from product_variants WHERE brand='Helly Hansen' AND product_family_name='Helly Hansen Chelsea Evolution Kensington V83-TOZ Work Jacket' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku=product_variants.product_sku AND property_key='color family' AND property_value_text='Blue') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku=product_variants.product_sku AND property_key='size' AND property_value_text='XL')",
-    "graz_stores": "lookup from stores WHERE city='Graz'",
-    "product_record_path": "record_path from product_variants WHERE product_sku=$product_sku",
-    "store_record_paths": "list of record_path from stores WHERE city='Graz'"
+    "product_sku": "lookup from product_variants where brand='Wurth' and series='Wurth Universal WU XLL-87U' and model='Anchor and Wall Plug', then join product_variant_properties where property_key='anchor_type' and property_value_text='frame fixing', property_key='diameter_mm' and property_value_text='6', property_key='length_mm' and property_value_text='30'",
+    "graz_stores": "select all stores where city='Graz'",
+    "inventory_quantities": "for each store in $graz_stores, get available_today_quantity from store_inventory where product_sku=$product_sku and store_id=$store.store_id, default 0"
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_DENIED_SECURITY",
     "OUTCOME_NONE_UNSUPPORTED"
   ],
   "constraints": [],
   "success_criteria": {
     "OUTCOME_OK": [
       {
-        "op": "regex_match",
-        "lhs": "$answer",
-        "rhs": "^answer=\\d+$",
+        "op": "ge",
+        "lhs": "$count",
+        "rhs": 0,
+        "args": []
+      },
+      {
+        "op": "eq",
+        "lhs": "$num_store_citations",
+        "rhs": "$num_graz_stores",
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$product_record_path",
+        "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "answer=%d",
+    "msg_skeleton": "qty {count}",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -34,7 +44,7 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product_record_path"
+        "source": "$product.record_path"
       },
       {
         "kind": "record_path",

@@ -57,9 +57,73 @@ entries:
     prevents unnecessary reads that can cause VM errors.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always include a decision branch that allows the main outcome when the
+    identity kind does not match the deny_when condition, and set the default label
+    to the deny outcome only when the identity kind matches the deny condition; do
+    not default to deny for all identity kinds.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR decision
+    only has a branch for identity_kind == ''guest'' leading to deny, and the default
+    label is also ''deny_security''. Since /bin/id returned ''customer'', the plan
+    incorrectly defaulted to deny. The security constraint only denies guests, so
+    the plan should have allowed the main outcome for ''customer'' and only denied
+    when identity_kind is ''guest''. The failing fragment: ''decision'': {''branches'':
+    [{''when'': {''op'': ''eq'', ''lhs'': ''$identity_kind'', ''rhs'': ''guest'',
+    ''args'': []}, ''label'': ''deny_security''}], ''default_label'': ''deny_security''}.
+    This rule ensures the decision logic correctly reflects the constraint''s deny
+    scope.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'get' primitive to extract a field from a single row (obtained
+    via 'first'), not the 'column' primitive which expects a list of dicts.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: ''interpret: compute step column failed: column expects list[dict];
+    use get for a single row''. Root cause: PlanIR uses ''column'' on $basket_row,
+    $total_row, $store_row, $time_row — each is a single dict from ''first''. ''column''
+    requires a list of dicts; ''get'' is correct for a single row. Failing fragment:
+    compute steps like {"prim":"column","args":["$basket_row","store_id"]}. No existing
+    rule covers this pattern; r003 addresses extracting rows from ExecResponse, not
+    the post-first extraction.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the record_path obtained from a database query to read the corresponding
+    file, rather than constructing a path from parameters.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: ''real_vm: read failed: not found''. Root cause: The PlanIR hardcodes
+    the basket file path ''/baskets/basket_001.json'' instead of using the record_path
+    obtained from the SQL query (bound as ''basket_record_path''). The required_refs
+    for OUTCOME_OK include a record_path from $result.record_path, indicating the
+    file at that path is needed. The hardcoded path likely does not exist, causing
+    the read failure. Failing PlanIR fragment: the Read RPC with args {''path'': ''/baskets/basket_001.json''}
+    and subsequent compute steps that extract fields from that file. Rule linkage:
+    This new rule ensures that when a record_path is available from a query, it is
+    used to ground file reads, preventing hardcoded paths that may not exist.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 4
-  date: '2026-06-24'
+  cycles_used: 3
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t24

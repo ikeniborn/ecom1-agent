@@ -5,7 +5,9 @@ entries:
     the deny outcome when the identity kind matches the security deny_when predicate;
     otherwise, do not produce any outcome (no answer).'
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by more specific rule that explicitly forbids using
+    raw ExecResponse in decision conditions and mandates using $_facts.identity.kind
+    with the deny_when operator.
   id: r001
   reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
     deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR always
@@ -16,7 +18,7 @@ entries:
     ''json'' but output is text; decision has default_label ''deny''. Rule linkage:
     The plan must correctly parse identity and only deny when the security constraint
     applies.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: 'Never use the ''get'' primitive with a single argument; ''get'' requires
@@ -65,7 +67,8 @@ entries:
     to the appropriate role, and then in the decision branch use the condition `{"op":"eq","lhs":"$_facts.identity.kind","rhs":"<deny_when
     rhs>"}` to ensure the predicate holds.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by new rule that mandates fact-based identity kind
+    setting and correct operator matching.
   id: r004
   reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
     deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR used
@@ -75,7 +78,7 @@ entries:
     evaluated to false. The existing rule r003 (Always extract identity kind...) was
     ambiguous about using the fact path directly. New rule clarifies that the decision
     branch must reference `$_facts.identity.kind` to match the predicate.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: '#security > guest-restrictions'
   content: Always include a custom_extract step after executing /bin/id to parse the
@@ -83,7 +86,9 @@ entries:
     eq condition on $_facts.identity.kind in the decision branch to compare against
     the deny_when rhs. Do not use the raw ExecResponse object in comparisons.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: These rules recommend using a custom_extract for parsing /bin/id
+    output without specifying a valid extract name, causing the 'parse_identity' failure.
+    The new rule provides a correct technique using compute primitives.
   id: r005
   reasoning: 'Error: real_vm: Protocol message ExecResponse has no ''guest'' field.
     Root cause: The PlanIR uses contains_any on the raw ExecResponse object ($identity_raw)
@@ -92,11 +97,189 @@ entries:
     of /bin/id via a custom_extract to extract the identity kind (e.g., ''guest'')
     and store it in $_facts.identity.kind, then use an eq condition on that field.
     The existing rules advise this but the script omitted the custom_extract step.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the 'concat' primitive with a single argument; 'concat' requires
+    exactly two arguments, both of which must be list[dict] rowsets. When the answer
+    template requires variables that are known from the TOOL_PLAN params (e.g., payment_id,
+    basket_id), include those columns in the SQL SELECT statement and extract them
+    using the 'get' primitive on the first row of the result. Do not attempt to create
+    string variables from literals using 'concat'.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: interpret compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. The plan used concat with a single string
+    argument (e.g., [''pay_036'']) to create payment_id and basket_id variables. The
+    concat primitive requires two list[dict] arguments (rowsets) and is intended for
+    concatenating rows, not for creating string literals. The correct approach is
+    to include payment_id and basket_id in the SQL SELECT statement (e.g., SELECT
+    pt.payment_id, sb.basket_id, ...) and then extract them from the first row using
+    ''get'' (e.g., get($payment_data.0, ''payment_id'')). This ensures the variables
+    are properly defined for the answer template.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When implementing a security deny_when predicate in a decision branch,
+    the default label must be set to a label that does not produce a deny outcome
+    (e.g., 'allow' or 'proceed'), and only the branch whose condition matches the
+    deny_when predicate (using eq) should produce the deny outcome. Do not use ne
+    for the deny condition; use eq to match the deny_when rhs.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: PlanIR decision
+    branch used `ne` condition on $_facts.identity.kind vs ''customer'' and set default
+    label to ''deny''. Since /bin/id returned roles: customer, the `ne` condition
+    was false, but the default label ''deny'' still produced DENIED_SECURITY. The
+    deny_when predicate in TOOL_PLAN is `ne lhs: $_facts.identity.kind rhs: customer`,
+    which means deny when identity.kind is NOT customer. The plan should have used
+    `eq` on the deny condition (deny when identity.kind equals the deny_when rhs?
+    Actually deny_when is ne, so deny when not customer. But the plan used ne, which
+    is correct for the condition? Wait: deny_when is ne, so if identity.kind != customer,
+    deny. The plan used ne, so if identity.kind != customer, the branch condition
+    is true, and it should go to deny. But the default was also deny, so even when
+    identity.kind == customer, it went to deny. The fix: default label should be ''allow''
+    (or a label that does not produce deny). Also, the condition should be eq? No,
+    the deny_when is ne, so the branch condition should be ne to match the deny_when.
+    But the plan used ne correctly for the branch, but the default was wrong. However,
+    the error says ''no declared security deny_when predicate holds'', meaning the
+    predicate (ne) did not hold (since identity.kind == customer, ne is false), so
+    the branch should not have been taken, but the default was deny. So the rule should
+    ensure default label is not deny. Also, the plan used `get` on literal strings
+    to set $payment_id and $basket_id, which is incorrect but not the direct cause
+    of this error. Existing rules r004 and r005 are incomplete because they do not
+    specify default label behavior; they are superseded by this rule.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always set $_facts.identity.kind via a custom_extract step after executing
+    /bin/id, parsing the stdout to extract the role from the 'roles:' line. Then in
+    the decision branch, use the same operator as the deny_when predicate (e.g., 'ne'
+    or 'eq') on $_facts.identity.kind against the deny_when rhs to determine the deny
+    branch. Do not use raw string matching (contains_any, not, etc.) on the stdout
+    for the deny condition, as that bypasses the fact system and will cause a verify
+    failure.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'The plan produced OUTCOME_DENIED_SECURITY but the security deny_when
+    predicate (ne on identity.kind vs customer) did not hold because the plan did
+    not set $_facts.identity.kind. Instead, it used a raw contains_any condition on
+    the /bin/id stdout, which bypasses the fact system. The verify phase detected
+    the spurious over-refusal. The failing PlanIR fragment is the decision branch:
+    {"when":{"op":"not","args":[{"op":"contains_any","lhs":"$identity_stdout","rhs":["roles:
+    customer"]}]},"label":"deny"}. Existing rules r001, r004, r005 are superseded
+    because they either omit the fact-setting step or incorrectly specify ''eq'' instead
+    of matching the deny_when operator.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use a custom_extract step with a name that is not a known built-in
+    extract function. To parse the output of /bin/id, use a compute step with the
+    'split' primitive on the stdout string to extract the role from the 'roles:' line,
+    then assign it to $_facts.identity.kind. If a built-in extract exists for parsing
+    /bin/id output, use that; otherwise, avoid custom_extract entirely for this purpose.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'The error ''interpret: custom_extract parse_identity failed: parse_identity''
+    indicates that the plan attempted to use a custom extract function named ''parse_identity''
+    which does not exist. Existing rules r001 and r005 recommend using a custom extract
+    for parsing /bin/id output, but they do not specify a valid extract name, leading
+    to this failure. The corrective rule replaces those rules by specifying that custom_extract
+    should not be used for this purpose; instead, use compute primitives like ''split''
+    to parse the stdout string.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use regex_match on the raw /bin/id stdout in a decision branch condition;
+    instead, parse the output into $_facts.identity.kind and use the deny_when predicate's
+    operator (e.g., 'ne' or 'eq') on $_facts.identity.kind in the decision branch
+    condition.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: verify I3 – outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds. The deny_when predicate is `{"op":"ne","lhs":"$_facts.identity.kind","rhs":"customer"}`.
+    The plan''s decision branch used `{"op":"not","args":[{"op":"regex_match","lhs":"$identity_stdout","rhs":"roles:
+    customer"}]}`. This condition does not evaluate the fact system; it matches raw
+    stdout. Since /bin/id returned ''roles: customer'', the regex matches, making
+    the ''not'' false, so the branch should not be taken, but the plan still produced
+    a deny outcome (likely due to a bug in the condition evaluation or the plan''s
+    answer block). The root cause is that the plan did not follow existing rules (r004,
+    r005, in-session rules) which require parsing /bin/id into $_facts.identity.kind
+    and using the exact deny_when operator. The new rule explicitly forbids raw regex
+    matching and mandates using the fact system with the correct operator.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the 'lt' primitive in compute steps; instead, use the 'compare'
+    primitive with the operator 'less_than' to perform numeric comparisons.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'The error ''compute step ''lt'' failed: ''lt'''' indicates that the
+    ''lt'' primitive is not recognized or fails when called. The PlanIR uses ''lt''
+    to compare two numbers. The root cause is that ''lt'' is not a supported compute
+    primitive. The fix is to replace ''lt'' with the ''compare'' primitive using the
+    ''less_than'' operator, which is a standard and supported primitive for numeric
+    comparisons.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use an Exec RPC to execute a SQL query when the result is expected
+    to be a rowset (list of dicts) for further compute steps like 'first' or 'get'.
+    Instead, use a Read RPC with path '/bin/sql' and the query as stdin, which returns
+    a rowset directly.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable at compute step
+    ''first'' on $payment_info. The plan used an Exec RPC to run a SQL query, which
+    returns an ExecResponse object (stdout, stderr, exit_code), not a list of rows.
+    The ''first'' primitive expects a list (rowset). The correct PlanIR shape is to
+    use a Read RPC with path ''/bin/sql'' and the query as stdin, which returns a
+    rowset (list of dicts) that can be subscripted. This rule prevents the shape bug.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the raw ExecResponse object from /bin/id in a decision branch
+    condition. Instead, after executing /bin/id, use a custom_extract step to parse
+    the stdout and set $_facts.identity.kind to the role value. Then in the decision
+    branch, use the same operator as the deny_when predicate (e.g., 'ne' or 'eq')
+    on $_facts.identity.kind against the deny_when rhs. Do not use 'contains_any',
+    'regex_match', or any other string matching on the raw ExecResponse.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Error: real_vm: Protocol message ExecResponse has no ''roles: customer''
+    field. Root cause: The PlanIR used `contains_any` on `$identity_raw` (the raw
+    ExecResponse from /bin/id) in the decision branch condition. The ExecResponse
+    is a protocol buffer message, not a text string, so it has no field named ''roles:
+    customer''. The existing rules (r001, r004, r005, in-session) already instruct
+    to parse the output into $_facts.identity.kind, but the PlanIR ignored them. This
+    rule explicitly forbids using the raw ExecResponse in conditions and mandates
+    the correct pattern: custom_extract to set $_facts.identity.kind, then use the
+    deny_when operator on that fact.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 5
-  date: '2026-06-24'
+  cycles_used: 8
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t31

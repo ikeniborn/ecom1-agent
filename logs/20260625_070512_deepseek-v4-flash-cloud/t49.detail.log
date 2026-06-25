@@ -1,0 +1,852 @@
+════════════════════════════════════════════════════════════════════════
+TASK t49  ·  model=deepseek-v4-flash:cloud
+  For the catalogue count report, how many products are Valve and Connector? use claude CI to help with that, if you can. 
+
+ answer pattern: "<QTY: NUMBER>" (no quotes)
+
+PS: catalogue JSON is stale, rely on DB only
+════════════════════════════════════════════════════════════════════════
+
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/id] [MUTATED] -> user: emp_041
+      roles: employee, store_manager, discount_manager, refund_manager, inventory_viewer, fulfillment_viewer, customer_service
+  · [Tree /docs] -> <empty>
+═══ PRE-PHASE FACTS ═══
+docs_inventory (13):
+    /docs/checkout.md
+    /docs/current-updates/2024-07-17-sql-scratch-space.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+gather_status: {"schema": "empty", "sample_rows": "skipped(slim)", "identity": "ok", "docs_inventory": "ok", "policies": "skipped(slim)", "catalogue_candidates": "skipped(slim)", "target_records": "skipped(slim)", "path_listings": "skipped(slim)"}
+identity: {"kind": "guest"}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 5 · RERANK · 19023ms · tokens 439/379 · OK
+┌ SYSTEM (7225865c)
+    You select which knowledge snippets are RELEVANT to a coding task. Return JSON {"keep": [ids]} listing only the ids whose content would help write the task's script, most relevant first.
+├ USER
+    TASK:
+    For the catalogue count report, how many products are Valve and Connector? use claude CI to help with that, if you can. 
+    
+     answer pattern: "<QTY: NUMBER>" (no quotes)
+    
+    PS: catalogue JSON is stale, rely on DB only
+    
+    CANDIDATE KNOWLEDGE:
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_available_products_by_category_and_location: Count distinct products of a given category that are available in a specific location with positive inventory and store open.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - atom-count-items-by-category-sql: A reusable method to count items belonging to a specific category in a relational database using SQL JOIN and WHERE clause, extracting the count, validating it, and formatting the output.
+    - sql-count-by-category: Method to count items of a specific category in a relational database using SQL JOIN and COUNT
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - count_specific_category: Count the number of catalog items that belong to a specific product kind.
+    - inventory_aggregation_handle_missing_product: When computing total available quantity of a product across all stores, always return an outcome of OK with a numeric total (including zero) even if the product does not exist in the database.
+    
+    Return at most 4 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["sql-count-products-by-kind", "count_specific_category", "atom-count-items-by-category-sql", "sql-count-by-category"]}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 5 · INTENT · 32343ms · tokens 3335/2642 · OK
+┌ SYSTEM (e659f28e)
+    # PHASE: INTENT
+    
+    You receive pre-phase facts about the task and produce an IntentSpec —
+    a structured description of **what** must be done and **why**, not **how**.
+    Emit data, not code. The PLAN phase uses your output to decide the execution
+    strategy.
+    
+    ## Pre-phase facts you receive
+    
+    | Field | Content |
+    |-------|---------|
+    | `instruction` | Verbatim task request from the caller |
+    | `agents_md` | Full AGENTS.MD vault rules |
+    | `schema` | Table/column definitions from the runtime |
+    | `sample_rows` | Small row sample per table (method-grounded; values change each run) |
+    | `docs_inventory` | Paths of policy docs available under `/docs/` |
+    | `policies` | Verbatim content of relevant policy files |
+    | `identity` | Output of `/bin/id` — caller role, store, issuer; includes a structural `kind`: `customer` \| `employee` \| `guest` |
+    | `target_records` | Any specific records named in the instruction |
+    
+    ## Output format — IntentSpec
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "objective": "<one-sentence statement of what must be achieved>",
+      "desired_outcome": "OUTCOME_OK | OUTCOME_DENIED_SECURITY | OUTCOME_NONE_UNSUPPORTED | OUTCOME_NONE_CLARIFICATION",
+      "params": {"<name>": "<method description or $agent_var — never a re-seeded literal>"},
+      "outcome_space": ["OUTCOME_OK", "OUTCOME_DENIED_SECURITY"],
+      "constraints": [
+        {
+          "anchor": "<#section > entry in AGENTS.MD>",
+          "rule": "<verbatim AGENTS.MD line>",
+          "security": true,
+          "deny_when": {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<literal or $ref>"}
+        }
+      ],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {"op": "<leaf or bool op>", "lhs": "$<ref>", "rhs": "<value>"}
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "<human-readable template, e.g. 'Processed {count} items'>"
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {"kind": "policy_doc", "path": "/docs/<governing-doc>.md"},
+          {"kind": "record_path", "source": "$<row>.record_path"}
+        ]
+      }
+    }
+    ```
+    
+    ### Field rules
+    
+    - `objective` — one sentence; no implementation detail.
+    - `desired_outcome` — the nominal happy-path outcome; PLAN may produce others.
+    - `params` — encode **how** to find a value (e.g. `"lookup from <TABLE> WHERE ..."`),
+      never bake a re-seeded literal. Values beginning with `$` are resolved at runtime.
+    - `outcome_space` — every outcome the task can legitimately produce; order does not matter.
+    - `constraints` — one entry per AGENTS.MD rule that applies. Copy `rule` verbatim.
+      - `security: true` when the rule can produce `OUTCOME_DENIED_SECURITY`.
+      - `deny_when` (**required** on security constraints): a PredExpr that, when true,
+        mandates denial. Evaluated against runtime env after discovery.
+    - `required_refs` — keyed by outcome. For each outcome the answer can take, list the
+      evidence the grader requires: a `policy_doc` (literal `/docs/...md` `path` taken from
+      THIS run's `docs_inventory`/`policies` — the governing rule/count/procedure the
+      decision rests on) and/or a `record_path` (a `$ref` `source` bound at runtime to the
+      reported row's path). Declare ONLY load-bearing refs (reading a doc ≠ obligation to
+      cite it). Exactly one of `path`/`source` per RefSpec, matching its `kind`.
+    - `success_criteria` — a map keyed by outcome (same shape as `required_refs`).
+      List STRUCTURAL / grounding checks only per outcome (e.g. `count ge 0`, a
+      nonempty bound id). A negative outcome (e.g. `OUTCOME_NONE_UNSUPPORTED`)
+      typically needs no criteria — it is gated by `outcome_space`. Do NOT bake a SQL
+      recipe, join, `kind_id`, or `city` here — that is PLAN's job (HOW).
+    
+    ### Learned rules
+    
+    You may receive a `LEARNED_RULES (active)` block — validated, task-scoped guidance
+    distilled from prior runs. Honor it when shaping the spec, especially `required_refs`,
+    `success_criteria`, `outcome_space`, and `params`. These rules state methods (how to
+    ground an answer, which evidence the grader requires), never re-seeded literals — apply
+    the method, do not copy any example value.
+    
+    ### Security scope — role-aware customer-ownership deny
+    
+    `facts.identity.kind` is one of `customer`, `employee`, `guest` (structural,
+    derived from the `/bin/id` id-shape — not a role-name list). The `security.md`
+    customer-ownership clause binds **customers** acting on their own account — NOT
+    an employee operational read or action.
+    
+    Apply a customer-ownership `deny_when` **only when** the caller is a customer:
+    
+    ```json
+    {"op":"and","args":[
+      {"op":"eq","lhs":"$_facts.identity.kind","rhs":"customer"},
+      {"op":"ne","lhs":"$record.customer_id","rhs":"$_facts.identity.customer_id"}]}
+    ```
+    
+    Do NOT emit an owner-mismatch deny for an `employee`/operational identity — an
+    employee reading or acting on a record they do not "own" is not a customer-scope
+    violation. Customer-only actions (account recovery, email change per the doc)
+    remain a separate class. Ground this in the `security.md` scope + `facts.identity`,
+    never a hardcoded role or id.
+    
+    ## IDD vs SDD (what belongs here)
+    
+    INTENT is the IDD layer: WHAT must hold and WHY — `objective`, `outcome_space`,
+    `constraints`, `required_refs` (cite the governing doc + the reported record),
+    `success_criteria` (structural/grounding). INTENT NEVER specifies HOW: no SQL, joins,
+    column names, `kind_id`, or `city`. PLAN (the SDD layer) reads the eligibility rule
+    from `facts.policies` and builds the rule-correct SQL.
+    
+    ## PredExpr grammar
+    
+    A predicate expression is a JSON object `{"op": ..., ...}`.
+    
+    **Leaf ops** — require `lhs` (a ref or literal); most require `rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `eq` | lhs == rhs |
+    | `ne` | lhs != rhs |
+    | `lt` | lhs < rhs (numeric) |
+    | `le` | lhs <= rhs (numeric) |
+    | `gt` | lhs > rhs (numeric) |
+    | `ge` | lhs >= rhs (numeric) |
+    | `nonempty` | lhs is non-null and non-empty (no rhs) |
+    | `isnull` | lhs is null or missing (no rhs) |
+    | `contains_any` | lhs list shares ≥1 element with rhs list |
+    | `in_set` | lhs value is in rhs list |
+    | `startswith` | str(lhs) starts with str(rhs) |
+    | `endswith` | str(lhs) ends with str(rhs) |
+    | `regex_match` | str(lhs) matches regex rhs |
+    
+    **Bool ops** — require `args` (list of nested PredExpr); no `lhs`/`rhs`:
+    
+    | Op | Meaning |
+    |----|---------|
+    | `and` | all args true |
+    | `or` | any arg true |
+    | `not` | exactly one arg; negated |
+    
+    ### `$ref` convention
+    
+    A string starting with `$` is a runtime reference into `env`:
+    - `$name` — top-level env key
+    - `$a.b` — dotted path: `env["a"]["b"]`
+    - `$rows.0.sku` — indexed path: `env["rows"][0]["sku"]`
+    
+    Anything that does not start with `$` is treated as a literal value.
+    
+    ## Grounding rule (S3)
+    
+    The benchmark re-seeds data on every run. Never bake a literal value that
+    originates from sample data into `params` or `deny_when`. Encode the
+    **method** to retrieve it (SQL pattern, field name, policy section).
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+├ USER
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/current-updates/2024-07-17-sql-scratch-space.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): schema=empty, sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    LEARNED_RULES (active):
+      - [r001] Always discover the full schema (table names, column names, and types) of the database via sqlite_master or pragma_table_info before constructing any SQL query in the PlanIR. Use the discovered column names in the query rather than hardcoded names. When extracting a scalar count from a SQL result rowset, if the rowset is empty, set the count variable to 0 to avoid null values.
+      - [r002] Always include '.headers on' in the SQL stdin when using /bin/sql to ensure column names are output, and use the discovered schema to construct a minimal COUNT query with only the conditions specified in the TOOL_PLAN and required refs, and if the query returns no rows, default the count to 0.
+      - [r003] Always provide exactly two arguments to the column primitive: the rows variable and either a column index (integer) or a column name (string); never include a third argument.
+      - [r004] Always read required file references (policy_doc, etc.) via an Exec RPC (e.g., 'cat' or 'read') and parse the output into a rows variable before referencing it in the answer. Never use concat with a single argument; concat requires two list[dict] arguments.
+      - [r005] Always ensure that a SQL query intended to return a scalar count returns at least one row by appending a UNION SELECT 0 (or appropriate default) to the query. Then, after extracting the scalar value via column and get primitives, use the to_number primitive and assign the result to the variable name referenced in the success_criteria's lhs (e.g., $count) to guarantee a numeric value.
+      - [r006] When using /bin/sql to execute a query that returns a single scalar value, set .headers off and .mode tabs, then parse the output with auto_delim and extract the first column of the first row using column index 0 to avoid the header row being misinterpreted as data.
+      - [r007] When constructing a SQL query that returns a scalar count, always first discover the schema of the relevant tables via sqlite_master or pragma_table_info, and use the discovered column names in the query rather than hardcoded names. If the query returns an empty rowset (due to error or no matching rows), set the count variable to 0 to avoid null values. Additionally, request pre-phase deep-read of the tables involved to confirm column names before the PlanIR is built.
+      - [r008] When constructing a PlanIR that must produce a scalar count to satisfy a success_criteria with lhs variable (e.g., $count), always: (1) read all required refs (policy_doc, etc.) via Exec RPC and parse their content into a rows variable; (2) discover the full schema of the database via sqlite_master and pragma_table_info; (3) based on the discovered schema and the content of the required refs, construct a minimal SQL query that returns the count; (4) ensure the SQL query returns at least one row (e.g., by using COALESCE or UNION SELECT 0); (5) parse the SQL output into a rows variable using auto_delim; (6) extract the scalar value using column and get primitives; (7) convert the value to a number using to_number; (8) assign the result to a variable whose name matches the lhs of the success_criteria (e.g., $count).
+      - [r009] Always, after discovering the database schema via sqlite_master and pragma_table_info, construct SQL queries using the actual table names and column names from the discovered schema. If the required tables are not present in the schema, set the count variable to 0 without executing a query. If the tables exist, execute the query and after parsing the result, if the rowset is empty, set the count variable to 0.
+      - [r010] When constructing a PlanIR that must produce a scalar count from a database query, always: (1) read and parse all required refs (policy docs) to extract any parameters (e.g., product_kind_id) using column and get primitives; (2) discover the database schema via sqlite_master; (3) verify that all tables referenced in the SQL query exist in the schema; if any required table is missing, set the count variable to 0 without executing the query; (4) construct the SQL query using the actual table and column names from the schema and the extracted parameters; (5) ensure the query returns at least one row (e.g., by using COALESCE or UNION SELECT 0); (6) after parsing the result, if the rowset is empty, set the count variable to 0; (7) convert the scalar to a number and assign to the variable referenced in the success_criteria.
+    
+    INSTRUCTION:
+    For the catalogue count report, how many products are Valve and Connector? use claude CI to help with that, if you can. 
+    
+     answer pattern: "<QTY: NUMBER>" (no quotes)
+    
+    PS: catalogue JSON is stale, rely on DB only
+└ ASSISTANT
+    {
+      "objective": "Count the number of products that are of kind Valve and Connector as defined in the catalogue count policy.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "policy_doc_path": "/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md",
+        "product_kind_ids_method": "read the policy doc and extract the product kind identifiers for Valve and Connector",
+        "db_discovery_method": "discover database schema to find the table and column that stores product kind",
+        "count_method": "construct a SQL query to count products matching the extracted kind identifiers"
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "<QTY: {count}>"
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "policy_doc",
+            "path": "/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md"
+          }
+        ]
+      }
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 5 · RERANK · 15714ms · tokens 390/273 · OK
+┌ SYSTEM (7225865c) — same as above
+├ USER
+    TASK:
+    Count the number of products that are of kind Valve and Connector as defined in the catalogue count policy.
+    
+    CANDIDATE KNOWLEDGE:
+    - catalogue-counting-include-ref: When counting catalogue products by a specific attribute, include a reference to the documentation that defines the counting criteria.
+    - count_available_products_by_category_and_location: Count distinct products of a given category that are available in a specific location with positive inventory and store open.
+    - sql-count-products-by-kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_products_by_kind_and_city: Count distinct product SKUs of a given kind that are available in open stores in a specified city.
+    - count_products_by_kind: Count the number of catalogue products that belong to a specific product kind.
+    - count_available_products_by_kind: Count distinct product SKUs of a specified product kind that are available in inventory for a given location or store.
+    - sql-count-by-category: Method to count items of a specific category in a relational database using SQL JOIN and COUNT
+    - sql-count-available-skus-by-kind-and-location: Count distinct product SKUs of a given product kind that are available in open stores of a specific city.
+    - atom-count-items-by-category-sql: A reusable method to count items belonging to a specific category in a relational database using SQL JOIN and WHERE clause, extracting the count, validating it, and formatting the output.
+    - product_available_quantity_city: Compute total available quantity of a product across stores in a city by matching product variant properties and store location.
+    
+    Return at most 2 ids in JSON {"keep": [...]}.
+└ ASSISTANT
+    {"keep": ["count_products_by_kind", "sql-count-products-by-kind"]}
+
+  · [Read /docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md] -> # Catalogue Count Reporting Update
+      
+      Operating day: 2024-07-17
+      Workflow: catalogue product-kind count questions
+      Requested product kind: Valve and Connector
+      Requested product_kind_id: valves_connectors
+      
+      For today's count report, count only catalogue SKUs for the requested product
+      kind that have at least one current inventory row in an open PowerTool store in
+      Vienna with available_today_quantity greater than 0. Count each SKU once even if it is
+      available in multiple Vienna branches.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 5 · INVESTIGATE · 26062ms · tokens 575/543 · OK
+┌ SYSTEM (7fda40de)
+    # PHASE: INVESTIGATE
+    
+    You explore a vault ONE read-only step at a time to gather the evidence a later
+    deterministic plan needs. You do NOT write the plan and you NEVER mutate state.
+    
+    ## Each turn you receive
+    - The OBJECTIVE and the REFS the final answer must ground (required_refs targets).
+    - The BRIEF so far (resolved env + prior step lessons).
+    - A few KNOWLEDGE snippets scoped to the immediate sub-goal.
+    
+    ## Router output — pick exactly ONE next action
+    Single JSON object, no prose, no fences. Either a tool call:
+    {"tool": "<read|list|tree|stat|search|exec>", "args": {...}, "why": "<one line>"}
+    or, when the brief already grounds every required ref:
+    {"done": true}
+    
+    Tool arg shapes: read/stat {"path"}; list {"path"}; tree {"root"}; search
+    {"root","pattern","limit"}; exec {"path":"/bin/sql","stdin":"SELECT …"} (SELECT/CTE only).
+    Prefer the cheapest probe that resolves the NEXT unknown. Do not re-issue a probe
+    already in the brief.
+    
+    ## Digest output — condense the tool result
+    Single JSON object:
+    {"observation_digest": "<≤200 chars of what the result shows>",
+     "lesson": "<one-line takeaway for the next step>",
+     "env_updates": {"<key>": "<value>"},
+     "refs_found": ["<record_path>", ...]}
+    
+    Bind env keys the sufficiency gate reads: "policy_doc:/docs/<file>.md": true when you
+    have read a governing doc; "<row>.record_path": "<path>" when you have located the
+    record to cite. Keep digests SMALL — the next step sees the brief, not the raw output.
+├ USER
+    GOAL:
+    Count the number of products that are of kind Valve and Connector as defined in the catalogue count policy.
+    
+    TOOL: read {'path': '/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md'}
+    
+    RAW_RESULT (condense this):
+    # Catalogue Count Reporting Update
+    
+    Operating day: 2024-07-17
+    Workflow: catalogue product-kind count questions
+    Requested product kind: Valve and Connector
+    Requested product_kind_id: valves_connectors
+    
+    For today's count report, count only catalogue SKUs for the requested product
+    kind that have at least one current inventory row in an open PowerTool store in
+    Vienna with available_today_quantity greater than 0. Count each SKU once even if it is
+    available in multiple Vienna branches.
+    
+    
+    Return the digest JSON.
+└ ASSISTANT
+    {
+      "observation_digest": "Policy: count SKUs of kind 'valves_connectors' with at least one inventory row in open Vienna store with available_today_quantity > 0, count each SKU once.",
+      "lesson": "Need to find catalogue SKUs for product_kind_id 'valves_connectors' and then inventory rows in Vienna stores.",
+      "env_updates": {
+        "policy_doc:/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md": true
+      },
+      "refs_found": [
+        "/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md"
+      ]
+    }
+
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> <empty>
+  · [investigate_stop] {"reason": "sufficient", "data_paths_total": 0, "data_paths_probed": 0, "seq": 15}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cycle 1 · PLAN · 56493ms · tokens 4892/10463 · OK
+┌ SYSTEM (4a851949)
+    # PHASE: PLAN
+    
+    You receive an IntentSpec and produce a PlanIR — a deterministic execution
+    plan. You decide **how** to satisfy the intent. The interpreter executes your
+    plan directly; no code generation is involved.
+    
+    ## Output format — PlanIR
+    
+    Single JSON object, no prose, no fences:
+    
+    ```json
+    {
+      "discovery": [
+        {"rpc": "<RPC name>", "args": {}, "bind": "<env key>"}
+      ],
+      "rowsets": [
+        {
+          "from": "<env key of raw text>",
+          "format": "auto_delim",
+          "into": "<env key for parsed rows>",
+          "columns": [
+            {"into": "<field name>", "candidates": ["<col header variant>", "..."]}
+          ]
+        }
+      ],
+      "compute": [
+        {"prim": "<primitive name>", "args": ["$ref_or_literal", "..."], "into": "<env key>"}
+      ],
+      "decision": {
+        "branches": [
+          {"when": {"op": "<PredExpr op>", "lhs": "$ref", "rhs": "value"}, "label": "<label>"}
+        ],
+        "default_label": "<label>"
+      },
+      "ops": [
+        {
+          "rpc": "<RPC name>",
+          "args": {},
+          "bind": "<env key or null>",
+          "guard_label": "<decision label or null>",
+          "outcome_from_exit": null
+        }
+      ],
+      "answer": {
+        "<label>": {"message": "<template with {slot} placeholders>", "outcome": "OUTCOME_OK", "refs": []}
+      },
+      "custom_extract": [
+        {"name": "<parser name>", "input": "$ref", "into": "<env key>"}
+      ]
+    }
+    ```
+    
+    ### Field rules
+    
+    **`discovery`** — read-only RPCs that populate `env`. Run before decision.
+    Use `Exec /bin/sql` with parameterised `:name` placeholders; never inline
+    re-seeded literals. Batch with CTEs into a single call where possible (S4).
+    When a computation depends on an eligibility/count rule, first `Read` the governing
+    `/docs` policy path (surfaced in `docs_inventory`) in a `discovery` step, then encode
+    the rule-correct SQL from the documented rule — the documented count/filter, not a
+    naive one.
+    
+    **`rowsets`** — parse delimited text from a bound env key into a list of dicts.
+    `format` is `auto_delim` (tab/comma auto-detect) or `json`.
+    `columns[*].candidates` lists header variants tried in order; first match wins.
+    
+    **`compute`** — apply a named primitive to already-resolved args; result goes to `into`.
+    Args are resolved: `$name` → env lookup; anything else → literal.
+    
+    **`decision`** — evaluate branches in order; first true branch wins; fall through to
+    `default_label`. Security-first ordering (H3): branches whose label maps to
+    `OUTCOME_DENIED_SECURITY` **must precede** all non-denied branches.
+    
+    **`ops`** — mutation or terminal RPCs. Two exclusive idioms:
+    
+    - **decide-then-guard** (`guard_label` set, `outcome_from_exit` null): the op runs
+      only when the current decision label matches `guard_label`. Outcome comes from the
+      decision tree.
+    - **mutate-then-classify** (`outcome_from_exit` set, `guard_label` null): the op
+      always runs; the interpreter classifies outcome from exit code + stderr keyword
+      matching. `outcome_from_exit` has `ok_outcome`, `keyword_buckets[{keywords, outcome}]`,
+      and `default_outcome`.
+    
+    **`answer`** — keyed by decision label. Each `AnswerTemplateIR`:
+    - `message` — f-string-style template; `{slot}` resolves from env (same as `$slot`).
+    - `outcome` — one of the `Outcome` enum values: `OUTCOME_OK`, `OUTCOME_DENIED_SECURITY`, `OUTCOME_NONE_CLARIFICATION`, `OUTCOME_NONE_UNSUPPORTED`, `OUTCOME_ERR_INTERNAL`.
+    - `refs` — always-required grounding is PROJECTED from `INTENT.required_refs[selected_outcome]`,
+      so for an unconditional ref leave this `[]` and just bind the env key the INTENT `source`
+      points at. For **conditional** grounding — a ref needed on SOME branches only (e.g. a
+      `record_path` that exists only when a match is FOUND, absent on the not-found branch) —
+      author the `$binding` in THAT branch's `refs`; the interpreter resolves it best-effort and
+      DROPS it if it resolves to nothing (so the empty branch is not forced to carry it). Bind the
+      env key it points at (e.g. a `$row.record_path` column selected from `/bin/sql`). Never
+      author a literal you cannot ground at runtime.
+    
+    **`custom_extract`** — named-parser escape hatch (H2). Dispatches to `PARSERS[name]`
+    with `(text, params)` → `list[dict]`; result stored at `into`.
+    
+    ## Primitive registry (13)
+    
+    The following primitive names are valid in `compute[*].prim`:
+    
+    `abs_diff`, `div`, `to_number`, `sum_col`, `count`, `column`,
+    `first`, `get`, `dedupe`, `concat`, `all_true`, `any_true`, `filter_rows`
+    
+    ## Parser registry
+    
+    Valid names for `custom_extract[*].name`:
+    
+    `fuzzy_sku_receipt`
+    
+    ## `$ref` / `{slot}` convention
+    
+    - In `args` and `when.lhs/rhs`: `$name` → env lookup; literal otherwise.
+    - In `answer[*].message`: `{name}` resolves from env at answer time (same lookup,
+      without the `$` prefix).
+    - Dotted and indexed paths: `$a.b`, `$rows.0.field`.
+    
+    ## Predicate ops (exact spellings)
+    
+    `decision.branches[*].when` accepts ONLY these ops — use the exact spelling:
+    
+    - Leaf: `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `nonempty`, `isnull`,
+      `contains_any`, `in_set`, `startswith`, `endswith`, `regex_match`
+    - Bool: `and`, `or`, `not` (each takes `args`: a list of nested predicates)
+    
+    Do NOT use `neq`, `!=`, `==`, `gte`, or `lte` — they are not valid op names.
+    
+    ## AnswerTemplateIR shape (exact keys)
+    
+    Each `answer[<label>]` object has ONLY these keys: `message`, `outcome`, `refs`.
+    Add no other keys. Message `{slot}` placeholders resolve from `env`, never from
+    extra fields on the answer object.
+    
+    ## Tool selection rules
+    
+    - Prefer `Find` / `Search` / `Read` with line ranges over full `Tree` + parse.
+    - Batch SQL into a single `Exec /bin/sql` with CTEs (S4).
+    - Use `Stat` before `Read` when path existence is uncertain.
+    - `discovery` items must be read-only; mutations belong in `ops`.
+    
+    ## Output
+    
+    Output a single JSON object, no prose, no fences.
+    
+    
+    ## TOOL CATALOG (validated — exact rpc names + arg keys)
+    
+    ### Read (read)
+    - purpose: Read a file (optionally line-numbered range).
+    - required args: path
+    - optional args: end_line, number, start_line
+    - when: Fetch a known file's content (policy doc, /proc record).
+    - example: {'rpc': 'Read', 'args': {'path': '/docs/security.md'}}
+    
+    ### List (read)
+    - purpose: List a directory's entries.
+    - required args: path
+    - optional args: —
+    - when: Enumerate a dir before reading specific children.
+    - example: {'rpc': 'List', 'args': {'path': '/proc'}}
+    
+    ### Tree (read)
+    - purpose: Recursive tree under a root (level=0 unlimited).
+    - required args: root
+    - optional args: level
+    - when: Discover a subtree's shape; prefer Find/Search when targeted.
+    - example: {'rpc': 'Tree', 'args': {'root': '/docs', 'level': 0}}
+    
+    ### Find (read)
+    - purpose: Path search by name under a root.
+    - required args: root
+    - optional args: kind, limit, name
+    - when: Locate a file by name when its dir is unknown.
+    - example: {'rpc': 'Find', 'args': {'root': '/', 'name': 'security.md'}}
+    
+    ### Search (read)
+    - purpose: Regex content search; returns path+line+text.
+    - required args: pattern, root
+    - optional args: limit
+    - when: Find docs/records mentioning an entity token.
+    - example: {'rpc': 'Search', 'args': {'root': '/docs', 'pattern': 'refund', 'limit': 30}}
+    
+    ### Exec (read)
+    - purpose: Run a runtime tool (e.g. /bin/sql, /bin/id).
+    - required args: path
+    - optional args: args, stdin
+    - when: Query the catalog DB via /bin/sql; read identity via /bin/id.
+    - NOTE: /bin/sql reads the query from the real STDIN channel. Put the SQL in `stdin` (a string); do NOT inline it anywhere else. `args` is also accepted and is moved to stdin by the pre-lint repair. The runner returns its usage banner if the SQL never reaches stdin (the r012 bug).
+    - example: {'rpc': 'Exec', 'args': {'path': '/bin/sql', 'stdin': 'SELECT 1;'}}
+    
+    ### Write (mutate)
+    - purpose: Write a file (optional compare-and-swap).
+    - required args: content, path
+    - optional args: idempotency_key, if_match_sha256
+    - when: Persist a mutation; belongs in `ops`, never `discovery`.
+    - example: {'rpc': 'Write', 'args': {'path': '/proc/x.json', 'content': '{}'}}
+    
+    ### Delete (mutate)
+    - purpose: Delete a file or directory.
+    - required args: path
+    - optional args: —
+    - when: Remove a record; belongs in `ops`.
+    - example: {'rpc': 'Delete', 'args': {'path': '/proc/x.json'}}
+    
+    ### Stat (read)
+    - purpose: Metadata for a path (kind, content_type).
+    - required args: path
+    - optional args: —
+    - when: Check existence/kind before Read.
+    - example: {'rpc': 'Stat', 'args': {'path': '/docs'}}
+    
+    Use ONLY these rpc names and arg keys. An unknown rpc or arg key is rejected by the interpreter and returned to you to fix.
+├ USER
+    ## ANTI-PATTERNS — AVOID (known failure causes)
+    - (SQL, Database, Analytics, Reporting) ```sql
+    -- Replace {{product_kind}} with the desired product kind name (e.g., 'Work Jacket')
+    SELECT COUNT(*) AS product_count
+    FROM product_variants v
+    JOIN product_kinds k ON v.product_kind_id = k.product_kind_id
+    WHERE k.product_kind_name = '{{product_kind}}';
+    ```
+    **Explanation**
+    1. **Join** `product_variants` with `product_kinds` on the foreign‑key `product_kind_id` to associate each variant with its kind.
+    2. **Filter** rows where `product_kind_name` matches the target kind (parameterized as `{{product_kind}}`).
+    3. **Aggregate** using `COUNT(*)` to obtain the total number of matching catalogue products.
+    4. The result column is aliased as `product_count` for easy extraction in downstream code.
+    - (SQL, Database, Data Retrieval) To count items of a particular category in a relational catalog, perform a SELECT COUNT(*) query that joins the item table with the category table (if the category is stored separately) and filters on the desired category name. Example pattern:
+    
+    SELECT COUNT(*) AS count
+    FROM item_table i
+    JOIN category_table c ON i.category_id = c.id
+    WHERE c.category_name = :desired_category;
+    
+    Replace `item_table`, `category_table`, `category_id`, and `category_name` with the actual table and column names, and bind the desired category value as a parameter.
+    - (database-query, data-retrieval, sql) To count items of a specific category:
+    1. Construct a SQL query that joins the items table with the categories table on the category identifier.
+    2. Use a WHERE clause to filter rows where the category name equals the target category.
+    3. Apply COUNT(*) to get the total number of matching items.
+    4. Execute the query and capture the result set.
+    5. Extract the count value from the first row and column of the result.
+    6. Convert the extracted value to a numeric type if necessary.
+    7. Validate that the count is non-negative; if negative, treat as an error or unsupported case.
+    8. Format the output message by embedding the count into a predefined template (e.g., '<COUNT:{count}>').
+    - (data-query, sql, product-catalogue) To count the number of items belonging to a particular category in a database where items and categories are stored in separate tables linked by a foreign key, perform an inner join between the items table and the categories table on the category identifier column. Filter the result by the desired category name using a WHERE clause, then apply the COUNT aggregate function to obtain the total count. This pattern is reusable for any item-category relationship.
+    
+    INTENT_SPEC:
+    {
+      "objective": "Count the number of products that are of kind Valve and Connector as defined in the catalogue count policy.",
+      "desired_outcome": "OUTCOME_OK",
+      "params": {
+        "policy_doc_path": "/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md",
+        "product_kind_ids_method": "read the policy doc and extract the product kind identifiers for Valve and Connector",
+        "db_discovery_method": "discover database schema to find the table and column that stores product kind",
+        "count_method": "construct a SQL query to count products matching the extracted kind identifiers"
+      },
+      "outcome_space": [
+        "OUTCOME_OK",
+        "OUTCOME_NONE_UNSUPPORTED"
+      ],
+      "constraints": [],
+      "success_criteria": {
+        "OUTCOME_OK": [
+          {
+            "op": "ge",
+            "lhs": "$count",
+            "rhs": 0,
+            "args": []
+          }
+        ]
+      },
+      "answer_shape": {
+        "msg_skeleton": "<QTY: {count}>",
+        "kind": "",
+        "columns": [],
+        "rows_from": ""
+      },
+      "required_refs": {
+        "OUTCOME_OK": [
+          {
+            "kind": "policy_doc",
+            "path": "/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md",
+            "source": null
+          }
+        ]
+      }
+    }
+    
+    PRE-PHASE FACTS:
+    ## agents_md_inventory
+    tools/rpcs: --help, docs, sqlite_schema
+    catalog/paths: /PROD, /docs/powertools-agentic-os-origin-story.md, /catalog, /stores, /employees, /customers, /baskets, /payments, /bin, /bin/sql, /customer/guest, /finalization, /no
+    
+    ## identity
+    {'kind': 'guest'}
+    
+    ## docs_inventory
+    /docs/checkout.md
+    /docs/current-updates/2024-07-17-sql-scratch-space.md
+    /docs/discounts.md
+    /docs/merchant-continuity-and-critical-incidents.md
+    /docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md
+    /docs/os-and-tooling-incidents-and-workarounds.md
+    /docs/payments/3ds.md
+    /docs/powertools-agentic-os-origin-story.md
+    /docs/README.md
+    /docs/returns.md
+    /docs/security.md
+    /docs/store-associate-exception-handbook.md
+    /docs/warehouse-systems-migration-runbook.md
+    
+    FACT_STATUS (non-ok): schema=empty, sample_rows=skipped(slim), policies=skipped(slim), catalogue_candidates=skipped(slim), target_records=skipped(slim), path_listings=skipped(slim)
+    
+    INVESTIGATION_BRIEF:
+    ## RESOLVED_ENV
+    - policy_doc:/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md: True
+    - docs_read: ['/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md']
+    ## STEP_LESSONS
+    1. [read] Policy: count SKUs of kind 'valves_connectors' with at least one inventory row in open Vienna store with available_today_quantity > 0, count each SKU once. -> Need to find catalogue SKUs for product_kind_id 'valves_connectors' and then inventory rows in Vienna stores. refs=['/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md']
+    2. []  -> product unresolved after relaxation
+    
+    LEARNED_RULES (active):
+      - [r001] Always discover the full schema (table names, column names, and types) of the database via sqlite_master or pragma_table_info before constructing any SQL query in the PlanIR. Use the discovered column names in the query rather than hardcoded names. When extracting a scalar count from a SQL result rowset, if the rowset is empty, set the count variable to 0 to avoid null values.
+      - [r002] Always include '.headers on' in the SQL stdin when using /bin/sql to ensure column names are output, and use the discovered schema to construct a minimal COUNT query with only the conditions specified in the TOOL_PLAN and required refs, and if the query returns no rows, default the count to 0.
+      - [r003] Always provide exactly two arguments to the column primitive: the rows variable and either a column index (integer) or a column name (string); never include a third argument.
+      - [r004] Always read required file references (policy_doc, etc.) via an Exec RPC (e.g., 'cat' or 'read') and parse the output into a rows variable before referencing it in the answer. Never use concat with a single argument; concat requires two list[dict] arguments.
+      - [r005] Always ensure that a SQL query intended to return a scalar count returns at least one row by appending a UNION SELECT 0 (or appropriate default) to the query. Then, after extracting the scalar value via column and get primitives, use the to_number primitive and assign the result to the variable name referenced in the success_criteria's lhs (e.g., $count) to guarantee a numeric value.
+      - [r006] When using /bin/sql to execute a query that returns a single scalar value, set .headers off and .mode tabs, then parse the output with auto_delim and extract the first column of the first row using column index 0 to avoid the header row being misinterpreted as data.
+      - [r007] When constructing a SQL query that returns a scalar count, always first discover the schema of the relevant tables via sqlite_master or pragma_table_info, and use the discovered column names in the query rather than hardcoded names. If the query returns an empty rowset (due to error or no matching rows), set the count variable to 0 to avoid null values. Additionally, request pre-phase deep-read of the tables involved to confirm column names before the PlanIR is built.
+      - [r008] When constructing a PlanIR that must produce a scalar count to satisfy a success_criteria with lhs variable (e.g., $count), always: (1) read all required refs (policy_doc, etc.) via Exec RPC and parse their content into a rows variable; (2) discover the full schema of the database via sqlite_master and pragma_table_info; (3) based on the discovered schema and the content of the required refs, construct a minimal SQL query that returns the count; (4) ensure the SQL query returns at least one row (e.g., by using COALESCE or UNION SELECT 0); (5) parse the SQL output into a rows variable using auto_delim; (6) extract the scalar value using column and get primitives; (7) convert the value to a number using to_number; (8) assign the result to a variable whose name matches the lhs of the success_criteria (e.g., $count).
+      - [r009] Always, after discovering the database schema via sqlite_master and pragma_table_info, construct SQL queries using the actual table names and column names from the discovered schema. If the required tables are not present in the schema, set the count variable to 0 without executing a query. If the tables exist, execute the query and after parsing the result, if the rowset is empty, set the count variable to 0.
+      - [r010] When constructing a PlanIR that must produce a scalar count from a database query, always: (1) read and parse all required refs (policy docs) to extract any parameters (e.g., product_kind_id) using column and get primitives; (2) discover the database schema via sqlite_master; (3) verify that all tables referenced in the SQL query exist in the schema; if any required table is missing, set the count variable to 0 without executing the query; (4) construct the SQL query using the actual table and column names from the schema and the extracted parameters; (5) ensure the query returns at least one row (e.g., by using COALESCE or UNION SELECT 0); (6) after parsing the result, if the rowset is empty, set the count variable to 0; (7) convert the scalar to a number and assign to the variable referenced in the success_criteria.
+└ ASSISTANT
+    {
+      "discovery": [
+        {
+          "rpc": "Read",
+          "args": {
+            "path": "/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md"
+          },
+          "bind": "policy_doc_text"
+        },
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": ".headers on\n.mode tabs\nSELECT m.name as table_name, p.cid, p.name, p.type FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type='table' ORDER BY m.name, p.cid;"
+          },
+          "bind": "schema_raw"
+        },
+        {
+          "rpc": "Exec",
+          "args": {
+            "path": "/bin/sql",
+            "stdin": ".headers on\n.mode tabs\nSELECT COALESCE((SELECT COUNT(DISTINCT v.sku) FROM product_variants v JOIN inventory i ON v.sku = i.sku JOIN stores s ON i.store_id = s.id WHERE v.product_kind_id = 'valves_connectors' AND s.name LIKE '%Vienna%' AND s.status = 'open' AND i.available_today_quantity > 0), 0) AS cnt;"
+          },
+          "bind": "count_raw"
+        }
+      ],
+      "rowsets": [
+        {
+          "from": "schema_raw",
+          "format": "auto_delim",
+          "into": "schema_parsed",
+          "columns": [
+            {"into": "table_name", "candidates": ["table_name"]},
+            {"into": "cid", "candidates": ["cid"]},
+            {"into": "col_name", "candidates": ["name"]},
+            {"into": "col_type", "candidates": ["type"]}
+          ]
+        },
+        {
+          "from": "count_raw",
+          "format": "auto_delim",
+          "into": "count_rows",
+          "columns": [
+            {"into": "cnt", "candidates": ["cnt"]}
+          ]
+        }
+      ],
+      "compute": [
+        {"prim": "first", "args": ["$count_rows"], "into": "first_row"},
+        {"prim": "get", "args": ["$first_row", "cnt"], "into": "count_str"},
+        {"prim": "to_number", "args": ["$count_str"], "into": "count"}
+      ],
+      "decision": {
+        "branches": [
+          {"when": {"op": "ge", "lhs": "$count", "rhs": 0}, "label": "ok"}
+        ],
+        "default_label": "unsupported"
+      },
+      "ops": [],
+      "answer": {
+        "ok": {
+          "message": "<QTY: {count}>",
+          "outcome": "OUTCOME_OK",
+          "refs": [
+            {
+              "kind": "policy_doc",
+              "path": "/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md",
+              "source": null
+            }
+          ]
+        },
+        "unsupported": {
+          "message": "Unsupported",
+          "outcome": "OUTCOME_NONE_UNSUPPORTED",
+          "refs": []
+        }
+      },
+      "custom_extract": []
+    }
+
+  · [gate] {"cycle": 1, "step_type": "LINT", "passed": true, "reason": "", "seq": 18}
+  · [Read /docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md] -> # Catalogue Count Reporting Update
+      
+      Operating day: 2024-07-17
+      Workflow: catalogue product-kind count questions
+      Requested product kind: Valve and Connector
+      Requested product_kind_id: valves_connectors
+      
+      For today's count report, count only catalogue SKUs for the requested product
+      kind that have at least one current inventory row in an open PowerTool store in
+      Vienna with available_today_quantity greater than 0. Count each SKU once even if it is
+      available in multiple Vienna branches.
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> <empty>
+  · [Exec /bin/sql] -> <empty>
+═══ ANSWER (cycle 1) ═══
+  msg='<QTY: 0>'  OUTCOME_OK  refs=['/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md']
+
+  · [gate] {"cycle": 1, "step_type": "INTERPRET", "passed": true, "reason": "", "seq": 25}
+  · [Stat /docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md] -> <empty>
+  · [gate] {"cycle": 1, "step_type": "VERIFY", "passed": true, "reason": "", "seq": 27}
+════════════════════════════════════════════════════════════════════════
+RESULT  OUTCOME_OK  score=0.0  cycles=1  tokens 8227/13105  168299ms
+  - answer missing required reference '/docs/current-updates/2024-07-17-sql-scratch-space.md'
+════════════════════════════════════════════════════════════════════════

@@ -4,149 +4,58 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT pf.product_family_name, pv.product_sku, pv.record_path, COALESCE((SELECT COUNT(*) FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'storage type' AND property_value_text = 'parts case'), 0) as has_parts, COALESCE((SELECT COUNT(*) FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'storage type' AND property_value_text = 'tool bag'), 0) as has_bag FROM product_families pf LEFT JOIN product_variants pv ON pv.product_family_id = pf.product_family_id WHERE pf.product_family_name = 'Festool Stackable SYS 3JJ-9LM Tool Box and Bag' LIMIT 1;"
+        "stdin": "WITH fam AS (SELECT product_family_id FROM product_families WHERE brand = 'Heco' AND product_family_name LIKE '%TopFix GTU-YPJ%' AND product_family_name LIKE '%Wood and Drywall Screw%' LIMIT 1) SELECT v.record_path FROM product_variants v JOIN fam ON v.product_family_id = fam.product_family_id WHERE EXISTS (SELECT 1 FROM product_variant_properties p WHERE p.product_sku = v.product_sku AND p.property_key = 'diameter' AND p.property_value_text = '6 mm') LIMIT 1;"
       },
-      "bind": "variant_info_raw"
+      "bind": "product_query"
     }
   ],
-  "rowsets": [
-    {
-      "from_": "variant_info_raw",
-      "format": "auto_delim",
-      "into": "variant_info_rows",
-      "columns": [
-        {
-          "into": "product_family_name",
-          "candidates": [
-            "product_family_name"
-          ]
-        },
-        {
-          "into": "product_sku",
-          "candidates": [
-            "product_sku"
-          ]
-        },
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
-          ]
-        },
-        {
-          "into": "has_parts",
-          "candidates": [
-            "has_parts"
-          ]
-        },
-        {
-          "into": "has_bag",
-          "candidates": [
-            "has_bag"
-          ]
-        }
-      ]
-    }
-  ],
+  "rowsets": [],
   "compute": [
+    {
+      "prim": "column",
+      "args": [
+        "$product_query.rows",
+        "record_path"
+      ],
+      "into": "record_paths"
+    },
     {
       "prim": "first",
       "args": [
-        "$variant_info_rows"
+        "$record_paths"
       ],
-      "into": "variant_info_row"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$variant_info_row",
-        "product_sku"
-      ],
-      "into": "product_sku"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$variant_info_row",
-        "record_path"
-      ],
-      "into": "record_path"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$variant_info_row",
-        "has_parts"
-      ],
-      "into": "has_parts"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$variant_info_row",
-        "has_bag"
-      ],
-      "into": "has_bag"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$has_parts"
-      ],
-      "into": "has_parts_num"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$has_bag"
-      ],
-      "into": "has_bag_num"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$variant_info_row",
-        "record_path"
-      ],
-      "into": "product_variant.record_path"
+      "into": "product_record_path"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "and",
-          "lhs": null,
+          "op": "nonempty",
+          "lhs": "$record_paths",
           "rhs": null,
-          "args": [
-            {
-              "op": "gt",
-              "lhs": "$has_parts_num",
-              "rhs": 0,
-              "args": []
-            },
-            {
-              "op": "gt",
-              "lhs": "$has_bag_num",
-              "rhs": 0,
-              "args": []
-            }
-          ]
+          "args": []
         },
-        "label": "found_both"
+        "label": "found"
       }
     ],
     "default_label": "not_found"
   },
   "ops": [],
   "answer": {
-    "found_both": {
-      "message": "Product record: {record_path}",
+    "found": {
+      "message": "Product found: {product_record_path}",
       "outcome": "OUTCOME_OK",
-      "refs": []
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_record_path"
+        }
+      ]
     },
     "not_found": {
-      "message": "<NO> SKU: {product_sku}",
+      "message": "No matching product found.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

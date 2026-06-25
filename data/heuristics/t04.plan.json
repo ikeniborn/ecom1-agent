@@ -1,24 +1,43 @@
 {
   "discovery": [
     {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/checkout.md"
+      },
+      "bind": "policy_content"
+    },
+    {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT v.record_path FROM product_variants v JOIN product_variant_properties p1 ON v.product_sku = p1.product_sku AND p1.property_key = 'sealant_type' AND p1.property_value_text = :sealant_type JOIN product_variant_properties p2 ON v.product_sku = p2.product_sku AND p2.property_key = 'color_family' AND p2.property_value_text = :color_family WHERE v.brand = :brand AND v.series = :series LIMIT 1;"
+        "stdin": "WITH family AS (SELECT product_family_id FROM product_families WHERE brand = 'Scheppach' AND product_family_name = 'Scheppach Professional BTS 17O-1W7 Workshop Saw and Cutter'), variant AS (SELECT pv.product_sku, pv.product_name, pv.record_path FROM product_variants pv JOIN family f ON pv.product_family_id = f.product_family_id WHERE EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'machine_type' AND property_value_text = 'mitre saw') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'voltage' AND property_value_text = '230 V') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'power' AND property_value_text = '2200 W')) SELECT product_sku, product_name, record_path AS \"product_variant.record_path\" FROM variant;"
       },
-      "bind": "sql_output"
+      "bind": "raw_product_data"
     }
   ],
   "rowsets": [
     {
-      "from_": "sql_output",
+      "from_": "raw_product_data",
       "format": "auto_delim",
-      "into": "rows",
+      "into": "product_rows",
       "columns": [
         {
-          "into": "record_path",
+          "into": "product_sku",
           "candidates": [
-            "record_path"
+            "product_sku"
+          ]
+        },
+        {
+          "into": "product_name",
+          "candidates": [
+            "product_name"
+          ]
+        },
+        {
+          "into": "product_variant.record_path",
+          "candidates": [
+            "product_variant.record_path"
           ]
         }
       ]
@@ -28,17 +47,33 @@
     {
       "prim": "first",
       "args": [
-        "$rows"
+        "$product_rows"
       ],
-      "into": "first_row"
+      "into": "product_row"
     },
     {
-      "prim": "get",
+      "prim": "column",
       "args": [
-        "$first_row",
-        "record_path"
+        "$product_row",
+        "product_sku"
       ],
-      "into": "found_record_path"
+      "into": "product_sku"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_row",
+        "product_name"
+      ],
+      "into": "product_name"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$product_row",
+        "product_variant.record_path"
+      ],
+      "into": "product_variant.record_path"
     }
   ],
   "decision": {
@@ -46,30 +81,35 @@
       {
         "when": {
           "op": "nonempty",
-          "lhs": "$found_record_path",
+          "lhs": "$product_sku",
           "rhs": null,
           "args": []
         },
-        "label": "found"
+        "label": "carried"
       }
     ],
-    "default_label": "not_found"
+    "default_label": "not_carried"
   },
   "ops": [],
   "answer": {
-    "found": {
-      "message": "The product {brand} {series} with sealant type {sealant_type} and color family {color_family} is available in the catalogue.",
+    "carried": {
+      "message": "We carry the {product_name}.",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
+          "kind": "policy_doc",
+          "path": "/docs/checkout.md",
+          "source": null
+        },
+        {
           "kind": "record_path",
           "path": null,
-          "source": "$found_record_path"
+          "source": "$product_variant.record_path"
         }
       ]
     },
-    "not_found": {
-      "message": "The product {brand} {series} with sealant type {sealant_type} and color family {color_family} is not available in the catalogue.",
+    "not_carried": {
+      "message": "We do not carry the specified product variant.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

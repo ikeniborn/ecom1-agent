@@ -9,7 +9,9 @@ entries:
     the plan, and must include a decision branch to handle the case where the store
     is not found.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by more precise rule requiring rowset extraction
+    from Exec RPC results before using list primitives and including parameter bindings
+    for parameterized queries.
   id: r001
   reasoning: 'Error: interpret: unresolved required ref(s) [''$store.record_path'',
     ''$product1.record_path'', ...] on OK answer. Root cause: The PlanIR only discovers
@@ -21,11 +23,82 @@ entries:
     product record_paths and no conditional logic. The new rule ensures product discovery
     steps are always included and that answer refs are consistent with bound variables,
     with a branch for missing store.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Always include a rowset step after each Exec RPC that returns tabular data
+    to extract rows into a list variable, and include parameter bindings in the Exec
+    RPC args when using parameterized SQL queries.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. Root cause: The plan binds $store directly to the
+    ExecResponse from the SQL query, then applies ''first'' to it, but ''first'' expects
+    a sequence (list of rows). The plan has no rowset step to extract rows from the
+    ExecResponse. Failing PlanIR fragment: {"prim":"first","args":["$store"],"into":"store_row"}.
+    Additionally, the second Exec RPC uses a parameterized query with :store_id but
+    lacks parameter bindings in the args. Existing rule r001 mentions a rowset but
+    does not explicitly require rowset extraction before list primitives or parameter
+    bindings; this new rule supersedes it.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always include in the answer block for each outcome the required refs as
+    specified in the TOOL_PLAN's required_refs for that outcome, using the variable
+    names that are bound in the plan.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: verify: I1: required ref source(s) [''$store.record_path''] did
+    not resolve on OUTCOME_OK answer (resolve-before-cite). The PlanIR script''s answer
+    block for ''ok'' has an empty refs array, but the TOOL_PLAN requires refs for
+    $store.record_path and $satisfying_product_record_paths. The root cause is that
+    the plan omitted the required refs from the answer block. The fix is to include
+    them. The script correctly binds those variables via compute steps, so they are
+    available. This rule ensures that future plans include the required refs in the
+    answer block.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the TOOL_PLAN's required_refs for an outcome include a source of the
+    form '$<variable>.record_path', the plan must create a variable with that exact
+    name (e.g., 'store') that holds a record with a 'record_path' field, and reference
+    '$<variable>.record_path' in the answer refs. Use that variable for the decision
+    branch condition to check existence.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: verify: I1: required ref source(s) [''$store.record_path''] did
+    not resolve on OUTCOME_OK answer (resolve-before-cite). Root cause: The plan''s
+    answer refs for store_found use ''$store_record_path'' (a scalar variable) instead
+    of ''$store.record_path'' (a property on a variable named ''store''). The plan
+    does not have a variable named ''store''; it only has ''store_rows'' (list) and
+    ''store_record_path'' (scalar). The required_refs in TOOL_PLAN explicitly require
+    a source ''$store.record_path'', meaning the plan must bind a variable ''store''
+    that is a record with a ''record_path'' field. The current plan''s compute steps
+    extract store_record_path but do not create a ''store'' variable. The decision
+    branch condition uses ''$store_rows'' which is acceptable, but the answer ref
+    must match exactly. The existing rule r001 advises referencing bound variables
+    but does not enforce the exact naming convention required by the TOOL_PLAN''s
+    required_refs. This new rule fills that gap.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Store Vienna Praterstern not found.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /docs/checkout.md
 last_run:
-  cycles_used: 2
-  date: '2026-06-24'
-  outcome: OUTCOME_DENIED_SECURITY
+  cycles_used: 4
+  date: '2026-06-25'
+  outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t14

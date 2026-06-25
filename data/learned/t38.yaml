@@ -48,7 +48,8 @@ entries:
     on that path. If the search returns no results, the PlanIR should fall back to
     a clarification answer.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by new rule that explicitly requires reading the
+    file to bind the record_path ref.
   id: r003
   reasoning: 'The error ''real_vm: list failed: not found'' occurred because the PlanIR
     attempted to List ''/payments'' which does not exist. The user''s intent mentions
@@ -60,11 +61,108 @@ entries:
     description before listing. Additionally, deep-reading the root directory (''/'')
     will provide the pre-phase with knowledge of available top-level paths, preventing
     future hardcoding of non-existent paths.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: '#security'
+  content: When the IntentSpec includes a security deny_when predicate, the PlanIR
+    must include a decision branch that denies only when that predicate is true; the
+    default branch must be the non-denial outcome (e.g., OUTCOME_OK) and must include
+    discovery steps to satisfy required_refs for that outcome.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: The PlanIR unconditionally denied with outcome DENIED_SECURITY, but the
+    security constraint only denies when identity.kind == 'guest'. The identity was
+    not guest, so the denial was spurious. The plan must only deny when the predicate
+    holds, and otherwise proceed to discover the fraudulent payment record as required
+    by the IntentSpec.
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always include discovery steps that produce all required_refs for the non-clarification
+    outcome that is the default branch. If a required_ref is a record_path from a
+    category not explicitly provided, the plan must first search for the directory,
+    list its contents, and read the identified file to bind the record_path ref. The
+    answer branch must not have empty refs for that outcome.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$fraudulent_payment_record.record_path'']
+    on OK answer. The PlanIR''s ok branch has empty refs and no discovery steps to
+    locate the fraudulent payment record. Root cause: the plan only checks identity
+    and does not search for or read the archived payment record. Existing rule r003
+    advises searching for the directory but does not explicitly require reading the
+    file to produce the record_path ref. The new rule supersedes r003 by adding the
+    read step and ensuring the answer branch includes the refs.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always set the default branch label of a decision to the non-denial outcome
+    (e.g., OUTCOME_OK) when the IntentSpec includes a security deny_when predicate.
+    The deny branch must only be taken when the predicate is true.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: PlanIR decision
+    has two branches: one for guest (deny) and default_label also set to ''deny'',
+    causing unconditional denial. The user identity (emp_011) is not guest, so the
+    deny_when predicate is false, yet the plan still denies. The existing rule [in-session]
+    about security deny_when was violated because the default branch was not set to
+    the non-denial outcome. This new rule makes the requirement explicit: default
+    branch must be the non-denial outcome, and deny only when predicate true.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#security'
+  content: Always set the default branch of the decision to the non-denial outcome
+    (OUTCOME_OK) when the IntentSpec includes a security deny_when predicate, and
+    use the identity kind from the /bin/id RPC output (bound to a variable) for the
+    deny branch condition to avoid spurious over-refusal, with a fallback that if
+    the identity kind is unavailable, the deny branch is not taken.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The PlanIR''s decision has
+    a deny branch with condition eq($_facts.identity.kind, ''guest''), but the observed
+    identity (emp_011) is not guest. The default branch is ''not_found'' (OUTCOME_NONE_CLARIFICATION)
+    instead of OUTCOME_OK, violating the existing in-session rule. The spurious denial
+    likely occurred because the condition relied on the pre-phase fact $_facts.identity.kind,
+    which may be undefined or incorrectly set, causing the deny branch to be taken.
+    The new rule ensures the condition uses the actual /bin/id RPC output and that
+    the default branch is the non-denial outcome, preventing over-refusal.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always access the stdout field of an ExecResponse (e.g., $_id_output.stdout)
+    when using its output in a decision condition or compute step, rather than using
+    the entire response object.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: ''real_vm: Protocol message ExecResponse has no "guest" field''.
+    Root cause: PlanIR decision condition uses $_id_output (the entire ExecResponse
+    object) as lhs of contains_any, but the runtime attempts to access a field ''guest''
+    on the ExecResponse object, which does not exist. The ExecResponse has fields
+    stdout, stderr, exit_code. The condition should use $_id_output.stdout to get
+    the string output. This is a PlanIR shape bug: the condition references the raw
+    RPC response instead of its stdout field.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 4
-  date: '2026-06-24'
+  cycles_used: 5
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 prephase_deep_read:

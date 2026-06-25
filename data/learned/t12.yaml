@@ -1,6 +1,155 @@
+entries:
+- agents_md_anchor: null
+  content: Always define a rowset for each Exec RPC that returns tabular data. The
+    rowset must specify the RPC bind name and the key 'rows' to extract the rows.
+    Then use the rowset variable (e.g., $sql_result_rows) in compute steps such as
+    'first' and 'column', rather than directly subscripting the ExecResponse object.
+  created: '2026-06-25'
+  deactivated_reason: These rules are too broad and encourage using rowset for all
+    Exec RPCs, including scalar results, leading to parsing issues. The new rule and
+    existing scalar rule provide more specific guidance.
+  id: r001
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. Root cause: The PlanIR compute step `{"prim":"first","args":["$sql_result"]}`
+    attempts to apply `first` directly to the ExecResponse object bound from the Exec
+    RPC. ExecResponse is not a list; it is an object with ''rows'' and ''columns''
+    keys. The PlanIR''s `rowsets` field is empty, so no row extraction was defined.
+    The correct approach is to define a rowset that extracts the ''rows'' array from
+    the ExecResponse, then reference that rowset in compute steps. This rule ensures
+    proper PlanIR structure for database queries.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When extracting a field from a single row (dict), use the 'get' primitive
+    instead of 'column'. Use 'column' only on a list of rows (list[dict]).
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: interpret: compute step ''column'' failed: ''column'' expects
+    list[dict]; use ''get'' for a single row. Root cause: PlanIR used ''column'' on
+    $first_row, which is a single dict from ''first'' primitive. The rowset $count_rows
+    is a list of rows; after ''first'', it becomes a single row. The plan should use
+    ''get'' to extract the field ''product_count'' from that single row. This is a
+    plan-shape bug, not a data issue.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always define a rowset for each Exec RPC that returns tabular data. The
+    rowset must include the key 'rows' set to the field name containing the rows (typically
+    'rows'), and set 'format' to 'json' (or 'auto') to correctly parse the JSON response.
+    Also, ensure the 'columns' list matches the SQL result column names.
+  created: '2026-06-25'
+  deactivated_reason: These rules are too broad and encourage using rowset for all
+    Exec RPCs, including scalar results, leading to parsing issues. The new rule and
+    existing scalar rule provide more specific guidance.
+  id: r003
+  reasoning: 'verify failure: answer did not match regex ''^<COUNT:\d+>$''. The PlanIR''s
+    rowset for the Exec RPC omitted the required ''rows'' key and used ''format'':''auto_delim''
+    instead of ''json''. This caused the rowset extraction to fail, leaving $sql_rows
+    empty/None, so count_num became None and the answer was ''<COUNT:None>''. The
+    existing rule (in-session) already mandates the ''rows'' key but was not followed;
+    the new rule adds the format requirement to prevent similar extraction failures.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: When an Exec RPC returns a plain text scalar (e.g., a count or single value),
+    do not define a rowset for that RPC. Instead, use the 'stdout' field of the ExecResponse
+    directly in compute steps, e.g., by using the 'get' primitive on the ExecResponse
+    object to retrieve 'stdout' and then trimming/parsing as needed.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: verify regex_match failed on answer. Root cause: PlanIR defined
+    a rowset with format ''json'' for an Exec RPC that returned plain text ''60''
+    (not JSON). The rowset extraction failed, leading to null count_value and answer
+    ''<COUNT:null>'' which did not match ''^<COUNT:\d+>$''. The existing rule ''Always
+    define a rowset for each Exec RPC that returns tabular data'' is too broad and
+    caused this failure. New rule clarifies that rowset should only be used when output
+    is tabular/JSON; for scalar text, use stdout directly.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that the 'args' field of a compute step is a list of arguments
+    (e.g., ['$variable', 'literal']), never a dict. Each argument should be a string
+    or a reference to a prior rowset or variable.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: PlanIR validation failed because compute.0.args was a dict instead of
+    a list. The compute step expects a list of arguments; providing a dict violates
+    the schema. This rule prevents that structural error by enforcing the correct
+    type for args.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always apply a 'trim' primitive to the stdout field of an ExecResponse
+    before using it in a message template or before converting it to a number, to
+    remove any leading/trailing whitespace (including newlines) that could cause regex
+    verification to fail.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: The verify error indicates the answer did not match the regex '^<COUNT:\d+>$'.
+    The observed RPC output shows the SQL returned '60' (likely with a trailing newline).
+    The PlanIR used to_number on the stdout, but if the stdout contained a newline,
+    the to_number may have failed silently or produced a number that when interpolated
+    still included the newline, resulting in an answer like '<COUNT:60\n>' which fails
+    the regex. The existing rule about using stdout directly for scalars does not
+    explicitly require trimming. Adding a trim step ensures the string is clean before
+    any conversion or interpolation, preventing such verification failures.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When an Exec RPC returns a single scalar value (e.g., a count from a SQL
+    query), do not define a rowset. Instead, use the 'stdout' field of the ExecResponse
+    directly. Apply a 'trim' primitive to the stdout string before converting it to
+    a number with 'to_number'. Then use the resulting number in the message template.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: verify regex failed on answer. Observed SQL output is ''60''
+    (scalar). The PlanIR defined a rowset for the Exec RPC, violating the existing
+    rule for scalar results, and did not trim the extracted value. The rowset approach
+    is unnecessary and error-prone; using stdout directly with trim ensures a clean
+    numeric conversion and avoids whitespace issues that cause regex mismatch. The
+    existing rules (r001, r003) that mandate rowset for all Exec RPCs are too broad
+    and conflict with the scalar rule; they are deactivated in favor of this more
+    specific guidance.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the 'stdout' field of an ExecResponse directly (with 'trim'
+    and 'to_number' primitives) when the SQL query returns a single scalar value,
+    rather than defining a rowset. This avoids parsing issues and ensures the value
+    is cleanly converted to a number for use in message templates.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: verify: success_criteria[OUTCOME_OK][0] failed regex match. The
+    PlanIR defined a rowset for the SQL result (a single scalar count ''60'') and
+    attempted to extract the count via rowset parsing. The existing rule (in-session)
+    explicitly advises against using a rowset for scalar results and recommends using
+    stdout directly with trim and to_number. The script violated that rule, likely
+    causing the count value to be improperly extracted or not trimmed, leading to
+    a message that did not match the expected regex ''<COUNT:\d+>''. The observed
+    RPC output shows the SQL returned ''60'' as plain text, confirming a scalar result.
+    The corrective rule reinforces the proper technique.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-24'
-  outcome: OUTCOME_OK
-  status: success
+  cycles_used: 8
+  date: '2026-06-25'
+  outcome: OUTCOME_NONE_CLARIFICATION
+  status: failure
 task_id: t12

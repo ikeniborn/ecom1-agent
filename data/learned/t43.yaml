@@ -20,7 +20,8 @@ entries:
     when using exec output in a decision condition, and use the 'contains' operator
     with a single string argument instead of 'contains_any' with a list.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: r002 advises using 'contains' which is not a valid predicate
+    op; superseded by rule using 'contains_any'.
   id: r002
   reasoning: 'Error: ''Protocol message ExecResponse has no "guest" field.'' Root
     cause: The PlanIR decision branch used `$identity_raw` directly as the LHS of
@@ -31,11 +32,39 @@ entries:
     (r001) says to ''use the bound result in the condition'' but does not specify
     how to access the output content, leading to this malformed condition. The new
     rule corrects the technique by mandating field access and appropriate operator.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always use the ''contains_any'' operator with a list containing the target
+    substring (e.g., {''op'': ''contains_any'', ''lhs'': ''<string>'', ''rhs'': [''substring'']})
+    when checking if a string contains a substring in a decision condition; the ''contains''
+    operator is not valid.'
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: plan validation failed because predicate op ''contains'' is unknown.
+    The PlanIR used {''op'': ''contains'', ''lhs'': ..., ''rhs'': ''customer''}. Existing
+    rule r002 incorrectly advises using ''contains'' instead of ''contains_any'',
+    but the system does not support ''contains''. The correct operator is ''contains_any''
+    with a list argument. Deactivating r002 and replacing with this rule.'
   status: active
   surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: Refund request requires customer identity.
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs:
+  - /docs/security.md
+  - /docs/returns.md
 last_run:
   cycles_used: 2
-  date: '2026-06-24'
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t43

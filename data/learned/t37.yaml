@@ -3,7 +3,9 @@ entries:
   content: When a parameter value is a literal string (not derived from a rowset or
     RPC output), use the 'literal' primitive (or 'const') to create a value, not 'concat'.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by in-session rule (no 'literal' in compute steps)
+    and this new rule; r001's suggestion to use 'literal' is now invalid, and its
+    alternative 'const' is covered by this rule.
   id: r001
   reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() missing
     1 required positional argument: ''b''. Contract: concat(a, b) requires two list[dict]
@@ -11,7 +13,7 @@ entries:
     to create basket_id. The correct primitive for a literal constant is ''literal''
     (or ''const''), not ''concat''. This rule prevents similar malformed PlanIR in
     future cycles.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: 'When an RPC returns a text output with key: value pairs (like /bin/id),
@@ -66,9 +68,137 @@ entries:
     access bug.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When a security constraint in the TOOL_PLAN includes a deny_when predicate,
+    the PlanIR decision must contain a branch that evaluates that predicate (using
+    the same op, lhs, rhs) and maps to the denied outcome only when the predicate
+    is true; the default branch must map to the allowed outcome (or continue to further
+    processing) unless the predicate is guaranteed to be true for all inputs.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: The PlanIR unconditionally assigned outcome DENIED_SECURITY via a decision
+    with both branches leading to 'denied', ignoring the security deny_when condition.
+    The verify phase correctly rejected this as spurious over-refusal because the
+    identity.kind was employee (deny_when false). The PlanIR must evaluate the deny_when
+    predicate and only deny when it holds; otherwise proceed to apply the discount.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Do not use the 'literal' primitive in compute steps; instead use 'const'
+    (if available) or embed the constant value directly in the decision predicate
+    or answer message without a compute step.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: ''interpret: compute step ''literal'' failed: ''literal''''.
+    Root cause: The interpreter does not support the ''literal'' primitive. The PlanIR
+    used ''literal'' for two compute steps (identity_kind, basket_id). Existing rule
+    r001 incorrectly recommends ''literal'' as an option. The fix is to avoid ''literal''
+    and use ''const'' or embed constants directly.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#plan-ir-compute'
+  content: Never use the 'concat' primitive in a compute step to create a scalar constant
+    (string, number) from a single argument; 'concat' requires two arguments, both
+    of which must be list[dict] rows (the output of a rowset extraction). For scalar
+    constants, either use a 'const' primitive (if available) or embed the constant
+    directly in the decision predicate or answer message without a compute step.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''''. The PlanIR contains two compute steps
+    using ''concat'' with a single string argument each (''guest'', ''basket_038'').
+    The contract for ''concat'' requires two arguments, both list[dict] rows. This
+    violates the primitive''s signature. Root cause: PLAN phase incorrectly used ''concat''
+    to create scalar constants instead of using ''const'' or embedding the value directly.
+    Existing rule r001 suggests using ''literal'' or ''const'', but the in-session
+    rule forbids ''literal'' in compute steps. This new rule supersedes r001 and explicitly
+    forbids ''concat'' for scalar constants.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When a policy document read in discovery contains a directive to apply
+    another document (e.g., 'apply docs/security.md'), the PlanIR must include a discovery
+    step to read that referenced document before making any decision that depends
+    on the policy.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r008
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR read
+    only /docs/discounts.md, which states ''Before applying a basket discount, apply
+    docs/security.md''. The PlanIR omitted reading /docs/security.md, so the security
+    decision was not grounded in the policy document. The verify step requires that
+    a security denial be justified by a policy document read; since no security policy
+    was read, the denial is spurious. The PlanIR''s decision branch (ne identity.kind
+    employee) is correct in shape but lacks the prerequisite policy read. Rule linkage:
+    Existing rules do not cover the need to follow cross-references in policy documents.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#security > identity-verification'
+  content: Always include a discovery step to run `/bin/id` before any decision branch
+    that evaluates a security constraint referencing `$_facts.identity`, and use the
+    output of `/bin/id` (e.g., extract `user` and `roles` fields) to populate the
+    identity facts for the decision predicate, rather than relying on pre-phase `$_facts.identity`
+    which may be stale.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR''s decision
+    branch condition uses `$_facts.identity.kind` without first running `/bin/id`
+    to obtain the current identity, violating the security policy''s mandate to run
+    `/bin/id` before any identity-dependent action. The pre-phase facts may be stale
+    or incorrect, causing the branch condition to evaluate to true (denying) even
+    though the actual identity is an employee (making the deny_when predicate false).
+    The verify step detects the mismatch. Failing PlanIR fragment: decision branch
+    with `{"op":"ne","lhs":"$_facts.identity.kind","rhs":"employee","args":[]}` without
+    a prior `/bin/id` RPC. Existing rule [in-session] about security constraints is
+    followed but does not ensure fresh identity facts; new rule required.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'When a security constraint in the TOOL_PLAN includes a deny_when predicate,
+    the PlanIR decision must contain exactly two branches: one that evaluates the
+    deny_when predicate (using the same op, lhs, rhs) and maps to the denied outcome
+    only when the predicate is true, and a default branch that maps to the allowed
+    outcome (OUTCOME_OK or the success outcome). The default branch must never map
+    to unsupported or any other outcome unless there is a separate unsupported condition
+    not related to the security constraint.'
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: verify phase reported ''outcome DENIED_SECURITY but no declared
+    security deny_when predicate holds (spurious over-refusal)''. The TOOL_PLAN''s
+    security constraint has deny_when: ne($_facts.identity.kind, employee). The PlanIR
+    decision had a single branch with that predicate mapping to denied_security, and
+    a default branch mapping to unsupported. Since the predicate was false (identity.kind
+    is employee), the default should have been taken, but the default mapped to unsupported
+    (OUTCOME_NONE_UNSUPPORTED) instead of the allowed outcome (OUTCOME_OK). The interpreter
+    apparently took the denied branch anyway (or the default was treated as denial),
+    causing a spurious refusal. The existing rule [in-session] about security constraints
+    was insufficiently precise about the default branch outcome. This new rule explicitly
+    requires the default to map to the allowed outcome, preventing the over-refusal.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
   cycles_used: 6
-  date: '2026-06-24'
-  outcome: OUTCOME_NONE_UNSUPPORTED
+  date: '2026-06-25'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
+prephase_deep_read:
+- /docs/security.md
 task_id: t37

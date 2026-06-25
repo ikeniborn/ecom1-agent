@@ -4,36 +4,86 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END AS exists_flag FROM product_variants v JOIN product_families f ON v.product_family_id = f.product_family_id JOIN product_variant_properties p ON v.product_sku = p.product_sku WHERE v.brand = 'Festool' AND f.product_family_name LIKE '%Stackable SYS 3JJ-9LM%' AND p.property_key = 'storage_type' AND p.property_value_text = 'tool bag';"
+        "stdin": "SELECT COUNT(*) AS matching_count, MIN(v.record_path) AS product_record_path FROM product_variants v JOIN product_variant_properties p1 ON v.product_sku = p1.product_sku AND p1.property_key = 'fastener type' AND p1.property_value_text = 'bolt' JOIN product_variant_properties p2 ON v.product_sku = p2.product_sku AND p2.property_key = 'diameter' AND p2.property_value_text = '10 mm' WHERE v.brand = 'Heco' AND v.series = '3DW-64B' AND v.model = 'Nut Bolt and Washer';"
       },
-      "bind": "exists_flag"
+      "bind": "sql_output"
     }
   ],
-  "rowsets": [],
-  "compute": [],
+  "rowsets": [
+    {
+      "from_": "sql_output",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "matching_count",
+          "candidates": [
+            "matching_count"
+          ]
+        },
+        {
+          "into": "product_record_path",
+          "candidates": [
+            "product_record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "matching_count"
+      ],
+      "into": "matching_count"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "product_record_path"
+      ],
+      "into": "product_record_path"
+    }
+  ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "eq",
-          "lhs": "$exists_flag",
-          "rhs": "1",
+          "op": "ge",
+          "lhs": "$matching_count",
+          "rhs": 1,
           "args": []
         },
-        "label": "exists"
+        "label": "found"
       }
     ],
-    "default_label": "not_exists"
+    "default_label": "not_found"
   },
   "ops": [],
   "answer": {
-    "exists": {
-      "message": "The product exists: {exists_flag}",
+    "found": {
+      "message": "The product exists in the catalogue.",
       "outcome": "OUTCOME_OK",
-      "refs": []
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_record_path"
+        }
+      ]
     },
-    "not_exists": {
-      "message": "The product does not exist.",
+    "not_found": {
+      "message": "The product does not exist in the catalogue.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

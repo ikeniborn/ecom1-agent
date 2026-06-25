@@ -1,0 +1,82 @@
+{
+  "objective": "Check if the 'manager waved through' exception from the Store Associate Exception Handbook applies to basket basket_132 and, if applicable, apply the exception without re-checking stock.",
+  "desired_outcome": "OUTCOME_OK",
+  "params": {
+    "basket_id": "basket_132",
+    "exception_name": "manager waved through",
+    "handbook_path": "/docs/store-associate-exception-handbook.md"
+  },
+  "outcome_space": [
+    "OUTCOME_OK",
+    "OUTCOME_DENIED_SECURITY",
+    "OUTCOME_NONE_UNSUPPORTED"
+  ],
+  "constraints": [
+    {
+      "anchor": "#security",
+      "rule": "Access to customer baskets is restricted to the owning customer.",
+      "security": true,
+      "deny_when": {
+        "op": "eq",
+        "lhs": "$_facts.identity.kind",
+        "rhs": "guest",
+        "args": []
+      },
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    }
+  ],
+  "success_criteria": {
+    "OUTCOME_OK": [
+      {
+        "op": "nonempty",
+        "lhs": "$basket.record_path",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$handbook_content",
+        "rhs": null,
+        "args": []
+      }
+    ]
+  },
+  "answer_shape": {
+    "msg_skeleton": "Exception '{exception_name}' applied to basket {basket_id} without stock re-check.",
+    "kind": "",
+    "columns": [],
+    "rows_from": ""
+  },
+  "required_refs": {
+    "OUTCOME_OK": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/store-associate-exception-handbook.md",
+        "source": null
+      },
+      {
+        "kind": "record_path",
+        "path": null,
+        "source": "$basket.record_path"
+      }
+    ],
+    "OUTCOME_DENIED_SECURITY": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/security.md",
+        "source": null
+      }
+    ],
+    "OUTCOME_NONE_UNSUPPORTED": [
+      {
+        "kind": "policy_doc",
+        "path": "/docs/store-associate-exception-handbook.md",
+        "source": null
+      }
+    ]
+  }
+}

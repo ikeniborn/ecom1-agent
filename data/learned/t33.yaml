@@ -1,6 +1,50 @@
+entries:
+- agents_md_anchor: null
+  content: When using Exec RPC to run SQL queries, bind the result to a variable and
+    then extract the 'rows' field from the ExecResponse before applying sequence primitives
+    such as 'first' or 'nth'.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: ''ExecResponse'' object is not subscriptable at compute step
+    ''first''. Root cause: PlanIR applies ''first'' directly to the ExecResponse object
+    bound from the Exec RPC, but ExecResponse is not a sequence; it is a structured
+    object. The failing fragment: {"prim":"first","args":["$query_result"],"into":"row"}.
+    The correct technique is to first extract the ''rows'' field from the ExecResponse
+    (e.g., via a ''get'' primitive) to obtain a list of rows, then apply ''first''
+    to that list. This rule ensures the PLAN phase shapes the PlanIR correctly for
+    SQL Exec RPC results.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When using the concat primitive in the compute step, always provide exactly
+    two arguments, each being a list[dict] rows (e.g., from rowsets or extracted rows).
+    Do not use concat for non-list arguments or single arguments.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: interpret: compute step ''concat'' failed: <lambda>() missing
+    1 required positional argument: ''b''. CONTRACT: concat(a, b): both args must
+    be list[dict] rows. The PlanIR compute step had concat with args:[''x''], but
+    ''x'' is not defined and only one argument provided. The plan should ensure concat
+    receives two list[dict] arguments. This rule prevents such malformed concat steps.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_DENIED_SECURITY
+  source: verdict
+  status: active
+  submitted_message: Product not found
+  submitted_outcome: OUTCOME_DENIED_SECURITY
+  submitted_refs:
+  - /docs/security.md
 last_run:
-  cycles_used: 1
-  date: '2026-06-24'
-  outcome: OUTCOME_NONE_UNSUPPORTED
+  cycles_used: 3
+  date: '2026-06-25'
+  outcome: OUTCOME_DENIED_SECURITY
   status: failure
 task_id: t33

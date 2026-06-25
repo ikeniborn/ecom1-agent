@@ -4,59 +4,75 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT v.record_path, v.product_sku, MAX(CASE WHEN p.property_key = 'cleaner type' THEN p.property_value_text END) AS cleaner_type_value, MAX(CASE WHEN p.property_key = 'wifi-enabled' THEN p.property_value_text END) AS wifi_enabled_value FROM product_variants v LEFT JOIN product_variant_properties p ON v.product_sku = p.product_sku WHERE v.brand = 'Tork' AND v.product_name LIKE '%Cleaning Liquid%' AND (v.series = 'Tork Heavy Duty T 3NB-FIT Cleaning Liquid' OR v.model = 'Tork Heavy Duty T 3NB-FIT Cleaning Liquid') GROUP BY v.product_sku HAVING cleaner_type_value = 'multi surface cleaner' AND wifi_enabled_value IS NOT NULL"
+        "stdin": "WITH family AS (\n  SELECT product_family_id FROM product_families WHERE product_family_name = 'Bosch Professional BBS 1P7-CG5 Automotive Charger and Bulb line'\n),\nmatching AS (\n  SELECT pv.product_sku, pv.record_path, pv.product_name\n  FROM product_variants pv\n  JOIN family ON pv.product_family_id = family.product_family_id\n  WHERE EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'product type' AND property_value_text = 'battery pack')\n    AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'voltage' AND property_value_text = '12 V')\n    AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'current' AND property_value_text = '16 A')\n    AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'wifi-enabled' AND property_value_text = 'yes')\n),\nbase AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  JOIN family ON pv.product_family_id = family.product_family_id\n  WHERE EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'product type' AND property_value_text = 'battery pack')\n    AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'voltage' AND property_value_text = '12 V')\n    AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'current' AND property_value_text = '16 A')\n    AND NOT EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = pv.product_sku AND property_key = 'wifi-enabled' AND property_value_text = 'yes')\n)\nSELECT \n  (SELECT product_family_id FROM family) AS family_id,\n  (SELECT product_sku FROM matching LIMIT 1) AS matching_sku,\n  (SELECT record_path FROM matching LIMIT 1) AS matching_record_path,\n  (SELECT product_name FROM matching LIMIT 1) AS matching_product_name,\n  (SELECT product_sku FROM base LIMIT 1) AS base_sku,\n  (SELECT record_path FROM base LIMIT 1) AS base_record_path;"
       },
-      "bind": "product_query_result"
+      "bind": "sql_result"
     }
   ],
-  "rowsets": [
-    {
-      "from_": "product_query_result",
-      "format": "auto_delim",
-      "into": "product_rows",
-      "columns": [
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
-          ]
-        },
-        {
-          "into": "product_sku",
-          "candidates": [
-            "product_sku"
-          ]
-        },
-        {
-          "into": "cleaner_type_value",
-          "candidates": [
-            "cleaner_type_value"
-          ]
-        },
-        {
-          "into": "wifi_enabled_value",
-          "candidates": [
-            "wifi_enabled_value"
-          ]
-        }
-      ]
-    }
-  ],
+  "rowsets": [],
   "compute": [
+    {
+      "prim": "get",
+      "args": [
+        "$sql_result",
+        "rows"
+      ],
+      "into": "rows_list"
+    },
     {
       "prim": "first",
       "args": [
-        "$product_rows"
+        "$rows_list"
       ],
-      "into": "first_product"
+      "into": "first_row"
     },
     {
-      "prim": "column",
+      "prim": "get",
       "args": [
-        "$first_product",
-        "record_path"
+        "$first_row",
+        "family_id"
       ],
-      "into": "record_path"
+      "into": "family_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "matching_sku"
+      ],
+      "into": "matching_sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "matching_record_path"
+      ],
+      "into": "matching_variant_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "matching_product_name"
+      ],
+      "into": "matching_product_name"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "base_sku"
+      ],
+      "into": "base_sku"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "base_record_path"
+      ],
+      "into": "base_variant_record_path"
     }
   ],
   "decision": {
@@ -64,31 +80,79 @@
       {
         "when": {
           "op": "nonempty",
-          "lhs": "$product_rows",
+          "lhs": "$matching_sku",
           "rhs": null,
           "args": []
         },
         "label": "ok"
+      },
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$family_id",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "isnull",
+              "lhs": "$matching_sku",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$base_sku",
+              "rhs": null,
+              "args": []
+            }
+          ]
+        },
+        "label": "unsupported"
+      },
+      {
+        "when": {
+          "op": "isnull",
+          "lhs": "$family_id",
+          "rhs": null,
+          "args": []
+        },
+        "label": "clarification"
       }
     ],
-    "default_label": "unsupported"
+    "default_label": "clarification"
   },
   "ops": [],
   "answer": {
     "ok": {
-      "message": "Product record: {record_path}. Claim matches.",
+      "message": "Found product: {matching_sku} - {matching_product_name}",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
           "path": null,
-          "source": "$record_path"
+          "source": "$matching_variant_record_path"
         }
       ]
     },
     "unsupported": {
-      "message": "No matching product found.",
+      "message": "<NO> {base_sku}",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$base_variant_record_path"
+        }
+      ]
+    },
+    "clarification": {
+      "message": "Product family not found",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
       "refs": []
     }
   },

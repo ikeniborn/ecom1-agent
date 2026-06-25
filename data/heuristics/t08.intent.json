@@ -1,13 +1,12 @@
 {
-  "objective": "Verify the catalogue claim about a Ceresit product (Ceresit CM CS 114-CVQ Tape and Foam line, repair tape, color family Brown, length 5 m, and color family gray) and report the result.",
+  "objective": "Determine if the product 'Corded Angle Grinder from Metabo' with disc diameter 115 mm exists in the catalogue, and if so, return its SKU.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "brand": "use literal 'Ceresit' from instruction",
-    "line": "use literal 'Ceresit CM CS 114-CVQ Tape and Foam' from instruction; match against product_families.product_family_name or product_variants.series",
-    "product_type": "use literal 'repair tape' from instruction; lookup product_kinds.product_kind_name and join to product_variants via product_kind_id",
-    "color_family_brown": "use literal 'Brown' from instruction; lookup product_variant_properties where property_key='color_family' and property_value_text='Brown'",
-    "length": "use literal '5 m' from instruction; lookup product_variant_properties where property_key='length' and property_value_text='5 m'",
-    "extra_claim": "check product_variant_properties for property_key='color_family' and property_value_text='gray'"
+    "brand": "Metabo",
+    "product_kind_name": "Corded Angle Grinder",
+    "product_family_name": "Metabo Professional SBE 36U-EHD Corded Angle Grinder line",
+    "property_key": "disc_diameter",
+    "property_value": "115 mm"
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -18,14 +17,14 @@
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$product_variant.record_path",
+        "lhs": "$found_sku",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Product record: {record_path}. SKU: {sku}. Extra claim (color family gray) present: {extra_present}. If absent, answer: <NO> {sku}.",
+    "msg_skeleton": "YES {sku}",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -35,7 +34,7 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product_variant.record_path"
+        "source": "$product_row.record_path"
       }
     ]
   }

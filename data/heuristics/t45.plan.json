@@ -1,15 +1,311 @@
 {
-  "discovery": [],
-  "rowsets": [],
-  "compute": [],
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH store AS (\n  SELECT store_id, record_path FROM stores WHERE store_name = 'PowerTool shop by Praterstern' AND city = 'Vienna' LIMIT 1\n),\np0 AS (\n  SELECT product_sku, record_path FROM product_variants WHERE brand = 'Raaco' AND series = 'Raaco Professional CarryLite 3CS-7A9 Shelving and Cabinet' AND model = 'Shelving and Cabinet' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'storage type' AND property_value_text = 'stacking box') LIMIT 1\n),\np1 AS (\n  SELECT product_sku, record_path FROM product_variants WHERE brand = 'Bahco' AND series = 'Bahco Comfort Grip BE 1ZR-PGS Pliers and Wrenches' AND model = 'Pliers and Wrenches' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'tool type' AND property_value_text = 'side cutter') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'length' AND property_value_text = '125 mm') LIMIT 1\n),\np2 AS (\n  SELECT product_sku, record_path FROM product_variants WHERE brand = 'Metabo' AND series = 'Metabo Brushless BS 1OW-IK5 Cordless Drill Driver' AND model = 'Cordless Drill Driver' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'voltage' AND property_value_text = '18 V') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'battery platform' AND property_value_text = '18v-system') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'kit contents' AND property_value_text = 'case') LIMIT 1\n),\np3 AS (\n  SELECT product_sku, record_path FROM product_variants WHERE brand = 'Bahco' AND series = 'Bahco Comfort Grip BE 1ZR-PGS Pliers and Wrenches' AND model = 'Pliers and Wrenches' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'tool type' AND property_value_text = 'side cutter') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'length' AND property_value_text = '300 mm') LIMIT 1\n),\np4 AS (\n  SELECT product_sku, record_path FROM product_variants WHERE brand = 'Geberit' AND series = 'Geberit Mapress Silent IC5-GU6 Valve and Connector' AND model = 'Valve and Connector' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'connector type' AND property_value_text = 'ball valve') LIMIT 1\n),\np5 AS (\n  SELECT product_sku, record_path FROM product_variants WHERE brand = 'Schneider Electric' AND series = 'Schneider Electric Heavy Duty Merten 214-ZHY Extension Cable' AND model = 'Extension Cable' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'color family' AND property_value_text = 'White') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'length' AND property_value_text = '3 m') LIMIT 1\n),\nzero_flags AS (\n  SELECT\n    (SELECT COUNT(*) FROM store_inventory si WHERE si.store_id = (SELECT store_id FROM store) AND si.product_sku = p0.product_sku AND si.available_today_quantity = 0) AS z0,\n    (SELECT COUNT(*) FROM store_inventory si WHERE si.store_id = (SELECT store_id FROM store) AND si.product_sku = p1.product_sku AND si.available_today_quantity = 0) AS z1,\n    (SELECT COUNT(*) FROM store_inventory si WHERE si.store_id = (SELECT store_id FROM store) AND si.product_sku = p2.product_sku AND si.available_today_quantity = 0) AS z2,\n    (SELECT COUNT(*) FROM store_inventory si WHERE si.store_id = (SELECT store_id FROM store) AND si.product_sku = p3.product_sku AND si.available_today_quantity = 0) AS z3,\n    (SELECT COUNT(*) FROM store_inventory si WHERE si.store_id = (SELECT store_id FROM store) AND si.product_sku = p4.product_sku AND si.available_today_quantity = 0) AS z4,\n    (SELECT COUNT(*) FROM store_inventory si WHERE si.store_id = (SELECT store_id FROM store) AND si.product_sku = p5.product_sku AND si.available_today_quantity = 0) AS z5\n)\nSELECT\n  (SELECT record_path FROM store) AS store_record_path,\n  (SELECT product_sku FROM p0) AS p0_sku,\n  (SELECT record_path FROM p0) AS p0_path,\n  (SELECT z0 FROM zero_flags) AS p0_zero,\n  (SELECT product_sku FROM p1) AS p1_sku,\n  (SELECT record_path FROM p1) AS p1_path,\n  (SELECT z1 FROM zero_flags) AS p1_zero,\n  (SELECT product_sku FROM p2) AS p2_sku,\n  (SELECT record_path FROM p2) AS p2_path,\n  (SELECT z2 FROM zero_flags) AS p2_zero,\n  (SELECT product_sku FROM p3) AS p3_sku,\n  (SELECT record_path FROM p3) AS p3_path,\n  (SELECT z3 FROM zero_flags) AS p3_zero,\n  (SELECT product_sku FROM p4) AS p4_sku,\n  (SELECT record_path FROM p4) AS p4_path,\n  (SELECT z4 FROM zero_flags) AS p4_zero,\n  (SELECT product_sku FROM p5) AS p5_sku,\n  (SELECT record_path FROM p5) AS p5_path,\n  (SELECT z5 FROM zero_flags) AS p5_zero,\n  (SELECT (z0+z1+z2+z3+z4+z5) FROM zero_flags) AS count_zero;"
+      },
+      "bind": "raw_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_result",
+      "format": "auto_delim",
+      "into": "parsed",
+      "columns": [
+        {
+          "into": "store_record_path",
+          "candidates": [
+            "store_record_path"
+          ]
+        },
+        {
+          "into": "p0_sku",
+          "candidates": [
+            "p0_sku"
+          ]
+        },
+        {
+          "into": "p0_path",
+          "candidates": [
+            "p0_path"
+          ]
+        },
+        {
+          "into": "p0_zero",
+          "candidates": [
+            "p0_zero"
+          ]
+        },
+        {
+          "into": "p1_sku",
+          "candidates": [
+            "p1_sku"
+          ]
+        },
+        {
+          "into": "p1_path",
+          "candidates": [
+            "p1_path"
+          ]
+        },
+        {
+          "into": "p1_zero",
+          "candidates": [
+            "p1_zero"
+          ]
+        },
+        {
+          "into": "p2_sku",
+          "candidates": [
+            "p2_sku"
+          ]
+        },
+        {
+          "into": "p2_path",
+          "candidates": [
+            "p2_path"
+          ]
+        },
+        {
+          "into": "p2_zero",
+          "candidates": [
+            "p2_zero"
+          ]
+        },
+        {
+          "into": "p3_sku",
+          "candidates": [
+            "p3_sku"
+          ]
+        },
+        {
+          "into": "p3_path",
+          "candidates": [
+            "p3_path"
+          ]
+        },
+        {
+          "into": "p3_zero",
+          "candidates": [
+            "p3_zero"
+          ]
+        },
+        {
+          "into": "p4_sku",
+          "candidates": [
+            "p4_sku"
+          ]
+        },
+        {
+          "into": "p4_path",
+          "candidates": [
+            "p4_path"
+          ]
+        },
+        {
+          "into": "p4_zero",
+          "candidates": [
+            "p4_zero"
+          ]
+        },
+        {
+          "into": "p5_sku",
+          "candidates": [
+            "p5_sku"
+          ]
+        },
+        {
+          "into": "p5_path",
+          "candidates": [
+            "p5_path"
+          ]
+        },
+        {
+          "into": "p5_zero",
+          "candidates": [
+            "p5_zero"
+          ]
+        },
+        {
+          "into": "count_zero",
+          "candidates": [
+            "count_zero"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "column",
+      "args": [
+        "$parsed",
+        "store_record_path"
+      ],
+      "into": "store_record_path"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$parsed",
+        "p0_path"
+      ],
+      "into": "p0_path"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$parsed",
+        "p1_path"
+      ],
+      "into": "p1_path"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$parsed",
+        "p2_path"
+      ],
+      "into": "p2_path"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$parsed",
+        "p3_path"
+      ],
+      "into": "p3_path"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$parsed",
+        "p4_path"
+      ],
+      "into": "p4_path"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$parsed",
+        "p5_path"
+      ],
+      "into": "p5_path"
+    },
+    {
+      "prim": "column",
+      "args": [
+        "$parsed",
+        "count_zero"
+      ],
+      "into": "count_zero"
+    }
+  ],
   "decision": {
-    "branches": [],
+    "branches": [
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$store_record_path",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$p0_path",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$p1_path",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$p2_path",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$p3_path",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$p4_path",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$p5_path",
+              "rhs": null,
+              "args": []
+            }
+          ]
+        },
+        "label": "ok"
+      }
+    ],
     "default_label": "unsupported"
   },
   "ops": [],
   "answer": {
+    "ok": {
+      "message": "count : {count_zero}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store_record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$p0_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$p1_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$p2_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$p3_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$p4_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$p5_path"
+        }
+      ]
+    },
     "unsupported": {
-      "message": "The six product descriptions are not provided in the intent spec.",
+      "message": "Unable to determine count because some products or store not found",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

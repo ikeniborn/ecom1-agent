@@ -1,0 +1,316 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/discounts.md"
+      },
+      "bind": "discounts_doc"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/store-associate-exception-handbook.md"
+      },
+      "bind": "handbook_doc"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH emp AS (SELECT employee_id, record_path AS emp_record_path, employee_display_name, store_id FROM employee_accounts WHERE employee_display_name = :name), emp_role AS (SELECT employee_id, role_code FROM employee_role_assignments WHERE employee_id = (SELECT employee_id FROM emp)), basket AS (SELECT basket_id, store_id AS basket_store_id, discount_percent, discount_reason_code, discount_issuer_employee_id, record_path AS basket_record_path FROM shopping_baskets WHERE basket_id = :basket_id), store AS (SELECT store_id, store_name FROM stores WHERE store_id = (SELECT store_id FROM emp)) SELECT emp.employee_id, emp.employee_display_name, emp.emp_record_path, emp.store_id, store.store_name, basket.basket_id, basket.basket_store_id, basket.discount_percent, basket.discount_reason_code, basket.discount_issuer_employee_id, basket.basket_record_path, CASE WHEN EXISTS (SELECT 1 FROM employee_role_assignments WHERE employee_id = emp.employee_id AND role_code = 'discount_manager') THEN 1 ELSE 0 END AS has_discount_role FROM emp, basket, store WHERE emp.store_id = basket.basket_store_id;",
+        "args": [
+          "Philipp Lehmann",
+          "basket_027"
+        ]
+      },
+      "bind": "sql_output"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "sql_output",
+      "format": "auto_delim",
+      "into": "rows",
+      "columns": [
+        {
+          "into": "employee_id",
+          "candidates": [
+            "employee_id"
+          ]
+        },
+        {
+          "into": "employee_display_name",
+          "candidates": [
+            "employee_display_name"
+          ]
+        },
+        {
+          "into": "emp_record_path",
+          "candidates": [
+            "emp_record_path"
+          ]
+        },
+        {
+          "into": "store_id",
+          "candidates": [
+            "store_id"
+          ]
+        },
+        {
+          "into": "store_name",
+          "candidates": [
+            "store_name"
+          ]
+        },
+        {
+          "into": "basket_id",
+          "candidates": [
+            "basket_id"
+          ]
+        },
+        {
+          "into": "basket_store_id",
+          "candidates": [
+            "basket_store_id"
+          ]
+        },
+        {
+          "into": "discount_percent",
+          "candidates": [
+            "discount_percent"
+          ]
+        },
+        {
+          "into": "discount_reason_code",
+          "candidates": [
+            "discount_reason_code"
+          ]
+        },
+        {
+          "into": "discount_issuer_employee_id",
+          "candidates": [
+            "discount_issuer_employee_id"
+          ]
+        },
+        {
+          "into": "basket_record_path",
+          "candidates": [
+            "basket_record_path"
+          ]
+        },
+        {
+          "into": "has_discount_role",
+          "candidates": [
+            "has_discount_role"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$rows"
+      ],
+      "into": "row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "employee_id"
+      ],
+      "into": "employee_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "employee_display_name"
+      ],
+      "into": "employee_display_name"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "emp_record_path"
+      ],
+      "into": "emp_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "store_id"
+      ],
+      "into": "store_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "store_name"
+      ],
+      "into": "store_name"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "basket_id"
+      ],
+      "into": "basket_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "basket_store_id"
+      ],
+      "into": "basket_store_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "discount_percent"
+      ],
+      "into": "discount_percent"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "discount_reason_code"
+      ],
+      "into": "discount_reason_code"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "discount_issuer_employee_id"
+      ],
+      "into": "discount_issuer_employee_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "basket_record_path"
+      ],
+      "into": "basket_record_path"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$row",
+        "has_discount_role"
+      ],
+      "into": "has_discount_role"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$rows",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$store_id",
+              "rhs": "$basket_store_id",
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$has_discount_role",
+              "rhs": 1,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$discount_percent",
+              "rhs": 5,
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$discount_reason_code",
+              "rhs": "service_recovery",
+              "args": []
+            },
+            {
+              "op": "eq",
+              "lhs": "$discount_issuer_employee_id",
+              "rhs": "$employee_id",
+              "args": []
+            }
+          ]
+        },
+        "label": "success"
+      },
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$rows",
+          "rhs": null,
+          "args": []
+        },
+        "label": "unsupported"
+      }
+    ],
+    "default_label": "no_data"
+  },
+  "ops": [],
+  "answer": {
+    "success": {
+      "message": "Verification result: success. Manager {employee_display_name} at {store_name} approved a 5% service_recovery discount for basket {basket_id}.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/discounts.md",
+          "source": null
+        },
+        {
+          "kind": "policy_doc",
+          "path": "/docs/store-associate-exception-handbook.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$emp_record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$basket_record_path"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "Verification result: failed. Manager {employee_display_name} at {store_name} attempted a discount for basket {basket_id} but conditions not met.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "no_data": {
+      "message": "Verification result: failed. Could not find the required records.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

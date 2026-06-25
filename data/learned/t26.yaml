@@ -21,7 +21,7 @@ entries:
     exactly two arguments, each a list of dict rows (rowsets). For building strings,
     use a single string literal or the `format` primitive with placeholders.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 10; pin to protect)'
   id: r002
   reasoning: 'Error: ''interpret: compute step ''concat'' failed: <lambda>() takes
     2 positional arguments but 3 were given''. Root cause: PlanIR used `concat` with
@@ -29,7 +29,7 @@ entries:
     b)` expects both args to be list[dict] rows. Additional misuses include `concat`
     with one argument. The correct approach is to avoid `concat` for string building;
     use a single string literal or `format` instead. This rule prevents future misuse.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Never include a decision branch that duplicates a security constraint's
@@ -40,7 +40,8 @@ entries:
     (e.g., 'identity') to ensure the identity fact is available for any necessary
     checks.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: Superseded by new rule that prohibits any manual security outcome
+    branch and retains the requirement to run /bin/id.
   id: r003
   reasoning: The PlanIR included a decision branch that checks $identity.kind != 'employee'
     to deny, but the security constraint already enforces that condition. The plan
@@ -50,7 +51,7 @@ entries:
     /bin/id) was employee, so the plan's over-refusal was flagged. The fix is to remove
     the redundant decision branch and add a discovery step to run /bin/id to satisfy
     the security policy's requirement.
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Never use the `get` primitive with more than two arguments. When a database
@@ -58,7 +59,7 @@ entries:
     primitive to extract the single row, then use `get` with two arguments (the row
     variable and the field name) to extract a field.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: 'capped (re-bloat guard: keep newest 10; pin to protect)'
   id: r004
   reasoning: 'Error: ''interpret: compute step ''get'' failed: <lambda>() takes 2
     positional arguments but 3 were given''. Root cause: The PlanIR used `get` with
@@ -71,7 +72,7 @@ entries:
     The existing rule about using a SQL RPC that returns a list of rows was violated,
     and the compute steps were malformed. This new rule explicitly forbids the three-argument
     `get` pattern and prescribes the correct two-step approach.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Always use the exact path from the required refs (e.g., '$basket.record_path')
@@ -79,7 +80,9 @@ entries:
     ref source must match the required ref path exactly so the system can resolve
     it from the basket object.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: r005 advises using the exact path expression as the source,
+    but the system cannot resolve dot notation in ref sources, causing unresolved
+    ref errors. The new rule supersedes it by requiring extraction into a simple variable.
   id: r005
   reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$basket.record_path'''']
     on OK answer''. The PlanIR answer for apply_discount includes a ref with source
@@ -88,7 +91,7 @@ entries:
     not a path into the basket object. The fix is to use the exact path ''$basket.record_path''
     as the source, which matches the required ref and is resolvable from the basket
     row.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: Never use an Exec RPC for any SQL statement that needs to return rows;
@@ -130,7 +133,9 @@ entries:
     For business logic failures (e.g., empty basket, existing discount), use a distinct
     outcome label to avoid spurious security refusals.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: r008 advises using a distinct outcome label for business logic
+    failures, but the outcome_space may not include such a label, causing verify failure.
+    The new rule requires using only outcomes from the outcome_space.
   id: r008
   reasoning: 'Error: ''verify: I3: outcome DENIED_SECURITY but no declared security
     deny_when predicate holds (spurious over-refusal)''. The plan''s decision tree
@@ -140,11 +145,172 @@ entries:
     cause is that the default branch was mislabeled as a security outcome, conflating
     business rule failures with security. The new rule prevents this by requiring
     distinct outcome labels for non-security failures.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: Never use format 'json' when parsing the output of /bin/id; the output
+    is plain text with key-value pairs. Instead, use format 'auto_delim' or 'text'
+    and then extract fields using text parsing primitives (e.g., split by newline
+    and colon).
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r009
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). Root cause: The PlanIR parsed
+    /bin/id output as JSON (format:''json''), but the actual output is plain text
+    (e.g., ''user: emp_006\nroles: employee, ...''). This caused identity_data to
+    be empty/null, making $identity.kind undefined. The decision branch condition
+    ''ne'' with undefined != ''employee'' evaluated to true, incorrectly taking the
+    denied_security branch. Failing PlanIR fragment: {"from_":"identity_raw","format":"json","into":"identity_data"}.
+    Existing rule r003 only mandates including the /bin/id step but does not specify
+    the correct parsing format. A new rule is needed to prevent this parsing mismatch.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Never include a decision branch that leads to OUTCOME_DENIED_SECURITY;
+    let the system enforce security automatically. Always include a discovery step
+    to run /bin/id and bind the result to a variable (e.g., 'identity') to ensure
+    identity facts are available for any necessary checks.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r010
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds. Root cause: PlanIR included a decision branch with
+    condition ''not startswith $identity_user emp_'' that leads to ''denied_security''
+    outcome. This condition does not match the declared security deny_when (identity.kind
+    != ''employee''), causing a spurious over-refusal. The system''s automatic security
+    enforcement would have correctly denied if the predicate held. The existing rule
+    r003 (never duplicate security condition) was insufficient because the condition
+    was not a duplicate but an alternative heuristic. New rule prohibits any manual
+    security outcome branch and retains the requirement to run /bin/id.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always ensure that every outcome label used in the answer section of the
+    PlanIR is one of the outcomes listed in the outcome_space. Do not introduce new
+    outcome labels that are not in the outcome_space.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r011
+  reasoning: 'Error: verify I2: outcome ''OUTCOME_NONE_UNSUPPORTED'' not in outcome_space
+    [''OUTCOME_OK'', ''OUTCOME_DENIED_SECURITY'']. Root cause: the PlanIR''s answer
+    section mapped the ''cannot_apply'' branch to OUTCOME_NONE_UNSUPPORTED, which
+    is not an allowed outcome. The outcome_space only contains OUTCOME_OK and OUTCOME_DENIED_SECURITY.
+    The PlanIR must only use those labels. Existing rule r008 advised using a distinct
+    outcome label for business logic failures, but that leads to invalid PlanIR when
+    the outcome_space lacks such a label. This new rule supersedes r008.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always re-read the affected record after a mutation (UPDATE/INSERT/DELETE)
+    that modifies fields referenced in success criteria, and update the corresponding
+    variable so that verification uses the post-mutation state.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r012
+  reasoning: 'Error: verify: success_criteria[OUTCOME_OK][0] failed: $basket.discount_percent
+    != 10. The PlanIR executed an UPDATE to set discount_percent=10, but the $basket
+    variable was populated from the initial SELECT (which had discount_percent empty).
+    The success criteria checks the variable, not the database, so the stale value
+    caused failure. Root cause: plan did not re-query the basket after mutation to
+    refresh the variable. This is a PlanIR shape bug; no missing data.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never set the outcome to OUTCOME_DENIED_SECURITY for a decision branch
+    that checks a business logic condition (e.g., record existence, existing value,
+    threshold comparison). For such branches, set the outcome to OUTCOME_OK and include
+    a message that explains the failure, and do not include the required refs for
+    the discount.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r013
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The PlanIR''s answer section
+    has three branches (no_basket, already_discounted, subtotal_too_low) all with
+    outcome OUTCOME_DENIED_SECURITY. The system''s security constraints only deny
+    when identity kind is not employee; here identity is employee, so no security
+    denial occurred. The PlanIR''s use of DENIED_SECURITY for business logic failures
+    causes the spurious over-refusal. Existing rules (r008 and in-session rule) prohibit
+    this, but the PlanIR violated them. The corrective rule explicitly forbids setting
+    outcome to DENIED_SECURITY for non-security decision branches, and instead uses
+    OUTCOME_OK with a message explaining the failure, omitting the required refs for
+    the discount. This avoids the spurious over-refusal error.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always extract any field referenced in answer refs as a separate variable
+    using a compute step (e.g., `get` from the row), and use that variable name (without
+    dot notation) as the source in the answer refs. This ensures the system can resolve
+    the ref as a simple variable and avoids unresolved ref errors when the source
+    variable is a path expression. If the field may be null (e.g., when the record
+    does not exist), still extract it; the variable will be null and the ref will
+    resolve.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r014
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$basket.record_path'']
+    on OK answer. Root cause: The answer refs use a path expression ''$basket.record_path''
+    as the source, but the system cannot resolve dot notation in ref sources. The
+    PlanIR does not extract record_path into a separate variable. Additionally, the
+    cannot_apply branch may be taken when $basket is null (basket not found), causing
+    the path expression to fail. Fix: Extract record_path into a variable (e.g., basket_record_path)
+    using a compute step, and use that variable name as the source. This ensures the
+    ref is a simple variable and resolves even if null. Existing rule r005 advises
+    using the exact path, which leads to this error; deactivate r005.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the exact path from the required refs (e.g., '$basket.record_path')
+    as the source in answer refs, never a separately computed variable name. This
+    ensures the system can resolve the ref from the basket object.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r015
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$basket.record_path'''']
+    on OK answer''. The PlanIR answer refs use ''$basket_record_path'' as source,
+    but the required refs specify ''$basket.record_path''. The system expects a path
+    relative to the basket object, not a standalone variable. The in-session rule
+    that advises extracting fields as separate variables and using that variable name
+    as source contradicts the required refs and causes this failure. This new rule
+    supersedes that in-session rule and reinforces r005. The in-session rule should
+    be deactivated.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use the exact path from the required refs (e.g., '$basket.record_path')
+    as the source in answer refs, without extracting the field into a separate variable.
+    The system resolves the path from the object, so a separate variable is unnecessary
+    and causes unresolved ref errors.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r016
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$basket.record_path'']
+    on OK answer. Root cause: The PlanIR answer refs use ''$basket_record_path'' (a
+    computed variable) instead of the required path ''$basket.record_path''. The required
+    refs specify source ''$basket.record_path'', but the PlanIR uses a separately
+    extracted variable. This violates rule [r005] which states to use the exact path.
+    An in-session rule incorrectly advises extracting the field into a separate variable,
+    leading to this mismatch. The fix is to use the exact path from required refs
+    directly in answer refs, without extraction. The in-session rule that says ''Always
+    extract any field referenced in answer refs as a separate variable...'' should
+    be deactivated as it contradicts [r005] and causes this failure.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/security.md'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 10
-  date: '2026-06-24'
+  cycles_used: 9
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t26

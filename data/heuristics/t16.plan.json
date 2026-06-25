@@ -1,50 +1,102 @@
 {
   "discovery": [
     {
-      "rpc": "Read",
-      "args": {
-        "path": "/docs/security.md"
-      },
-      "bind": "policy_doc"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/id"
-      },
-      "bind": "identity_raw"
-    },
-    {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city = 'Bratislava' AND store_name LIKE '%PowerTool%' LIMIT 1) SELECT s.store_id, s.record_path, (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.brand = 'Bosch' AND pv.series = 'Bosch Compact IXO G9T-QOS' AND pv.model = 'Cordless Drill Driver' AND EXISTS (SELECT 1 FROM product_variant_properties pvp1 WHERE pvp1.product_sku = pv.product_sku AND pvp1.property_key = 'voltage' AND pvp1.property_value_text = '12 V') AND EXISTS (SELECT 1 FROM product_variant_properties pvp2 WHERE pvp2.product_sku = pv.product_sku AND pvp2.property_key = 'battery platform' AND pvp2.property_value_text = '12v-system') AND EXISTS (SELECT 1 FROM product_variant_properties pvp3 WHERE pvp3.product_sku = pv.product_sku AND pvp3.property_key = 'kit contents' AND pvp3.property_value_text = 'case') AND EXISTS (SELECT 1 FROM store_inventory si WHERE si.store_id = s.store_id AND si.product_sku = pv.product_sku AND si.available_today_quantity >= 2)) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.brand = 'Stanley' AND pv.series = 'Stanley Professional SX 3OT-GPF' AND pv.model = 'Hammer Measuring and Cutting Tool' AND EXISTS (SELECT 1 FROM product_variant_properties pvp1 WHERE pvp1.product_sku = pv.product_sku AND pvp1.property_key = 'tool type' AND pvp1.property_value_text = 'utility knife') AND EXISTS (SELECT 1 FROM product_variant_properties pvp2 WHERE pvp2.product_sku = pv.product_sku AND pvp2.property_key = 'length' AND pvp2.property_value_text = '150 mm') AND EXISTS (SELECT 1 FROM store_inventory si WHERE si.store_id = s.store_id AND si.product_sku = pv.product_sku AND si.available_today_quantity >= 2)) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.brand = 'Heco' AND pv.series = 'Heco Heavy Duty HECO 6IT-PBI' AND pv.model = 'Anchor and Wall Plug' AND EXISTS (SELECT 1 FROM product_variant_properties pvp1 WHERE pvp1.product_sku = pv.product_sku AND pvp1.property_key = 'anchor type' AND pvp1.property_value_text = 'frame fixing') AND EXISTS (SELECT 1 FROM product_variant_properties pvp2 WHERE pvp2.product_sku = pv.product_sku AND pvp2.property_key = 'diameter' AND pvp2.property_value_text = '6 mm') AND EXISTS (SELECT 1 FROM product_variant_properties pvp3 WHERE pvp3.product_sku = pv.product_sku AND pvp3.property_key = 'length' AND pvp3.property_value_text = '40 mm') AND EXISTS (SELECT 1 FROM store_inventory si WHERE si.store_id = s.store_id AND si.product_sku = pv.product_sku AND si.available_today_quantity >= 2)) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.brand = 'Mellerud' AND pv.series = 'Mellerud Concentrate MEL PWG-BFQ' AND pv.model = 'Cleaning Liquid' AND EXISTS (SELECT 1 FROM product_variant_properties pvp1 WHERE pvp1.product_sku = pv.product_sku AND pvp1.property_key = 'cleaner type' AND pvp1.property_value_text = 'drain cleaner') AND EXISTS (SELECT 1 FROM product_variant_properties pvp2 WHERE pvp2.product_sku = pv.product_sku AND pvp2.property_key = 'volume' AND pvp2.property_value_text = '5000 ml') AND EXISTS (SELECT 1 FROM store_inventory si WHERE si.store_id = s.store_id AND si.product_sku = pv.product_sku AND si.available_today_quantity >= 2)) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.brand = 'Bondex' AND pv.series = 'Bondex Weather Shield Garden 2IA-K10' AND pv.model = 'Wood Stain and Deck Oil' AND EXISTS (SELECT 1 FROM product_variant_properties pvp1 WHERE pvp1.product_sku = pv.product_sku AND pvp1.property_key = 'product type' AND pvp1.property_value_text = 'primer') AND EXISTS (SELECT 1 FROM product_variant_properties pvp2 WHERE pvp2.product_sku = pv.product_sku AND pvp2.property_key = 'color family' AND pvp2.property_value_text = 'Gray') AND EXISTS (SELECT 1 FROM store_inventory si WHERE si.store_id = s.store_id AND si.product_sku = pv.product_sku AND si.available_today_quantity >= 2)) THEN 1 ELSE 0 END) + (CASE WHEN EXISTS (SELECT 1 FROM product_variants pv WHERE pv.brand = 'Legrand' AND pv.series = 'Legrand Eco LG 3KP-P51' AND pv.model = 'LED Bulb' AND EXISTS (SELECT 1 FROM product_variant_properties pvp1 WHERE pvp1.product_sku = pv.product_sku AND pvp1.property_key = 'wattage' AND pvp1.property_value_text = '10 W') AND EXISTS (SELECT 1 FROM product_variant_properties pvp2 WHERE pvp2.product_sku = pv.product_sku AND pvp2.property_key = 'luminous flux' AND pvp2.property_value_text = '1521 lm') AND EXISTS (SELECT 1 FROM store_inventory si WHERE si.store_id = s.store_id AND si.product_sku = pv.product_sku AND si.available_today_quantity >= 2)) THEN 1 ELSE 0 END) AS count FROM store s"
+        "stdin": "WITH store AS (\n  SELECT store_id, record_path\n  FROM stores\n  WHERE city = 'Linz'\n    AND (store_name LIKE '%hardware%' OR store_name = 'Central Linz Hardware')\n  LIMIT 1\n),\nproduct_1 AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  WHERE pv.brand = 'Tork'\n    AND pv.series = 'Tork Wiping W'\n    AND pv.model = '2RU-ZDO'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'cleaning_type' AND pvp.property_value_text = 'sponge')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'pack_count' AND pvp.property_value_text = '3 pcs')\n),\nproduct_2 AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  WHERE pv.brand = 'Sikkens'\n    AND pv.series = 'Sikkens Exterior SIK ZRP-H5X'\n    AND pv.model = 'ZRP-H5X'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'product_type' AND pvp.property_value_text = 'wood sealer')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'color_family' AND pvp.property_value_text = 'Brown')\n),\nproduct_3 AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  WHERE pv.brand = 'Sikkens'\n    AND pv.series = 'Sikkens Exterior Cetol 3CU-TSJ'\n    AND pv.model = '3CU-TSJ'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'product_type' AND pvp.property_value_text = 'wood stain')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'color_family' AND pvp.property_value_text = 'White')\n),\nproduct_4 AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  WHERE pv.brand = 'Bernardo'\n    AND pv.series = 'Bernardo Professional TK 2DM-OB7'\n    AND pv.model = '2DM-OB7'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'machine_type' AND pvp.property_value_text = 'bench grinder')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'voltage' AND pvp.property_value_text = '230 V')\n),\nproduct_5 AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  WHERE pv.brand = 'Michelin'\n    AND pv.series = 'Michelin Compact Radius ONB-OGX'\n    AND pv.model = 'ONB-OGX'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'product_type' AND pvp.property_value_text = 'battery charger')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'voltage' AND pvp.property_value_text = '12 V')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'current' AND pvp.property_value_text = '4 A')\n),\nproduct_6 AS (\n  SELECT pv.product_sku, pv.record_path\n  FROM product_variants pv\n  WHERE pv.brand = 'Karcher'\n    AND pv.series = 'Karcher Professional WD 1V2-NV2'\n    AND pv.model = '1V2-NV2'\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'cleaner_type' AND pvp.property_value_text = 'glass cleaner')\n    AND EXISTS (SELECT 1 FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND pvp.property_key = 'volume' AND pvp.property_value_text = '2500 ml')\n),\nall_products AS (\n  SELECT product_sku, record_path FROM product_1\n  UNION ALL\n  SELECT product_sku, record_path FROM product_2\n  UNION ALL\n  SELECT product_sku, record_path FROM product_3\n  UNION ALL\n  SELECT product_sku, record_path FROM product_4\n  UNION ALL\n  SELECT product_sku, record_path FROM product_5\n  UNION ALL\n  SELECT product_sku, record_path FROM product_6\n),\ninventory_count AS (\n  SELECT COUNT(*) AS cnt\n  FROM all_products ap\n  JOIN store_inventory si ON si.product_sku = ap.product_sku AND si.store_id = (SELECT store_id FROM store)\n  WHERE si.available_today_quantity > 0\n)\nSELECT \n  (SELECT record_path FROM store) AS store_record_path,\n  (SELECT cnt FROM inventory_count) AS count,\n  (SELECT product_sku FROM product_1) AS p1_sku,\n  (SELECT record_path FROM product_1) AS p1_record_path,\n  (SELECT product_sku FROM product_2) AS p2_sku,\n  (SELECT record_path FROM product_2) AS p2_record_path,\n  (SELECT product_sku FROM product_3) AS p3_sku,\n  (SELECT record_path FROM product_3) AS p3_record_path,\n  (SELECT product_sku FROM product_4) AS p4_sku,\n  (SELECT record_path FROM product_4) AS p4_record_path,\n  (SELECT product_sku FROM product_5) AS p5_sku,\n  (SELECT record_path FROM product_5) AS p5_record_path,\n  (SELECT product_sku FROM product_6) AS p6_sku,\n  (SELECT record_path FROM product_6) AS p6_record_path;"
       },
-      "bind": "result_raw"
+      "bind": "query_result"
     }
   ],
   "rowsets": [
     {
-      "from_": "result_raw",
+      "from_": "query_result",
       "format": "auto_delim",
-      "into": "result_rows",
+      "into": "parsed_rows",
       "columns": [
         {
-          "into": "store_id",
+          "into": "store_record_path",
           "candidates": [
-            "store_id"
-          ]
-        },
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
+            "store_record_path"
           ]
         },
         {
           "into": "count",
           "candidates": [
             "count"
+          ]
+        },
+        {
+          "into": "p1_sku",
+          "candidates": [
+            "p1_sku"
+          ]
+        },
+        {
+          "into": "p1_record_path",
+          "candidates": [
+            "p1_record_path"
+          ]
+        },
+        {
+          "into": "p2_sku",
+          "candidates": [
+            "p2_sku"
+          ]
+        },
+        {
+          "into": "p2_record_path",
+          "candidates": [
+            "p2_record_path"
+          ]
+        },
+        {
+          "into": "p3_sku",
+          "candidates": [
+            "p3_sku"
+          ]
+        },
+        {
+          "into": "p3_record_path",
+          "candidates": [
+            "p3_record_path"
+          ]
+        },
+        {
+          "into": "p4_sku",
+          "candidates": [
+            "p4_sku"
+          ]
+        },
+        {
+          "into": "p4_record_path",
+          "candidates": [
+            "p4_record_path"
+          ]
+        },
+        {
+          "into": "p5_sku",
+          "candidates": [
+            "p5_sku"
+          ]
+        },
+        {
+          "into": "p5_record_path",
+          "candidates": [
+            "p5_record_path"
+          ]
+        },
+        {
+          "into": "p6_sku",
+          "candidates": [
+            "p6_sku"
+          ]
+        },
+        {
+          "into": "p6_record_path",
+          "candidates": [
+            "p6_record_path"
           ]
         }
       ]
@@ -54,38 +106,259 @@
     {
       "prim": "first",
       "args": [
-        "$result_rows"
+        "$parsed_rows"
       ],
-      "into": "store"
+      "into": "first_row"
     },
     {
       "prim": "get",
       "args": [
-        "$store",
+        "$first_row",
+        "store_record_path"
+      ],
+      "into": "store_record_path_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
         "count"
       ],
-      "into": "count"
+      "into": "count_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p1_record_path"
+      ],
+      "into": "p1_record_path_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p2_record_path"
+      ],
+      "into": "p2_record_path_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p3_record_path"
+      ],
+      "into": "p3_record_path_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p4_record_path"
+      ],
+      "into": "p4_record_path_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p5_record_path"
+      ],
+      "into": "p5_record_path_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p6_record_path"
+      ],
+      "into": "p6_record_path_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p1_sku"
+      ],
+      "into": "p1_sku_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p2_sku"
+      ],
+      "into": "p2_sku_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p3_sku"
+      ],
+      "into": "p3_sku_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p4_sku"
+      ],
+      "into": "p4_sku_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p5_sku"
+      ],
+      "into": "p5_sku_val"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p6_sku"
+      ],
+      "into": "p6_sku_val"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$count_val"
+      ],
+      "into": "count_num"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "store_record_path"
+      ],
+      "into": "store_record_path_final"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p1_record_path"
+      ],
+      "into": "p1_record_path_final"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p2_record_path"
+      ],
+      "into": "p2_record_path_final"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p3_record_path"
+      ],
+      "into": "p3_record_path_final"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p4_record_path"
+      ],
+      "into": "p4_record_path_final"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p5_record_path"
+      ],
+      "into": "p5_record_path_final"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "p6_record_path"
+      ],
+      "into": "p6_record_path_final"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "eq",
-          "lhs": "1",
-          "rhs": "1",
-          "args": []
+          "op": "and",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$store_record_path_final",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "nonempty",
+              "lhs": "$count_num",
+              "rhs": null,
+              "args": []
+            }
+          ]
         },
         "label": "ok"
       }
     ],
-    "default_label": "ok"
+    "default_label": "unsupported"
   },
   "ops": [],
   "answer": {
     "ok": {
-      "message": "qty={count}",
+      "message": "qty={count_num}",
       "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_1.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_2.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_3.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_4.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_5.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$product_6.record_path"
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "Unable to determine count: store or products not found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }
   },

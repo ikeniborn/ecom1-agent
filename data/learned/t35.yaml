@@ -45,9 +45,55 @@ entries:
     bypassing safety.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Do not include a Read RPC for a path that is not listed in the plan's required
+    refs or that duplicates data already obtained via a SQL query, as it may fail
+    if the path does not exist.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: ''real_vm: read failed: not found'' during execution. The PlanIR
+    includes a Read RPC at ''/proc/payments/pay_041'' which does not exist. The required
+    refs only need a record_path from the SQL query; the file read is redundant and
+    causes failure. The SQL query already retrieves all needed fields including record_path.
+    The rule prevents unnecessary file reads that are not required by the plan''s
+    refs.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the 'concat' primitive to build a JSON string from fragments;
+    instead, use the 'json_build' primitive with key-value pairs to construct JSON
+    objects for Write RPC content.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: ''concat'' step failed because it received 33 arguments but expects
+    exactly 2 (both list[dict] rows). Root cause: PlanIR used ''concat'' to manually
+    concatenate string fragments and variable values into a JSON string, which is
+    a misuse of the primitive. The correct approach is to use ''json_build'' which
+    accepts key-value pairs and produces a JSON object. The failing PlanIR fragment
+    is the compute step with prim ''concat'' that builds ''new_payment_content''.
+    No existing rule covers this misuse.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - Answer should contain 'paid'
+  source: verdict
+  status: active
+  submitted_message: 3DS recovery not eligible.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /docs/payments/3ds.md
+  - /proc/baskets/basket_241.json
+  - /proc/payments/pay_041.json
+  - /docs/security.md
 last_run:
-  cycles_used: 4
-  date: '2026-06-24'
+  cycles_used: 3
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t35

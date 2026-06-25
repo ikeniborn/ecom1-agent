@@ -6,7 +6,9 @@ entries:
     must define a variable named '$product_variant.record_path' and reference it in
     the answer refs.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: r001 advises setting variable names to exactly match required_refs
+    source names, which for dotted paths would create invalid variable names; the
+    new rule supersedes it by requiring simple scalar variables for answer refs.
   id: r001
   reasoning: 'Error: verify: I1: required ref source(s) [''$product_variant.record_path'']
     did not resolve on OUTCOME_OK answer. Root cause: PlanIR answer refs used source
@@ -15,7 +17,7 @@ entries:
     ''$product_variant.record_path''. This mismatch caused the verification to fail
     because the ref source was not found. The SQL query and decision logic are correct;
     only the variable naming is wrong.'
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: When required_refs source is a dotted path, set the parent variable as
@@ -34,9 +36,97 @@ entries:
     this error; it will be deactivated.'
   status: active
   surface: ir
+- agents_md_anchor: '#plan-ir-decision-branches'
+  content: 'Always structure decision branch ''when'' conditions as PredExpr objects
+    (dictionary with ''op'' and ''args''), not as raw string references. For example,
+    use {''op'': ''nonempty'', ''args'': [{''ref'': ''$variable_name''}]} instead
+    of ''$variable_name''.'
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: plan validation failed with ''Input should be a valid dictionary
+    or instance of PredExpr'' for decision.branches.0.when.args.0 and branches.1.when.args.0.
+    Root cause: The PlanIR decision branches used raw string references like ''$product_variant.record_path''
+    as the ''when'' condition, but the schema requires a PredExpr object. The TOOL_PLAN''s
+    success_criteria uses op=''nonempty'' on that ref, so the correct condition is
+    a PredExpr with op=''nonempty'' and a Ref argument. No existing rule covers this
+    structural requirement; r001 only addresses variable naming in compute steps,
+    not decision branch conditions.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always use a simple variable that directly holds the scalar value (e.g.,
+    $record_path) as the source in answer refs, never a dotted path on an object variable.
+    If the required_refs specifies a dotted path like '$product_variant.record_path',
+    extract the field into a simple variable and reference that variable.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: verify: I1: required ref source(s) [''$product_variant.record_path'']
+    did not resolve on OUTCOME_NONE_UNSUPPORTED answer (resolve-before-cite). The
+    PlanIR compute steps set $product_variant as a row object and $record_path as
+    the scalar value, but the answer refs for both branches use ''$product_variant.record_path''
+    as source. The interpreter attempts to resolve this as a variable name, which
+    does not exist. The observed RPC output shows the data exists, so the failure
+    is purely a PlanIR shape bug. Existing rule r001 advises setting variable names
+    to exactly match required_refs source names, which would lead to using dotted
+    paths as variable names—this is not supported. Rule r002 is partially correct
+    but incomplete for answer refs. The corrective rule ensures answer ref sources
+    are simple variable names that hold the scalar value.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always structure decision branch 'when' conditions as a single PredExpr
+    (dictionary with 'op' and 'args') where each argument is either a ref (dictionary
+    with 'ref' key) or another PredExpr (dictionary with 'op' and 'args'). Never use
+    raw strings, lists, or dicts with only 'ref' as a direct argument of the 'when'
+    PredExpr.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: plan validation failed with multiple ''Field required'' and ''Extra
+    inputs are not permitted'' on decision.branches[0].when.args. Each ''when'' was
+    given as a list of dicts with only ''ref'' (e.g., {''ref'': ''$product_data''})
+    and raw values (''purple'', [''interior'']) instead of a proper PredExpr. Root
+    cause: the PlanIR used invalid condition structures. The existing rule [in-session]
+    about PredExpr was too vague and did not specify that args must also be PredExpr
+    or refs, nor that literals must be wrapped. This new rule supersedes it with precise
+    structural requirements.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: 'Always structure decision branch ''when'' conditions as a single PredExpr
+    (dictionary with ''op'' and ''args'') where each argument is a PredExpr (dictionary
+    with ''op'' and ''args''), never a bare ref dictionary. For existence checks,
+    use {''op'': ''nonempty'', ''args'': [{''ref'': ''$variable''}]}.'
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: plan validation failed with 8 errors: decision.branches[0].when.args[0].args[0].op
+    missing, args[0].args[0].ref extra, etc. Root cause: the ''when'' condition used
+    bare ref dictionaries (e.g., {''ref'': ''$color_family''}) as direct arguments
+    of the ''and'' PredExpr, but the schema requires each argument to be a PredExpr
+    with ''op'' and ''args''. The existing [in-session] rule incorrectly allowed bare
+    ref dictionaries as arguments, leading to this invalid PlanIR. The failing PlanIR
+    fragment likely had: ''when'': {''op'': ''and'', ''args'': [{''ref'': ''$color_family''},
+    {''ref'': ''$target_color''}, ...]}. The new rule corrects this by requiring all
+    arguments to be PredExprs.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - Answer should contain '<NO>'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
-  cycles_used: 3
-  date: '2026-06-24'
-  outcome: OUTCOME_OK
-  status: success
+  cycles_used: 5
+  date: '2026-06-25'
+  outcome: OUTCOME_NONE_UNSUPPORTED
+  status: failure
 task_id: t07

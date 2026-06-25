@@ -15,9 +15,93 @@ entries:
     decision branches rely on actual available fields, preventing such mismatches.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always include a rowset that queries the table indicated by the objective's
+    data source parameter and binds a column as the required record_path ref when
+    the answer requires a record_path with source null.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: The error 'unresolved required ref(s) ['$payment.record_path']' indicates
+    the PlanIR did not produce the required ref for the OK answer. The plan only has
+    a discovery step for identity and no rowsets. The required refs for OUTCOME_OK
+    include a record_path with source null, meaning the planner must include a rowset
+    that queries the archived payments table (from objective param) and binds a column
+    as $payment.record_path. The current plan violates this. Additionally, the plan
+    uses '$identity.kind' which violates existing rule r001 (should use 'user' and
+    'roles'), but that is not the immediate error. The new rule ensures the planner
+    always includes a rowset to produce required record_path refs.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the answer requires a record_path ref with source null, the PLAN must
+    include a rowset that queries the table specified in the objective's data source
+    parameter and binds the column named after the dot in the ref (e.g., record_path
+    for $payment.record_path) as the ref value.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: interpret: unresolved required ref(s) [''$payment.record_path''].
+    The PlanIR script has no rowsets, so $payment.record_path is never defined. The
+    answer for OUTCOME_OK requires a record_path ref with source null. The existing
+    rule [in-session] should have triggered but the script omitted the rowset. The
+    rule needs to be more explicit about binding the column from the table. Deactivating
+    [in-session] and replacing with a precise rule that specifies the column name
+    must match the ref''s variable name after the dot.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the answer requires a ref with a source that is a dotted variable
+    path (e.g., $payment.record_path), the PlanIR must compute a variable with that
+    exact dotted name (e.g., 'payment.record_path') and use it as the ref source,
+    rather than a differently named variable.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$payment.record_path'''']
+    on OK answer''. The PlanIR answer branch ''ok_found'' uses ref source ''$first_record_path'',
+    but the required ref source is ''$payment.record_path''. The interpreter requires
+    exact match. The PlanIR computed ''first_record_path'' instead of ''payment.record_path''.
+    Root cause: variable naming mismatch. Rule linkage: existing rule [in-session]
+    covers including a rowset but not the exact variable name. New rule ensures the
+    computed variable name matches the required ref source exactly.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the decision branch condition uses the output of an Exec RPC that
+    returns a structured message (e.g., /bin/id), the lhs must be a field reference
+    (e.g., $identity_output.user) rather than the entire variable, and the operator
+    must be appropriate for the field type (e.g., 'eq' for string, 'contains_any'
+    for repeated string).
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Error: ''real_vm: Protocol message ExecResponse has no "guest" field.''
+    Root cause: The decision branch uses lhs=''$identity_output'' (the entire ExecResponse
+    protobuf) with operator ''contains_any'' and rhs=[''guest'']. The ExecResponse
+    has fields ''user'' and ''roles'', not a ''guest'' field, so the VM fails when
+    trying to access a non-existent field. The correct approach is to reference a
+    specific field like $identity_output.user (string) or $identity_output.roles (repeated
+    string). Existing rule r001 advises using ''user'' and ''roles'' fields but does
+    not enforce that the decision branch must reference those fields directly. The
+    failing PlanIR fragment is the decision branch: {"when":{"op":"contains_any","lhs":"$identity_output","rhs":["guest"],"args":[]},"label":"denied"}.
+    New rule ensures the lhs is a field reference, not the whole message.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 2
-  date: '2026-06-24'
-  outcome: OUTCOME_NONE_UNSUPPORTED
+  cycles_used: 5
+  date: '2026-06-25'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t39

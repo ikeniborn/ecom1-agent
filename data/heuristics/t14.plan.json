@@ -4,94 +4,96 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE city='Graz' AND store_name LIKE '%PowerTool%' AND store_name LIKE '%north%' LIMIT 1), product1 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Bosch' AND pv.series='Professional' AND pv.model='GSR 12V' AND pvp.property_key='Battery Voltage' AND pvp.property_value_text='12V' LIMIT 1), product2 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Bosch' AND pv.series='Professional' AND pv.model='GWS 7-115' AND pvp.property_key='Disc Diameter' AND pvp.property_value_text='115mm' LIMIT 1), product3 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Bosch' AND pv.series='Professional' AND pv.model='GBH 2-26' AND pvp.property_key='Impact Energy' AND pvp.property_value_text='2.6 J' LIMIT 1), product4 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Makita' AND pv.series='XPT' AND pv.model='DHR242' AND pvp.property_key='Battery Voltage' AND pvp.property_value_text='18V' LIMIT 1), product5 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='Makita' AND pv.series='XPT' AND pv.model='DHP484' AND pvp.property_key='Battery Voltage' AND pvp.property_value_text='18V' LIMIT 1), product6 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku WHERE pv.brand='DeWalt' AND pv.series='XRP' AND pv.model='DCD791' AND pvp.property_key='Battery Voltage' AND pvp.property_value_text='20V' LIMIT 1), inventory AS (SELECT si.product_sku, si.available_today_quantity FROM store_inventory si JOIN store s ON si.store_id = s.store_id), counted AS (SELECT COUNT(*) as cnt FROM (SELECT product_sku FROM product1 UNION ALL SELECT product_sku FROM product2 UNION ALL SELECT product_sku FROM product3 UNION ALL SELECT product_sku FROM product4 UNION ALL SELECT product_sku FROM product5 UNION ALL SELECT product_sku FROM product6) all_products JOIN inventory i ON all_products.product_sku = i.product_sku WHERE i.available_today_quantity >= 4) SELECT s.record_path AS store_path, p1.record_path AS p1_path, p2.record_path AS p2_path, p3.record_path AS p3_path, p4.record_path AS p4_path, p5.record_path AS p5_path, p6.record_path AS p6_path, counted.cnt FROM store s, product1 p1, product2 p2, product3 p3, product4 p4, product5 p5, product6 p6, counted;"
+        "stdin": "SELECT store_id, record_path FROM stores WHERE store_name = 'Vienna Praterstern' AND city = 'Vienna';"
       },
-      "bind": "raw_sql_result"
+      "bind": "store_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "raw_sql_result",
+      "from_": "store_raw",
       "format": "auto_delim",
-      "into": "rows",
+      "into": "store_rows",
       "columns": [
         {
-          "into": "$store.record_path",
+          "into": "store_id",
           "candidates": [
-            "store_path"
+            "store_id"
           ]
         },
         {
-          "into": "$product1.record_path",
+          "into": "record_path",
           "candidates": [
-            "p1_path"
-          ]
-        },
-        {
-          "into": "$product2.record_path",
-          "candidates": [
-            "p2_path"
-          ]
-        },
-        {
-          "into": "$product3.record_path",
-          "candidates": [
-            "p3_path"
-          ]
-        },
-        {
-          "into": "$product4.record_path",
-          "candidates": [
-            "p4_path"
-          ]
-        },
-        {
-          "into": "$product5.record_path",
-          "candidates": [
-            "p5_path"
-          ]
-        },
-        {
-          "into": "$product6.record_path",
-          "candidates": [
-            "p6_path"
-          ]
-        },
-        {
-          "into": "$count",
-          "candidates": [
-            "cnt"
+            "record_path"
           ]
         }
       ]
     }
   ],
-  "compute": [],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$store_rows"
+      ],
+      "into": "store"
+    }
+  ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "nonempty",
-          "lhs": "$rows",
+          "op": "isnull",
+          "lhs": "$store",
           "rhs": null,
           "args": []
         },
-        "label": "store_found"
+        "label": "store_not_found"
       }
     ],
-    "default_label": "store_not_found"
+    "default_label": "store_found"
   },
-  "ops": [],
+  "ops": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH product1 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv WHERE pv.brand = 'Gardena' AND pv.series = 'Gardena Smart PowerMax 280-5FI Manual Garden Tool' AND pv.model = 'Manual Garden Tool' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ((property_key='tool type' AND property_value_text='pruning saw'))) = 1), product2 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv WHERE pv.brand = 'Viega' AND pv.series = 'Viega Professional Sanpress 2OG-ENN Pipe Fitting' AND pv.model = 'Pipe Fitting' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ((property_key='fitting type' AND property_value_text='pipe fitting') OR (property_key='diameter' AND property_value_text='15 mm') OR (property_key='connection type' AND property_value_text='threaded'))) = 3), product3 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv WHERE pv.brand = 'Sika' AND pv.series = 'Sika Professional Sika 28T-UV8 Sealant' AND pv.model = 'Sealant' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ((property_key='sealant type' AND property_value_text='hybrid sealant') OR (property_key='color family' AND property_value_text='Gray') OR (property_key='volume' AND property_value_text='280 ml'))) = 3), product4 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv WHERE pv.brand = 'Portwest' AND pv.series = 'Portwest PW3 DX 3TU-ST2 Work Gloves' AND pv.model = 'Work Gloves' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ((property_key='size' AND property_value_text='S'))) = 1), product5 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv WHERE pv.brand = 'Ryobi' AND pv.series = 'Ryobi Precision RLM 2KQ-R4C Cordless Saw and Sander' AND pv.model = 'Cordless Saw and Sander' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ((property_key='tool type' AND property_value_text='planer'))) = 1), product6 AS (SELECT pv.product_sku, pv.record_path FROM product_variants pv WHERE pv.brand = 'Portwest' AND pv.series = 'Portwest PW3 DX 3TU-ST2 Work Gloves' AND pv.model = 'Work Gloves' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ((property_key='size' AND property_value_text='M'))) = 1), all_products AS (SELECT product_sku, record_path FROM product1 UNION SELECT product_sku, record_path FROM product2 UNION SELECT product_sku, record_path FROM product3 UNION SELECT product_sku, record_path FROM product4 UNION SELECT product_sku, record_path FROM product5 UNION SELECT product_sku, record_path FROM product6) SELECT COUNT(*) AS count, COALESCE(GROUP_CONCAT(record_path, ','), '') AS satisfying_product_record_paths FROM all_products ap JOIN store_inventory si ON ap.product_sku = si.product_sku AND si.store_id = :store_id WHERE si.available_today_quantity >= 2;",
+        "args": {
+          "store_id": "$store.store_id"
+        }
+      },
+      "bind": "count_raw",
+      "guard_label": "store_found",
+      "outcome_from_exit": null
+    }
+  ],
   "answer": {
-    "store_found": {
-      "message": "Count: {count}",
-      "outcome": "OUTCOME_OK",
+    "store_not_found": {
+      "message": "Store Vienna Praterstern not found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     },
-    "store_not_found": {
-      "message": "Store not found",
-      "outcome": "OUTCOME_DENIED_SECURITY",
-      "refs": []
+    "store_found": {
+      "message": "result {count}",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/checkout.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$store.record_path"
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$satisfying_product_record_paths"
+        }
+      ]
     }
   },
   "custom_extract": []

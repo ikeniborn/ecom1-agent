@@ -4,24 +4,16 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH product AS (SELECT pv.product_sku, pv.record_path AS product_record_path FROM product_variants pv JOIN product_families pf ON pv.product_family_id = pf.product_family_id JOIN product_variant_properties pvp_color ON pv.product_sku = pvp_color.product_sku AND pvp_color.property_key = 'color' JOIN product_variant_properties pvp_volume ON pv.product_sku = pvp_volume.product_sku AND pvp_volume.property_key = 'volume' WHERE pv.brand = 'Sika' AND pf.product_family_name = 'Sika Weatherproof Sikaflex 1JG-02A Sealant' AND pvp_color.property_value_text = 'Gray' AND pvp_volume.property_value_text = '100 ml' LIMIT 1), stores_vienna AS (SELECT store_id FROM stores WHERE city = 'Vienna'), inventory_sum AS (SELECT COALESCE(SUM(si.available_today_quantity), 0) AS total_quantity FROM stores_vienna sv LEFT JOIN store_inventory si ON sv.store_id = si.store_id AND si.product_sku = (SELECT product_sku FROM product)) SELECT (SELECT product_sku FROM product) AS product_sku, (SELECT product_record_path FROM product) AS product_record_path, (SELECT total_quantity FROM inventory_sum) AS total_quantity;"
+        "stdin": "SELECT\n  (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand = 'Wurth' AND pv.series = 'Wurth Universal ZEBRA 2RS-7GT Wood and Drywall Screw' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ( (pvp.property_key = 'screw type' AND pvp.property_value_text = 'wood screw') OR (pvp.property_key = 'diameter' AND pvp.property_value_text = '3 mm') OR (pvp.property_key = 'length' AND pvp.property_value_text = '30 mm') OR (pvp.property_key = 'drive type' AND pvp.property_value_text = 'torx') ) ) = 4) AS product_sku,\n  (SELECT pv.record_path FROM product_variants pv WHERE pv.brand = 'Wurth' AND pv.series = 'Wurth Universal ZEBRA 2RS-7GT Wood and Drywall Screw' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ( (pvp.property_key = 'screw type' AND pvp.property_value_text = 'wood screw') OR (pvp.property_key = 'diameter' AND pvp.property_value_text = '3 mm') OR (pvp.property_key = 'length' AND pvp.property_value_text = '30 mm') OR (pvp.property_key = 'drive type' AND pvp.property_value_text = 'torx') ) ) = 4) AS product_record_path,\n  (SELECT COALESCE(json_group_array(json_object('record_path', record_path)), '[]') FROM stores WHERE city = 'Graz') AS store_record_paths,\n  (SELECT COALESCE(SUM(si.available_today_quantity), 0) FROM store_inventory si WHERE si.product_sku = (SELECT pv.product_sku FROM product_variants pv WHERE pv.brand = 'Wurth' AND pv.series = 'Wurth Universal ZEBRA 2RS-7GT Wood and Drywall Screw' AND (SELECT COUNT(*) FROM product_variant_properties pvp WHERE pvp.product_sku = pv.product_sku AND ( (pvp.property_key = 'screw type' AND pvp.property_value_text = 'wood screw') OR (pvp.property_key = 'diameter' AND pvp.property_value_text = '3 mm') OR (pvp.property_key = 'length' AND pvp.property_value_text = '30 mm') OR (pvp.property_key = 'drive type' AND pvp.property_value_text = 'torx') ) ) = 4) AND si.store_id IN (SELECT store_id FROM stores WHERE city = 'Graz')) AS total_available;"
       },
-      "bind": "product_sum_raw"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT record_path FROM stores WHERE city = 'Vienna';"
-      },
-      "bind": "stores_raw"
+      "bind": "data_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "product_sum_raw",
+      "from_": "data_raw",
       "format": "auto_delim",
-      "into": "product_sum_rows",
+      "into": "data_rows",
       "columns": [
         {
           "into": "product_sku",
@@ -36,17 +28,23 @@
           ]
         },
         {
-          "into": "total_quantity",
+          "into": "store_record_paths",
           "candidates": [
-            "total_quantity"
+            "store_record_paths"
+          ]
+        },
+        {
+          "into": "total_available",
+          "candidates": [
+            "total_available"
           ]
         }
       ]
     },
     {
-      "from_": "stores_raw",
-      "format": "auto_delim",
-      "into": "stores_rows",
+      "from_": "store_record_paths",
+      "format": "json",
+      "into": "store_paths_rows",
       "columns": [
         {
           "into": "record_path",
@@ -61,14 +59,14 @@
     {
       "prim": "first",
       "args": [
-        "$product_sum_rows"
+        "$data_rows"
       ],
-      "into": "product_sum_row"
+      "into": "data_row"
     },
     {
       "prim": "get",
       "args": [
-        "$product_sum_row",
+        "$data_row",
         "product_sku"
       ],
       "into": "product_sku"
@@ -76,7 +74,7 @@
     {
       "prim": "get",
       "args": [
-        "$product_sum_row",
+        "$data_row",
         "product_record_path"
       ],
       "into": "product.record_path"
@@ -84,38 +82,59 @@
     {
       "prim": "get",
       "args": [
-        "$product_sum_row",
-        "total_quantity"
+        "$data_row",
+        "total_available"
       ],
-      "into": "count"
+      "into": "total"
     },
     {
       "prim": "column",
       "args": [
-        "$stores_rows",
+        "$store_paths_rows",
         "record_path"
       ],
-      "into": "store_record_paths"
+      "into": "graz_store_paths"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "nonempty",
+          "op": "isnull",
           "lhs": "$product_sku",
           "rhs": null,
           "args": []
         },
-        "label": "found"
+        "label": "unsupported"
+      },
+      {
+        "when": {
+          "op": "not",
+          "lhs": null,
+          "rhs": null,
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$graz_store_paths",
+              "rhs": null,
+              "args": []
+            }
+          ]
+        },
+        "label": "unsupported"
       }
     ],
-    "default_label": "not_found"
+    "default_label": "ok"
   },
   "ops": [],
   "answer": {
-    "found": {
-      "message": "count: {count}",
+    "unsupported": {
+      "message": "Unable to determine total: product or stores not found.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "ok": {
+      "message": "count: {total}",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
@@ -126,14 +145,9 @@
         {
           "kind": "record_path",
           "path": null,
-          "source": "$store_record_paths"
+          "source": "$graz_store_paths"
         }
       ]
-    },
-    "not_found": {
-      "message": "Product not found",
-      "outcome": "OUTCOME_NONE_UNSUPPORTED",
-      "refs": []
     }
   },
   "custom_extract": []

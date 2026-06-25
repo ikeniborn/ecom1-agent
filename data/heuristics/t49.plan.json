@@ -1,0 +1,131 @@
+{
+  "discovery": [
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md"
+      },
+      "bind": "policy_doc_text"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": ".headers on\n.mode tabs\nSELECT m.name as table_name, p.cid, p.name, p.type FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type='table' ORDER BY m.name, p.cid;"
+      },
+      "bind": "schema_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": ".headers on\n.mode tabs\nSELECT COALESCE((SELECT COUNT(DISTINCT v.sku) FROM product_variants v JOIN inventory i ON v.sku = i.sku JOIN stores s ON i.store_id = s.id WHERE v.product_kind_id = 'valves_connectors' AND s.name LIKE '%Vienna%' AND s.status = 'open' AND i.available_today_quantity > 0), 0) AS cnt;"
+      },
+      "bind": "count_raw"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "schema_raw",
+      "format": "auto_delim",
+      "into": "schema_parsed",
+      "columns": [
+        {
+          "into": "table_name",
+          "candidates": [
+            "table_name"
+          ]
+        },
+        {
+          "into": "cid",
+          "candidates": [
+            "cid"
+          ]
+        },
+        {
+          "into": "col_name",
+          "candidates": [
+            "name"
+          ]
+        },
+        {
+          "into": "col_type",
+          "candidates": [
+            "type"
+          ]
+        }
+      ]
+    },
+    {
+      "from_": "count_raw",
+      "format": "auto_delim",
+      "into": "count_rows",
+      "columns": [
+        {
+          "into": "cnt",
+          "candidates": [
+            "cnt"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$count_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "cnt"
+      ],
+      "into": "count_str"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$count_str"
+      ],
+      "into": "count"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "ge",
+          "lhs": "$count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "ok"
+      }
+    ],
+    "default_label": "unsupported"
+  },
+  "ops": [],
+  "answer": {
+    "ok": {
+      "message": "<QTY: {count}>",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/ops-policy-notes/catalogue-count-valves-connectors-vienna-2024-07-17.md",
+          "source": null
+        }
+      ]
+    },
+    "unsupported": {
+      "message": "Unsupported",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

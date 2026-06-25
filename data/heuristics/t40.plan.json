@@ -1,43 +1,58 @@
 {
   "discovery": [
     {
-      "rpc": "Read",
+      "rpc": "Search",
       "args": {
-        "path": "/docs/security.md"
+        "pattern": "fraud incident",
+        "root": "/docs",
+        "limit": 10
       },
-      "bind": "security_doc"
+      "bind": "search_results"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/payments/3ds.md"
+        "path": "/docs/merchant-continuity-and-critical-incidents.md"
       },
-      "bind": "three_ds_doc"
+      "bind": "incident_doc"
     }
   ],
   "rowsets": [],
-  "compute": [],
+  "compute": [
+    {
+      "prim": "get",
+      "args": [
+        "$search_results",
+        "results"
+      ],
+      "into": "search_results_list"
+    }
+  ],
   "decision": {
-    "branches": [],
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$search_results_list",
+          "rhs": "",
+          "args": []
+        },
+        "label": "found_incident"
+      }
+    ],
     "default_label": "clarify"
   },
   "ops": [],
   "answer": {
     "clarify": {
-      "message": "Clarification needed: Please specify the criteria for fraudulent payments and confirm access permissions for guest identity.",
+      "message": "Clarification needed: Please specify the criteria or identifier for the confirmed fraud incident, e.g., a specific payment_id, basket_id, or a set of conditions such as payment_status or 3DS failure patterns.",
       "outcome": "OUTCOME_NONE_CLARIFICATION",
-      "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/security.md",
-          "source": null
-        },
-        {
-          "kind": "policy_doc",
-          "path": "/docs/payments/3ds.md",
-          "source": null
-        }
-      ]
+      "refs": []
+    },
+    "found_incident": {
+      "message": "Found potential incident definition. Please specify which incident you are referring to.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
     }
   },
   "custom_extract": []

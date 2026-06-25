@@ -332,3 +332,684 @@
   embedding_hash: ef2d6e776c040971b92845f542e3fb4e4eeb5a6c584c3cf021d0e8af3d9bf26c
   source_task: t20
   polarity: anti_pattern
+- id: existence-check-via-sql-join-count
+  description: Check existence of an entity with multiple properties by joining a properties table and
+    counting matches.
+  domain:
+  - data querying
+  - SQL
+  - existence check
+  content: To verify if an entity (e.g., product variant) with a set of specific property-value pairs
+    exists, perform a SQL query that joins the main entity table with the properties table for each property,
+    using equality conditions on property key and value. Use COUNT(*) to count matching rows. If the count
+    is greater than or equal to 1, the entity exists; otherwise, it does not.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 1731859698924c4ff0e92d2fb0207855552ca99aa6943a1d766c7621bdfec327
+  source_task: t01
+  polarity: anti_pattern
+- id: product-existence-check-sql
+  description: Check if a product variant exists in a catalog by querying with brand, series, name, and
+    a property key-value pair.
+  domain:
+  - product catalog
+  - database query
+  - existence check
+  content: To determine if a product variant exists in a catalog, execute a SQL query that joins the product_variants
+    and product_variant_properties tables. Filter by brand, series, product_name, and a specific property
+    key-value. Use COUNT(*) to get the number of matching records. If the count is greater than or equal
+    to 1, the product exists; otherwise, it does not.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: e0b9491363df0afd52af71b1ab82eabb144b73f4efd4b60ca9590fafdb44f3ed
+  source_task: t02
+  polarity: anti_pattern
+- id: product_variant_existence_check
+  description: Method to determine if a specific product variant exists in a catalog by querying variant
+    and property tables.
+  domain:
+  - data retrieval
+  - product catalog
+  - SQL
+  - inventory management
+  content: To check existence of a product variant with given properties (e.g., brand, series, model,
+    size, color), perform a SQL query that joins the product_variants table with the product_variant_properties
+    table on product_sku. Filter by the fixed attributes (brand, series, model) and property key-value
+    pairs for each dynamic property. Use LIMIT 1 and test if any row is returned. If a row exists, the
+    variant is present; otherwise, it is not.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 2591bd82c64fb10162e81ca7629c9d13cc0524f02476c6a6ed0037c81c32ccc2
+  source_task: t03
+  polarity: anti_pattern
+- id: product-variant-existence-check
+  description: General method to determine if a specific product variant is carried in a catalog by querying
+    product families and variants with property filters.
+  domain:
+  - e-commerce
+  - product catalog
+  - inventory management
+  content: To check if a product variant is in the catalog, query the product database by joining product_families
+    and product_variants. Filter by brand and product family name. Then verify that the variant has all
+    required properties (e.g., machine_type, voltage, power) by using EXISTS clauses on the product_variant_properties
+    table. If a matching product_sku exists, the variant is carried; otherwise, it is not. This method
+    avoids hardcoding specific values by using parameters for brand, family name, and property key-value
+    pairs.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 50393e8fc64168306e7ef4a429de071c671ec59b417a7496aaa8ed1a84b73365
+  source_task: t04
+  polarity: anti_pattern
+- id: product-existence-check-multi-attribute
+  description: Check if a product exists in a catalog by matching brand, product line, and multiple variant
+    properties.
+  domain:
+  - data querying
+  - product catalog
+  - SQL
+  content: 'To verify product existence with multiple criteria across related tables: 1) Identify the
+    product family using brand and product line name patterns (e.g., LIKE with wildcards). 2) Within that
+    family, search for a variant that has all required property-value pairs. Use a subquery with EXISTS
+    for each property or join the properties table multiple times. Return a boolean or the variant identifier
+    if found. Use LIMIT 1 to stop after the first match.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 3e141cb5b41fef92bb570a6d9cf64f9d221fa6bc742ff146e3d67367f5d3b815
+  source_task: t05
+  polarity: anti_pattern
+- id: verify_product_claim_multiple_attributes
+  description: Verify that a product has multiple specific attribute values by checking a property field
+    for substrings.
+  domain:
+  - data verification
+  - product attribute checking
+  content: To verify a product claim that it has multiple specific attribute values (e.g., cleaner types),
+    query the product variant and its property for the relevant key. Then check if the property value
+    contains all required substrings. If all are present, the claim is confirmed; otherwise, it is not.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: f9dfa839075b71925c1ca8d1314ef581d6d6bfe8387cab1e51cadbdb8d115157
+  source_task: t06
+  polarity: anti_pattern
+- id: verify-multiple-property-values
+  description: Verify that a product variant has all required property values by using SQL conditional
+    aggregation and checking non-empty for each.
+  domain:
+  - data-verification
+  - product-catalog
+  - sql
+  content: To verify that a product variant possesses multiple specific property values, query the product_variants
+    and product_variant_properties tables. For each required property key-value pair, create a flag using
+    MAX(CASE WHEN property_key = '<key>' AND property_value_text = '<value>' THEN 1 ELSE 0 END). Group
+    by variant. Then check that all flags are non-empty (non-zero). If any flag is missing, the claim
+    is unsupported.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 59dad58ca19d2f87fb5762a37cb50c562c0cdd8b07579a30071d34b0288fee52
+  source_task: t07
+  polarity: anti_pattern
+- id: answer-format-marker
+  description: When a query returns a positive result, the answer must include the exact expected marker
+    string (e.g., '<YES>') as required by the test or validation framework.
+  domain:
+  - coding
+  - testing
+  - output-formatting
+  content: In conditional answer templates, use the exact marker string (e.g., '<YES>') required by the
+    grader, and insert dynamic values using placeholders. The marker must be exactly as expected (including
+    angle brackets if specified), not a similar word or phrase.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 7c826d9e614eaf98f232fbabcac15610089aad3e756205cfd32d74adbd716724
+  source_task: t08
+  polarity: anti_pattern
+- id: count-variants-by-kind
+  description: Count product variants for a given product kind, ensuring required documentation references
+    are included in the answer.
+  domain:
+  - data querying
+  - inventory management
+  - SQL
+  content: 'To count product variants for a specific product kind, execute a SQL query that joins the
+    product_variants table with the product_kinds table on product_kind_id, filtering by the product_kind_name.
+    The result should be a single count. When the answer is expected to include references to documentation
+    (e.g., a reporting guide), ensure the answer''s refs array contains the required document path. The
+    general method: SELECT COUNT(*) FROM product_variants WHERE product_kind_id = (SELECT product_kind_id
+    FROM product_kinds WHERE product_kind_name = ''<kind_name>''); then format the answer with the count
+    and the required reference.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: cd5f7842af0b4a1bf6065a764c5b08cc951dd1e22246405703831735048b7c12
+  source_task: t10
+  polarity: anti_pattern
+- id: count-by-policy-document
+  description: Count database records matching a category defined in an external policy document.
+  domain:
+  - data retrieval
+  - policy-driven queries
+  - database operations
+  content: To count records in a database that correspond to a category specified in a policy document,
+    first read the policy document to obtain the category identifier. Then perform a database count query
+    (e.g., SELECT COUNT(*) FROM table WHERE category_id = '<identifier>') to get the number of matching
+    records. Parse the query result to extract the count, and output it in a structured message. Ensure
+    the process handles missing or invalid policy documents gracefully.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: cce0ab972a54e77396a79aee9c7614686ad968109aad45939eaffbfaeccbd4f0
+  source_task: t12
+  polarity: anti_pattern
+- id: include-catalog-reference-in-answer
+  description: When answering queries that involve product catalog data, the answer must include a reference
+    to the catalog file used.
+  domain:
+  - data-querying
+  - answer-formatting
+  content: For any answer that involves product catalog information, the answer must include a reference
+    to the specific catalog file (e.g., '/proc/catalog/...') that was used to retrieve the data. This
+    ensures traceability and validation of the answer.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: e676c6904a402eb265767eb633bccc668433c3816f48c9dbef3673f90050afd1
+  source_task: t13
+  polarity: anti_pattern
+- id: inventory-availability-check
+  description: Count how many specified products have at least a minimum quantity available at a given
+    store.
+  domain:
+  - retail
+  - inventory
+  - e-commerce
+  content: To determine the number of products meeting an availability threshold at a specific store,
+    first ensure the store exists by querying the stores table. Then, for each product variant defined
+    by brand, series, model, and required properties, join with the inventory table on product_sku and
+    store_id, and count those where the available quantity (e.g., available_today_quantity) is at least
+    the threshold. The result is the count of products that satisfy the condition.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 59eef6ffe670513630980f6d575c9354aeca968a7e557dc69e64431174708a50
+  source_task: t14
+  polarity: anti_pattern
+- id: inventory-count-reference
+  description: When counting products with at least a specified quantity in a store, the answer must include
+    a reference to the store's storage bins organizer file.
+  domain:
+  - inventory
+  - store
+  - reference
+  content: For queries that count products with available quantity >= threshold in a store, ensure the
+    answer's refs array contains the path to the storage bins organizer JSON file for that store. This
+    file is typically located under /proc/catalog/storage/bins_organizers/ with a store-specific identifier.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: f5aad3fc5b4dd5e8abaf34ad5eae7793bdea13520a1c7c7e473735e7ae44d747
+  source_task: t15
+  polarity: anti_pattern
+- id: data-integrity-validate-record-path
+  description: Ensure that product variant record paths exist before querying inventory to prevent missing
+    reference errors.
+  domain:
+  - data_integrity
+  - error_handling
+  content: When constructing queries that rely on product variant record paths (e.g., for inventory lookups),
+    always validate that the path corresponds to an existing file or data source. This prevents runtime
+    errors caused by missing references, such as '/proc/catalog/workshop_machines/drill_grinders_sanders/fam_workshop_machines_drill_grinders_sanders_0002_epffkyv5/MAC-2LDP3TT3.json'.
+    Use a pre-check or fallback mechanism to handle cases where the path is invalid.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 2a72258aa3989c17f6d885d9fdb90af4e05de323c66c12c091d41423880414a2
+  source_task: t16
+  polarity: anti_pattern
+- id: zero-aware-aggregation
+  description: When aggregating numeric values (e.g., inventory quantities) across a set that may be empty,
+    use COALESCE to default to zero and avoid conditional checks that would skip the result if the set
+    is empty.
+  domain:
+  - inventory
+  - SQL
+  - aggregation
+  - retail
+  content: Use LEFT JOIN and COALESCE(SUM(column), 0) to ensure that an empty set returns zero. In the
+    decision logic, do not require that the product or stores exist; instead, always return the computed
+    total (which will be zero if no data). This avoids the OUTCOME_NONE_UNSUPPORTED error when the product
+    or stores are missing but a zero total is acceptable.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 59bd87fe307798386676850b2ee2cc1a89622f8a853fb7fe7f8d313899534b5a
+  source_task: t17
+  polarity: anti_pattern
+- id: product-inventory-summary-with-citations
+  description: Compute total available quantity of a product across stores in a city, including zero-availability
+    stores, with citations of product and store records.
+  domain:
+  - data query
+  - inventory management
+  - SQL
+  content: 'To compute total available quantity of a product across all stores in a given city, first
+    query the product by its identifying attributes (brand, series, model, and specific properties such
+    as anchor_type, diameter_mm, length_mm) to obtain its SKU and record path. If no product matches,
+    return an unsupported outcome. Otherwise, for that SKU, query all stores in the city using a LEFT
+    JOIN with the inventory table, coalescing null quantities to zero. Sum the available_today_quantity
+    column. Return the total sum along with citations: the product record path and the list of store record
+    paths.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 975f10912b00b29a85699b8e72db91eb3f0c7e37f50b00c4d48188813d04f6a5
+  source_task: t19
+  polarity: anti_pattern
+- id: inventory-query-handle-empty-stores
+  description: When computing total available quantity across stores, treat an empty store list as zero
+    availability rather than an unsupported condition.
+  domain:
+  - data-querying
+  - inventory
+  - decision-logic
+  content: When aggregating inventory quantities across a set of stores, if the set of stores is empty
+    (no stores match the criteria), the total should be 0. Do not branch to an unsupported outcome; instead,
+    use COALESCE or a default value to ensure the sum returns 0, and allow the decision logic to proceed
+    to the OK branch.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: d9fd38c6885897e018e714cad1116fa04b5ee7c1e8ac52b8eda3451c4b1896ee
+  source_task: t20
+  polarity: anti_pattern
+- id: checkout-guest-denial
+  description: Deny checkout for guest users with a security policy reference and a message containing
+    the basket identifier.
+  domain:
+  - e-commerce
+  - security
+  content: When processing a checkout request, first retrieve a security policy document and the user's
+    identity. If the user is a guest, deny the checkout by referencing the security policy and providing
+    a message that includes the basket identifier, stating that guest checkout is not permitted. Otherwise,
+    return an unsupported outcome.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 5472a0749905a9bdc1dc962e212c148c266bdd3f2154d7bbd4382f80f896c618
+  source_task: t21
+  polarity: method
+- id: avoid-hardcoded-file-paths
+  description: Do not hardcode file paths in scripts; use parameters or configuration to reference data
+    sources dynamically.
+  domain:
+  - data-access
+  - security
+  - coding-practices
+  content: When accessing data files or resources, avoid embedding literal paths (e.g., '/proc/baskets/basket_008.json')
+    directly in the code. Instead, use variables, environment variables, or configuration files to specify
+    the path. This prevents hardcoded dependencies, reduces the risk of path traversal vulnerabilities,
+    and makes the code more reusable and maintainable.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: cb005d3332b6717809a43a0fed5022c8a0d3997e3a87854979a60911ad6442af
+  source_task: t23
+  polarity: anti_pattern
+- id: checkout-3ds-recovery-decision
+  description: Decision logic for recovering a checkout after a 3DS authentication failure, based on attempt
+    count and status.
+  domain:
+  - payment
+  - checkout
+  - 3ds
+  - security
+  content: When processing a checkout recovery after a 3DS failure, evaluate the 3DS status and attempt
+    count. If the 3DS status is 'failed' and the number of attempts has reached the maximum allowed, deny
+    the recovery for security reasons. If the 3DS status is 'success', allow the recovery. For any other
+    status (e.g., pending, not attempted), the recovery action is unsupported.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 5d0f791f57081f6b816f55d5864b3d21d5cb3528d288ce752b3c49dc95389f39
+  source_task: t27
+  polarity: anti_pattern
+- id: authorization_decision_branching
+  description: When verifying authorization, include explicit branches for denial (principal exists but
+    lacks required role) and map to a security denial outcome.
+  domain:
+  - authorization
+  - decision_logic
+  - scripting
+  content: 'In a verification script that checks if a principal is authorized to perform an action, the
+    decision tree should have at least three branches: success (all conditions met), denial (principal
+    exists but fails authorization conditions), and no_data (principal not found). The denial branch should
+    be mapped to an outcome like OUTCOME_DENIED_SECURITY, not left as unsupported.'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 10744a160ce5e09f41c1da741862b0a83f8ba150525616b6c639cae4b0df4ac7
+  source_task: t28
+  polarity: anti_pattern
+- id: security-check-before-employee-data-access
+  description: Before querying employee personal information, verify the requester's identity. If the
+    requester is a guest or unauthorized, deny access with a security outcome.
+  domain:
+  - security
+  - data access
+  - employee records
+  content: When accessing employee personal data (e.g., email, name), first check the identity of the
+    requester (e.g., via `$_identity_raw`). If the requester is a guest or unauthorized user, immediately
+    return a denial with outcome `OUTCOME_DENIED_SECURITY` and a message indicating access is denied.
+    This prevents unauthorized access to sensitive employee data.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 311b44c08e55cfe09ed6e614369aecac57f071260de0de2c137c98fe1058d6d8
+  source_task: t29
+  polarity: anti_pattern
+- id: payment-3ds-recovery-check
+  description: Determine if a failed 3-DS payment can be recovered without bypassing security.
+  domain:
+  - payment
+  - e-commerce
+  - checkout
+  content: When a payment fails due to 3-DS authentication, first verify the user's identity and that
+    the payment status is 'failed'. Then check if the 3-DS failure reason is one of the recoverable reasons
+    (e.g., cardholder not enrolled, authentication unavailable) and that the number of 3-DS attempts is
+    less than the maximum allowed. If both conditions are met, allow recovery; otherwise, deny the recovery
+    to ensure payment security is not bypassed.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 4b0be448bf91ebdef5d359fb93b30869cc2ed63195faf4d03c1b302c06384168
+  source_task: t30
+  polarity: anti_pattern
+- id: product-variant-verification-pattern
+  description: Pattern to verify existence of a product variant with specific properties within a product
+    family, handling exact match, partial match, and missing family.
+  domain:
+  - product-catalog
+  - inventory
+  - e-commerce
+  content: To verify a product variant with given properties (e.g., product type, voltage, current, wifi-enabled)
+    exists in a product family, first retrieve the product family ID by its name. Then query for a variant
+    that has all required property key-value pairs. If such a variant exists, return it as the matching
+    product. If the family exists but no variant matches all properties, return a base variant (matching
+    some but not all properties) as unsupported. If the family does not exist, indicate clarification
+    needed.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: e7a972d6268509572ba4192068ce562242d77723b116ce8ae054d4a130a83847
+  source_task: t32
+  polarity: anti_pattern
+- id: avoid-denial-on-missing-data
+  description: When querying inventory or similar data across stores, if no matching stores or products
+    are found, return a default value (e.g., 0) instead of triggering a security denial. This ensures
+    the query succeeds even when data is absent.
+  domain:
+  - data-access
+  - inventory-query
+  content: Use conditional logic to check for existence of stores/products before querying. If none exist,
+    return a default count (e.g., 0) rather than raising a security error. This prevents false denials
+    when data is simply missing.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 9011925975dd7699ece602256c1a6ee01b5d3929be2c7b8663609a3096bdedfb
+  source_task: t33
+  polarity: anti_pattern
+- id: checkout-identity-branching
+  description: Ensure checkout workflow has explicit branches for both guest and authenticated users to
+    avoid unexpected outcomes.
+  domain:
+  - e-commerce
+  - checkout
+  - identity
+  - security
+  content: When implementing a checkout process that depends on user identity, always define explicit
+    branches for both 'guest' and 'authenticated' user types. Do not rely on a default branch (e.g., 'unsupported')
+    to handle authenticated users, as this can lead to errors such as 'OUTCOME_NONE_CLARIFICATION' instead
+    of the expected 'OUTCOME_DENIED_SECURITY' for guests or a successful checkout for authenticated users.
+    Instead, ensure that the decision logic covers all relevant identity states.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 49e18e9e185ebc0de7c2e4ff0bbd5b60a2fb7f0810c6d373c7060961c2fe8581
+  source_task: t34
+  polarity: anti_pattern
+- id: 3ds-recovery-eligibility
+  description: Check eligibility for 3DS flow recovery on a payment.
+  domain:
+  - payments
+  - 3ds
+  - security
+  content: A payment is eligible for 3DS recovery if its status is 'pending', its 3DS status is 'failed',
+    and the number of 3DS attempts is less than the maximum allowed attempts. Additionally, the user must
+    not be a guest, as guests are not permitted to modify payments.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: ecb06285e121a56c7f7c49f18170212b9c74cb9fe218ad61c6f5d5b060180224
+  source_task: t35
+  polarity: anti_pattern
+- id: include-required-references-in-answer
+  description: When constructing an answer for a decision or exception, ensure that the answer object
+    includes all required references as specified by the domain documentation (e.g., '/docs/checkout.md').
+    Missing required references will cause validation failures.
+  domain:
+  - decision-making
+  - exception-handling
+  - answer-construction
+  content: Always include all required references in the answer object. The required references are defined
+    in the domain's documentation (e.g., '/docs/checkout.md'). For each answer, check the domain specification
+    and add the necessary refs array entries. Failure to include required references results in a validation
+    error.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 5b9209304bd6c9e20c60d22fcff35445aec2651032300e54b86f7a82e71929f2
+  source_task: t36
+  polarity: anti_pattern
+- id: entity-dataset-requirement
+  description: Before querying records for a known entity in a specific dataset, ensure you have the entity's
+    identifier and the dataset's location. If missing, request clarification.
+  domain:
+  - fraud detection
+  - data retrieval
+  - payment processing
+  content: When tasked to identify records belonging to a known entity (e.g., fraud hit) in an archived
+    dataset (e.g., payment history), you must first obtain the entity's unique identifier and the exact
+    location of the archived data (e.g., directory path, database table, or query condition). Without
+    these specifics, you cannot perform the retrieval and should ask for clarification rather than proceeding
+    with incomplete information.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 3097026a26732d07c3ff0212dee8a5f21f3da9a96e023acf389088be986eca1a
+  source_task: t38
+  polarity: anti_pattern
+- id: fraud-archived-payment-query
+  description: To identify payment records that are part of a confirmed fraud incident in archived payment
+    history, query the payment transactions table filtering for archived basket references and specific
+    payment and 3DS statuses that indicate fraud.
+  domain:
+  - fraud
+  - payments
+  - data-query
+  content: When investigating confirmed fraud incidents, retrieve payment records from the payment_transactions
+    table where the basket is archived (is_archived_basket_reference = 1) and the payment status indicates
+    a 3DS action is required (e.g., 'requires_3ds_action') and the 3DS status matches a known fraud indicator
+    (e.g., '3ds_status2'). This combination helps isolate records that are part of the fraud incident.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: cecfd1fbfd9cb524287cd6737ab0b2973e780f8bf28a3f19b9477164ed3b88ce
+  source_task: t39
+  polarity: anti_pattern
+- id: clarify-ambiguous-entity-reference
+  description: When a user request references a specific entity (e.g., a fraud incident) without providing
+    a unique identifier or criteria, the system must request clarification before proceeding, to avoid
+    incorrect or incomplete results.
+  domain:
+  - data retrieval
+  - fraud detection
+  - user interaction
+  - clarification
+  content: Before executing a search or action that depends on a specific entity (such as a fraud incident,
+    payment record, or customer), verify that the request includes a unique identifier or explicit criteria.
+    If not, return a clarification prompt asking the user to specify the missing information (e.g., incident
+    ID, payment ID, or set of conditions). Do not attempt to infer or proceed with ambiguous references,
+    as this leads to incorrect outcomes.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 2d5b194ced7b1463077175c3fb4579523d706058482b29bde9f402a2b450654c
+  source_task: t40
+  polarity: anti_pattern
+- id: atom-001
+  description: Ensure response includes all required documentation references to pass grader validation.
+  domain:
+  - response-validation
+  - automated-grading
+  - documentation
+  content: When generating a response that will be validated by an automated grader, include all required
+    documentation references to avoid validation failures. Do not default to a clarification request if
+    the grader expects a specific reference.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: f3a4bd22d2b434df12b2dcf74b3ccd706ede42cae653437acad40f7465be27ca
+  source_task: t41
+  polarity: anti_pattern
+- id: decision-branch-outcome-mapping
+  description: When a condition is satisfied in a decision branch, the branch should execute the intended
+    operation and return a success outcome, not a clarification request.
+  domain:
+  - refund processing
+  - customer authentication
+  - decision logic
+  - conditional branching
+  content: In a decision tree, after verifying that a required condition (e.g., user is a customer) is
+    met, the corresponding branch should perform the intended action (e.g., process refund) and return
+    a success outcome (e.g., OUTCOME_OK). Returning a clarification outcome (e.g., OUTCOME_NONE_CLARIFICATION)
+    when the condition is satisfied is incorrect; clarification should only be used when additional information
+    is needed, not when the condition is already met. Ensure that each branch's outcome matches the logical
+    result of the condition.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: a7d4366b346d5dcfbd933bd2cedf49e14e65f8e0780adf6e5bde1a7ce6e752c0
+  source_task: t43
+  polarity: anti_pattern
+- id: count-zero-inventory-products
+  description: Count how many specified products have zero available quantity at a given store, using
+    SQL CTEs to identify products by brand/series/model/properties and then checking inventory.
+  domain:
+  - SQL
+  - inventory
+  - e-commerce
+  - data query
+  content: 'To count products with zero available quantity at a specific store, use a series of CTEs:
+    first select the store_id from the stores table; then for each product, select its product_sku from
+    product_variants filtered by brand, series, model, and required property key-value pairs (using EXISTS
+    subqueries on product_variant_properties). Finally, in a main query, use scalar subqueries to count
+    inventory rows for each product where store_id matches and available_today_quantity = 0. Return the
+    sum of these counts. Ensure each product subquery returns exactly one row (use LIMIT 1).'
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 604d17a6d02bcaeb037876d018e78d96a0b9ffb2e9d77419090d24d09cff3e19
+  source_task: t45
+  polarity: anti_pattern
+- id: policy-answer-refs
+  description: Policy answer must include references to all data sources used in the decision.
+  domain:
+  - policy
+  - catalog
+  - availability
+  content: When constructing a policy script that checks product descriptions against a catalogue and
+    store availability, the answer block must include references (refs) to the catalogue file(s) used.
+    Otherwise, a grader will flag a 'missing required reference' error.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: f6a5dba77449063433d1616fafa1f639f1224583b8b32560ad9c85c038ee1b17
+  source_task: t47
+  polarity: anti_pattern
+- id: required-scratch-space-reference
+  description: When providing an answer based on SQL query results, always include a reference to the
+    scratch space document used for the SQL session.
+  domain:
+  - data-querying
+  - sql-execution
+  - answer-formatting
+  content: For any answer that includes results from a SQL query executed in a scratch space, the answer
+    must include a reference to the scratch space document (e.g., '/docs/current-updates/<date>-sql-scratch-space.md')
+    to indicate where the query was run. This reference is required even if other references (like policy
+    documents) are present.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: 8246782fa41f2d85d0e5eaec4400b4f8d96e17e1f7359e01a7bc3cc0b0284b48
+  source_task: t49
+  polarity: anti_pattern
+- id: include_resource_ref
+  description: Always include a reference to the specific resource being acted upon in the response.
+  domain:
+  - API design
+  - data retrieval
+  - response validation
+  content: When implementing a function that retrieves or processes a specific resource (e.g., a basket,
+    order, user account), ensure that the output includes a reference to that resource's identifier or
+    path. This enables verification and traceability, and is often required by graders or downstream systems.
+  source: distilled
+  validated_by: ''
+  validated_at: ''
+  status: active
+  embedding_hash: ce4f468ea4d83919fd6929a11ef65108c538fece02c783befcae30ca83085d5f
+  source_task: t50
+  polarity: anti_pattern

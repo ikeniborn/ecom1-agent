@@ -1,0 +1,78 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT v.record_path FROM product_variants v JOIN product_variant_properties p_size ON v.product_sku = p_size.product_sku AND p_size.property_key = 'size' AND p_size.property_value_text = 'S' JOIN product_variant_properties p_color ON v.product_sku = p_color.product_sku AND p_color.property_key = 'color_family' AND p_color.property_value_text = 'Blue' WHERE v.brand = 'Ansell' AND v.series = 'HyFlex ActivArmr 1DI-VG8' AND v.model = 'Work Gloves' LIMIT 1;"
+      },
+      "bind": "raw_query_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "raw_query_result",
+      "format": "auto_delim",
+      "into": "parsed_rows",
+      "columns": [
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$parsed_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "record_path"
+      ],
+      "into": "record_path"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "nonempty",
+          "lhs": "$parsed_rows",
+          "rhs": null,
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "The product is in the catalogue.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$record_path"
+        }
+      ]
+    },
+    "not_found": {
+      "message": "The product is not in the catalogue.",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

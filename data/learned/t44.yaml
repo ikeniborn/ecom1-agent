@@ -14,9 +14,35 @@ entries:
     RPC in ops. Rule: Use only ''Exec'' RPCs for all file operations.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Always extract the 'stdout' field from an ExecResponse using a 'get' operation
+    before using the output in string comparison operations such as contains_any.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''real_vm: Protocol message ExecResponse has no "employee" field.''
+    Root cause: PlanIR uses `$_identity_raw` (an ExecResponse object) directly in
+    a `contains_any` operation with rhs ["employee"]. The VM attempts to access a
+    field named "employee" on the ExecResponse, which does not exist. The failing
+    fragment is the decision branch: `{"op":"contains_any","lhs":"$_identity_raw","rhs":["employee"]}`.
+    The fix is to extract the stdout field from the ExecResponse before string operations.
+    This rule ensures proper handling of Exec RPC outputs.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - answer missing required reference '/docs/returns.md'
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
   cycles_used: 1
-  date: '2026-06-24'
-  outcome: OUTCOME_NONE_CLARIFICATION
+  date: '2026-06-25'
+  outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t44

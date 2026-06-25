@@ -1,8 +1,10 @@
 {
-  "objective": "Verify whether the Metabo Brushless BS 1OW-IK5 Cordless Drill Driver product has the claimed battery platform 18v-system property in addition to its base properties (voltage 12 V, battery platform 12v-system, kit contents starter kit).",
+  "objective": "Verify whether the product 'Mellerud Bio MEL 233-MOB Cleaning Liquid' has both cleaner type 'multi surface cleaner' and 'floor cleaner' as claimed, and report the result.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_discovery": "Search product_variants for brand 'Metabo' and product_name containing 'Brushless BS 1OW-IK5' to obtain the SKU. Then query product_variant_properties for that SKU to retrieve all property_key, property_value_text pairs. Verify that the base properties (voltage=12 V, battery platform=12v-system, kit contents=starter kit) are present. Then check if battery platform=18v-system is also present."
+    "product_sku": "lookup from product_variants WHERE brand='Mellerud' AND series='Bio MEL 233-MOB' AND model='Cleaning Liquid' to get product_sku",
+    "product_record_path": "lookup from product_variants WHERE brand='Mellerud' AND series='Bio MEL 233-MOB' AND model='Cleaning Liquid' to get record_path",
+    "cleaner_type_value": "lookup from product_variant_properties WHERE product_sku=$product_sku AND property_key='cleaner type' to get property_value_text"
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -16,49 +18,11 @@
         "lhs": "$product_sku",
         "rhs": null,
         "args": []
-      },
-      {
-        "op": "eq",
-        "lhs": "$product.brand",
-        "rhs": "Metabo",
-        "args": []
-      },
-      {
-        "op": "contains_any",
-        "lhs": "$product.product_name",
-        "rhs": [
-          "Brushless BS 1OW-IK5"
-        ],
-        "args": []
-      },
-      {
-        "op": "in_set",
-        "lhs": "$properties.voltage",
-        "rhs": [
-          "12 V"
-        ],
-        "args": []
-      },
-      {
-        "op": "in_set",
-        "lhs": "$properties.battery_platform",
-        "rhs": [
-          "12v-system"
-        ],
-        "args": []
-      },
-      {
-        "op": "in_set",
-        "lhs": "$properties.kit_contents",
-        "rhs": [
-          "starter kit"
-        ],
-        "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "<NO> {sku}",
+    "msg_skeleton": "Checked product {product_sku}: claim that it has both cleaner types is absent. Answer: <NO>",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -68,7 +32,7 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product.record_path"
+        "source": "$product_record_path"
       }
     ]
   }

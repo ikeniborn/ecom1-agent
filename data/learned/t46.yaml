@@ -35,9 +35,86 @@ entries:
     entirely, but the PlanIR did not follow it.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: Never use the `concat` primitive for string concatenation; it only accepts
+    exactly two list[dict] row arguments. Use `str_concat` for string concatenation,
+    or embed variable references directly in the `stdin` template of an Exec RPC.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: ''interpret: compute step concat failed: <lambda>() takes 2 positional
+    arguments but 5 were given''. The PlanIR compute step used `concat` with 5 string
+    arguments to build an SQL UPDATE statement. The contract requires exactly two
+    list[dict] arguments (row sets). Root cause: misuse of `concat` for string concatenation.
+    Failing fragment: {"prim":"concat","args":["UPDATE shopping_baskets SET discount_percent
+    = ","$discount_percent",", discount_reason_code = ''service_recovery'' WHERE basket_id
+    = ''","$basket_id","'';"]}. Correct approach: use `str_concat` or embed variables
+    directly in the `stdin` template. No existing rule covers this.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always place all branches with label 'denied_security' before any branch
+    with a different label in the decision tree, to satisfy the security-first policy
+    that prevents information leakage.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: ''interpret: security-first violation: a DENIED_SECURITY branch
+    follows a non-DENIED branch in the decision tree''. Root cause: The decision tree
+    in the PlanIR has branches in order: unsupported (non-DENIED), denied_security,
+    unsupported, denied_security, apply_10, default apply_5. The first branch is non-DENIED,
+    violating the security-first ordering rule. The PlanIR must be restructured so
+    that all denied_security branches appear first, then the remaining branches. This
+    rule ensures the interpreter does not reject the plan.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always provide the `args` field of a compute step as a list of argument
+    dicts, even for a single argument. For extracting a single column from a single
+    row, use the `get` primitive (which takes a single row dict and a column name)
+    instead of `column` (which requires a list of rows).
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: The PlanIR validation failed because compute steps had `args` as a dict
+    instead of a list. The error message also indicates that `column` expects a list
+    of rows; for a single row, `get` should be used. This rule prevents such structural
+    errors.
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always construct decision branch `when` conditions as predicate expressions
+    (dicts with `op` and `args`), never as raw strings or other types.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'Error: plan validation failed at decision.branches.0.when.args.0.args.0:
+    expected a dictionary or PredExpr but got string ''discount_manager''. Root cause:
+    the plan used a raw string where a predicate expression was required, likely in
+    a condition that should have been a comparison or logical operation. The failing
+    PlanIR fragment is unknown but the error path indicates a nested predicate argument
+    was a string. This violates the PlanIR schema. Rule linkage: no existing rule
+    covers predicate construction; this rule ensures all conditions are valid predicate
+    objects.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Always verify that the ecom runtime is active before using /bin/sql in
+    Exec RPCs; if the runtime is inactive, include a step to create a new runtime
+    or use an alternative execution method that does not require a runtime.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'Error: ''real_vm: failed to load ecom runtime ... trial is no longer
+    active''. The PlanIR directly uses /bin/sql without checking runtime status, causing
+    failure when the runtime trial expires. The rule ensures the plan proactively
+    checks runtime availability or creates a fresh runtime, preventing reliance on
+    an inactive runtime.'
+  status: active
+  surface: ir
 last_run:
-  cycles_used: 2
-  date: '2026-06-24'
+  cycles_used: 5
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t46

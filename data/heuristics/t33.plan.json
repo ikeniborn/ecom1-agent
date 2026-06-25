@@ -4,16 +4,32 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH product AS (SELECT product_sku, record_path FROM product_variants WHERE brand='Uvex' AND series='Uvex Industrial' AND model='uvex 2KV-937 Work Gloves' AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku=product_variants.product_sku AND property_key='Size' AND property_value_text='L') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku=product_variants.product_sku AND property_key='Color Family' AND property_value_text='Blue')), stores AS (SELECT store_id, record_path FROM stores WHERE city='Vienna' AND is_open=1) SELECT (SELECT product_sku FROM product) AS product_sku, (SELECT record_path FROM product) AS product_record_path, (SELECT COUNT(*) FROM stores) AS store_count, (SELECT record_path FROM stores LIMIT 1) AS store_record_path, COALESCE((SELECT SUM(available_today_quantity) FROM store_inventory WHERE product_sku IN (SELECT product_sku FROM product) AND store_id IN (SELECT store_id FROM stores)), 0) AS total_count;"
+        "stdin": "SELECT product_sku, record_path FROM product_variants WHERE brand = 'Engelbert Strauss' AND series = 'e.s.vision' AND model = 'e.s. 150-ZC6 Work Top' AND product_sku IN (SELECT product_sku FROM product_variant_properties WHERE property_key = 'garment type' AND property_value_text = 'polo shirt')"
       },
-      "bind": "result_raw"
+      "bind": "product_info_text"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT COALESCE((SELECT SUM(available_today_quantity) FROM store_inventory WHERE store_id IN (SELECT store_id FROM stores WHERE city = 'Graz' AND store_name LIKE '%PowerTool%') AND product_sku = '$product_sku'), 0) AS total_available"
+      },
+      "bind": "total_available_text"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "SELECT record_path FROM stores WHERE city = 'Graz' AND store_name LIKE '%PowerTool%'"
+      },
+      "bind": "store_paths_text"
     }
   ],
   "rowsets": [
     {
-      "from_": "result_raw",
+      "from_": "product_info_text",
       "format": "auto_delim",
-      "into": "result_rows",
+      "into": "product_info_rows",
       "columns": [
         {
           "into": "product_sku",
@@ -22,27 +38,35 @@
           ]
         },
         {
-          "into": "product_record_path",
+          "into": "record_path",
           "candidates": [
-            "product_record_path"
+            "record_path"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "from_": "total_available_text",
+      "format": "auto_delim",
+      "into": "total_available_rows",
+      "columns": [
         {
-          "into": "store_count",
+          "into": "total_available",
           "candidates": [
-            "store_count"
+            "total_available"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "from_": "store_paths_text",
+      "format": "auto_delim",
+      "into": "store_paths_rows",
+      "columns": [
         {
-          "into": "store_record_path",
+          "into": "record_path",
           "candidates": [
-            "store_record_path"
-          ]
-        },
-        {
-          "into": "total_count",
-          "candidates": [
-            "total_count"
+            "record_path"
           ]
         }
       ]
@@ -50,136 +74,97 @@
   ],
   "compute": [
     {
-      "prim": "column",
-      "args": [
-        "$result_rows",
-        "product_sku"
-      ],
-      "into": "product_sku_list"
-    },
-    {
       "prim": "first",
       "args": [
-        "$product_sku_list"
+        "$product_info_rows"
+      ],
+      "into": "product_info_first"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$product_info_first",
+        "product_sku"
       ],
       "into": "product_sku"
     },
     {
-      "prim": "column",
+      "prim": "get",
       "args": [
-        "$result_rows",
-        "product_record_path"
+        "$product_info_first",
+        "record_path"
       ],
-      "into": "product_record_path_list"
+      "into": "product_record_path"
     },
     {
       "prim": "first",
       "args": [
-        "$product_record_path_list"
+        "$total_available_rows"
       ],
-      "into": "product_variant.record_path"
+      "into": "total_available_first"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$total_available_first",
+        "total_available"
+      ],
+      "into": "total_available"
     },
     {
       "prim": "column",
       "args": [
-        "$result_rows",
-        "store_count"
+        "$store_paths_rows",
+        "record_path"
       ],
-      "into": "store_count_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$store_count_list"
-      ],
-      "into": "store_count_str"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$store_count_str"
-      ],
-      "into": "store_count_num"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$result_rows",
-        "store_record_path"
-      ],
-      "into": "store_record_path_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$store_record_path_list"
-      ],
-      "into": "store.record_path"
-    },
-    {
-      "prim": "column",
-      "args": [
-        "$result_rows",
-        "total_count"
-      ],
-      "into": "total_count_list"
-    },
-    {
-      "prim": "first",
-      "args": [
-        "$total_count_list"
-      ],
-      "into": "count"
+      "into": "store_record_paths"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "and",
+          "op": "isnull",
+          "lhs": "$product_record_path",
+          "rhs": null,
+          "args": []
+        },
+        "label": "denied_missing_product"
+      },
+      {
+        "when": {
+          "op": "not",
           "lhs": null,
           "rhs": null,
           "args": [
             {
               "op": "nonempty",
-              "lhs": "$product_sku",
+              "lhs": "$store_record_paths",
               "rhs": null,
-              "args": []
-            },
-            {
-              "op": "gt",
-              "lhs": "$store_count_num",
-              "rhs": 0,
               "args": []
             }
           ]
         },
-        "label": "ok"
+        "label": "denied_missing_stores"
       }
     ],
-    "default_label": "unsupported"
+    "default_label": "ok"
   },
   "ops": [],
   "answer": {
-    "ok": {
-      "message": "Count: {count}",
-      "outcome": "OUTCOME_OK",
-      "refs": [
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$product_variant.record_path"
-        },
-        {
-          "kind": "record_path",
-          "path": null,
-          "source": "$store.record_path"
-        }
-      ]
+    "denied_missing_product": {
+      "message": "Product not found",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
     },
-    "unsupported": {
-      "message": "Unable to determine count.",
-      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+    "denied_missing_stores": {
+      "message": "No PowerTool stores found in Graz",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
+    },
+    "ok": {
+      "message": "report count {total_available}",
+      "outcome": "OUTCOME_OK",
       "refs": []
     }
   },

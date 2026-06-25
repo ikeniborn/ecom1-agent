@@ -1,10 +1,10 @@
 {
-  "objective": "Calculate the total number of units of a specific product (Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer, fastener type bolt, diameter 10 mm) available today across all Vienna stores, including stores with zero availability, and cite each store record and the product record.",
+  "objective": "Determine the total available_today_quantity of a specific Festool product across all Graz stores, including stores with zero availability.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "product_sku": "lookup from product_variants, product_families, product_variant_properties matching brand='Heco', product_family_name='Heco Zinc Plated HECO 3DW-64B Nut Bolt and Washer', property_key='fastener type' value='bolt', property_key='diameter' value='10 mm'",
-    "vienna_stores": "lookup from stores WHERE city='Vienna'",
-    "total_available": "sum over vienna_stores of available_today_quantity from store_inventory for product_sku, default 0"
+    "product_sku": "Lookup from product_variants WHERE brand='Festool' AND series='Festool Stackable SYS 3JJ-9LM Tool Box and Bag' AND model='Tool Box and Bag', then verify in product_variant_properties that property_key='storage type' AND property_value_text='tool bag' for that SKU.",
+    "graz_stores": "Query stores WHERE city='Graz' to obtain list of store_ids and record_paths.",
+    "available_today_sum": "For each store in graz_stores, sum available_today_quantity from store_inventory WHERE product_sku = $product_sku AND store_id = $store_id. If no row exists, treat as 0. Sum across all stores."
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -15,26 +15,26 @@
     "OUTCOME_OK": [
       {
         "op": "ge",
-        "lhs": "$total_available",
+        "lhs": "$store_count",
+        "rhs": 1,
+        "args": []
+      },
+      {
+        "op": "nonempty",
+        "lhs": "$product_sku",
+        "rhs": null,
+        "args": []
+      },
+      {
+        "op": "ge",
+        "lhs": "$answer",
         "rhs": 0,
-        "args": []
-      },
-      {
-        "op": "nonempty",
-        "lhs": "$vienna_store_paths",
-        "rhs": null,
-        "args": []
-      },
-      {
-        "op": "nonempty",
-        "lhs": "$product_record_path",
-        "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "count: {count}",
+    "msg_skeleton": "answer=%d",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -44,12 +44,12 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$vienna_store_paths"
+        "source": "$product_record_path"
       },
       {
         "kind": "record_path",
         "path": null,
-        "source": "$product_record_path"
+        "source": "$store_record_paths"
       }
     ]
   }

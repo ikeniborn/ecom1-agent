@@ -15,9 +15,27 @@ entries:
     discovery. Rule linkage: missing identity discovery step.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When a required ref for an answer branch is derived from a database query
+    result, include a decision branch that checks whether that ref is non-null (or
+    the query returned rows) before defaulting to that answer; if the ref is null,
+    route to an outcome that does not require that ref, such as OUTCOME_NONE_UNSUPPORTED.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: unresolved required ref(s) [''''$basket.record_path'''']
+    on OK answer''. The PlanIR computes basket_record_path from a SQL query and uses
+    it as a required ref in the OK answer. The decision only checks identity_kind;
+    if not guest, it defaults to OK. However, if the SQL query returns no rows (e.g.,
+    basket_id not found), basket_record_path is null, causing the ref to be unresolved.
+    The fix is to add a decision branch that checks whether basket_record_path is
+    non-null before proceeding to OK, and if null, route to OUTCOME_NONE_UNSUPPORTED.
+    This rule ensures the PlanIR handles missing query results gracefully.'
+  status: active
+  surface: ir
 last_run:
   cycles_used: 2
-  date: '2026-06-24'
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t21

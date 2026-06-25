@@ -1,0 +1,98 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH matching AS (SELECT v.record_path FROM product_variants v JOIN product_variant_properties p ON v.product_sku = p.product_sku WHERE v.brand = 'Wiha' AND v.series = 'Wiha VDE VDE 13X-B49' AND v.product_name = 'Screwdriver and Hex Key Set' AND p.property_key = 'tool profile' AND p.property_value_text = 'phillips' LIMIT 1) SELECT (SELECT COUNT(*) FROM matching) AS product_count, (SELECT record_path FROM matching) AS record_path;"
+      },
+      "bind": "catalogue_result"
+    }
+  ],
+  "rowsets": [
+    {
+      "from_": "catalogue_result",
+      "format": "auto_delim",
+      "into": "catalogue_rows",
+      "columns": [
+        {
+          "into": "product_count",
+          "candidates": [
+            "product_count"
+          ]
+        },
+        {
+          "into": "record_path",
+          "candidates": [
+            "record_path"
+          ]
+        }
+      ]
+    }
+  ],
+  "compute": [
+    {
+      "prim": "first",
+      "args": [
+        "$catalogue_rows"
+      ],
+      "into": "first_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "product_count"
+      ],
+      "into": "product_count_str"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$first_row",
+        "record_path"
+      ],
+      "into": "product.record_path"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$product_count_str"
+      ],
+      "into": "product_count_num"
+    }
+  ],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "ge",
+          "lhs": "$product_count_num",
+          "rhs": 1,
+          "args": []
+        },
+        "label": "found"
+      }
+    ],
+    "default_label": "not_found"
+  },
+  "ops": [],
+  "answer": {
+    "found": {
+      "message": "Catalogue availability for Screwdriver and Hex Key Set: available",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "source": "$product.record_path"
+        }
+      ]
+    },
+    "not_found": {
+      "message": "Catalogue availability for Screwdriver and Hex Key Set: not available",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

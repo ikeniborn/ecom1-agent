@@ -3,100 +3,76 @@
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/security.md"
+        "path": "/docs/checkout.md"
       },
-      "bind": "security_policy"
+      "bind": "checkout_doc"
     },
     {
       "rpc": "Read",
       "args": {
-        "path": "/docs/checkout.md"
+        "path": "/docs/security.md"
       },
-      "bind": "checkout_policy"
+      "bind": "security_doc"
     },
     {
-      "rpc": "Exec",
+      "rpc": "Read",
       "args": {
-        "path": "/bin/id"
+        "path": "/proc/baskets/basket_008.json"
       },
-      "bind": "identity_raw"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "WITH basket AS (SELECT basket_id, store_id, customer_id, basket_status FROM shopping_baskets WHERE basket_id = 'basket_035'), items AS (SELECT product_sku, requested_quantity FROM shopping_basket_items WHERE basket_id = 'basket_035'), inventory AS (SELECT si.product_sku, si.available_today_quantity FROM store_inventory si JOIN basket b ON si.store_id = b.store_id WHERE si.product_sku IN (SELECT product_sku FROM items)), prices AS (SELECT pv.product_sku, pv.price_cents FROM product_variants pv WHERE pv.product_sku IN (SELECT product_sku FROM items)), payment_exists AS (SELECT COUNT(*) as cnt FROM payment_transactions WHERE basket_id = 'basket_035' AND payment_status = 'completed') SELECT b.basket_status, b.store_id, b.customer_id, CASE WHEN MIN(i.available_today_quantity - it.requested_quantity) >= 0 THEN 1 ELSE 0 END as sufficient_inventory, CASE WHEN pe.cnt > 0 THEN 1 ELSE 0 END as payment_exists, SUM(p.price_cents * it.requested_quantity) as total_amount_cents FROM basket b CROSS JOIN items it JOIN inventory i ON it.product_sku = i.product_sku JOIN prices p ON it.product_sku = p.product_sku CROSS JOIN payment_exists pe GROUP BY b.basket_status, b.store_id, b.customer_id, pe.cnt;"
-      },
-      "bind": "basket_data_raw"
+      "bind": "basket_raw"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT hex(randomblob(16)) as payment_id;"
+        "stdin": "SELECT '/proc/payments/pay_' || :basket_id || '.json' AS record_path;"
       },
-      "bind": "payment_id_raw"
+      "bind": "payment_record_path_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH inv AS (SELECT available_today_quantity FROM store_inventory WHERE store_id = :store_id AND product_sku = :sku), price AS (SELECT price_cents FROM product_variants WHERE product_sku = :sku) SELECT inv.available_today_quantity, price.price_cents FROM inv, price;"
+      },
+      "bind": "inventory_price_raw"
     }
   ],
   "rowsets": [
     {
-      "from_": "identity_raw",
+      "from_": "basket_raw",
       "format": "json",
-      "into": "identity_parsed",
+      "into": "basket_rows",
       "columns": []
     },
     {
-      "from_": "basket_data_raw",
+      "from_": "payment_record_path_raw",
       "format": "auto_delim",
-      "into": "basket_rows",
+      "into": "payment_record_path_rows",
       "columns": [
         {
-          "into": "basket_status",
+          "into": "record_path",
           "candidates": [
-            "basket_status"
-          ]
-        },
-        {
-          "into": "store_id",
-          "candidates": [
-            "store_id"
-          ]
-        },
-        {
-          "into": "customer_id",
-          "candidates": [
-            "customer_id"
-          ]
-        },
-        {
-          "into": "sufficient_inventory",
-          "candidates": [
-            "sufficient_inventory"
-          ]
-        },
-        {
-          "into": "payment_exists",
-          "candidates": [
-            "payment_exists"
-          ]
-        },
-        {
-          "into": "total_amount_cents",
-          "candidates": [
-            "total_amount_cents"
+            "record_path"
           ]
         }
       ]
     },
     {
-      "from_": "payment_id_raw",
+      "from_": "inventory_price_raw",
       "format": "auto_delim",
-      "into": "payment_id_rows",
+      "into": "inventory_price_rows",
       "columns": [
         {
-          "into": "payment_id",
+          "into": "available_today_quantity",
           "candidates": [
-            "payment_id"
+            "available_today_quantity"
+          ]
+        },
+        {
+          "into": "price_cents",
+          "candidates": [
+            "price_cents"
           ]
         }
       ]
@@ -104,24 +80,24 @@
   ],
   "compute": [
     {
-      "prim": "get",
-      "args": [
-        "$identity_parsed",
-        "kind"
-      ],
-      "into": "identity_kind"
-    },
-    {
       "prim": "first",
       "args": [
         "$basket_rows"
       ],
-      "into": "basket_row"
+      "into": "basket"
     },
     {
       "prim": "get",
       "args": [
-        "$basket_row",
+        "$basket",
+        "customer_id"
+      ],
+      "into": "basket_customer_id"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$basket",
         "basket_status"
       ],
       "into": "basket_status"
@@ -129,129 +105,184 @@
     {
       "prim": "get",
       "args": [
-        "$basket_row",
+        "$basket",
         "store_id"
       ],
-      "into": "store_id"
+      "into": "basket_store_id"
     },
     {
       "prim": "get",
       "args": [
-        "$basket_row",
-        "customer_id"
+        "$basket",
+        "items"
       ],
-      "into": "customer_id"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$basket_row",
-        "sufficient_inventory"
-      ],
-      "into": "sufficient_inventory"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$basket_row",
-        "payment_exists"
-      ],
-      "into": "payment_exists"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$basket_row",
-        "total_amount_cents"
-      ],
-      "into": "total_amount_cents"
+      "into": "basket_items"
     },
     {
       "prim": "first",
       "args": [
-        "$payment_id_rows"
+        "$basket_items"
       ],
-      "into": "payment_id_row"
+      "into": "first_item"
     },
     {
       "prim": "get",
       "args": [
-        "$payment_id_row",
-        "payment_id"
+        "$first_item",
+        "product_sku"
       ],
-      "into": "payment_id"
+      "into": "sku"
     },
     {
-      "prim": "concat",
+      "prim": "get",
       "args": [
-        "/payments/",
-        "$payment_id"
+        "$first_item",
+        "requested_quantity"
+      ],
+      "into": "qty"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$payment_record_path_rows"
+      ],
+      "into": "payment_record_path_row"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$payment_record_path_row",
+        "record_path"
       ],
       "into": "payment_record_path"
+    },
+    {
+      "prim": "count",
+      "args": [
+        "$inventory_price_rows"
+      ],
+      "into": "inv_count"
+    },
+    {
+      "prim": "first",
+      "args": [
+        "$inventory_price_rows"
+      ],
+      "into": "inv_price"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$inv_price",
+        "available_today_quantity"
+      ],
+      "into": "available_qty"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$inv_price",
+        "price_cents"
+      ],
+      "into": "price_cents"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$qty"
+      ],
+      "into": "qty_num"
+    },
+    {
+      "prim": "to_number",
+      "args": [
+        "$available_qty"
+      ],
+      "into": "avail_num"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "eq",
-          "lhs": "$identity_kind",
-          "rhs": "guest",
+          "op": "ne",
+          "lhs": "$basket_customer_id",
+          "rhs": "cust_028",
           "args": []
         },
-        "label": "security_denied"
+        "label": "deny_constraints"
+      },
+      {
+        "when": {
+          "op": "ne",
+          "lhs": "$basket_status",
+          "rhs": "open",
+          "args": []
+        },
+        "label": "deny_constraints"
       },
       {
         "when": {
           "op": "eq",
-          "lhs": "$payment_exists",
-          "rhs": 1,
+          "lhs": "$inv_count",
+          "rhs": "0",
           "args": []
         },
-        "label": "already_checked_out"
+        "label": "deny_inventory"
       },
       {
         "when": {
-          "op": "eq",
-          "lhs": "$sufficient_inventory",
-          "rhs": 0,
+          "op": "gt",
+          "lhs": "$qty_num",
+          "rhs": "$avail_num",
           "args": []
         },
-        "label": "insufficient_inventory"
+        "label": "deny_inventory"
       }
     ],
-    "default_label": "proceed"
+    "default_label": "create_payment"
   },
   "ops": [
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "UPDATE shopping_baskets SET basket_status = 'checked_out' WHERE basket_id = 'basket_035'; INSERT INTO payment_transactions (payment_id, record_path, basket_id, is_archived_basket_reference, customer_id, store_id, payment_amount_cents, payment_currency, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude) VALUES ('$payment_id', '$payment_record_path', 'basket_035', 0, '$customer_id', '$store_id', $total_amount_cents, 'USD', 'completed', datetime('now'), 'unknown', 'unknown', 0.0, 0.0);"
+        "stdin": "BEGIN; INSERT INTO payment_transactions (payment_id, record_path, basket_id, is_archived_basket_reference, customer_id, store_id, payment_amount_cents, payment_currency, payment_status, payment_created_at, payment_method_fingerprint, device_fingerprint, observed_latitude, observed_longitude) SELECT 'pay_' || :basket_id, '/proc/payments/pay_' || :basket_id || '.json', :basket_id, 0, :customer_id, :store_id, :qty * pv.price_cents, 'USD', 'completed', datetime('now'), 'disabled', 'disabled', 0.0, 0.0 FROM product_variants pv WHERE pv.product_sku = :sku; UPDATE shopping_baskets SET basket_status = 'checked_out' WHERE basket_id = :basket_id; COMMIT;"
       },
       "bind": null,
-      "guard_label": "proceed",
-      "outcome_from_exit": null
+      "guard_label": "create_payment",
+      "outcome_from_exit": {
+        "ok_outcome": "OUTCOME_OK",
+        "keyword_buckets": [],
+        "default_outcome": "OUTCOME_ERR_INTERNAL"
+      }
     }
   ],
   "answer": {
-    "security_denied": {
-      "message": "Guest checkout not allowed.",
+    "deny_constraints": {
+      "message": "Checkout denied: basket does not belong to customer or is not open.",
       "outcome": "OUTCOME_DENIED_SECURITY",
-      "refs": []
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/checkout.md",
+          "source": null
+        }
+      ]
     },
-    "already_checked_out": {
-      "message": "Basket already checked out.",
-      "outcome": "OUTCOME_NONE_CLARIFICATION",
-      "refs": []
+    "deny_inventory": {
+      "message": "Checkout denied: insufficient inventory.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/checkout.md",
+          "source": null
+        }
+      ]
     },
-    "insufficient_inventory": {
-      "message": "Insufficient inventory for some items.",
-      "outcome": "OUTCOME_NONE_CLARIFICATION",
-      "refs": []
-    },
-    "proceed": {
-      "message": "Checkout completed for basket {basket_id}. Payment ID: {payment_id}",
+    "create_payment": {
+      "message": "Checkout completed for basket {basket_id}.",
       "outcome": "OUTCOME_OK",
       "refs": [
         {

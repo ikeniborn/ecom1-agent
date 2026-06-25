@@ -1,0 +1,57 @@
+{
+  "discovery": [
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/id"
+      },
+      "bind": "identity_raw"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/security.md"
+      },
+      "bind": "security_doc"
+    },
+    {
+      "rpc": "Read",
+      "args": {
+        "path": "/docs/returns.md"
+      },
+      "bind": "returns_doc"
+    }
+  ],
+  "rowsets": [],
+  "compute": [],
+  "decision": {
+    "branches": [
+      {
+        "when": {
+          "op": "contains_any",
+          "lhs": "$identity_raw.stdout",
+          "rhs": [
+            "customer"
+          ],
+          "args": []
+        },
+        "label": "customer"
+      }
+    ],
+    "default_label": "denied"
+  },
+  "ops": [],
+  "answer": {
+    "customer": {
+      "message": "Refund request requires customer identity.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
+      "refs": []
+    },
+    "denied": {
+      "message": "Refund request denied: Only customers may request refunds.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": []
+    }
+  },
+  "custom_extract": []
+}

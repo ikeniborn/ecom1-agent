@@ -1,6 +1,49 @@
+entries:
+- agents_md_anchor: null
+  content: Always use 'get' to extract a field from a single row (result of 'first'
+    or 'get' on a list), and use 'column' only on a list of dicts.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: interpret compute step ''column'' failed because ''column'' expects
+    list[dict] but received a single dict from ''first''. Root cause: PlanIR compute
+    step used ''column'' on ''$first_row'' (a single row) instead of ''get''. Failing
+    fragment: {"prim":"column","args":["$first_row","product_sku"],...}. Rule linkage:
+    This rule prevents misuse of ''column'' vs ''get'' in compute steps.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never apply `first` or `column` directly to the result of an Exec RPC;
+    instead, first extract the rows using `rows` or `row` from the ExecResponse.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: ''interpret: compute step ''first'' failed: ''ExecResponse''
+    object is not subscriptable''. Root cause: The PlanIR applies `first` directly
+    to `$result`, which is an ExecResponse object, not a list. The `first` primitive
+    expects a sequence (list) and tries to subscript it, causing the error. Failing
+    PlanIR fragment: `{"prim":"first","args":["$result"],"into":"result_row"}`. The
+    Exec RPC returns an ExecResponse; to access rows, one must use `rows` (to get
+    a list of dicts) or `row` (to get the first row as a dict) before applying `first`
+    or `column`. Existing rule about using ''get'' after ''first'' is correct but
+    does not cover this initial extraction step.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: Unable to determine availability for the specified product in
+    Graz.
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs: []
 last_run:
-  cycles_used: 1
-  date: '2026-06-24'
+  cycles_used: 3
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t17

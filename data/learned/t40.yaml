@@ -1,6 +1,92 @@
+entries:
+- agents_md_anchor: null
+  content: When the plan's desired outcome is clarification due to a missing parameter
+    that defines the target entity, the PlanIR must include a discovery step that
+    attempts to find the entity using available data, and a decision branch that routes
+    to clarify only if discovery yields no results.
+  created: '2026-06-25'
+  deactivated_reason: Superseded by more specific rule that includes extraction of
+    results list from SearchResponse.
+  id: r001
+  reasoning: 'Error: ''interpret: attempt grounded discovery before clarifying (clarify-only
+    plan rejected while OUTCOME_OK is reachable)''. Root cause: The PlanIR was a clarify-only
+    plan with empty discovery, rowsets, and decision branches. It immediately jumped
+    to clarify without attempting to find the fraud incident from available data.
+    The interpreter expects that before concluding clarification is needed, the plan
+    should first try to discover the incident (e.g., by querying payment records with
+    relevant statuses). The new rule ensures that discovery is always attempted before
+    clarifying, aligning with the principle of grounding decisions in data.'
+  status: inactive
+  surface: ir
+- agents_md_anchor: null
+  content: 'Never pass three arguments to the `get` primitive in compute steps; `get`
+    accepts exactly two arguments (object+key or list+index). To extract a field from
+    a specific row in a list, chain two `get` calls: first get the row by index, then
+    get the field from that row.'
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: `interpret: compute step ''get'' failed: <lambda>() takes 2 positional
+    arguments but 3 were given`. The PlanIR compute step `{"prim":"get","args":["$fraud_payments_rows",0,"payment_id"]}`
+    passes three arguments (list, index, key) to a two-argument function. The correct
+    approach is to first get the row at index 0, then get the ''payment_id'' field
+    from that row. This rule prevents the invalid call and ensures proper chaining.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never use the `count` primitive on the result of an `Exec` RPC; `Exec`
+    returns an ExecResponse object, not a list. To count rows from a SQL query, use
+    a `sql` RPC which returns a rowset, or parse the ExecResponse's stdout to extract
+    rows before counting.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r003
+  reasoning: 'Error: interpret: compute step ''count'' failed: object of type ''ExecResponse''
+    has no len(). Root cause: The PlanIR''s discovery step used an `Exec` RPC to run
+    a SQL query and bound the result to `$fraud_flags`. The compute step then attempted
+    to apply `count` to `$fraud_flags`, but `Exec` returns an ExecResponse object
+    (containing stdout, stderr, etc.), not a list/rowset. The `count` primitive expects
+    a list. Failing PlanIR fragment: `{"prim":"count","args":["$fraud_flags"],"into":"fraud_count"}`.
+    Rule linkage: This violates the principle that `count` must receive a rowset;
+    the plan should use a `sql` RPC to get a rowset directly, or parse the ExecResponse''s
+    stdout to extract rows before counting.'
+  status: active
+  surface: ir
+- agents_md_anchor: '#plan-ir'
+  content: When using a Search RPC in a discovery step, always extract the 'results'
+    field from the SearchResponse object before applying count or any list operation,
+    because SearchResponse is an object, not a list. Then use the extracted list for
+    counting or iteration.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r004
+  reasoning: 'Error: ''interpret: compute step ''count'' failed: object of type ''SearchResponse''
+    has no len()''. Root cause: PlanIR discovery step uses Search RPC and binds the
+    result to ''fraud_incident_docs'', then compute step applies count directly to
+    that SearchResponse object. The count primitive requires a rowset/list, but SearchResponse
+    is an object. The failing PlanIR fragment: ''compute'':[{''prim'':''count'',''args'':[''$fraud_incident_docs''],''into'':''incident_doc_count''}].
+    Existing rule ''When the plan''s desired outcome is clarification...'' correctly
+    mandates a discovery step but does not specify how to handle the SearchResponse.
+    New rule supersedes it by providing the necessary technique to avoid this error.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: 'Clarification needed: Please specify the criteria or identifier
+    for the confirmed fraud incident, e.g., a specific payment_id, basket_id, or a
+    set of conditions such as payment_status or 3DS failure patterns.'
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs:
+  - /docs/payments/3ds.md
 last_run:
-  cycles_used: 1
-  date: '2026-06-24'
+  cycles_used: 5
+  date: '2026-06-25'
   outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t40

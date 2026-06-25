@@ -42,7 +42,9 @@ entries:
     should be omitted or placed in a separate field if the system supports it, but
     the answer itself must be a string.
   created: '2026-06-24'
-  deactivated_reason: null
+  deactivated_reason: The new rule strictly supersedes r003 and the in-session rule
+    by providing a more explicit and complete specification of the answer structure
+    for regex_match success criteria.
   id: r003
   reasoning: The verify step failed because the success_criteria regex_match on $answer
     failed. The PlanIR answer for outcome 'ok' is a dict {'message':'<COUNT:14>','outcome':'OUTCOME_OK','refs':[...]},
@@ -51,7 +53,7 @@ entries:
     is incorrect for a regex_match success_criteria. The corrective rule enforces
     that when success_criteria uses regex_match on $answer, the PlanIR answer must
     be a plain string.
-  status: active
+  status: inactive
   surface: ir
 - agents_md_anchor: null
   content: When using the 'concat' primitive in a compute step, the 'args' list must
@@ -69,9 +71,72 @@ entries:
     error.'
   status: active
   surface: ir
+- agents_md_anchor: null
+  content: When the answer message must include a computed value (e.g., a count from
+    a SQL query), use a compute step with the 'concat' primitive to construct the
+    full message string, and then set the answer to that computed variable. Do not
+    use placeholders like {count} in the message field of the answer object.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r005
+  reasoning: 'Verify failure: success_criteria regex_match on $answer failed. The
+    PlanIR answer object contained a dict with a message template ''[QTY:{count}]''
+    and a placeholder. The system does not substitute placeholders inside the message
+    field; the answer must be a plain string built via compute steps. Existing rule
+    r003 states the answer must be a plain string, but the PlanIR violated it by using
+    a dict with a template. A new rule is needed to specify the correct technique:
+    use ''concat'' to build the string from literal parts and the computed variable,
+    then set the answer to that variable. This ensures the answer is a plain string
+    and the computed value is properly included.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the success_criteria includes a regex_match on $answer, the answer
+    field in the PlanIR for that outcome must be a string (either a literal or a variable
+    reference starting with '$'), not a dict. If the answer is constructed via compute
+    steps, set the answer to the computed variable directly (e.g., '$answer_msg').
+    Do not use a dict with a 'message' key or a placeholder string like '{answer_msg}'.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r006
+  reasoning: 'verify failure: regex_match on $answer failed because answer was a dict
+    with message field, not a string. The PlanIR answer for OUTCOME_OK is {"message":"{answer_msg}"}
+    which is a dict, not a string. Existing rule r003 already states answer must be
+    a plain string, but the plan phase violated it. New rule supersedes r003 with
+    more explicit prohibition of dicts and placeholder strings.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: When the success_criteria includes a regex_match on $answer, the answer
+    value for that outcome in PlanIR must be a string (a literal or a variable reference
+    starting with '$'), not a dict. Do not include 'message', 'outcome', or 'refs'
+    keys; the answer itself is the string. If the answer is constructed via compute
+    steps, set the answer to the computed variable directly (e.g., '$answer_msg').
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r007
+  reasoning: 'verify error: regex_match on $answer failed. The PlanIR answer for OUTCOME_OK
+    is a dict {''message'': ''$answer_msg'', ''outcome'': ''OUTCOME_OK'', ''refs'':
+    []}, but the success_criteria expects $answer to be a string. Existing rules r003
+    and in-session rule already state this, but the PlanIR violated them. The new
+    rule explicitly prohibits dicts with ''message'', ''outcome'', or ''refs'' keys
+    and requires a plain string, superseding the prior rules.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_OK, got OUTCOME_NONE_CLARIFICATION
+  source: verdict
+  status: active
+  submitted_message: ''
+  submitted_outcome: OUTCOME_NONE_CLARIFICATION
+  submitted_refs: []
 last_run:
-  cycles_used: 6
-  date: '2026-06-24'
-  outcome: OUTCOME_NONE_UNSUPPORTED
+  cycles_used: 3
+  date: '2026-06-25'
+  outcome: OUTCOME_NONE_CLARIFICATION
   status: failure
 task_id: t11

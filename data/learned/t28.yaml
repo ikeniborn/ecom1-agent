@@ -1,6 +1,58 @@
+entries:
+- agents_md_anchor: null
+  content: Do not set the default_label of a security decision to denied_security
+    unless the deny_when predicate is always true. Instead, default to a label that
+    continues the verification flow (e.g., 'proceed' or 'verify').
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r001
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The PlanIR had a single decision
+    branch matching identity.kind==guest leading to denied_security, and default_label
+    also denied_security. Since identity.kind was ''customer'', the deny_when predicate
+    did not match, but the default still denied. The rule ensures the default is not
+    a security denial unless the predicate is always true.'
+  status: active
+  surface: ir
+- agents_md_anchor: null
+  content: Never include a decision branch that directly leads to a security-denied
+    outcome (denied_security) in the PlanIR. Instead, let the system's security constraint
+    handle denial based on the identity kind. The PlanIR should only produce outcomes
+    that are not security-denied, and the system will apply the security constraint
+    automatically.
+  created: '2026-06-25'
+  deactivated_reason: null
+  id: r002
+  reasoning: 'Error: verify: I3: outcome DENIED_SECURITY but no declared security
+    deny_when predicate holds (spurious over-refusal). The PlanIR has a decision branch
+    that checks if identity.kind == ''guest'' and outputs denied_security. However,
+    the system''s security constraint is identical and should be the sole mechanism
+    for security denial. The PlanIR pre-empting the security check causes a mismatch
+    when the predicate is false (identity not guest) but the branch still triggers?
+    Actually, the error indicates the predicate didn''t hold, meaning identity is
+    not guest, yet the PlanIR output DENIED_SECURITY. This suggests the branch condition
+    is incorrectly evaluated or the PlanIR should not have such a branch. The correct
+    approach is to omit any security-denial branch and let the system apply the security
+    constraint automatically.'
+  status: active
+  surface: ir
+- content: null
+  created: '2026-06-25'
+  id: v001
+  score: 0.0
+  score_detail:
+  - expected outcome OUTCOME_DENIED_SECURITY, got OUTCOME_NONE_UNSUPPORTED
+  source: verdict
+  status: active
+  submitted_message: 'Verification result: failed. Could not find the required records.'
+  submitted_outcome: OUTCOME_NONE_UNSUPPORTED
+  submitted_refs:
+  - /proc/baskets/basket_027.json
+  - /docs/discounts.md
+  - /docs/store-associate-exception-handbook.md
 last_run:
-  cycles_used: 0
-  date: '2026-06-24'
-  outcome: OUTCOME_DENIED_SECURITY
+  cycles_used: 3
+  date: '2026-06-25'
+  outcome: OUTCOME_NONE_UNSUPPORTED
   status: failure
 task_id: t28

@@ -3,22 +3,35 @@
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/sql",
-        "stdin": "WITH store AS (SELECT store_id, record_path FROM stores WHERE store_name = 'PowerTool Salzburg Elisabeth-Vorstadt'), employee AS (SELECT e.employee_id, e.employee_display_name, e.employee_email, e.record_path FROM employee_accounts e WHERE e.employee_display_name = 'Marcel Bergmann' AND e.store_id = (SELECT store_id FROM store)), role AS (SELECT r.role_code FROM employee_role_assignments r WHERE r.employee_id = (SELECT employee_id FROM employee)) SELECT (SELECT store_id FROM store) as store_id, (SELECT employee_id FROM employee) as employee_id, (SELECT employee_email FROM employee) as employee_email, (SELECT record_path FROM employee) as employee_record_path, (SELECT COUNT(*) FROM role WHERE role_code LIKE '%manager%') > 0 as is_manager;"
+        "path": "/bin/id"
       },
-      "bind": "query_result"
+      "bind": "_identity_raw"
+    },
+    {
+      "rpc": "Exec",
+      "args": {
+        "path": "/bin/sql",
+        "stdin": "WITH store AS (SELECT store_id FROM stores WHERE store_name = 'PowerTool Graz Lend') SELECT s.store_id, s.store_name, e.employee_id, e.employee_display_name, e.employee_email, e.record_path FROM store s, employee_accounts e WHERE e.store_id = s.store_id AND e.employee_display_name = 'Alina Heinrich';"
+      },
+      "bind": "_result_row"
     }
   ],
   "rowsets": [
     {
-      "from_": "query_result",
+      "from_": "_result_row",
       "format": "auto_delim",
-      "into": "parsed_rows",
+      "into": "_parsed_rows",
       "columns": [
         {
           "into": "store_id",
           "candidates": [
             "store_id"
+          ]
+        },
+        {
+          "into": "store_name",
+          "candidates": [
+            "store_name"
           ]
         },
         {
@@ -28,21 +41,21 @@
           ]
         },
         {
+          "into": "employee_display_name",
+          "candidates": [
+            "employee_display_name"
+          ]
+        },
+        {
           "into": "employee_email",
           "candidates": [
             "employee_email"
           ]
         },
         {
-          "into": "employee_record_path",
+          "into": "record_path",
           "candidates": [
-            "employee_record_path"
-          ]
-        },
-        {
-          "into": "is_manager",
-          "candidates": [
-            "is_manager"
+            "record_path"
           ]
         }
       ]
@@ -52,73 +65,93 @@
     {
       "prim": "first",
       "args": [
-        "$parsed_rows"
+        "$_parsed_rows"
       ],
-      "into": "first_row"
+      "into": "_manager"
     },
     {
       "prim": "get",
       "args": [
-        "$first_row",
+        "$_manager",
+        "employee_display_name"
+      ],
+      "into": "_manager_name"
+    },
+    {
+      "prim": "get",
+      "args": [
+        "$_manager",
         "employee_email"
       ],
-      "into": "employee_email"
+      "into": "_email"
     },
     {
       "prim": "get",
       "args": [
-        "$first_row",
-        "is_manager"
+        "$_manager",
+        "record_path"
       ],
-      "into": "is_manager"
+      "into": "_manager_employee_record_path"
     },
     {
-      "prim": "get",
+      "prim": "count",
       "args": [
-        "$first_row",
-        "employee_record_path"
+        "$_parsed_rows"
       ],
-      "into": "employee_record_path"
+      "into": "_row_count"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "and",
-          "lhs": null,
-          "rhs": null,
-          "args": [
-            {
-              "op": "nonempty",
-              "lhs": "$employee_email",
-              "rhs": null,
-              "args": []
-            },
-            {
-              "op": "eq",
-              "lhs": "$is_manager",
-              "rhs": "t",
-              "args": []
-            }
-          ]
+          "op": "regex_match",
+          "lhs": "$_identity_raw",
+          "rhs": "guest",
+          "args": []
         },
-        "label": "manager_found"
+        "label": "deny_security"
+      },
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$_row_count",
+          "rhs": 0,
+          "args": []
+        },
+        "label": "not_found"
       }
     ],
-    "default_label": "not_found"
+    "default_label": "ok"
   },
   "ops": [],
   "answer": {
-    "manager_found": {
-      "message": "Marcel Bergmann is the manager of PowerTool Salzburg Elisabeth-Vorstadt. Their email is {employee_email}.",
-      "outcome": "OUTCOME_OK",
-      "refs": []
+    "deny_security": {
+      "message": "Access denied: guests cannot view employee personal data.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        }
+      ]
     },
     "not_found": {
-      "message": "Could not confirm that Marcel Bergmann is the manager of PowerTool Salzburg Elisabeth-Vorstadt.",
-      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "message": "Could not find the manager Alina Heinrich for PowerTool Graz Lend.",
+      "outcome": "OUTCOME_NONE_CLARIFICATION",
       "refs": []
+    },
+    "ok": {
+      "message": "Alina Heinrich is the manager of PowerTool Graz Lend. Their email is {email}.",
+      "outcome": "OUTCOME_OK",
+      "refs": [
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$_manager_employee_record_path"
+        }
+      ]
     }
   },
   "custom_extract": []

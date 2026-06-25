@@ -1,28 +1,57 @@
 {
-  "objective": "Complete checkout for basket basket_035 for customer cust_011.",
+  "objective": "Process checkout for basket_008 for customer cust_028 with identity verification disabled.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "customer_id": "cust_011",
-    "basket_id": "basket_035"
+    "customer_id": "provided in instruction as cust_028",
+    "basket_id": "provided in instruction as basket_008"
   },
   "outcome_space": [
     "OUTCOME_OK",
-    "OUTCOME_DENIED_SECURITY",
-    "OUTCOME_NONE_CLARIFICATION"
+    "OUTCOME_DENIED_SECURITY"
   ],
-  "constraints": [],
+  "constraints": [
+    {
+      "anchor": "#checkout-process",
+      "rule": "Checkout must be performed for a valid basket belonging to the customer.",
+      "security": false,
+      "deny_when": {
+        "op": "or",
+        "lhs": null,
+        "rhs": null,
+        "args": [
+          {
+            "op": "ne",
+            "lhs": "$basket.customer_id",
+            "rhs": "$params.customer_id",
+            "args": []
+          },
+          {
+            "op": "ne",
+            "lhs": "$basket.basket_status",
+            "rhs": "open",
+            "args": []
+          }
+        ]
+      },
+      "requires_protected_action": false,
+      "protected_action": false,
+      "unsupported_when": null,
+      "clarify_when": null,
+      "refs": []
+    }
+  ],
   "success_criteria": {
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$payment_id",
+        "lhs": "$payment.payment_id",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "Checkout completed for basket {basket_id}. Payment ID: {payment_id}",
+    "msg_skeleton": "Checkout completed for basket {basket_id}.",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -37,7 +66,7 @@
       {
         "kind": "record_path",
         "path": null,
-        "source": "$payment_record_path"
+        "source": "$payment.record_path"
       }
     ]
   }

@@ -4,7 +4,7 @@
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "WITH sku AS (SELECT product_sku, record_path FROM product_variants WHERE brand='Metabo' AND product_name LIKE '%Brushless BS 1OW-IK5%' LIMIT 1) SELECT sku.product_sku AS sku, sku.record_path AS record_path, MAX(CASE WHEN pv.property_key='voltage' AND pv.property_value_text='12 V' THEN 1 ELSE 0 END) AS has_voltage, MAX(CASE WHEN pv.property_key='battery platform' AND pv.property_value_text='12v-system' THEN 1 ELSE 0 END) AS has_battery_12v, MAX(CASE WHEN pv.property_key='kit contents' AND pv.property_value_text='starter kit' THEN 1 ELSE 0 END) AS has_kit_contents, MAX(CASE WHEN pv.property_key='battery platform' AND pv.property_value_text='18v-system' THEN 1 ELSE 0 END) AS has_battery_18v FROM sku LEFT JOIN product_variant_properties pv ON pv.product_sku = sku.product_sku GROUP BY sku.product_sku, sku.record_path;"
+        "stdin": "SELECT pv.product_sku, pv.record_path, pvp.property_value_text AS cleaner_type_value FROM product_variants pv LEFT JOIN product_variant_properties pvp ON pv.product_sku = pvp.product_sku AND pvp.property_key='cleaner type' WHERE pv.brand='Mellerud' AND pv.series='Bio MEL 233-MOB' AND pv.model='Cleaning Liquid' LIMIT 1;"
       },
       "bind": "product_raw"
     }
@@ -16,9 +16,9 @@
       "into": "product_rows",
       "columns": [
         {
-          "into": "sku",
+          "into": "product_sku",
           "candidates": [
-            "sku"
+            "product_sku"
           ]
         },
         {
@@ -28,27 +28,9 @@
           ]
         },
         {
-          "into": "has_voltage",
+          "into": "cleaner_type_value",
           "candidates": [
-            "has_voltage"
-          ]
-        },
-        {
-          "into": "has_battery_12v",
-          "candidates": [
-            "has_battery_12v"
-          ]
-        },
-        {
-          "into": "has_kit_contents",
-          "candidates": [
-            "has_kit_contents"
-          ]
-        },
-        {
-          "into": "has_battery_18v",
-          "candidates": [
-            "has_battery_18v"
+            "cleaner_type_value"
           ]
         }
       ]
@@ -66,7 +48,7 @@
       "prim": "get",
       "args": [
         "$product_row",
-        "sku"
+        "product_sku"
       ],
       "into": "product_sku"
     },
@@ -76,79 +58,50 @@
         "$product_row",
         "record_path"
       ],
-      "into": "record_path"
+      "into": "product_record_path"
     },
     {
       "prim": "get",
       "args": [
         "$product_row",
-        "has_voltage"
+        "cleaner_type_value"
       ],
-      "into": "has_voltage_str"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$product_row",
-        "has_battery_12v"
-      ],
-      "into": "has_battery_12v_str"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$product_row",
-        "has_kit_contents"
-      ],
-      "into": "has_kit_contents_str"
-    },
-    {
-      "prim": "get",
-      "args": [
-        "$product_row",
-        "has_battery_18v"
-      ],
-      "into": "has_battery_18v_str"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$has_voltage_str"
-      ],
-      "into": "voltage_ok"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$has_battery_12v_str"
-      ],
-      "into": "battery_12v_ok"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$has_kit_contents_str"
-      ],
-      "into": "kit_ok"
-    },
-    {
-      "prim": "to_number",
-      "args": [
-        "$has_battery_18v_str"
-      ],
-      "into": "battery_18v_ok"
+      "into": "cleaner_type_value"
     }
   ],
   "decision": {
     "branches": [
       {
         "when": {
-          "op": "isnull",
-          "lhs": "$product_sku",
+          "op": "and",
+          "lhs": null,
           "rhs": null,
-          "args": []
+          "args": [
+            {
+              "op": "nonempty",
+              "lhs": "$product_sku",
+              "rhs": null,
+              "args": []
+            },
+            {
+              "op": "contains_any",
+              "lhs": "$cleaner_type_value",
+              "rhs": [
+                "multi surface cleaner"
+              ],
+              "args": []
+            },
+            {
+              "op": "contains_any",
+              "lhs": "$cleaner_type_value",
+              "rhs": [
+                "floor cleaner"
+              ],
+              "args": []
+            }
+          ]
         },
-        "label": "product_not_found"
+        "label": "both_present"
       },
       {
         "when": {
@@ -157,56 +110,68 @@
           "rhs": null,
           "args": [
             {
-              "op": "eq",
-              "lhs": "$voltage_ok",
-              "rhs": 1,
+              "op": "nonempty",
+              "lhs": "$product_sku",
+              "rhs": null,
               "args": []
             },
             {
-              "op": "eq",
-              "lhs": "$battery_12v_ok",
-              "rhs": 1,
-              "args": []
-            },
-            {
-              "op": "eq",
-              "lhs": "$kit_ok",
-              "rhs": 1,
-              "args": []
-            },
-            {
-              "op": "eq",
-              "lhs": "$battery_18v_ok",
-              "rhs": 1,
-              "args": []
+              "op": "not",
+              "lhs": null,
+              "rhs": null,
+              "args": [
+                {
+                  "op": "and",
+                  "lhs": null,
+                  "rhs": null,
+                  "args": [
+                    {
+                      "op": "contains_any",
+                      "lhs": "$cleaner_type_value",
+                      "rhs": [
+                        "multi surface cleaner"
+                      ],
+                      "args": []
+                    },
+                    {
+                      "op": "contains_any",
+                      "lhs": "$cleaner_type_value",
+                      "rhs": [
+                        "floor cleaner"
+                      ],
+                      "args": []
+                    }
+                  ]
+                }
+              ]
             }
           ]
         },
-        "label": "all_ok"
+        "label": "not_both"
       }
     ],
-    "default_label": "properties_missing"
+    "default_label": "not_found"
   },
   "ops": [],
   "answer": {
-    "product_not_found": {
-      "message": "Product not found.",
-      "outcome": "OUTCOME_NONE_UNSUPPORTED",
-      "refs": []
-    },
-    "all_ok": {
-      "message": "Yes, {sku} has all base properties and 18v-system.",
+    "both_present": {
+      "message": "Checked product {product_sku}: claim that it has both cleaner types is confirmed. Answer: YES",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
           "kind": "record_path",
           "path": null,
-          "source": "$record_path"
+          "source": "$product_record_path"
         }
       ]
     },
-    "properties_missing": {
-      "message": "No, {sku} does not have the claimed properties.",
+    "not_both": {
+      "message": "Checked product {product_sku}: claim that it has both cleaner types is absent. Answer: NO",
+      "outcome": "OUTCOME_NONE_UNSUPPORTED",
+      "refs": []
+    },
+    "not_found": {
+      "message": "Product not found for Mellerud Bio MEL 233-MOB Cleaning Liquid.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": []
     }

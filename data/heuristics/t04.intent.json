@@ -1,11 +1,9 @@
 {
-  "objective": "Determine whether a specific Sealant product from Den Braven, in the Den Braven Professional DB 1FQ-XIS Sealant line, with sealant type silicone sealant and color family Clear, exists in the product catalogue.",
+  "objective": "Determine whether the specified product variant (Workshop Saw and Cutter from Scheppach, Scheppach Professional BTS 17O-1W7, mitre saw, 230V, 2200W) is carried in the product catalog.",
   "desired_outcome": "OUTCOME_OK",
   "params": {
-    "brand": "Den Braven",
-    "series": "Den Braven Professional DB 1FQ-XIS Sealant",
-    "sealant_type": "silicone sealant",
-    "color_family": "Clear"
+    "product_family_id": "lookup from product_families WHERE brand = 'Scheppach' AND product_family_name = 'Scheppach Professional BTS 17O-1W7 Workshop Saw and Cutter'",
+    "product_sku": "lookup from product_variants WHERE product_family_id = $product_family_id AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'machine_type' AND property_value_text = 'mitre saw') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'voltage' AND property_value_text = '230 V') AND EXISTS (SELECT 1 FROM product_variant_properties WHERE product_sku = product_variants.product_sku AND property_key = 'power' AND property_value_text = '2200 W')"
   },
   "outcome_space": [
     "OUTCOME_OK",
@@ -16,14 +14,14 @@
     "OUTCOME_OK": [
       {
         "op": "nonempty",
-        "lhs": "$found_record_path",
+        "lhs": "$product_sku",
         "rhs": null,
         "args": []
       }
     ]
   },
   "answer_shape": {
-    "msg_skeleton": "The product {brand} {series} with sealant type {sealant_type} and color family {color_family} is {status} in the catalogue.",
+    "msg_skeleton": "We {carry_status} the {product_name}.",
     "kind": "",
     "columns": [],
     "rows_from": ""
@@ -31,9 +29,14 @@
   "required_refs": {
     "OUTCOME_OK": [
       {
+        "kind": "policy_doc",
+        "path": "/docs/checkout.md",
+        "source": null
+      },
+      {
         "kind": "record_path",
         "path": null,
-        "source": "$found_record_path"
+        "source": "$product_variant.record_path"
       }
     ]
   }

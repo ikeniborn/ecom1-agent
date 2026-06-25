@@ -1,90 +1,40 @@
 {
   "discovery": [
     {
-      "rpc": "Read",
+      "rpc": "Exec",
       "args": {
-        "path": "/docs/payments/3ds.md"
+        "path": "/bin/id"
       },
-      "bind": "policy_3ds"
-    },
-    {
-      "rpc": "Read",
-      "args": {
-        "path": "/docs/security.md"
-      },
-      "bind": "policy_security"
+      "bind": "identity_raw"
     },
     {
       "rpc": "Exec",
       "args": {
         "path": "/bin/sql",
-        "stdin": "SELECT * FROM payment_transactions WHERE payment_id = 'pay_079';"
+        "stdin": "SELECT payment_status, three_ds_status, three_ds_attempts, three_ds_max_attempts, record_path FROM payment_transactions WHERE payment_id = 'pay_041';"
       },
       "bind": "payment_raw"
-    },
-    {
-      "rpc": "Exec",
-      "args": {
-        "path": "/bin/sql",
-        "stdin": "SELECT * FROM shopping_baskets WHERE basket_id = 'basket_279';"
-      },
-      "bind": "basket_raw"
     }
   ],
   "rowsets": [
+    {
+      "from_": "identity_raw",
+      "format": "auto_delim",
+      "into": "identity_rows",
+      "columns": [
+        {
+          "into": "kind",
+          "candidates": [
+            "kind"
+          ]
+        }
+      ]
+    },
     {
       "from_": "payment_raw",
       "format": "auto_delim",
       "into": "payment_rows",
       "columns": [
-        {
-          "into": "payment_id",
-          "candidates": [
-            "payment_id"
-          ]
-        },
-        {
-          "into": "record_path",
-          "candidates": [
-            "record_path"
-          ]
-        },
-        {
-          "into": "basket_id",
-          "candidates": [
-            "basket_id"
-          ]
-        },
-        {
-          "into": "is_archived_basket_reference",
-          "candidates": [
-            "is_archived_basket_reference"
-          ]
-        },
-        {
-          "into": "customer_id",
-          "candidates": [
-            "customer_id"
-          ]
-        },
-        {
-          "into": "store_id",
-          "candidates": [
-            "store_id"
-          ]
-        },
-        {
-          "into": "payment_amount_cents",
-          "candidates": [
-            "payment_amount_cents"
-          ]
-        },
-        {
-          "into": "payment_currency",
-          "candidates": [
-            "payment_currency"
-          ]
-        },
         {
           "into": "payment_status",
           "candidates": [
@@ -92,45 +42,9 @@
           ]
         },
         {
-          "into": "payment_created_at",
-          "candidates": [
-            "payment_created_at"
-          ]
-        },
-        {
-          "into": "payment_method_fingerprint",
-          "candidates": [
-            "payment_method_fingerprint"
-          ]
-        },
-        {
-          "into": "device_fingerprint",
-          "candidates": [
-            "device_fingerprint"
-          ]
-        },
-        {
-          "into": "observed_latitude",
-          "candidates": [
-            "observed_latitude"
-          ]
-        },
-        {
-          "into": "observed_longitude",
-          "candidates": [
-            "observed_longitude"
-          ]
-        },
-        {
           "into": "three_ds_status",
           "candidates": [
             "three_ds_status"
-          ]
-        },
-        {
-          "into": "three_ds_failure_reason",
-          "candidates": [
-            "three_ds_failure_reason"
           ]
         },
         {
@@ -144,66 +58,11 @@
           "candidates": [
             "three_ds_max_attempts"
           ]
-        }
-      ]
-    },
-    {
-      "from_": "basket_raw",
-      "format": "auto_delim",
-      "into": "basket_rows",
-      "columns": [
-        {
-          "into": "basket_id",
-          "candidates": [
-            "basket_id"
-          ]
         },
         {
           "into": "record_path",
           "candidates": [
             "record_path"
-          ]
-        },
-        {
-          "into": "customer_id",
-          "candidates": [
-            "customer_id"
-          ]
-        },
-        {
-          "into": "store_id",
-          "candidates": [
-            "store_id"
-          ]
-        },
-        {
-          "into": "basket_status",
-          "candidates": [
-            "basket_status"
-          ]
-        },
-        {
-          "into": "basket_created_at",
-          "candidates": [
-            "basket_created_at"
-          ]
-        },
-        {
-          "into": "discount_percent",
-          "candidates": [
-            "discount_percent"
-          ]
-        },
-        {
-          "into": "discount_reason_code",
-          "candidates": [
-            "discount_reason_code"
-          ]
-        },
-        {
-          "into": "discount_issuer_employee_id",
-          "candidates": [
-            "discount_issuer_employee_id"
           ]
         }
       ]
@@ -211,22 +70,31 @@
   ],
   "compute": [
     {
-      "prim": "first",
+      "prim": "to_number",
       "args": [
-        "$payment_rows"
+        "$payment_rows.0.three_ds_attempts"
       ],
-      "into": "payment"
+      "into": "three_ds_attempts_num"
     },
     {
-      "prim": "first",
+      "prim": "to_number",
       "args": [
-        "$basket_rows"
+        "$payment_rows.0.three_ds_max_attempts"
       ],
-      "into": "basket"
+      "into": "three_ds_max_attempts_num"
     }
   ],
   "decision": {
     "branches": [
+      {
+        "when": {
+          "op": "eq",
+          "lhs": "$identity_rows.0.kind",
+          "rhs": "guest",
+          "args": []
+        },
+        "label": "denied_security"
+      },
       {
         "when": {
           "op": "and",
@@ -234,74 +102,39 @@
           "rhs": null,
           "args": [
             {
-              "op": "nonempty",
-              "lhs": "$payment.three_ds_status",
-              "rhs": null,
+              "op": "eq",
+              "lhs": "$payment_rows.0.payment_status",
+              "rhs": "pending",
               "args": []
             },
             {
-              "op": "in_set",
-              "lhs": "$payment.three_ds_status",
-              "rhs": [
-                "authenticated",
-                "successful"
-              ],
+              "op": "eq",
+              "lhs": "$payment_rows.0.three_ds_status",
+              "rhs": "failed",
+              "args": []
+            },
+            {
+              "op": "lt",
+              "lhs": "$three_ds_attempts_num",
+              "rhs": "$three_ds_max_attempts_num",
               "args": []
             }
           ]
         },
-        "label": "denied_security"
-      },
-      {
-        "when": {
-          "op": "or",
-          "lhs": null,
-          "rhs": null,
-          "args": [
-            {
-              "op": "ne",
-              "lhs": "$basket.basket_status",
-              "rhs": "checked_out",
-              "args": []
-            },
-            {
-              "op": "ne",
-              "lhs": "$payment.payment_status",
-              "rhs": "requires_3ds",
-              "args": []
-            },
-            {
-              "op": "and",
-              "lhs": null,
-              "rhs": null,
-              "args": [
-                {
-                  "op": "nonempty",
-                  "lhs": "$payment.three_ds_status",
-                  "rhs": null,
-                  "args": []
-                },
-                {
-                  "op": "ne",
-                  "lhs": "$payment.three_ds_status",
-                  "rhs": "failed",
-                  "args": []
-                }
-              ]
-            }
-          ]
-        },
-        "label": "unsupported"
+        "label": "ok"
       }
     ],
-    "default_label": "ok"
+    "default_label": "unsupported"
   },
   "ops": [
     {
       "rpc": "Exec",
       "args": {
-        "path": "/bin/sql",
-        "stdin": "UPDATE payment_transactions SET three_ds_status = 'recovered' WHERE payment_id = 'pay_079';"
+        "path": "/bin/payments",
+        "args": [
+          "recover-3ds",
+          "pay_041"
+        ]
       },
       "bind": null,
       "guard_label": "ok",
@@ -309,8 +142,24 @@
     }
   ],
   "answer": {
+    "denied_security": {
+      "message": "Guest not permitted to modify payment.",
+      "outcome": "OUTCOME_DENIED_SECURITY",
+      "refs": [
+        {
+          "kind": "policy_doc",
+          "path": "/docs/security.md",
+          "source": null
+        },
+        {
+          "kind": "record_path",
+          "path": null,
+          "source": "$payment_rows.0.record_path"
+        }
+      ]
+    },
     "ok": {
-      "message": "Recovered 3DS flow for payment {payment_id}.",
+      "message": "3DS flow recovered for payment pay_041.",
       "outcome": "OUTCOME_OK",
       "refs": [
         {
@@ -321,28 +170,17 @@
         {
           "kind": "record_path",
           "path": null,
-          "source": "$payment.record_path"
+          "source": "$payment_rows.0.record_path"
         }
       ]
     },
     "unsupported": {
-      "message": "3DS recovery not eligible for payment {payment_id}.",
+      "message": "3DS recovery not eligible.",
       "outcome": "OUTCOME_NONE_UNSUPPORTED",
       "refs": [
         {
           "kind": "policy_doc",
           "path": "/docs/payments/3ds.md",
-          "source": null
-        }
-      ]
-    },
-    "denied_security": {
-      "message": "Cannot recover 3DS flow: would bypass payment safety.",
-      "outcome": "OUTCOME_DENIED_SECURITY",
-      "refs": [
-        {
-          "kind": "policy_doc",
-          "path": "/docs/security.md",
           "source": null
         }
       ]
